@@ -1,0 +1,30 @@
+# Dependências
+node_modules/
+.next/
+
+# Ambiente
+.env*
+!.env.example
+
+# Prisma
+/prisma/migrations
+/prisma/*.db
+
+# IDE
+.vscode/
+.idea/
+
+# Sistema
+.DS_Store
+*.log
+
+# Build
+dist/
+out/
+
+# Testes
+coverage/
+
+# Outros
+*.swp
+*.swo

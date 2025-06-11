@@ -1,0 +1,27 @@
+datasource db {
+  provider = "postgresql"
+  url      = "postgresql://postgres:root@localhost:5432/controle_de_carga"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model ControleCarga {
+  id          String      @id @default(uuid())
+  dataCriacao DateTime    @default(now())
+  motorista   String
+  responsavel String
+  finalizado  Boolean     @default(false)
+  notas       NotaFiscal[]
+}
+
+model NotaFiscal {
+  id          String   @id @default(uuid())
+  dataCriacao DateTime @default(now())
+  codigo      String
+  numeroNota  String
+  valor       Float
+  controleId  String?
+  controle    ControleCarga? @relation(fields: [controleId], references: [id])
+}
