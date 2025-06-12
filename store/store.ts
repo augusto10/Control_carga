@@ -50,7 +50,8 @@ export const useStore = create<StoreState>((set) => ({
 
   addNota: async (nota) => {
     try {
-      const response = await fetch('/api/notas', {
+      console.log('Dados sendo enviados:', nota);
+      const response = await fetch('/api/addNota', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -58,8 +59,11 @@ export const useStore = create<StoreState>((set) => ({
         body: JSON.stringify(nota),
       });
       
+      console.log('Status da resposta:', response.status);
       if (!response.ok) {
-        throw new Error('Erro ao salvar nota');
+        const errorData = await response.text();
+        console.error('Detalhes do erro:', errorData);
+        throw new Error(`Erro ao salvar nota: ${response.status} - ${errorData}`);
       }
       
       const newNota = await response.json();
