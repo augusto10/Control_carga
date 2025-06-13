@@ -9,7 +9,7 @@ export default async function handler(
 ) {
   if (req.method === 'POST') {
     try {
-      const { numero } = req.body;
+      const { codigo, numeroNota, valor } = req.body;
       
       // Lógica para adicionar nota
       const controle = await prisma.controleCarga.findFirst({
@@ -23,14 +23,16 @@ export default async function handler(
 
       const newNota = await prisma.notaFiscal.create({
         data: {
-          numero,
+          codigo,
+          numeroNota,
+          valor,
           controleId: controle.id
         }
       });
 
       res.status(200).json(newNota);
-    } catch (error) {
-      res.status(500).json({ error: error.message });
+    } catch (error: any) {
+      res.status(500).json({ error: { message: error.message, statusCode: 500 } });
     }
   } else {
     res.setHeader('Allow', ['POST']);

@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import useStore from '../store/store';
+import { useStore } from '../store/store';
 import { 
   Container,
   Typography,
@@ -75,7 +75,7 @@ const ListarControlesPage = () => {
 
       addText(`Motorista: ${controle.motorista}`);
       addText(`Responsável: ${controle.responsavel}`);
-      addText(`Data: ${format(new Date(controle.dataCriacao), 'dd/MM/yyyy HH:mm', { locale: ptBR })}`);
+      addText(`Data: ${format(new Date(controle.dataCriacao), 'dd/MM/yyyy HH:mm')}`);
       
       // Lista de notas fiscais
       yPosition -= 20;
@@ -153,7 +153,7 @@ const ListarControlesPage = () => {
                   <TableCell>{controle.motorista}</TableCell>
                   <TableCell>{controle.responsavel}</TableCell>
                   <TableCell>
-                    {format(new Date(controle.dataCriacao), 'dd/MM/yyyy HH:mm', { locale: ptBR })}
+                    {format(new Date(controle.dataCriacao), 'dd/MM/yyyy HH:mm')}
                   </TableCell>
                   <TableCell>
                     {controle.notas.length > 0 ? (
