@@ -7,11 +7,21 @@ generator client {
   provider = "prisma-client-js"
 }
 
+enum Transportadora {
+  ACERT
+  EXPRESSO_GOIAS
+}
+
 model ControleCarga {
   id          String      @id @default(uuid())
   dataCriacao DateTime    @default(now())
   motorista   String
+  cpfMotorista String
   responsavel String
+  transportadora Transportadora @default(ACERT)
+  numeroManifesto String
+  qtdPallets Int
+  observacao String?
   finalizado  Boolean     @default(false)
   notas       NotaFiscal[]
 }
