@@ -1,7 +1,17 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Transportadora } from '@prisma/client';
 
 const prisma = new PrismaClient();
+
+interface CreateControleRequest {
+  motorista: string;
+  cpfMotorista: string;
+  responsavel: string;
+  transportadora?: Transportadora;
+  numeroManifesto: string;
+  qtdPallets: number;
+  observacao?: string;
+}
 
 export default async function handler(
   req: NextApiRequest,
@@ -9,18 +19,50 @@ export default async function handler(
 ) {
   if (req.method === 'POST') {
     try {
-      const { motorista, responsavel } = req.body;
+      const {
+        motorista,
+        cpfMotorista,
+        responsavel,
+        transportadora = Transportadora.ACERT,
+        numeroManifesto,
+        qtdPallets,
+        observacao
+      } = req.body as CreateControleRequest;
       
+      // Validação dos campos obrigatórios
+      if (!motorista || !cpfMotorista || !responsavel || !numeroManifesto || qtdPallets === undefined) {
+        return res.status(400).json({ 
+          error: 'Campos obrigatórios não fornecidos',
+          requiredFields: ['motorista', 'cpfMotorista', 'responsavel', 'numeroManifesto', 'qtdPallets']
+        });
+      }
+
       const newControle = await prisma.controleCarga.create({
-        data: { motorista, responsavel }
+        data: {
+          motorista,
+          cpfMotorista,
+          responsavel,
+          transportadora,
+          numeroManifesto,
+          qtdPallets: Number(qtdPallets),
+          observacao: observacao || null
+        }
       });
 
-      res.status(200).json(newControle);
-    } catch (error) {
-      res.status(500).json({ error: error.message });
+      return res.status(201).json(newControle);
+    } catch (error: unknown) {
+      console.error('Erro ao criar controle de carga:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      return res.status(500).json({ 
+        error: 'Erro interno do servidor',
+        message: errorMessage
+      });
     }
   } else {
     res.setHeader('Allow', ['POST']);
-    res.status(405).end(`Method ${req.method} Not Allowed`);
+    return res.status(405).json({ 
+      error: `Método ${req.method} não permitido`,
+      allowed: ['POST']
+    });
   }
 }

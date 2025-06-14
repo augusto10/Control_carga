@@ -94,22 +94,50 @@ export const useStore = create<StoreState>((set) => ({
   },
 
   criarControle: async (controle) => {
-    const response = await fetch('/api/controles', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(controle),
-    });
-    
-    if (!response.ok) {
-      throw new Error('Erro ao criar controle');
+    try {
+      console.log('Enviando requisição para criar controle:', controle);
+      
+      const response = await fetch('/api/controles', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(controle),
+      });
+      
+      const responseData = await response.json().catch(() => ({}));
+      
+      if (!response.ok) {
+        console.error('Erro na resposta da API:', response.status, responseData);
+        const error = new Error(responseData.error || 'Erro ao criar controle');
+        (error as any).response = { data: responseData };
+        throw error;
+      }
+      
+      console.log('Controle criado com sucesso:', responseData);
+      
+      set((state) => ({
+        controles: [...state.controles, { ...responseData, notas: [] }],
+        status: 'success'
+      }));
+      
+      return { ...responseData, notas: [] };
+    } catch (error: any) {
+      console.error('Erro ao criar controle:', error);
+      set((state) => ({
+        ...state,
+        status: 'error'
+      }));
+      
+      // Se for um erro de validação, propagar os detalhes
+      if (error.response?.data) {
+        const validationError = new Error(error.response.data.error || 'Erro de validação');
+        (validationError as any).response = error.response;
+        throw validationError;
+      }
+      
+      throw error;
     }
-    
-    const newControle = await response.json();
-    
-    set((state) => ({ controles: [...state.controles, { ...newControle, notas: [] }] }));
-    return { ...newControle, notas: [] };
   },
 
   vincularNotas: async (controleId, notasIds) => {
