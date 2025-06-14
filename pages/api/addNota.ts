@@ -1,7 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import prisma from '../../lib/prisma';
 
 export default async function handler(
   req: NextApiRequest,
@@ -11,22 +9,17 @@ export default async function handler(
     try {
       const { codigo, numeroNota, valor } = req.body;
       
-      // Lógica para adicionar nota
-      const controle = await prisma.controleCarga.findFirst({
-        where: { dataCriacao: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } },
-        orderBy: { dataCriacao: 'desc' }
-      });
-
-      if (!controle) {
-        throw new Error('Nenhum controle encontrado nas últimas 24 horas');
+      if (!codigo || !numeroNota) {
+        throw new Error('Campos obrigatórios ausentes');
       }
+      const numericValor = typeof valor === 'number' ? valor : parseFloat(valor) || 0;
 
       const newNota = await prisma.notaFiscal.create({
         data: {
           codigo,
           numeroNota,
-          valor,
-          controleId: controle.id
+          valor: numericValor,
+          controleId: null
         }
       });
 

@@ -18,19 +18,20 @@ import { useRouter } from 'next/router';
 import { useSnackbar } from 'notistack';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
+import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 
 interface Controle {
   id: string;
   motorista: string;
   responsavel: string;
+  numeroManifesto: string;
   dataCriacao: Date;
-  notas: { id: string; numeroNota: string; codigo: string }[];
+  notas: { id: string; numeroNota: string; codigo: string; valor: number }[];
   finalizado: boolean;
 }
 
 const ListarControlesPage = () => {
-  const { controles, fetchControles } = useStore();
+  const { controles, fetchControles, finalizarControle } = useStore();
   const router = useRouter();
   const { enqueueSnackbar } = useSnackbar();
 
@@ -38,87 +39,62 @@ const ListarControlesPage = () => {
     fetchControles();
   }, [fetchControles]);
 
+  const gerarPdf = async (controle: Controle) => {
+    // Load template PDF from public folder
+    const existingBytes = await fetch('/templates/modelo-romaneio.pdf').then(res => res.arrayBuffer());
+    const doc = await PDFDocument.load(existingBytes);
+    const page = doc.getPage(0);
+    const { width, height } = page.getSize();
+
+    const font = await doc.embedFont(StandardFonts.Helvetica);
+
+    // Posição logo abaixo do título (ajuste fino pode ser feito depois)
+    // Posição cerca de 20 linhas (~280px) abaixo do título
+    const camposY = height - 355;
+    page.drawText(`Manifesto Nº: ${controle.numeroManifesto}`, { x: 50, y: camposY, size: 12, font });
+    page.drawText(`Motorista: ${controle.motorista}`, { x: 50, y: camposY - 18, size: 12, font });
+    page.drawText(`Responsável: ${controle.responsavel}`, { x: 50, y: camposY - 36, size: 12, font });
+    page.drawText(`Data: ${format(new Date(controle.dataCriacao), 'dd/MM/yyyy HH:mm')}`, { x: 50, y: camposY - 54, size: 12, font });
+    // Table header
+
+    // --- Assinaturas ---
+    // Linhas para assinatura no rodapé
+    const assinaturaY = 60;
+    page.drawLine({ start: { x: 80, y: assinaturaY }, end: { x: 250, y: assinaturaY }, thickness: 1, color: rgb(0,0,0) });
+    page.drawLine({ start: { x: width/2 + 20, y: assinaturaY }, end: { x: width/2 + 190, y: assinaturaY }, thickness: 1, color: rgb(0,0,0) });
+    // Nomes abaixo das linhas
+    page.drawText(`Motorista: ${controle.motorista}`, { x: 80, y: assinaturaY - 15, size: 10, font });
+    page.drawText(`Responsável: ${controle.responsavel}`, { x: width/2 + 20, y: assinaturaY - 15, size: 10, font });
+    const startY = height - 120;
+    page.drawText('Cód', { x: 50, y: startY, size: 10, font });
+    page.drawText('Número NF', { x: 100, y: startY, size: 10, font });
+    page.drawText('Valor', { x: 250, y: startY, size: 10, font });
+
+    let y = startY - 15;
+    controle.notas.forEach((nota, idx) => {
+      page.drawText(String(idx + 1), { x: 50, y, size: 10, font });
+      page.drawText(nota.numeroNota, { x: 100, y, size: 10, font });
+      page.drawText(nota.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), { x: 250, y, size: 10, font });
+      y -= 15;
+    });
+
+    // total value
+    const total = controle.notas.reduce((acc, n) => acc + n.valor, 0);
+    page.drawText(`Total: R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, { x: 250, y: y - 10, size: 10, font });
+
+    const pdfBytes = await doc.save();
+    const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+    const url = URL.createObjectURL(blob);
+    window.open(url);
+  };
+
   const handleGerarPDF = async (controleId: string) => {
     try {
       const controle = controles.find(c => c.id === controleId);
       if (!controle) return;
 
-      // Criar novo documento PDF
-      const pdfDoc = await PDFDocument.create();
-      const page = pdfDoc.addPage([600, 800]);
-      const { width, height } = page.getSize();
-      const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-      const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+      await gerarPdf(controle);
 
-      // Adicionar cabeçalho
-      page.drawText('Controle de Carga', {
-        x: 50,
-        y: height - 70,
-        size: 24,
-        font: boldFont,
-        color: rgb(0, 0, 0),
-      });
-
-      // Informações do controle
-      let yPosition = height - 120;
-      
-      const addText = (text: string, isBold = false) => {
-        page.drawText(text, {
-          x: 50,
-          y: yPosition,
-          size: 12,
-          font: isBold ? boldFont : font,
-          color: rgb(0, 0, 0),
-        });
-        yPosition -= 20;
-      };
-
-      addText(`Motorista: ${controle.motorista}`);
-      addText(`Responsável: ${controle.responsavel}`);
-      addText(`Data: ${format(new Date(controle.dataCriacao), 'dd/MM/yyyy HH:mm')}`);
-      
-      // Lista de notas fiscais
-      yPosition -= 20;
-      addText('Notas Fiscais:', true);
-      
-      controle.notas.forEach(nota => {
-        addText(`- ${nota.numeroNota} (${nota.codigo})`);
-      });
-
-      // Campos para assinatura
-      yPosition -= 40;
-      addText('Assinaturas:', true);
-      yPosition -= 40;
-      
-      // Linha para assinatura do motorista
-      page.drawLine({
-        start: { x: 50, y: yPosition },
-        end: { x: 250, y: yPosition },
-        thickness: 1,
-        color: rgb(0, 0, 0),
-      });
-      addText('Motorista', false);
-      
-      // Linha para assinatura do responsável
-      yPosition -= 60;
-      page.drawLine({
-        start: { x: 50, y: yPosition },
-        end: { x: 250, y: yPosition },
-        thickness: 1,
-        color: rgb(0, 0, 0),
-      });
-      addText('Responsável', false);
-
-      // Salvar PDF
-      const pdfBytes = await pdfDoc.save();
-      
-      // Criar blob e download
-      const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = `controle-carga-${controle.id}.pdf`;
-      link.click();
-      
       enqueueSnackbar('PDF gerado com sucesso!', { variant: 'success' });
     } catch (error) {
       enqueueSnackbar('Erro ao gerar PDF', { variant: 'error' });
@@ -139,10 +115,13 @@ const ListarControlesPage = () => {
           <Table>
             <TableHead>
               <TableRow>
+                <TableCell>Manifesto</TableCell>
                 <TableCell>Motorista</TableCell>
                 <TableCell>Responsável</TableCell>
                 <TableCell>Data</TableCell>
-                <TableCell>Notas Fiscais</TableCell>
+                <TableCell>Notas</TableCell>
+                <TableCell>Qtd</TableCell>
+                <TableCell>Valor Total</TableCell>
                 <TableCell>Status</TableCell>
                 <TableCell align="right">Ações</TableCell>
               </TableRow>
@@ -150,6 +129,7 @@ const ListarControlesPage = () => {
             <TableBody>
               {(controles as Controle[]).map((controle) => (
                 <TableRow key={controle.id}>
+                  <TableCell>{controle.numeroManifesto}</TableCell>
                   <TableCell>{controle.motorista}</TableCell>
                   <TableCell>{controle.responsavel}</TableCell>
                   <TableCell>
@@ -168,20 +148,47 @@ const ListarControlesPage = () => {
                       <Chip label="Nenhuma nota" color="default" />
                     )}
                   </TableCell>
+                  <TableCell>{controle.notas.length}</TableCell>
+                  <TableCell>{controle.notas.reduce((a,n)=>a+n.valor,0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
                   <TableCell>
                     <Chip 
-                      label={controle.finalizado ? 'Finalizado' : 'Em andamento'} 
+                      label={controle.finalizado ? 'Enviado' : 'Em andamento'} 
                       color={controle.finalizado ? 'success' : 'warning'} 
                     />
                   </TableCell>
                   <TableCell align="right">
-                    <Button 
-                      variant="outlined" 
-                      onClick={() => handleGerarPDF(controle.id)}
-                      sx={{ mr: 1 }}
-                    >
-                      Gerar PDF
-                    </Button>
+                    {!controle.finalizado && (
+                      <Button 
+                        variant="outlined" 
+                        onClick={() => router.push(`/vincular-notas?id=${controle.id}`)}
+                        sx={{ mr: 1 }}
+                      >
+                        Editar
+                      </Button>
+                    )}
+                    {!controle.finalizado && (
+                      <Button 
+                        variant="contained" 
+                        size="small" 
+                        color="success" 
+                        sx={{ mr: 1 }}
+                        onClick={async () => {
+                          await finalizarControle(controle.id);
+                          enqueueSnackbar('Controle finalizado!', { variant: 'success' });
+                        }}
+                      >
+                        Finalizar
+                      </Button>
+                    )}
+                    {controle.finalizado && (
+                      <Button 
+                        variant="outlined" 
+                        size="small" 
+                        onClick={() => handleGerarPDF(controle.id)}
+                      >
+                        Gerar PDF
+                      </Button>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}

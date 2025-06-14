@@ -5,6 +5,11 @@ export default function Navbar() {
   return (
     <AppBar position="static" elevation={0}>
       <Toolbar sx={{ justifyContent: 'center', gap: 2 }}>
+        <Link href="/" passHref legacyBehavior>
+          <Button color="inherit" sx={{ fontWeight: 600 }}>
+            Início
+          </Button>
+        </Link>
         <Link href="/adicionar-notas" passHref legacyBehavior>
           <Button color="inherit" sx={{ fontWeight: 600 }}>
             Adicionar Notas

@@ -7,53 +7,50 @@ type BarcodeScannerProps = {
 
 const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan }) => {
   useEffect(() => {
+    let buffer = '';
+
     const handleKeyPress = (e: KeyboardEvent) => {
-      // Verifica se é um código de barras (tecla Enter no final)
+      // Ignora modificadores ou combinações
+      if (e.ctrlKey || e.altKey || e.metaKey) return;
+      // Captura tecla Enter --> processar
       if (e.key === 'Enter') {
-        const barcode = (e.target as HTMLInputElement)?.value;
-        if (barcode) {
+        if (buffer.length === 44) {
           try {
-            // Padrão DANFE NF-e: 44 caracteres
-            if (barcode.length === 44) {
-              const nfeData = {
-                uf: barcode.substring(0, 2),
-                emissao: barcode.substring(2, 6),
-                cnpj: barcode.substring(6, 20),
-                modelo: barcode.substring(20, 22),
-                serie: barcode.substring(22, 25),
-                numero: barcode.substring(25, 34),
-                codigo: barcode.substring(34, 43),
-                digito: barcode.substring(43, 44)
-              };
-              
-              // Formato para nosso sistema: CODIGO;NUMERO;VALOR
-              // Como o valor não vem no código, usaremos 0 por padrão
-              onScan(`${nfeData.codigo};${nfeData.numero};0`);
-            } else {
-              throw new Error('Código inválido - Não é um DANFE NF-e padrão');
-            }
+            const barcode = buffer;
+            const nfeData = {
+              uf: barcode.substring(0, 2),
+              emissao: barcode.substring(2, 6),
+              cnpj: barcode.substring(6, 20),
+              modelo: barcode.substring(20, 22),
+              serie: barcode.substring(22, 25),
+              numero: barcode.substring(25, 34),
+              codigo: barcode.substring(34, 43),
+              digito: barcode.substring(43, 44)
+            };
+            
+            // Formato para nosso sistema: CODIGO;NUMERO;VALOR
+            // Como o valor não vem no código, usaremos 0 por padrão
+            onScan(`${nfeData.codigo};${nfeData.numero};0`);
           } catch (error) {
             console.error('Erro ao processar código de barras:', error);
           }
-          // Limpa o input após a leitura
-          (e.target as HTMLInputElement).value = '';
+        }
+        buffer = '';
+        return;
+      }
+      // Se for caractere imprimível único, adicionar ao buffer
+      if (e.key.length === 1) {
+        buffer += e.key;
+        // Mantém apenas os últimos 44 caracteres
+        if (buffer.length > 44) {
+          buffer = buffer.slice(-44);
         }
       }
     };
 
-    // Adiciona um input invisível para capturar os dados do leitor
-    const input = document.createElement('input');
-    input.style.position = 'fixed';
-    input.style.opacity = '0';
-    input.style.pointerEvents = 'none';
-    document.body.appendChild(input);
-    input.focus();
-    
     window.addEventListener('keypress', handleKeyPress);
-    
     return () => {
       window.removeEventListener('keypress', handleKeyPress);
-      document.body.removeChild(input);
     };
   }, [onScan]);
 

@@ -14,7 +14,12 @@ type ControleCarga = {
   id: string;
   dataCriacao: Date;
   motorista: string;
+  cpfMotorista: string;
   responsavel: string;
+  transportadora: 'ACERT' | 'EXPRESSO_GOIAS';
+  numeroManifesto: string;
+  qtdPallets: number;
+  observacao?: string;
   finalizado: boolean;
   notas: NotaFiscal[];
 };
@@ -23,12 +28,13 @@ interface StoreState {
   notas: NotaFiscal[];
   controles: ControleCarga[];
   status: 'success' | 'error' | null;
-  fetchNotas: () => Promise<void>;
+  fetchNotas: (start?: string, end?: string) => Promise<void>;
   fetchControles: () => Promise<void>;
   addNota: (nota: Omit<NotaFiscal, 'id' | 'dataCriacao' | 'controleId'>) => Promise<NotaFiscal>;
   criarControle: (controle: Omit<ControleCarga, 'id' | 'dataCriacao' | 'finalizado' | 'notas'>) => Promise<ControleCarga>;
   vincularNotas: (controleId: string, notasIds: string[]) => Promise<void>;
   finalizarControle: (controleId: string) => Promise<void>;
+  atualizarControle: (controleId: string, dados: Partial<Omit<ControleCarga, 'id' | 'dataCriacao' | 'notas'>>) => Promise<void>;
 }
 
 export const useStore = create<StoreState>((set) => ({
@@ -36,8 +42,11 @@ export const useStore = create<StoreState>((set) => ({
   controles: [],
   status: null,
 
-  fetchNotas: async () => {
-    const response = await fetch('/api/notas');
+  fetchNotas: async (start?: string, end?: string) => {
+    const params = new URLSearchParams();
+    if (start) params.append('start', start);
+    if (end) params.append('end', end);
+    const response = await fetch(`/api/notas${params.toString() ? '?' + params.toString() : ''}`);
     const notas = await response.json();
     set({ notas });
   },
@@ -127,6 +136,15 @@ export const useStore = create<StoreState>((set) => ({
       body: JSON.stringify({ controleId }),
     });
     
+    await useStore.getState().fetchControles();
+  },
+
+  atualizarControle: async (controleId, dados) => {
+    await fetch('/api/controles/atualizar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ controleId, ...dados }),
+    });
     await useStore.getState().fetchControles();
   },
 }));
