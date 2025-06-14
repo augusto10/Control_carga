@@ -1,10 +1,22 @@
 import { ThemeProvider, CssBaseline } from '@mui/material';
 import { professionalTheme } from '../styles/theme';
-import Navbar from '../components/Navbar';
 import { SnackbarProvider } from 'notistack';
 import { AppProps } from 'next/app';
+import Layout from '../components/Layout';
+import { useEffect, useState } from 'react';
 
 function MyApp({ Component, pageProps }: AppProps) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Evita a renderização do lado do servidor para evitar problemas de hidratação
+  if (!mounted) {
+    return null;
+  }
+
   return (
     <ThemeProvider theme={professionalTheme}>
       <CssBaseline />
@@ -13,8 +25,9 @@ function MyApp({ Component, pageProps }: AppProps) {
         anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
         autoHideDuration={3000}
       >
-        <Navbar />
-        <Component {...pageProps} />
+        <Layout>
+          <Component {...pageProps} />
+        </Layout>
       </SnackbarProvider>
     </ThemeProvider>
   );
