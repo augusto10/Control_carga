@@ -19,22 +19,26 @@ interface CurrencyInputProps {
   sx?: any;
 }
 
-const CurrencyInput: React.FC<CurrencyInputProps> = ({ label, value, onChange, fullWidth, sx }) => (
-  <NumericFormat
-    value={value}
-    onValueChange={(v: any) => onChange(v.formattedValue)}
-    thousandSeparator="."
-    decimalSeparator=","
-    decimalScale={2}
-    fixedDecimalScale
-    allowNegative={false}
-    prefix=""
-    customInput={TextField as any}
-    label={label}
-    fullWidth={fullWidth}
-    sx={sx}
-  />
-);
+const CurrencyInput: React.FC<CurrencyInputProps> = ({ label, value, onChange, fullWidth, sx }) => {
+  return (
+    <NumericFormat
+      value={value}
+      onValueChange={(v: any) => onChange(v.formattedValue)}
+      thousandSeparator="."
+      decimalSeparator=","
+      decimalScale={2}
+      fixedDecimalScale
+      allowNegative={false}
+      prefix=""
+      customInput={TextField}
+      fullWidth={fullWidth}
+      sx={sx}
+      // Passando as props do TextField diretamente
+      label={label}
+      variant="outlined"
+    />
+  );
+};
 
 const AdicionarNotasPage = () => {
   const [notas, setNotas] = useState<NotaAdicionada[]>([]);
