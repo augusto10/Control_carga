@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useStore } from '../store/store';
 import { 
   Container,
@@ -10,7 +10,13 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  FormHelperText
+  FormHelperText,
+  Paper,
+  List,
+  ListItem,
+  ListItemText,
+  Checkbox,
+  CircularProgress
 } from '@mui/material';
 import { useRouter } from 'next/router';
 import { useSnackbar } from 'notistack';
@@ -45,9 +51,32 @@ function validarCPF(cpf: string): boolean {
 }
 
 const CriarControlePage = () => {
-  const { criarControle } = useStore();
+  const { criarControle, fetchNotas, notas } = useStore();
   const router = useRouter();
   const { enqueueSnackbar } = useSnackbar();
+  
+  const [notasSelecionadas, setNotasSelecionadas] = useState<string[]>([]);
+  const [carregandoNotas, setCarregandoNotas] = useState(false);
+  
+  // Carrega as notas disponíveis ao montar o componente
+  useEffect(() => {
+    const carregarNotas = async () => {
+      try {
+        setCarregandoNotas(true);
+        await fetchNotas();
+      } catch (error) {
+        console.error('Erro ao carregar notas:', error);
+        enqueueSnackbar('Erro ao carregar notas', { variant: 'error' });
+      } finally {
+        setCarregandoNotas(false);
+      }
+    };
+    
+    carregarNotas();
+  }, [fetchNotas, enqueueSnackbar]);
+  
+  // Filtra apenas as notas não vinculadas
+  const notasDisponiveis = notas.filter(nota => !nota.controleId);
   
   const [formData, setFormData] = useState<{
     motorista: string;
@@ -56,7 +85,7 @@ const CriarControlePage = () => {
     transportadora: Transportadora;
     qtdPallets: number;
     observacao: string;
-    numeroManifesto?: string; // Será preenchido no submit
+    numeroManifesto?: string;
   }>({
     motorista: '',
     cpfMotorista: '',
@@ -65,6 +94,7 @@ const CriarControlePage = () => {
     qtdPallets: 1,
     observacao: ''
   });
+  
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -82,6 +112,14 @@ const CriarControlePage = () => {
         [name as string]: ''
       }));
     }
+  };
+
+  const handleToggleNota = (notaId: string) => {
+    setNotasSelecionadas(prev => 
+      prev.includes(notaId)
+        ? prev.filter(id => id !== notaId)
+        : [...prev, notaId]
+    );
   };
 
   const validateForm = () => {
@@ -112,6 +150,11 @@ const CriarControlePage = () => {
       newErrors.qtdPallets = 'A quantidade de pallets deve ser maior que zero';
     }
     
+    // Validação de notas selecionadas (opcional, se quiser forçar pelo menos uma nota)
+    // if (notasSelecionadas.length === 0) {
+    //   newErrors.notas = 'Selecione pelo menos uma nota fiscal';
+    // }
+    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -126,32 +169,37 @@ const CriarControlePage = () => {
     
     setLoading(true);
     try {
-      // Gerar número de manifesto temporário (será substituído pelo número gerado no servidor)
+      // Gerar número de manifesto temporário
       const numeroManifesto = 'TEMP-' + Date.now();
+      
+      // Garantir que a transportadora seja um valor válido do enum
+      const transportadoraValida = Object.values(Transportadora).includes(formData.transportadora as Transportadora)
+        ? formData.transportadora
+        : Transportadora.ACERT;
       
       const dadosControle = {
         motorista: formData.motorista.trim(),
         cpfMotorista: formData.cpfMotorista.replace(/[\D]/g, ''),
         responsavel: formData.responsavel.trim(),
-        transportadora: formData.transportadora,
+        transportadora: transportadoraValida,
         qtdPallets: Number(formData.qtdPallets) || 1,
         observacao: formData.observacao.trim(),
-        numeroManifesto // Será substituído pelo número gerado no servidor
+        numeroManifesto,
+        notasIds: notasSelecionadas
       };
       
-      console.log('Enviando dados para a API:', dadosControle);
+      console.log('Criando controle com dados:', dadosControle);
       
       const controle = await criarControle(dadosControle);
       
       enqueueSnackbar('Controle criado com sucesso!', { variant: 'success' });
-      router.push(`/vincular-notas?id=${controle.id}`);
+      router.push('/listar-controles');
     } catch (error: any) {
       console.error('Erro ao criar controle:', error);
       
       let errorMessage = 'Erro ao criar controle. Tente novamente.';
       
       if (error.response) {
-        // Erro da API com resposta
         const { data } = error.response;
         if (data?.error) {
           errorMessage = data.error;
@@ -160,10 +208,8 @@ const CriarControlePage = () => {
           }
         }
       } else if (error.request) {
-        // Erro de rede (sem resposta)
         errorMessage = 'Não foi possível conectar ao servidor. Verifique sua conexão.';
       } else if (error.message) {
-        // Outros erros
         errorMessage = error.message;
       }
       
@@ -260,6 +306,54 @@ const CriarControlePage = () => {
             rows={2}
           />
         </Box>
+
+        {/* Seção de seleção de notas */}
+        <Box sx={{ mt: 4 }}>
+          <Typography variant="h6" gutterBottom>
+            Notas Fiscais Disponíveis
+          </Typography>
+          <Paper elevation={2} sx={{ p: 2, maxHeight: 300, overflow: 'auto' }}>
+            {carregandoNotas ? (
+              <Box display="flex" justifyContent="center" p={2}>
+                <CircularProgress />
+              </Box>
+            ) : notasDisponiveis.length > 0 ? (
+              <List dense>
+                {notasDisponiveis.map((nota) => (
+                  <ListItem 
+                    key={nota.id}
+                    button 
+                    onClick={() => handleToggleNota(nota.id)}
+                    selected={notasSelecionadas.includes(nota.id)}
+                  >
+                    <Checkbox
+                      edge="start"
+                      checked={notasSelecionadas.includes(nota.id)}
+                      tabIndex={-1}
+                      disableRipple
+                    />
+                    <ListItemText 
+                      primary={`Nota: ${nota.numeroNota}`}
+                      secondary={`Código: ${nota.codigo} | Valor: R$ ${nota.valor?.toFixed(2) || '0,00'}`}
+                    />
+                  </ListItem>
+                ))}
+              </List>
+            ) : (
+              <Typography variant="body2" color="textSecondary" sx={{ p: 2, textAlign: 'center' }}>
+                Nenhuma nota fiscal disponível para vincular.
+              </Typography>
+            )}
+          </Paper>
+          {notasSelecionadas.length > 0 && (
+            <Typography variant="caption" color="primary" sx={{ mt: 1, display: 'block' }}>
+              {notasSelecionadas.length} nota(s) selecionada(s)
+            </Typography>
+          )}
+          {errors.notas && (
+            <FormHelperText error>{errors.notas}</FormHelperText>
+          )}
+        </Box>
         
         <Box sx={{ mt: 4, display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
           <Button 
@@ -275,7 +369,7 @@ const CriarControlePage = () => {
             color="primary"
             disabled={loading}
           >
-            {loading ? 'Salvando...' : 'Salvar e Continuar'}
+            {loading ? 'Salvando...' : 'Salvar Controle'}
           </Button>
         </Box>
       </Box>
