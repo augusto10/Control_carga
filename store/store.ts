@@ -31,7 +31,7 @@ interface StoreState {
   fetchNotas: (start?: string, end?: string) => Promise<void>;
   fetchControles: () => Promise<void>;
   addNota: (nota: Omit<NotaFiscal, 'id' | 'dataCriacao' | 'controleId'>) => Promise<NotaFiscal>;
-  criarControle: (controle: Omit<ControleCarga, 'id' | 'dataCriacao' | 'finalizado' | 'notas'>) => Promise<ControleCarga>;
+  criarControle: (controle: Omit<ControleCarga, 'id' | 'dataCriacao' | 'finalizado' | 'notas'> & { notasIds: string[] }) => Promise<ControleCarga>;
   vincularNotas: (controleId: string, notasIds: string[]) => Promise<void>;
   finalizarControle: (controleId: string) => Promise<void>;
   atualizarControle: (controleId: string, dados: Partial<Omit<ControleCarga, 'id' | 'dataCriacao' | 'notas'>>) => Promise<void>;
@@ -95,7 +95,7 @@ export const useStore = create<StoreState>((set) => ({
 
   criarControle: async (controle) => {
     try {
-      console.log('Enviando requisição para criar controle:', controle);
+      console.log('Enviando requisição para criar controle com notas:', controle);
       
       const response = await fetch('/api/controles', {
         method: 'POST',
@@ -104,38 +104,47 @@ export const useStore = create<StoreState>((set) => ({
         },
         body: JSON.stringify(controle),
       });
-      
-      const responseData = await response.json().catch(() => ({}));
-      
+
       if (!response.ok) {
-        console.error('Erro na resposta da API:', response.status, responseData);
-        const error = new Error(responseData.error || 'Erro ao criar controle');
-        (error as any).response = { data: responseData };
-        throw error;
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Erro ao criar controle');
+      }
+
+      const novoControle = await response.json();
+      
+      // Se houver notas para vincular, faz o vínculo
+      if (controle.notasIds && controle.notasIds.length > 0) {
+        try {
+          await fetch('/api/controles/vincular-notas', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              controleId: novoControle.id,
+              notasIds: controle.notasIds
+            }),
+          });
+          
+          // Atualiza o controle com as notas vinculadas
+          novoControle.notas = controle.notasIds.map((id: string) => ({
+            id,
+            // Adicione outros campos necessários da nota aqui
+          }));
+          
+        } catch (error) {
+          console.error('Erro ao vincular notas:', error);
+          // Não lança o erro para não interromper o fluxo, apenas loga
+        }
       }
       
-      console.log('Controle criado com sucesso:', responseData);
+      // Atualiza a lista de controles
+      const controles = await (await fetch('/api/controles')).json();
+      set({ controles });
       
-      set((state) => ({
-        controles: [...state.controles, { ...responseData, notas: [] }],
-        status: 'success'
-      }));
-      
-      return { ...responseData, notas: [] };
-    } catch (error: any) {
-      console.error('Erro ao criar controle:', error);
-      set((state) => ({
-        ...state,
-        status: 'error'
-      }));
-      
-      // Se for um erro de validação, propagar os detalhes
-      if (error.response?.data) {
-        const validationError = new Error(error.response.data.error || 'Erro de validação');
-        (validationError as any).response = error.response;
-        throw validationError;
-      }
-      
+      return novoControle;
+    } catch (error) {
+      console.error('Erro na função criarControle:', error);
       throw error;
     }
   },

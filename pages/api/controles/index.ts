@@ -24,7 +24,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
     case 'POST': {
       try {
-        const { motorista, responsavel, cpfMotorista, transportadora, qtdPallets, observacao, numeroManifesto } = req.body;
+        const { motorista, responsavel, cpfMotorista, transportadora, qtdPallets, observacao, numeroManifesto, notasIds } = req.body;
 
         // Validar campos obrigatórios
         const camposObrigatorios = [];
@@ -37,6 +37,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             error: 'Campos obrigatórios não fornecidos',
             requiredFields: camposObrigatorios
           });
+        }
+
+        // Validar se as notas existem e estão disponíveis
+        if (notasIds && notasIds.length > 0) {
+          const notasExistentes = await prisma.notaFiscal.findMany({
+            where: {
+              id: { in: notasIds },
+              OR: [
+                { controleId: { not: null } },
+              ]
+            },
+            select: { id: true }
+          });
+
+          if (notasExistentes.length > 0) {
+            return res.status(400).json({
+              error: 'Uma ou mais notas já estão vinculadas a outro controle',
+              notasIndisponiveis: notasExistentes.map(n => n.id)
+            });
+          }
         }
 
         // Se não veio um número de manifesto, gera um sequencial
@@ -61,7 +81,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           numeroManifestoFinal = (maxNum + 1).toString();
         }
 
-
         // Garantir que a transportadora tenha um valor válido
         const transportadoraValida = transportadora || 'ACERT';
         
@@ -71,11 +90,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             motorista: motorista.trim(),
             cpfMotorista: cpfMotorista.replace(/[\D]/g, ''),
             responsavel: responsavel.trim(),
-            transportadora: transportadoraValida as any, // O Prisma irá converter para o enum correto
+            transportadora: transportadoraValida as Transportadora,
             numeroManifesto: numeroManifestoFinal,
             qtdPallets: qtdPallets ? Number(qtdPallets) : 0,
             observacao: observacao ? observacao.trim() : null,
             finalizado: false,
+            // Vincula as notas diretamente na criação
+            ...(notasIds && notasIds.length > 0 && {
+              notas: {
+                connect: notasIds.map(id => ({ id }))
+              }
+            })
           },
           include: {
             notas: true
@@ -98,21 +123,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
         
         // Outros erros do Prisma
-        if (error.code?.startsWith('P')) {
-          console.error('Erro do Prisma:', error);
+        if (error.code?.startsWith('P2')) {
           return res.status(400).json({
-            error: 'Erro de validação dos dados',
-            details: error.message,
-            code: 'VALIDATION_ERROR'
+            error: 'Erro de validação',
+            details: error.message
           });
         }
         
-        // Erro genérico
-        const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
         res.status(500).json({ 
-          error: 'Erro interno ao processar a requisição',
-          message: errorMessage,
-          code: 'INTERNAL_SERVER_ERROR'
+          error: 'Erro ao criar controle',
+          details: process.env.NODE_ENV === 'development' ? error.message : undefined
         });
       }
       break;
