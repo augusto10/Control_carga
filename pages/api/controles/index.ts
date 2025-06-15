@@ -98,7 +98,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             // Vincula as notas diretamente na criação
             ...(notasIds && notasIds.length > 0 && {
               notas: {
-                connect: notasIds.map(id => ({ id }))
+                connect: notasIds.map((id: string) => ({ id }))
               }
             })
           },
