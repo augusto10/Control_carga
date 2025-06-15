@@ -80,9 +80,13 @@ const DrawerHeader = styled('div')(({ theme }) => ({
   color: theme.palette.primary.contrastText,
 }));
 
+interface AppBarPropsExtended extends AppBarProps {
+  open?: boolean;
+}
+
 const AppBar = styled(MuiAppBar, {
   shouldForwardProp: (prop) => prop !== 'open',
-})<AppBarProps>(({ theme, open }) => ({
+})<AppBarPropsExtended>(({ theme, open }) => ({
   zIndex: theme.zIndex.drawer + 1,
   transition: theme.transitions.create(['width', 'margin'], {
     easing: theme.transitions.easing.sharp,
@@ -200,6 +204,11 @@ const menuItems = [
     text: 'Relatórios', 
     icon: <ReportIcon />,
     path: '/relatorios'
+  },
+  { 
+    text: 'Perfil', 
+    icon: <PersonIcon />,
+    path: '/perfil'
   },
 ];
 
@@ -329,7 +338,8 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh' }}>
-      <AppBar position="fixed" open={open}>
+      <AppBar position="fixed" open={open} elevation={0}>
+        {/* Adicionado elevation={0} para remover a sombra padrão do AppBar */}
         <Toolbar>
           <IconButton
             color="inherit"

@@ -2,11 +2,19 @@ import { ThemeProvider, CssBaseline } from '@mui/material';
 import { professionalTheme } from '../styles/theme';
 import { SnackbarProvider } from 'notistack';
 import { AppProps } from 'next/app';
-import Layout from '../components/Layout';
+import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
+import Layout from '../components/Layout';
+import { AuthProvider } from '../contexts/AuthContext';
+import ProtectedRoute from '../components/ProtectedRoute';
+
+// Lista de rotas públicas que não requerem autenticação
+const publicRoutes = ['/login', '/esqueci-senha', '/cadastro'];
 
 function MyApp({ Component, pageProps }: AppProps) {
   const [mounted, setMounted] = useState(false);
+  const router = useRouter();
+  const isPublicRoute = publicRoutes.includes(router.pathname);
 
   useEffect(() => {
     setMounted(true);
@@ -17,6 +25,19 @@ function MyApp({ Component, pageProps }: AppProps) {
     return null;
   }
 
+  // Determinar se o layout deve ser aplicado (não aplicar na página de login, por exemplo)
+  const getLayout = (page: React.ReactNode) => {
+    if (isPublicRoute) {
+      return page;
+    }
+    
+    return (
+      <ProtectedRoute>
+        <Layout>{page}</Layout>
+      </ProtectedRoute>
+    );
+  };
+
   return (
     <ThemeProvider theme={professionalTheme}>
       <CssBaseline />
@@ -25,9 +46,9 @@ function MyApp({ Component, pageProps }: AppProps) {
         anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
         autoHideDuration={3000}
       >
-        <Layout>
-          <Component {...pageProps} />
-        </Layout>
+        <AuthProvider>
+          {getLayout(<Component {...pageProps} />)}
+        </AuthProvider>
       </SnackbarProvider>
     </ThemeProvider>
   );
