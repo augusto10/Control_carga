@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { useSnackbar } from 'notistack';
 
-type NotaFiscal = {
+export type NotaFiscal = {
   id: string;
   dataCriacao: Date;
   codigo: string;
@@ -177,11 +177,29 @@ export const useStore = create<StoreState>((set) => ({
   },
 
   atualizarControle: async (controleId, dados) => {
-    await fetch('/api/controles/atualizar', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ controleId, ...dados }),
-    });
-    await useStore.getState().fetchControles();
+    try {
+      const response = await fetch('/api/controles/atualizar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          controleId, 
+          ...dados,
+          // Garante que qtdPallets seja um número
+          qtdPallets: Number(dados.qtdPallets) || 0
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Erro ao atualizar controle');
+      }
+      
+      // Atualiza a lista de controles após a atualização
+      await useStore.getState().fetchControles();
+      return await response.json();
+    } catch (error) {
+      console.error('Erro ao atualizar controle:', error);
+      throw error;
+    }
   },
 }));

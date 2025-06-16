@@ -65,9 +65,15 @@ const AdicionarNotasPage = () => {
         throw new Error('Formato inválido. Use: CODIGO;NUMERO_NOTA');
       }
       
+      // Verifica se já existe uma nota com o mesmo número
+      const notaExistente = notas.find(nota => nota.numeroNota === numeroNota.trim());
+      if (notaExistente) {
+        throw new Error(`Já existe uma nota com o número ${numeroNota} na lista`);
+      }
+      
       const novaNota = { 
         codigo, 
-        numeroNota, 
+        numeroNota: numeroNota.trim(), 
         valorStr: '' 
       };
       
@@ -88,19 +94,31 @@ const AdicionarNotasPage = () => {
   };
 
   const handleAddManual = () => {
-    if (!manualNumero.trim()) {
+    const numeroNota = manualNumero.trim();
+    
+    if (!numeroNota) {
       enqueueSnackbar('Número da nota obrigatório', { variant: 'warning' });
       return;
     }
+    
+    // Verifica se já existe uma nota com o mesmo número
+    const notaExistente = notas.find(nota => nota.numeroNota === numeroNota);
+    if (notaExistente) {
+      enqueueSnackbar(`Já existe uma nota com o número ${numeroNota} na lista`, { variant: 'error' });
+      return;
+    }
+    
     const novaNota: NotaAdicionada = {
       codigo: manualCodigo.trim() || 'MANUAL',
-      numeroNota: manualNumero.trim(),
+      numeroNota,
       valorStr: manualValor.trim(),
     };
+    
     setNotas([...notas, novaNota]);
     setManualCodigo('');
     setManualNumero('');
     setManualValor('');
+    enqueueSnackbar('Nota adicionada com sucesso!', { variant: 'success' });
   };
 
   const handleAdicionar = async () => {

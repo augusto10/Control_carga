@@ -62,23 +62,35 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // Se não veio um número de manifesto, gera um sequencial
         let numeroManifestoFinal = numeroManifesto;
         if (!numeroManifestoFinal) {
-          const allManifestos = await prisma.controleCarga.findMany({
-            where: {
-              NOT: {
-                numeroManifesto: {
-                  startsWith: 'TEMP-'
-                }
-              }
+          // Encontra o maior número de manifesto existente
+          // Busca o maior número de manifesto existente
+          const todosControles = await prisma.controleCarga.findMany({
+            select: { 
+              numeroManifesto: true
             },
-            select: { numeroManifesto: true },
+            orderBy: { 
+              id: 'desc' 
+            }
           });
           
-          const maxNum = allManifestos.reduce((max, c) => {
-            const n = parseInt(c.numeroManifesto, 10);
-            return (!isNaN(n) && n > max) ? n : max;
-          }, 0);
+          // Filtra e converte para números inteiros
+          const numerosManifesto = todosControles
+            .map(controle => controle.numeroManifesto)
+            .filter((num): num is string => {
+              if (!num) return false;
+              // Verifica se é um número inteiro positivo
+              return /^\d+$/.test(num) && !num.startsWith('0');
+            })
+            .map(num => parseInt(num, 10));
           
-          numeroManifestoFinal = (maxNum + 1).toString();
+          // Encontra o maior número ou usa 0 se não houver nenhum
+          const ultimoNumero = numerosManifesto.length > 0 
+            ? Math.max(...numerosManifesto) 
+            : 0;
+            
+          // Gera o próximo número sequencial
+          numeroManifestoFinal = (ultimoNumero + 1).toString();
+          console.log('Último número de manifesto:', ultimoNumero, '| Novo número:', numeroManifestoFinal);
         }
 
         // Garantir que a transportadora tenha um valor válido
