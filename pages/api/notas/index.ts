@@ -19,6 +19,12 @@ export default async function handler(
         }
       }
       const notas = await prisma.notaFiscal.findMany({ where });
+      
+      // Adiciona cabeçalhos para evitar cache
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+      
       res.status(200).json(notas);
     } catch (error) {
       console.error('Erro ao listar notas:', error);

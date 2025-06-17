@@ -169,9 +169,6 @@ const CriarControlePage = () => {
     
     setLoading(true);
     try {
-      // Gerar número de manifesto temporário
-      const numeroManifesto = 'TEMP-' + Date.now();
-      
       // Garantir que a transportadora seja um valor válido do enum
       const transportadoraValida = Object.values(Transportadora).includes(formData.transportadora as Transportadora)
         ? formData.transportadora
@@ -184,7 +181,6 @@ const CriarControlePage = () => {
         transportadora: transportadoraValida,
         qtdPallets: Number(formData.qtdPallets) || 1,
         observacao: formData.observacao.trim(),
-        numeroManifesto,
         notasIds: notasSelecionadas
       };
       

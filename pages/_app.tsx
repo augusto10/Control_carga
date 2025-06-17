@@ -38,6 +38,26 @@ function MyApp({ Component, pageProps }: AppProps) {
     );
   };
 
+  // Componente de carregamento global
+  const GlobalLoader = () => (
+    <Box
+      sx={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100%',
+        height: '100%',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255, 255, 255, 0.8)',
+        zIndex: 9999,
+      }}
+    >
+      <CircularProgress size={60} />
+    </Box>
+  );
+
   return (
     <ThemeProvider theme={professionalTheme}>
       <CssBaseline />
@@ -47,11 +67,18 @@ function MyApp({ Component, pageProps }: AppProps) {
         autoHideDuration={3000}
       >
         <AuthProvider>
-          {getLayout(<Component {...pageProps} />)}
+          <ConfiguracaoProvider>
+            {/* Mostrar o loader global quando estiver carregando configurações */}
+            {loading && <GlobalLoader />}
+            {getLayout(<Component {...pageProps} />)}
+          </ConfiguracaoProvider>
         </AuthProvider>
       </SnackbarProvider>
     </ThemeProvider>
   );
 }
 
-export default MyApp;
+// Adicionando tipo para o componente MyApp
+const MyAppWithType: React.FC<AppProps> = (props) => <MyApp {...props} />;
+
+export default MyAppWithType;

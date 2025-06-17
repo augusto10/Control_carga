@@ -52,5 +52,35 @@ model Usuario {
 
 enum TipoUsuario {
   ADMIN
+  GERENTE
   USUARIO
+}
+
+model AuditoriaAcesso {
+  id          String    @id @default(uuid())
+  usuarioId   String
+  usuario     Usuario   @relation(fields: [usuarioId], references: [id])
+  acao        String    // LOGIN, LOGOUT, ACESSO_NEGADO, etc.
+  descricao   String?
+  ip          String?
+  userAgent   String?
+  dataHora    DateTime  @default(now())
+  
+  @@index([usuarioId])
+  @@index([dataHora])
+  @@map("auditoria_acesso")
+}
+
+model ConfiguracaoSistema {
+  id          String   @id @default(uuid())
+  chave       String   @unique
+  valor       String
+  descricao   String?
+  tipo        String   @default("string") // string, number, boolean, json
+  opcoes      String?  // Opções para selects, separadas por vírgula
+  editavel    Boolean  @default(true)
+  dataCriacao DateTime @default(now())
+  dataAtualizacao DateTime @updatedAt
+  
+  @@index([chave])
 }
