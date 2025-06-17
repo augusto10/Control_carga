@@ -216,19 +216,34 @@ const VincularNotasPage = () => {
 
   const handleAtualizar = async (): Promise<boolean> => {
     try {
-      // Atualiza o estado global
-      await atualizarControle(controleId, {
+      console.log('Chamando atualizarControle com dados:', {
         motorista,
         cpfMotorista: cpfMotorista.replace(/\D/g, ''),
         transportadora,
         responsavel,
         observacao,
         qtdPallets: Number(qtdPallets) || 0,
+        numeroManifesto
+      });
+      
+      // Atualiza o estado global
+      const resultado = await atualizarControle(controleId, {
+        motorista,
+        cpfMotorista: cpfMotorista.replace(/\D/g, ''),
+        transportadora,
+        responsavel,
+        observacao,
+        qtdPallets: Number(qtdPallets) || 0,
+        numeroManifesto, // Incluindo o número do manifesto na atualização
       });
 
       // Se houver notas selecionadas, faz a vinculação
+      console.log('Controle atualizado com sucesso, resultado:', resultado);
+      
       if (notasSelecionadas.length > 0) {
+        console.log('Vinculando notas:', notasSelecionadas);
         await vincularNotas(controleId, notasSelecionadas);
+        console.log('Notas vinculadas com sucesso');
       }
 
       return true;
@@ -259,10 +274,22 @@ const VincularNotasPage = () => {
   };
 
   const handleConfirmSave = async () => {
+    console.log('Iniciando salvamento...');
     setOpenConfirmDialog(false);
     
     try {
       setLoading(true);
+      
+      console.log('Dados do formulário:', {
+        motorista,
+        cpfMotorista,
+        responsavel,
+        transportadora,
+        numeroManifesto,
+        qtdPallets,
+        observacao,
+        notasSelecionadas
+      });
       
       // Verifica se é um novo controle e não há notas selecionadas
       if (!controleId && notasSelecionadas.length === 0) {

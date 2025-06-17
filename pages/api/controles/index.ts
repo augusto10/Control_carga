@@ -15,6 +15,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             notas: true,
           },
         });
+        
+        // Adiciona cabeçalhos para evitar cache
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+        
         res.status(200).json(controles);
       } catch (error) {
         console.error(error);

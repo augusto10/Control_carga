@@ -46,15 +46,44 @@ export const useStore = create<StoreState>((set) => ({
     const params = new URLSearchParams();
     if (start) params.append('start', start);
     if (end) params.append('end', end);
-    const response = await fetch(`/api/notas${params.toString() ? '?' + params.toString() : ''}`);
+    const response = await fetch(`/api/notas${params.toString() ? '?' + params.toString() : ''}`, {
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      }
+    });
     const notas = await response.json();
     set({ notas });
   },
 
   fetchControles: async () => {
-    const response = await fetch('/api/controles');
-    const controles = await response.json();
-    set({ controles });
+    console.log('Iniciando fetchControles...');
+    try {
+      const response = await fetch('/api/controles', {
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      });
+      
+      console.log('Resposta do fetchControles recebida, status:', response.status);
+      
+      if (!response.ok) {
+        console.error('Erro ao buscar controles:', response.status, response.statusText);
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Detalhes do erro:', errorData);
+        throw new Error(errorData.error || 'Erro ao buscar controles');
+      }
+      
+      const controles = await response.json();
+      console.log('Controles carregados com sucesso, quantidade:', controles.length);
+      set({ controles });
+    } catch (error) {
+      console.error('Erro em fetchControles:', error);
+      throw error;
+    }
   },
 
   addNota: async (nota) => {
@@ -177,10 +206,22 @@ export const useStore = create<StoreState>((set) => ({
   },
 
   atualizarControle: async (controleId, dados) => {
+    console.log('Iniciando atualizarControle...');
     try {
+      console.log('Enviando requisição para /api/controles/atualizar com dados:', {
+        controleId,
+        ...dados,
+        qtdPallets: Number(dados.qtdPallets) || 0
+      });
+      
       const response = await fetch('/api/controles/atualizar', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        },
         body: JSON.stringify({ 
           controleId, 
           ...dados,
@@ -189,14 +230,21 @@ export const useStore = create<StoreState>((set) => ({
         }),
       });
 
+      console.log('Resposta recebida, status:', response.status);
+      
       if (!response.ok) {
+        console.error('Erro na resposta da API:', response.status, response.statusText);
         const errorData = await response.json().catch(() => ({}));
+        console.error('Detalhes do erro:', errorData);
         throw new Error(errorData.error || 'Erro ao atualizar controle');
       }
       
       // Atualiza a lista de controles após a atualização
+      console.log('Atualizando lista de controles...');
       await useStore.getState().fetchControles();
-      return await response.json();
+      const result = await response.json();
+      console.log('Controle atualizado com sucesso:', result);
+      return result;
     } catch (error) {
       console.error('Erro ao atualizar controle:', error);
       throw error;
