@@ -1,10 +1,11 @@
 import { useRouter } from 'next/router';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import CircularProgress from '@mui/material/CircularProgress';
 import Box from '@mui/material/Box';
+import { USER_TYPES } from '../types/auth-types';
 
-type TipoUsuario = 'ADMIN' | 'USUARIO';
+type TipoUsuario = typeof USER_TYPES.ADMIN | typeof USER_TYPES.GERENTE | typeof USER_TYPES.USUARIO;
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -19,17 +20,29 @@ export default function ProtectedRoute({
 }: ProtectedRouteProps) {
   const { user, isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
+  const [checkedAuth, setCheckedAuth] = useState(false);
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      router.push(redirectTo);
-    } else if (!isLoading && isAuthenticated && user && !allowedRoles.includes(user.tipo)) {
-      // Usuário autenticado, mas sem permissão
-      router.push('/acesso-negado');
-    }
-  }, [isAuthenticated, isLoading, user, router, allowedRoles, redirectTo]);
+    // Só verifica a autenticação depois que o carregamento inicial for concluído
+    if (!isLoading) {
+      setCheckedAuth(true);
+      
+      // Se não está autenticado, redireciona para a página de login
+      if (!isAuthenticated) {
+        router.push(redirectTo);
+        return;
+      }
 
-  if (isLoading) {
+      // Se está autenticado mas não tem permissão, redireciona para acesso negado
+      if (user && !allowedRoles.includes(user.tipo)) {
+        router.push('/acesso-negado');
+        return;
+      }
+    }
+  }, [isLoading, isAuthenticated, user, router, allowedRoles, redirectTo]);
+
+  // Mostra um loader enquanto verifica a autenticação
+  if (isLoading || !checkedAuth) {
     return (
       <Box 
         display="flex" 
@@ -42,9 +55,6 @@ export default function ProtectedRoute({
     );
   }
 
-  if (!isAuthenticated || (user && !allowedRoles.includes(user.tipo))) {
-    return null;
-  }
-
+  // Se chegou até aqui, o usuário está autenticado e tem permissão
   return <>{children}</>;
 }

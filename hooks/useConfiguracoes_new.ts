@@ -1,8 +1,7 @@
-// hooks/useConfiguracoes.ts
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { api } from '../services/api';
 
-export interface ConfiguracaoSistema {
+interface ConfiguracaoSistema {
   chave: string;
   valor: string;
   tipo: 'string' | 'number' | 'boolean' | 'json';
@@ -13,11 +12,11 @@ export interface ConfiguracaoSistema {
 
 export function useConfiguracoes() {
   const [configuracoes, setConfiguracoes] = useState<Record<string, any>>({});
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
   // Carregar configurações
-  const carregarConfiguracoes = useCallback(async (): Promise<Record<string, any>> => {
+  const carregarConfiguracoes = useCallback(async () => {
     try {
       setLoading(true);
       const response = await api.get('/api/admin/configuracoes');
@@ -44,26 +43,19 @@ export function useConfiguracoes() {
         }
       });
       
-      setConfiguracoes(prevConfigs => {
-        // Só atualiza se as configurações forem diferentes
-        if (JSON.stringify(prevConfigs) !== JSON.stringify(configs)) {
-          return configs;
-        }
-        return prevConfigs;
-      });
-      
+      setConfiguracoes(configs);
       setError(null);
+      setLoading(false);
       return configs;
     } catch (err) {
       console.error('Erro ao carregar configurações:', err);
-      setError(err instanceof Error ? err : new Error('Erro desconhecido'));
-      return {}; // Retorna um objeto vazio em caso de erro
-    } finally {
+      setError(err instanceof Error ? err : new Error('Erro ao carregar configurações'));
       setLoading(false);
+      throw err;
     }
-  }, [setConfiguracoes, setLoading, setError]);
+  }, []);
 
-  // Atualizar configurações
+  // Atualizar configuração
   const atualizarConfiguracoes = useCallback(async (chave: string, novoValor: any) => {
     try {
       setLoading(true);
@@ -76,13 +68,13 @@ export function useConfiguracoes() {
       }));
       
       setError(null);
+      setLoading(false);
       return response.data;
     } catch (err) {
       console.error('Erro ao atualizar configuração:', err);
       setError(err instanceof Error ? err : new Error('Erro ao atualizar configuração'));
-      throw err;
-    } finally {
       setLoading(false);
+      throw err;
     }
   }, []);
 
@@ -92,17 +84,9 @@ export function useConfiguracoes() {
   }, [configuracoes]);
 
   // Carregar configurações quando o componente é montado
-  const isMounted = useRef(true);
-
   useEffect(() => {
-    if (Object.keys(configuracoes).length === 0) {
-      carregarConfiguracoes();
-    }
-
-    return () => {
-      isMounted.current = false;
-    };
-  }, [carregarConfiguracoes, configuracoes]);
+    carregarConfiguracoes();
+  }, [carregarConfiguracoes]);
 
   return {
     configuracoes,
@@ -130,4 +114,4 @@ export function useConfiguracao<T>(chave: string, valorPadrao: T = null as T) {
     error,
     atualizar
   };
-};
+}

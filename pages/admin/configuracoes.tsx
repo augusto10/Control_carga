@@ -57,9 +57,11 @@ export default function ConfiguracoesSistema() {
         throw new Error(response.data.error?.message || 'Erro ao carregar configurações');
       }
 
+      const configuracoesData = response.data.data || [];
+      
       // Inicializar valores iniciais
       const valoresIniciais: Record<string, any> = {};
-      response.data.data.forEach((config: Configuracoes) => {
+      configuracoesData.forEach((config: Configuracoes) => {
         if (config.tipo === 'boolean') {
           valoresIniciais[config.chave] = config.valor === 'true';
         } else if (config.tipo === 'number') {
@@ -68,18 +70,24 @@ export default function ConfiguracoesSistema() {
           try {
             valoresIniciais[config.chave] = JSON.parse(config.valor);
           } catch {
-            valoresIniciais[config.valor] = {};
+            valoresIniciais[config.chave] = config.valor;
           }
         } else {
           valoresIniciais[config.chave] = config.valor;
         }
       });
       
-      setConfiguracoes(response.data.data);
+      setConfiguracoes(configuracoesData);
       setValues(valoresIniciais);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Erro ao carregar configurações:', err);
-      setError(err.message || 'Erro ao carregar configurações. Tente novamente.');
+      const errorMessage = err && typeof err === 'object' && 'response' in err && 
+        err.response && typeof err.response === 'object' && 'data' in err.response && 
+        err.response.data && typeof err.response.data === 'object' && 'error' in err.response.data &&
+        err.response.data.error && typeof err.response.data.error === 'object' && 'message' in err.response.data.error
+          ? String(err.response.data.error.message)
+          : 'Erro ao carregar configurações';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -120,9 +128,14 @@ export default function ConfiguracoesSistema() {
       
       // Fechar a mensagem de sucesso após 5 segundos
       setTimeout(() => setSuccess(null), 5000);
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Erro ao salvar configurações:', err);
-      setError(err.response?.data?.message || 'Erro ao salvar configurações. Tente novamente.');
+      const errorMessage = err && typeof err === 'object' && 'response' in err && 
+        err.response && typeof err.response === 'object' && 'data' in err.response && 
+        err.response.data && typeof err.response.data === 'object' && 'message' in err.response.data
+          ? String(err.response.data.message)
+          : 'Erro ao salvar configurações. Tente novamente.';
+      setError(errorMessage);
     } finally {
       setSaving(false);
     }

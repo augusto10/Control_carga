@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useStore, NotaFiscal } from '../store/store';
+import { useStore, NotaFiscal, type ControleCarga } from '../store/store';
 import { 
   Container,
   Typography,
@@ -263,7 +263,7 @@ const VincularNotasPage = () => {
 
   const handleCriar = async (): Promise<boolean> => {
     try {
-      const novoControle = await atualizarControle('', {
+      const novoControle: ControleCarga | null = await atualizarControle('', {
         motorista: motorista.trim(),
         responsavel: responsavel.trim(),
         cpfMotorista: cpfMotorista.replace(/\D/g, ''),
@@ -412,7 +412,7 @@ const VincularNotasPage = () => {
               select
               label="Transportadora"
               value={transportadora}
-              onChange={(e: SelectChangeEvent) => 
+              onChange={(e: React.ChangeEvent<{ value: unknown }>) => 
                 setTransportadora(e.target.value as 'ACERT' | 'EXPRESSO_GOIAS')
               }
               fullWidth

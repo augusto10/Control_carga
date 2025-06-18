@@ -38,7 +38,8 @@ const drawerWidth = 240;
 interface AdminLayoutProps {
   children: ReactNode;
   title: string;
-}\n
+}
+
 export default function AdminLayout({ children, title }: AdminLayoutProps) {
   const { user, logout } = useAuth();
   const router = useRouter();

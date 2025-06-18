@@ -40,10 +40,18 @@ export default function Login() {
     e.preventDefault();
     setError(null);
     
+    console.log('Iniciando tentativa de login...');
+    console.log('Dados do formulário:', formData);
+    
     try {
+      console.log('Chamando a função login...');
       await login(formData);
+      console.log('Login realizado com sucesso!');
     } catch (err: any) {
-      setError(err.message || 'Erro ao fazer login. Verifique suas credenciais.');
+      console.error('Erro durante o login:', err);
+      const errorMessage = err.response?.data?.message || err.message || 'Erro ao fazer login. Verifique suas credenciais.';
+      console.log('Mensagem de erro:', errorMessage);
+      setError(errorMessage);
     }
   };
 

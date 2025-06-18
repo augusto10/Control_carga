@@ -1,43 +1,55 @@
-import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useRouter } from 'next/router';
-import { NextPageContext } from 'next';
 import Cookies from 'js-cookie';
 import { api } from '../services/api';
-import { User, USER_TYPES, LoginCredentials, AuthError } from '../types/auth-types';
-import { AuthState, AuthContextType } from '../types/auth-context';
+import { User, AuthError, LoginCredentials, USER_TYPES } from '../types/auth-types';
 import jwt from 'jsonwebtoken';
 
-type ServerRequest = NextPageContext['req'] & {
-  headers: {
-    cookie?: string;
-  };
+// Tipagem para o estado de autenticação
+type AuthState = {
+  user: User | null;
+  token: string | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  error: string | null;
 };
 
-type CookieOptions = Cookies.CookieAttributes;
+// Tipagem para o contexto
+type AuthContextType = {
+  user: User | null;
+  login: (credentials: LoginCredentials) => Promise<void>;
+  logout: () => void;
+  isLoading: boolean;
+  error: string | null;
+  isAuthenticated: boolean;
+  updateUser: (userData: Partial<User>) => void;
+  checkTokenExpiration: () => void;
+  authError: AuthError | null;
+};
 
-// Função para obter cookie no servidor
-function getServerCookie(name: string, req?: NextPageContext['req']): string | undefined {
-  if (!req?.headers.cookie) return undefined;
-  const cookieValue = req.headers.cookie
-    .split('; ')
-    .find(row => row.startsWith(`${name}=`))
-    ?.split('=')[1];
-  return cookieValue ? decodeURIComponent(cookieValue) : undefined;
-}
+// Contexto de autenticação
+export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Funções para uso no cliente
+// Hook personalizado para usar o contexto
+export const useAuth = (): AuthContextType => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth deve ser usado dentro de um AuthProvider');
+  }
+  return context;
+};
+
+// Funções auxiliares para manipulação de cookies
 const getCookie = (name: string): string | undefined => {
   if (typeof window === 'undefined') return undefined;
   return Cookies.get(name);
 };
 
-
-
 const setCookie = (name: string, value: string, options: Cookies.CookieAttributes = {}): void => {
   if (typeof window !== 'undefined') {
     Cookies.set(name, value, { 
+      expires: 7, // 7 dias
       path: '/',
-      expires: TOKEN_EXPIRATION_DAYS, // 7 dias
       sameSite: 'lax',
       secure: process.env.NODE_ENV === 'production',
       ...options 
@@ -51,20 +63,7 @@ const removeCookie = (name: string): void => {
   }
 };
 
-// Tempo de expiração do token (1 hora)
-const TOKEN_EXPIRATION_MS = 3600000;
-const TOKEN_EXPIRATION_DAYS = 7;
-
-// Re-export para compatibilidade
-export type { AuthContextType } from '../types/auth-context';
-
-export const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-interface AuthProviderProps {
-  children: React.ReactNode;
-}
-
-export function AuthProvider({ children }: AuthProviderProps) {
+export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>({
     user: null,
     token: null,
@@ -84,7 +83,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }));
   }, []);
 
-  // Carregar usuário do armazenamento
+  // Definir erro de autenticação
+  const setAuthenticationError = useCallback((error: AuthError | null) => {
+    setAuthError(error);
+    if (error) {
+      updateAuthState({ 
+        error: error.message,
+        isLoading: false,
+        isAuthenticated: false,
+        user: null,
+        token: null
+      });
+    }
+  }, [updateAuthState]);
+
+  // Verificar autenticação ao carregar
   const loadUserFromStorage = useCallback(async () => {
     try {
       console.log('[AuthContext] Carregando usuário do armazenamento...');
@@ -92,13 +105,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       
       if (!token) {
         console.log('[AuthContext] Nenhum token encontrado');
-        updateAuthState({ 
-          isLoading: false, 
-          isAuthenticated: false,
-          user: null,
-          token: null,
-          error: null
-        });
+        updateAuthState({ isLoading: false, isAuthenticated: false });
         return;
       }
 
@@ -148,10 +155,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     } catch (err) {
       console.error('[AuthContext] Erro ao carregar autenticação:', err);
       updateAuthState({
-        user: null,
-        token: null,
-        isAuthenticated: false,
         isLoading: false,
+        isAuthenticated: false,
         error: 'Erro ao carregar autenticação'
       });
     }
@@ -162,42 +167,40 @@ export function AuthProvider({ children }: AuthProviderProps) {
     loadUserFromStorage();
   }, [loadUserFromStorage]);
 
+  // Função de login
   const login = useCallback(async ({ email, senha }: LoginCredentials): Promise<void> => {
     try {
-      updateAuthState({ 
-        isLoading: true, 
-        error: null,
-        isAuthenticated: false,
-        user: null,
-        token: null
-      });
-      setAuthError(null);
-      
-      console.log('[AuthContext] Fazendo login com:', { email });
+      console.log('[AuthContext] Iniciando processo de login...');
+      updateAuthState({ isLoading: true, error: null });
+      setAuthenticationError(null);
+
+      console.log('[AuthContext] Fazendo requisição para /api/auth/login...');
       const response = await api.post('/api/auth/login', { email, senha });
       
+      console.log('[AuthContext] Resposta da API:', response.data);
+      
+      // Verificar se a resposta tem a estrutura esperada
       if (!response.data || !response.data.success) {
-        throw new Error(response.data?.message || 'Erro ao fazer login. Tente novamente.');
+        const errorMessage = response.data?.message || 'Erro ao fazer login. Tente novamente.';
+        throw new Error(errorMessage);
       }
       
       const { user, token } = response.data;
-      
+
       if (!token) {
+        console.error('[AuthContext] Token não recebido do servidor');
         throw new Error('Token não recebido do servidor');
       }
-      
+
+      console.log('[AuthContext] Armazenando token em cookie...');
       // Armazenar token em cookie seguro
-      setCookie('auth_token', token, { 
-        path: '/',
-        expires: TOKEN_EXPIRATION_DAYS,
-        sameSite: 'lax',
-        secure: process.env.NODE_ENV === 'production',
-        httpOnly: false // Necessário para ser acessível pelo cliente
-      });
-      
+      setCookie('auth_token', token);
+
+      console.log('[AuthContext] Atualizando header de autorização...');
       // Atualizar header de autorização
       api.defaults.headers.Authorization = `Bearer ${token}`;
-      
+
+      console.log('[AuthContext] Atualizando estado do contexto...');
       // Atualizar estado
       updateAuthState({
         user,
@@ -206,14 +209,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
         isLoading: false,
         error: null
       });
-      
+
       // Redirecionar com base no tipo de usuário
+      console.log(`[AuthContext] Redirecionando usuário do tipo ${user.tipo}...`);
       if (user.tipo === USER_TYPES.ADMIN) {
-        await router.push('/admin');
+        console.log('[AuthContext] Redirecionando para /admin');
+        router.push('/admin');
       } else {
-        await router.push('/dashboard');
+        console.log('[AuthContext] Redirecionando para /dashboard');
+        router.push('/dashboard');
       }
-      
     } catch (error: any) {
       console.error('[AuthContext] Erro no login:', error);
       
@@ -238,94 +243,74 @@ export function AuthProvider({ children }: AuthProviderProps) {
         code: error.code
       });
       
-      // Atualizar estado com erro
-      updateAuthState({
-        user: null,
-        token: null,
-        isAuthenticated: false,
-        isLoading: false,
-        error: errorMessage
+      // Definir erro de autenticação
+      setAuthenticationError({
+        message: errorMessage,
+        code: error.response?.status || 500,
+        details: process.env.NODE_ENV === 'development' ? {
+          originalError: error.message,
+          stack: error.stack
+        } : undefined
       });
       
       // Remover token inválido
       removeCookie('auth_token');
       delete api.defaults.headers.Authorization;
-      
-      // Lançar o erro novamente para que os componentes possam lidar com ele, se necessário
-      throw error;
     }
-  }, [router, updateAuthState]);
+  }, [router, updateAuthState, setAuthenticationError]);
 
+  // Função de logout
   const logout = useCallback(() => {
-    try {
-      // Remove os cookies
-      removeCookie('auth_token');
-      removeCookie('user');
-      
-      // Limpa o header de autorização
-      delete api.defaults.headers.Authorization;
-      
-      // Atualiza o estado
-      updateAuthState({
-        user: null,
-        token: null,
-        isAuthenticated: false,
-        isLoading: false,
-        error: null
-      });
-      
-      // Redireciona para a página de login
-      router.push('/login');
-    } catch (error) {
-      console.error('[AuthContext] Erro durante o logout:', error);
-      // Garante que o estado seja limpo mesmo em caso de erro
-      updateAuthState({
-        user: null,
-        token: null,
-        isAuthenticated: false,
-        isLoading: false,
-        error: 'Ocorreu um erro durante o logout'
-      });
-    }
+    console.log('[AuthContext] Efetuando logout...');
+    
+    // Remover cookies
+    removeCookie('auth_token');
+    removeCookie('user');
+    
+    // Limpar header de autorização
+    delete api.defaults.headers.Authorization;
+    
+    // Atualizar estado
+    updateAuthState({
+      user: null,
+      token: null,
+      isAuthenticated: false,
+      isLoading: false,
+      error: null
+    });
+    
+    // Redirecionar para a página de login
+    console.log('[AuthContext] Redirecionando para /login');
+    router.push('/login');
   }, [router, updateAuthState]);
 
+  // Atualizar dados do usuário
   const updateUser = useCallback((userData: Partial<User>) => {
-    setState((prevState) => ({
-      ...prevState,
-      user: prevState.user ? { ...prevState.user, ...userData } : null
-    }));
-  }, []);
+    updateAuthState({
+      user: state.user ? { ...state.user, ...userData } : null
+    });
+  }, [state.user, updateAuthState]);
 
-  const checkTokenExpiration = useCallback((): boolean => {
+  // Verificar expiração do token
+  const checkTokenExpiration = useCallback(() => {
     const token = getCookie('auth_token');
-    if (!token) return false;
-    
-    try {
-      const decoded = jwt.decode(token) as { exp?: number };
-      const isExpired = decoded?.exp && decoded.exp * 1000 < Date.now();
-      
-      if (isExpired) {
-        console.log('[AuthContext] Token expirado');
+    if (token) {
+      try {
+        const decoded = jwt.decode(token) as { exp?: number };
+        if (decoded?.exp && decoded.exp * 1000 < Date.now()) {
+          console.log('[AuthContext] Token expirado');
+          logout();
+        }
+      } catch (error) {
+        console.error('[AuthContext] Erro ao verificar expiração do token:', error);
         logout();
-        return false;
       }
-      
-      return true;
-    } catch (error) {
-      console.error('Error checking token expiration:', error);
-      logout();
-      return false;
     }
   }, [logout]);
 
+  // Verificar expiração do token periodicamente (a cada 5 minutos)
   useEffect(() => {
-    // Verificação inicial ao montar o componente
-    checkTokenExpiration();
-    
-    // Configura verificação periódica a cada 5 minutos
     const interval = setInterval(checkTokenExpiration, 5 * 60 * 1000);
-    
-    // Limpa o intervalo ao desmontar o componente
     return () => clearInterval(interval);
   }, [checkTokenExpiration]);
 
@@ -346,12 +331,4 @@ export function AuthProvider({ children }: AuthProviderProps) {
       {children}
     </AuthContext.Provider>
   );
-}
-
-export function useAuth() {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth deve ser usado dentro de um AuthProvider');
-  }
-  return context;
 }
