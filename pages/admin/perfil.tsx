@@ -1,6 +1,7 @@
 import { useState, useEffect, useContext } from 'react';
 import { useRouter } from 'next/router';
 import { ApiError, ApiResponse } from '../../types/api';
+import { api } from '../../services/api';
 import { 
   Container, 
   Typography, 

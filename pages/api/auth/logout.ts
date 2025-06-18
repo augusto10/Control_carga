@@ -1,7 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { PrismaClient } from '@prisma/client';
-import jwt from 'jsonwebtoken';
-import { parseCookies } from 'nookies';
+import { serialize } from 'cookie';
 
 // Lista de origens permitidas
 const ALLOWED_ORIGINS = [
@@ -15,7 +13,7 @@ const ALLOWED_ORIGINS = [
 
 // Configurações de CORS padrão
 const DEFAULT_CORS_HEADERS = {
-  'Access-Control-Allow-Methods': 'GET, OPTIONS',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With, X-XSRF-TOKEN',
   'Access-Control-Allow-Credentials': 'true',
   'Access-Control-Expose-Headers': 'Set-Cookie, XSRF-TOKEN',
@@ -63,7 +61,7 @@ const allowCors = (fn: any) => async (req: NextApiRequest, res: NextApiResponse)
   try {
     return await fn(req, res);
   } catch (error) {
-    console.error('Erro no handler de me:', error);
+    console.error('Erro no handler de logout:', error);
     return res.status(500).json({
       success: false,
       message: 'Erro interno do servidor',
@@ -72,109 +70,69 @@ const allowCors = (fn: any) => async (req: NextApiRequest, res: NextApiResponse)
   }
 };
 
-const prisma = new PrismaClient();
-
-interface TokenPayload {
-  id: string;
-  email: string;
-  tipo: string;
-  iat: number;
-  exp: number;
-}
+const COOKIE_NAME = 'auth_token';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
-  
-  // Obter a origem da requisição para uso em logs
-  const origin = req.headers.origin || '';
-
-  // Se for uma requisição OPTIONS, retornar imediatamente
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-  
-  if (req.method !== 'GET') {
+  if (req.method !== 'POST') {
     return res.status(405).json({ 
       success: false,
       message: 'Método não permitido' 
     });
   }
-  
-  // Configurar headers de segurança
-  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-  res.setHeader('Pragma', 'no-cache');
-  res.setHeader('Expires', '0');
-  res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('X-Frame-Options', 'DENY');
-  res.setHeader('X-XSS-Protection', '1; mode=block');
-  
-  if (process.env.NODE_ENV === 'production') {
-    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
-  }
 
   try {
-    // Obter o token dos cookies
-    const cookies = parseCookies({ req });
-    const token = cookies.auth_token;
+    // Determinar o domínio do cookie
+    const isProduction = process.env.NODE_ENV === 'production';
+    const origin = req.headers.origin || '';
+    let cookieDomain = '';
     
-    if (!token) {
-      return res.status(401).json({ 
-        success: false,
-        message: 'Não autenticado' 
-      });
+    if (isProduction) {
+      cookieDomain = '.seu-dominio.com';
+    } else if (origin.includes('localhost')) {
+      // Em desenvolvimento, não definimos o domínio para que o cookie seja removido corretamente
+      cookieDomain = '';
     }
 
-    // Verificar o token
-    try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'seu_segredo_secreto') as TokenPayload;
-      
-      // Buscar usuário
-      const user = await prisma.usuario.findUnique({
-        where: { id: decoded.id },
-        select: {
-          id: true,
-          nome: true,
-          email: true,
-          tipo: true,
-          ativo: true,
-          dataCriacao: true,
-          ultimoAcesso: true
-        }
-      });
+    // Configuração do cookie para expirar imediatamente
+    const cookieOptions: any = {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: isProduction ? 'lax' : 'lax',
+      path: '/',
+      expires: new Date(0), // Define a data de expiração para o passado
+    };
 
-      if (!user) {
-        return res.status(404).json({ 
-          success: false,
-          message: 'Usuário não encontrado' 
-        });
-      }
-
-      // Atualizar último acesso
-      await prisma.usuario.update({
-        where: { id: user.id },
-        data: { ultimoAcesso: new Date() }
-      });
-
-      return res.status(200).json({ 
-        success: true,
-        user 
-      });
-      
-    } catch (error) {
-      console.error('Erro ao verificar token:', error);
-      return res.status(401).json({ 
-        success: false,
-        message: 'Sessão inválida ou expirada' 
-      });
+    // Adiciona o domínio apenas se estiver definido e em produção
+    if (isProduction && cookieDomain) {
+      cookieOptions.domain = cookieDomain;
     }
+
+    // Define o cookie com data de expiração no passado para removê-lo
+    const cookie = serialize(COOKIE_NAME, '', cookieOptions);
+    res.setHeader('Set-Cookie', cookie);
+
+    // Configurar headers de segurança
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('X-XSS-Protection', '1; mode=block');
     
-  } catch (error) {
-    console.error('Erro ao buscar usuário:', error);
-    return res.status(500).json({ 
-      success: false,
-      message: 'Erro interno do servidor' 
+    if (isProduction) {
+      res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    }
+
+    return res.status(200).json({ 
+      success: true, 
+      message: 'Logout realizado com sucesso' 
     });
-  } finally {
-    await prisma.$disconnect();
+  } catch (error) {
+    console.error('Erro durante o logout:', error);
+    return res.status(500).json({ 
+      success: false, 
+      message: 'Erro durante o logout' 
+    });
   }
 }
 

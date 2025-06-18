@@ -29,9 +29,9 @@ import {
   Snackbar
 } from '@mui/material';
 import { Edit as EditIcon, Delete as DeleteIcon, Add as AddIcon } from '@mui/icons-material';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { TipoUsuario } from '@prisma/client';
-import { api } from '../../../services/api';
+import { api } from '@/services/api';
 
 interface Usuario {
   id: string;
@@ -41,6 +41,8 @@ interface Usuario {
   ativo: boolean;
   dataCriacao: string;
   ultimoAcesso?: string | null;
+  senha?: string;
+  confirmarSenha?: string;
 }
 
 export default function GerenciarUsuarios() {
@@ -52,7 +54,15 @@ export default function GerenciarUsuarios() {
   const [openDialog, setOpenDialog] = useState(false);
   const [currentUsuario, setCurrentUsuario] = useState<Partial<Usuario> | null>(null);
   const [isEditing, setIsEditing] = useState(false);
-  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+  const [snackbar, setSnackbar] = useState<{ 
+    open: boolean; 
+    message: string; 
+    severity: 'success' | 'error' | 'warning' | 'info' 
+  }>({ 
+    open: false, 
+    message: '', 
+    severity: 'success' 
+  });
 
   // Verificar se o usuário tem permissão
   useEffect(() => {
@@ -71,9 +81,10 @@ export default function GerenciarUsuarios() {
       setLoading(true);
       const response = await api.get('/api/admin/usuarios');
       setUsuarios(response.data);
-    } catch (err) {
-      console.error('Erro ao carregar usuários:', err);
-      setError('Erro ao carregar usuários. Tente novamente mais tarde.');
+    } catch (error: unknown) {
+      console.error('Erro ao carregar usuários:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Erro ao carregar usuários';
+      setError(`Erro ao carregar usuários: ${errorMessage}`);
     } finally {
       setLoading(false);
     }
@@ -107,11 +118,11 @@ export default function GerenciarUsuarios() {
     setCurrentUsuario(null);
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value, checked, type } = e.target;
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | { name?: string; value: unknown }>) => {
+    const { name, value } = e.target as { name: string; value: unknown };
     setCurrentUsuario(prev => ({
       ...prev!,
-      [name]: type === 'checkbox' ? checked : value
+      [name]: value
     }));
   };
 
@@ -133,12 +144,19 @@ export default function GerenciarUsuarios() {
       
       handleCloseDialog();
       await carregarUsuarios();
-    } catch (err) {
-      console.error('Erro ao salvar usuário:', err);
+    } catch (error: unknown) {
+      console.error('Erro ao salvar usuário:', error);
+      const errorMessage = error && typeof error === 'object' && 'response' in error && 
+                         error.response && typeof error.response === 'object' && 
+                         'data' in error.response && 
+                         error.response.data && typeof error.response.data === 'object' &&
+                         'message' in error.response.data ?
+                         String(error.response.data.message) : 'Erro ao salvar usuário';
+      
       setSnackbar({ 
         open: true, 
-        message: err.response?.data?.message || 'Erro ao salvar usuário', 
-        severity: 'error' 
+        message: errorMessage, 
+        severity: 'error' as const
       });
     } finally {
       setLoading(false);
@@ -159,12 +177,19 @@ export default function GerenciarUsuarios() {
         message: `Usuário ${!ativo ? 'ativado' : 'desativado'} com sucesso!`, 
         severity: 'success' 
       });
-    } catch (err) {
-      console.error('Erro ao atualizar status do usuário:', err);
+    } catch (error: unknown) {
+      console.error('Erro ao atualizar status do usuário:', error);
+      const errorMessage = error && typeof error === 'object' && 'response' in error && 
+                         error.response && typeof error.response === 'object' && 
+                         'data' in error.response && 
+                         error.response.data && typeof error.response.data === 'object' &&
+                         'message' in error.response.data ?
+                         String(error.response.data.message) : 'Erro ao atualizar status do usuário';
+      
       setSnackbar({ 
         open: true, 
-        message: 'Erro ao atualizar status do usuário', 
-        severity: 'error' 
+        message: errorMessage,
+        severity: 'error' as const
       });
     } finally {
       setLoading(false);

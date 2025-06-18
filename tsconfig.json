@@ -20,7 +20,11 @@
     "jsx": "preserve",
     "baseUrl": "./",
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["./*"],
+      "@/contexts/*": ["contexts/*"],
+      "@/services/*": ["services/*"],
+      "@/types/*": ["types/*"],
+      "@/components/*": ["components/*"]
     },
     "types": ["node"],
     "allowSyntheticDefaultImports": true
@@ -32,5 +36,10 @@
   ],
   "exclude": [
     "node_modules"
-  ]
+  ],
+  "ts-node": {
+    "compilerOptions": {
+      "module": "commonjs"
+    }
+  }
 }

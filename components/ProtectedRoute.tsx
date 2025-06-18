@@ -27,14 +27,16 @@ export default function ProtectedRoute({
     if (!isLoading) {
       setCheckedAuth(true);
       
-      // Se não está autenticado, redireciona para a página de login
-      if (!isAuthenticated) {
+      // Se não está autenticado e não está na página de login, redireciona para a página de login
+      if (!isAuthenticated && router.pathname !== '/login') {
+        console.log('[ProtectedRoute] Usuário não autenticado, redirecionando para login...');
         router.push(redirectTo);
         return;
       }
 
       // Se está autenticado mas não tem permissão, redireciona para acesso negado
-      if (user && !allowedRoles.includes(user.tipo)) {
+      if (isAuthenticated && user && !allowedRoles.includes(user.tipo)) {
+        console.log('[ProtectedRoute] Usuário não autorizado, redirecionando...');
         router.push('/acesso-negado');
         return;
       }
