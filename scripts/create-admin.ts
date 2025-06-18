@@ -5,15 +5,15 @@ const prisma = new PrismaClient();
 
 async function main() {
   // Verificar se o usuário admin já existe
-  const adminExists = await prisma.usuario.findUnique({
+  const adminExists = await prisma.Usuario.findUnique({
     where: { email: 'admin@controlecarga.com' },
   });
 
   if (!adminExists) {
     // Criar o usuário admin
-    const hashedPassword = await hash('admin123', 10);
+    const hashedPassword = await hash('adm123', 10);
     
-    const admin = await prisma.usuario.create({
+    const admin = await prisma.Usuario.create({
       data: {
         nome: 'Administrador',
         email: 'admin@controlecarga.com',
@@ -25,7 +25,8 @@ async function main() {
 
     console.log('✅ Usuário administrador criado com sucesso!');
     console.log('Email: admin@controlecarga.com');
-    console.log('Senha: admin123');
+    console.log('Senha: adm123');
+    console.log('ID do usuário:', admin.id);
   } else {
     console.log('ℹ️ Usuário administrador já existe no banco de dados.');
   }

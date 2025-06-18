@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { useStore } from '../store/store';
-import {
+import React, { useState, useEffect, useCallback } from 'react';
+import { useStore, NotaFiscal } from '../store/store';
+import { 
   Container,
   Typography,
   Paper,
@@ -14,10 +14,22 @@ import {
   Divider,
   TextField,
   MenuItem,
+  CircularProgress,
+  Chip,
+  InputAdornment,
+  IconButton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
   SelectChangeEvent
 } from '@mui/material';
+import SearchIcon from '@mui/icons-material/Search';
+import ClearIcon from '@mui/icons-material/Clear';
 import { useRouter } from 'next/router';
 import { useSnackbar } from 'notistack';
+import RefreshIcon from '@mui/icons-material/Refresh';
 
 interface Nota {
   id: string;
@@ -26,7 +38,6 @@ interface Nota {
   valor: number;
   controleId?: string;
 }
-import RefreshIcon from '@mui/icons-material/Refresh';
 
 const VincularNotasPage = () => {
   const { enqueueSnackbar } = useSnackbar();
@@ -35,6 +46,7 @@ const VincularNotasPage = () => {
   
   const { 
     notas, 
+    controles,
     fetchNotas, 
     fetchControles,
     vincularNotas,
@@ -42,57 +54,65 @@ const VincularNotasPage = () => {
   } = useStore();
   
   const [notasSelecionadas, setNotasSelecionadas] = useState<string[]>([]);
-  const controleId = Array.isArray(id) ? id[0] || '' : id || '';
-  const [motorista, setMotorista] = useState<string>('');
-  const [cpfMotorista, setCpfMotorista] = useState<string>('');
-  const [responsavel, setResponsavel] = useState<string>('');
+  const [buscaNota, setBuscaNota] = useState('');
+  const controleId = typeof id === 'string' ? id : '';
+  const [motorista, setMotorista] = useState('');
+  const [cpfMotorista, setCpfMotorista] = useState('');
+  const [responsavel, setResponsavel] = useState('');
   const [transportadora, setTransportadora] = useState<'ACERT' | 'EXPRESSO_GOIAS'>('ACERT');
-  const [numeroManifesto, setNumeroManifesto] = useState<string>('');
+  const [numeroManifesto, setNumeroManifesto] = useState('');
   const [qtdPallets, setQtdPallets] = useState<number>(0);
-  const [observacao, setObservacao] = useState<string>('');
+  const [observacao, setObservacao] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [openConfirmDialog, setOpenConfirmDialog] = useState(false);
+  const [controleEncontrado, setControleEncontrado] = useState<boolean>(false);
   const [erros, setErros] = useState<Record<string, string>>({});
 
-  const validarCPF = (cpf: string): boolean => {
-    cpf = cpf.replace(/[\D]/g, '');
-    
-    if (cpf.length !== 11) return false;
-    
-    // Verifica se todos os dígitos são iguais
-    if (/^(\d)\1+$/.test(cpf)) return false;
-    
-    // Validação do primeiro dígito verificador
-    let soma = 0;
-    for (let i = 0; i < 9; i++) {
-      soma += parseInt(cpf.charAt(i)) * (10 - i);
-    }
-    let resto = 11 - (soma % 11);
-    const digitoVerificador1 = resto >= 10 ? 0 : resto;
-    
-    if (digitoVerificador1 !== parseInt(cpf.charAt(9))) return false;
-    
-    // Validação do segundo dígito verificador
-    soma = 0;
-    for (let i = 0; i < 10; i++) {
-      soma += parseInt(cpf.charAt(i)) * (11 - i);
-    }
-    resto = 11 - (soma % 11);
-    const digitoVerificador2 = resto >= 10 ? 0 : resto;
-    
-    return digitoVerificador2 === parseInt(cpf.charAt(10));
-  };
-  
-  const formatarCPF = (cpf: string): string => {
-    return cpf
-      .replace(/\D/g, '')
-      .replace(/(\d{3})(\d)/, '$1.$2')
-      .replace(/(\d{3})(\d)/, '$1.$2')
-      .replace(/(\d{3})(\d{1,2})/, '$1-$2')
-      .replace(/(-\d{2})\d+?$/, '$1');
-  };
-
+  // Carrega os dados iniciais
   useEffect(() => {
-    fetchNotas();
-  }, [fetchNotas]);
+    const loadData = async () => {
+      setLoading(true);
+      try {
+        await Promise.all([
+          fetchNotas(),
+          fetchControles()
+        ]);
+        
+        // Se estiver editando, carrega os dados do controle
+        if (controleId) {
+          const controle = controles.find(c => c.id === controleId);
+          if (controle) {
+            setControleEncontrado(true);
+            setMotorista(controle.motorista);
+            setCpfMotorista(controle.cpfMotorista);
+            setResponsavel(controle.responsavel);
+            setTransportadora(controle.transportadora);
+            setNumeroManifesto(controle.numeroManifesto);
+            setQtdPallets(controle.qtdPallets);
+            setObservacao(controle.observacao || '');
+            
+            // Marca as notas já vinculadas como selecionadas
+            const notasVinculadas = controle.notas
+              .filter((nota: NotaFiscal) => nota.controleId === controleId)
+              .map((nota: NotaFiscal) => nota.id);
+            setNotasSelecionadas(notasVinculadas);
+          } else {
+            setControleEncontrado(false);
+          }
+        }
+      } catch (error) {
+        console.error('Erro ao carregar dados:', error);
+        enqueueSnackbar('Erro ao carregar dados. Tente novamente.', { 
+          variant: 'error',
+          anchorOrigin: { vertical: 'top', horizontal: 'center' }
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadData();
+  }, [controleId, fetchNotas, fetchControles, controles, enqueueSnackbar]);
 
   const handleToggleNota = (notaId: string) => {
     const currentIndex = notasSelecionadas.indexOf(notaId);
@@ -107,6 +127,77 @@ const VincularNotasPage = () => {
     setNotasSelecionadas(newSelecionadas);
   };
 
+  const validarCPF = (cpf: string): { valido: boolean; mensagem?: string } => {
+    cpf = cpf.replace(/[\D]/g, '');
+    
+    if (cpf.length !== 11) {
+      return { valido: false, mensagem: 'CPF deve ter 11 dígitos' };
+    }
+    
+    // Verifica se todos os dígitos são iguais
+    if (/^(\d)\1+$/.test(cpf)) {
+      return { valido: false, mensagem: 'CPF inválido' };
+    }
+    
+    // Validação do primeiro dígito verificador
+    let soma = 0;
+    for (let i = 0; i < 9; i++) {
+      soma += parseInt(cpf.charAt(i)) * (10 - i);
+    }
+    let resto = 11 - (soma % 11);
+    const digitoVerificador1 = resto >= 10 ? 0 : resto;
+    
+    if (digitoVerificador1 !== parseInt(cpf.charAt(9))) {
+      return { valido: false, mensagem: 'CPF inválido' };
+    }
+    
+    // Validação do segundo dígito verificador
+    soma = 0;
+    for (let i = 0; i < 10; i++) {
+      soma += parseInt(cpf.charAt(i)) * (11 - i);
+    }
+    resto = 11 - (soma % 11);
+    const digitoVerificador2 = resto >= 10 ? 0 : resto;
+    
+    if (digitoVerificador2 !== parseInt(cpf.charAt(10))) {
+      return { valido: false, mensagem: 'CPF inválido' };
+    }
+    
+    return { valido: true };
+  };
+  
+  const formatarCPF = (cpf: string): string => {
+    return cpf
+      .replace(/\D/g, '')
+      .replace(/(\d{3})(\d)/, '$1.$2')
+      .replace(/(\d{3})(\d)/, '$1.$2')
+      .replace(/(\d{3})(\d{1,2})/, '$1-$2')
+      .replace(/(-\d{2})\d+?$/, '$1');
+  };
+
+  const handleCpfChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const valorFormatado = formatarCPF(e.target.value);
+    setCpfMotorista(valorFormatado);
+    
+    // Validação em tempo real
+    if (valorFormatado.length === 14) { // Formato completo: 000.000.000-00
+      const validacao = validarCPF(valorFormatado);
+      if (!validacao.valido) {
+        setErros(prev => ({ ...prev, cpfMotorista: validacao.mensagem || 'CPF inválido' }));
+      } else {
+        const novosErros = { ...erros };
+        delete novosErros.cpfMotorista;
+        setErros(novosErros);
+      }
+    } else if (valorFormatado.length > 0) {
+      setErros(prev => ({ ...prev, cpfMotorista: 'CPF incompleto' }));
+    } else {
+      const novosErros = { ...erros };
+      delete novosErros.cpfMotorista;
+      setErros(novosErros);
+    }
+  }, [erros]);
+
   const validarFormulario = (): boolean => {
     const novosErros: Record<string, string> = {};
     
@@ -120,20 +211,30 @@ const VincularNotasPage = () => {
     
     if (!cpfMotorista.trim()) {
       novosErros.cpfMotorista = 'CPF é obrigatório';
-    } else if (!validarCPF(cpfMotorista)) {
-      novosErros.cpfMotorista = 'CPF inválido';
+    } else {
+      const validacao = validarCPF(cpfMotorista);
+      if (!validacao.valido) {
+        novosErros.cpfMotorista = validacao.mensagem || 'CPF inválido';
+      }
     }
     
     setErros(novosErros);
     return Object.keys(novosErros).length === 0;
   };
 
-  const handleVincular = async () => {
+  const handleVincular = () => {
     if (!validarFormulario()) {
-      enqueueSnackbar('Corrija os erros antes de salvar', { variant: 'warning' });
+      enqueueSnackbar('Corrija os erros antes de salvar', { 
+        variant: 'warning',
+        anchorOrigin: { vertical: 'top', horizontal: 'center' }
+      });
       return;
     }
     
+    setOpenConfirmDialog(true);
+  };
+
+  const handleAtualizar = async (): Promise<boolean> => {
     try {
       await atualizarControle(controleId, {
         motorista: motorista.trim(),
@@ -149,149 +250,345 @@ const VincularNotasPage = () => {
         await vincularNotas(controleId, notasSelecionadas);
       }
       
-      enqueueSnackbar('Controle salvo com sucesso!', { variant: 'success' });
-      router.push('/listar-controles');
-    } catch (e) {
-      console.error('Erro ao salvar controle:', e);
-      enqueueSnackbar('Erro ao salvar controle. Tente novamente.', { variant: 'error' });
+      return true;
+    } catch (error) {
+      console.error('Erro ao atualizar controle:', error);
+      enqueueSnackbar('Erro ao atualizar controle. Tente novamente.', { 
+        variant: 'error',
+        anchorOrigin: { vertical: 'top', horizontal: 'center' }
+      });
+      return false;
     }
   };
-// Adicione este botão no seu componente VincularNotasPage
-const handleAtualizarNotas = () => {
-  fetchNotas();
-  enqueueSnackbar('Atualizando lista de notas...', { variant: 'info' });
-};
 
-// No seu JSX, adicione este botão
-<Box sx={{ mb: 2 }}>
-  <Button 
-    variant="outlined"
-    onClick={handleAtualizarNotas}
-    startIcon={<RefreshIcon />}
-  >
-    Atualizar Lista de Notas
-  </Button>
-</Box>
-  return (
-    <Container maxWidth="md" sx={{ mt: 4, mb: 4 }}>
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" component="h1" gutterBottom>
-          Vincular Notas ao Controle
-        </Typography>
-      </Box>
+  const handleCriar = async (): Promise<boolean> => {
+    try {
+      const novoControle = await atualizarControle('', {
+        motorista: motorista.trim(),
+        responsavel: responsavel.trim(),
+        cpfMotorista: cpfMotorista.replace(/\D/g, ''),
+        transportadora,
+        numeroManifesto,
+        qtdPallets,
+        observacao: observacao.trim(),
+      });
       
-      <Paper elevation={3} sx={{ p: 3, mb: 3 }}>
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 2 }}>
-          <Box sx={{ display: 'flex', gap: 2 }}>
-            <TextField 
-              label="Motorista" 
-              value={motorista} 
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setMotorista(e.target.value)}
+      if (notasSelecionadas.length > 0 && novoControle?.id) {
+        await vincularNotas(novoControle.id, notasSelecionadas);
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('Erro ao criar controle:', error);
+      enqueueSnackbar('Erro ao criar controle. Tente novamente.', { 
+        variant: 'error',
+        anchorOrigin: { vertical: 'top', horizontal: 'center' }
+      });
+      return false;
+    }
+  };
+
+  const handleConfirmSave = async () => {
+    setOpenConfirmDialog(false);
+    setLoading(true);
+    
+    try {
+      let sucesso = false;
+      
+      if (controleId) {
+        sucesso = await handleAtualizar();
+      } else {
+        sucesso = await handleCriar();
+      }
+      
+      if (sucesso) {
+        enqueueSnackbar(
+          controleId ? 'Controle atualizado com sucesso!' : 'Controle criado com sucesso!', 
+          { 
+            variant: 'success',
+            anchorOrigin: { vertical: 'top', horizontal: 'center' }
+          }
+        );
+        router.push('/listar-controles');
+      }
+    } catch (error) {
+      console.error('Erro ao processar o formulário:', error);
+      enqueueSnackbar('Ocorreu um erro ao processar sua solicitação.', { 
+        variant: 'error',
+        anchorOrigin: { vertical: 'top', horizontal: 'center' }
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAtualizarNotas = () => {
+    setLoading(true);
+    fetchNotas().finally(() => setLoading(false));
+  };
+
+  // Filtra as notas com base no termo de busca
+  const notasFiltradas = notas.filter(nota => 
+    !buscaNota || 
+    nota.numeroNota.toLowerCase().includes(buscaNota.toLowerCase()) ||
+    nota.codigo.toLowerCase().includes(buscaNota.toLowerCase())
+  );
+
+  if (loading) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (controleId && !controleEncontrado) {
+    return (
+      <Container maxWidth="lg">
+        <Box my={4}>
+          <Typography variant="h4" gutterBottom>
+            Controle não encontrado
+          </Typography>
+          <Button 
+            variant="contained" 
+            color="primary" 
+            onClick={() => router.push('/listar-controles')}
+          >
+            Voltar para a lista
+          </Button>
+        </Box>
+      </Container>
+    );
+  }
+
+  return (
+    <Container maxWidth="lg">
+      <Box my={4}>
+        <Typography variant="h4" gutterBottom>
+          {controleId ? 'Editar Controle' : 'Novo Controle'}
+        </Typography>
+        
+        <Paper sx={{ p: 3, mb: 3 }}>
+          <Typography variant="h6" gutterBottom>
+            Dados do Motorista
+          </Typography>
+          
+          <Box display="flex" gap={2} flexWrap="wrap" mb={2}>
+            <TextField
+              label="Motorista"
+              value={motorista}
+              onChange={(e) => setMotorista(e.target.value)}
+              fullWidth
+              margin="normal"
               error={!!erros.motorista}
               helperText={erros.motorista}
-              fullWidth 
-              required
             />
-            <TextField 
-              label="CPF Motorista" 
-              value={formatarCPF(cpfMotorista)}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                setCpfMotorista(e.target.value.replace(/\D/g, ''));
-              }}
-              error={!!erros.cpfMotorista}
-              helperText={erros.cpfMotorista || 'Apenas números'}
-              fullWidth 
-              required
+            
+            <TextField
+              label="CPF do Motorista"
+              value={cpfMotorista}
+              onChange={handleCpfChange}
+              fullWidth
+              margin="normal"
               placeholder="000.000.000-00"
+              error={!!erros.cpfMotorista}
+              helperText={erros.cpfMotorista}
+              inputProps={{ maxLength: 14 }}
             />
-          </Box>
-          <Box sx={{ display: 'flex', gap: 2 }}>
-            <TextField 
-              select 
-              label="Transportadora" 
-              value={transportadora} 
-              onChange={(e: SelectChangeEvent<'ACERT' | 'EXPRESSO_GOIAS'>) => 
-                setTransportadora(e.target.value as 'ACERT' | 'EXPRESSO_GOIAS')
-              } 
-              sx={{ minWidth: 200 }}
-            >
-              <MenuItem value="ACERT">Acert</MenuItem>
-              <MenuItem value="EXPRESSO_GOIAS">Expresso Goiás</MenuItem>
-            </TextField>
-            <TextField 
-              label="Número Manifesto" 
-              value={numeroManifesto} 
-              InputProps={{ readOnly: true }} 
-              fullWidth 
-            />
-            <TextField 
-              label="Qtd Pallets" 
-              type="number" 
-              value={qtdPallets} 
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => 
-                setQtdPallets(Math.max(0, parseInt(e.target.value) || 0))
-              } 
-              sx={{ maxWidth: 160 }} 
-              inputProps={{ min: 0 }}
-            />
-          </Box>
-          <Box>
-            <TextField 
-              label="Responsável" 
-              value={responsavel} 
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setResponsavel(e.target.value)}
+            
+            <TextField
+              label="Responsável"
+              value={responsavel}
+              onChange={(e) => setResponsavel(e.target.value)}
+              fullWidth
+              margin="normal"
               error={!!erros.responsavel}
               helperText={erros.responsavel}
-              fullWidth 
-              required
             />
           </Box>
-          <TextField 
-            label="Observação" 
-            value={observacao} 
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setObservacao(e.target.value)} 
-            multiline 
-            rows={3} 
-            fullWidth 
+          
+          <Box display="flex" gap={2} flexWrap="wrap" mb={2}>
+            <TextField
+              select
+              label="Transportadora"
+              value={transportadora}
+              onChange={(e: SelectChangeEvent) => 
+                setTransportadora(e.target.value as 'ACERT' | 'EXPRESSO_GOIAS')
+              }
+              fullWidth
+              margin="normal"
+            >
+              <MenuItem value="ACERT">ACERT</MenuItem>
+              <MenuItem value="EXPRESSO_GOIAS">Expresso Goiás</MenuItem>
+            </TextField>
+            
+            <TextField
+              label="Número do Manifesto"
+              value={numeroManifesto}
+              onChange={(e) => setNumeroManifesto(e.target.value)}
+              fullWidth
+              margin="normal"
+            />
+            
+            <TextField
+              label="Quantidade de Pallets"
+              type="number"
+              value={qtdPallets}
+              onChange={(e) => 
+                setQtdPallets(Math.max(0, parseInt(e.target.value) || 0))
+              }
+              fullWidth
+              margin="normal"
+              InputProps={{
+                inputProps: { min: 0 }
+              }}
+            />
+          </Box>
+          
+          <TextField
+            label="Observações"
+            value={observacao}
+            onChange={(e) => setObservacao(e.target.value)}
+            fullWidth
+            multiline
+            rows={3}
+            margin="normal"
           />
-        </Box>
-        <Typography variant="h6" gutterBottom>
-          Notas Disponíveis:
-        </Typography>
-        <Divider sx={{ mb: 2 }} />
+        </Paper>
         
-        <List>
-          {(Array.isArray(notas) ? notas : [])
-            .filter((nota) => !nota.controleId)
-            .map((nota) => (
-              <ListItem key={nota.id}>
+        <Paper sx={{ p: 3, mb: 3 }}>
+          <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+            <Typography variant="h6">
+              Notas Fiscais
+            </Typography>
+            <Box display="flex" gap={1}>
+              <Button 
+                variant="outlined" 
+                startIcon={<RefreshIcon />}
+                onClick={handleAtualizarNotas}
+                disabled={loading}
+              >
+                Atualizar
+              </Button>
+              <TextField
+                placeholder="Buscar nota..."
+                value={buscaNota}
+                onChange={(e) => setBuscaNota(e.target.value)}
+                size="small"
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon />
+                    </InputAdornment>
+                  ),
+                  endAdornment: buscaNota && (
+                    <InputAdornment position="end">
+                      <IconButton
+                        size="small"
+                        onClick={() => setBuscaNota('')}
+                        edge="end"
+                      >
+                        <ClearIcon fontSize="small" />
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }}
+                sx={{ minWidth: 250 }}
+              />
+            </Box>
+          </Box>
+          
+          <List>
+            {notasFiltradas.length > 0 ? (
+              notasFiltradas.map((nota) => (
+                <React.Fragment key={nota.id}>
+                  <ListItem>
+                    <Checkbox
+                      checked={notasSelecionadas.includes(nota.id)}
+                      onChange={() => handleToggleNota(nota.id)}
+                      color="primary"
+                    />
+                    <ListItemText
+                      primary={`Nota: ${nota.numeroNota}`}
+                      secondary={`Código: ${nota.codigo} | Valor: R$ ${nota.valor.toFixed(2)}`}
+                    />
+                    {nota.controleId && nota.controleId !== controleId && (
+                      <Chip 
+                        label="Já vinculada" 
+                        color="warning" 
+                        size="small"
+                        sx={{ ml: 1 }}
+                      />
+                    )}
+                  </ListItem>
+                  <Divider component="li" />
+                </React.Fragment>
+              ))
+            ) : (
+              <ListItem>
                 <ListItemText 
-                  primary={`Nota: ${nota.numeroNota}`}
-                  secondary={`Código: ${nota.codigo}`} 
+                  primary="Nenhuma nota encontrada" 
+                  secondary={buscaNota ? 'Tente ajustar sua busca' : 'Faça uma busca para encontrar notas'}
                 />
-                <ListItemSecondaryAction>
-                  <Checkbox
-                    edge="end"
-                    onChange={() => handleToggleNota(nota.id)}
-                    checked={notasSelecionadas.indexOf(nota.id) !== -1}
-                    inputProps={{ 'aria-label': `Selecionar nota ${nota.numeroNota}` } as React.InputHTMLAttributes<HTMLInputElement>}
-                  />
-                </ListItemSecondaryAction>
               </ListItem>
-            ))}
-        </List>
-      </Paper>
-      
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-        <Button 
-          variant="contained" 
-          size="large"
-          onClick={handleVincular}
-          disabled={notasSelecionadas.length === 0}
-        >
-          Vincular Notas Selecionadas
-        </Button>
+            )}
+          </List>
+        </Paper>
+        
+        <Box display="flex" justifyContent="flex-end" gap={2}>
+          <Button 
+            variant="outlined" 
+            onClick={() => router.push('/listar-controles')}
+          >
+            Cancelar
+          </Button>
+          <Button 
+            variant="contained" 
+            color="primary" 
+            onClick={handleVincular}
+            disabled={loading}
+            startIcon={loading ? <CircularProgress size={20} /> : null}
+          >
+            {controleId ? 'Atualizar' : 'Salvar'}
+          </Button>
+        </Box>
       </Box>
+      
+      <Dialog
+        open={openConfirmDialog}
+        onClose={() => setOpenConfirmDialog(false)}
+      >
+        <DialogTitle>
+          {controleId ? 'Atualizar Controle?' : 'Criar Novo Controle?'}
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            {controleId 
+              ? 'Deseja realmente atualizar este controle com as alterações feitas?'
+              : 'Deseja criar um novo controle com as informações fornecidas?'}
+          </DialogContentText>
+          {notasSelecionadas.length > 0 && (
+            <Box mt={2}>
+              <Typography variant="subtitle2">Notas selecionadas:</Typography>
+              <Typography variant="body2" color="text.secondary">
+                {notasSelecionadas.length} nota(s) serão vinculadas a este controle.
+              </Typography>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenConfirmDialog(false)}>Cancelar</Button>
+          <Button 
+            onClick={handleConfirmSave} 
+            color="primary"
+            variant="contained"
+            autoFocus
+            disabled={loading}
+          >
+            {loading ? 'Salvando...' : 'Confirmar'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 };

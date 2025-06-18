@@ -57,14 +57,7 @@ const ListarControlesPage = () => {
     page.drawText(`Data: ${format(new Date(controle.dataCriacao), 'dd/MM/yyyy HH:mm')}`, { x: 50, y: camposY - 54, size: 12, font });
     // Table header
 
-    // --- Assinaturas ---
-    // Linhas para assinatura no rodapé
-    const assinaturaY = 60;
-    page.drawLine({ start: { x: 80, y: assinaturaY }, end: { x: 250, y: assinaturaY }, thickness: 1, color: rgb(0,0,0) });
-    page.drawLine({ start: { x: width/2 + 20, y: assinaturaY }, end: { x: width/2 + 190, y: assinaturaY }, thickness: 1, color: rgb(0,0,0) });
-    // Nomes abaixo das linhas
-    page.drawText(`Motorista: ${controle.motorista}`, { x: 80, y: assinaturaY - 15, size: 10, font });
-    page.drawText(`Responsável: ${controle.responsavel}`, { x: width/2 + 20, y: assinaturaY - 15, size: 10, font });
+    // Tabela de notas
     const startY = height - 120;
     page.drawText('Cód', { x: 50, y: startY, size: 10, font });
     page.drawText('Número NF', { x: 100, y: startY, size: 10, font });
