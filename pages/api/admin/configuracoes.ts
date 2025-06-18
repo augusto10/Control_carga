@@ -1,11 +1,31 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getSession } from 'next-auth/react';
 import { prisma } from '../../../prisma/config';
 import { PrismaClientWithConfiguracaoSistema } from '../../../prisma/config';
 import { ApiError, ApiResponse } from '../../../types/api';
+import jwt from 'jsonwebtoken';
+
+interface TokenPayload {
+  id: string;
+  email: string;
+  tipo: string;
+  iat: number;
+  exp: number;
+}
+
+// Tipos permitidos para as configurações
+type TipoConfiguracao = 'string' | 'number' | 'boolean' | 'json';
+
+interface ConfiguracaoPadrao {
+  chave: string;
+  valor: string;
+  descricao: string;
+  tipo: TipoConfiguracao;
+  editavel: boolean;
+  opcoes?: string;
+}
 
 // Configurações padrão do sistema
-const CONFIGURACOES_PADRAO = [
+const CONFIGURACOES_PADRAO: ConfiguracaoPadrao[] = [
   {
     chave: 'SISTEMA_NOME',
     valor: 'Sistema de Controle de Carga',
@@ -86,9 +106,19 @@ async function inicializarConfiguracoesPadrao() {
     const contador = await (prisma as PrismaClientWithConfiguracaoSistema).configuracaoSistema.count();
     
     if (contador === 0) {
-      // Criar configurações padrão
+      // Mapear as configurações para o formato esperado pelo Prisma
+      const configuracoesParaCriar = CONFIGURACOES_PADRAO.map(config => ({
+        chave: config.chave,
+        valor: config.valor,
+        descricao: config.descricao,
+        tipo: config.tipo,
+        opcoes: config.opcoes || null,
+        editavel: config.editavel
+      }));
+
+      // Criar configurações padrão usando createMany
       await (prisma as PrismaClientWithConfiguracaoSistema).configuracaoSistema.createMany({
-        data: CONFIGURACOES_PADRAO
+        data: configuracoesParaCriar
       });
     }
   } catch (error) {
@@ -100,22 +130,34 @@ async function inicializarConfiguracoesPadrao() {
 // Função para listar configurações
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Verificar autenticação e permissão
-  const session = await getSession({ req });
+  const authHeader = req.headers.authorization;
   
-  if (!session?.user?.email) {
+  if (!authHeader) {
     return res.status(401).json({
-      message: 'Não autorizado'
+      message: 'Token não fornecido'
     });
   }
 
-  const usuario = await (prisma as PrismaClientWithConfiguracaoSistema).usuario.findUnique({
-    where: { email: session.user.email },
-    select: { tipo: true }
-  });
+  const token = authHeader.split(' ')[1];
+  if (!token) {
+    return res.status(401).json({
+      message: 'Token inválido'
+    });
+  }
 
-  if (!usuario || usuario.tipo !== 'ADMIN') {
-    return res.status(403).json({
-      message: 'Acesso negado. Permissão de administrador necessária.'
+  try {
+    // Verificar o token JWT
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'seu_segredo_secreto') as TokenPayload;
+    
+    // Verificar se o usuário é administrador
+    if (decoded.tipo !== 'ADMIN') {
+      return res.status(403).json({
+        message: 'Acesso negado. Permissão de administrador necessária.'
+      });
+    }
+  } catch (error) {
+    return res.status(401).json({
+      message: 'Token inválido ou expirado'
     });
   }
 

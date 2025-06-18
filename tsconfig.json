@@ -20,17 +20,15 @@
     "jsx": "preserve",
     "baseUrl": "./",
     "paths": {
-      "@/*": ["./"]
-    }
+      "@/*": ["./*"]
+    },
+    "types": ["node"],
+    "allowSyntheticDefaultImports": true
   },
   "include": [
     "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx"
-  ],
-  "typeRoots": [
-    "./node_modules/@types",
-    "./types"
   ],
   "exclude": [
     "node_modules"

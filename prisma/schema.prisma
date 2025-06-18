@@ -39,15 +39,16 @@ enum Transportadora {
 }
 
 model Usuario {
-  id           String       @id @default(uuid())
-  nome         String
-  email        String       @unique
-  senha        String
-  tipo         TipoUsuario  @default(USUARIO)
-  ativo        Boolean      @default(true)
-  dataCriacao  DateTime     @default(now())
-  ultimoAcesso DateTime?
-  notas        NotaFiscal[]
+  id               String            @id @default(uuid())
+  nome             String
+  email            String            @unique
+  senha            String
+  tipo             TipoUsuario       @default(USUARIO)
+  ativo            Boolean           @default(true)
+  dataCriacao      DateTime          @default(now())
+  ultimoAcesso     DateTime?
+  notas            NotaFiscal[]
+  auditoriasAcesso AuditoriaAcesso[]
 }
 
 enum TipoUsuario {

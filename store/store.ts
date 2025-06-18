@@ -10,7 +10,7 @@ export type NotaFiscal = {
   controleId: string | null;
 };
 
-type ControleCarga = {
+export type ControleCarga = {
   id: string;
   dataCriacao: Date;
   motorista: string;
@@ -34,7 +34,7 @@ interface StoreState {
   criarControle: (controle: Omit<ControleCarga, 'id' | 'dataCriacao' | 'finalizado' | 'notas'> & { notasIds: string[] }) => Promise<ControleCarga>;
   vincularNotas: (controleId: string, notasIds: string[]) => Promise<void>;
   finalizarControle: (controleId: string) => Promise<void>;
-  atualizarControle: (controleId: string, dados: Partial<Omit<ControleCarga, 'id' | 'dataCriacao' | 'notas'>>) => Promise<void>;
+  atualizarControle: (controleId: string, dados: Partial<Omit<ControleCarga, 'id' | 'dataCriacao' | 'notas'>>) => Promise<ControleCarga | null>;
 }
 
 export const useStore = create<StoreState>((set) => ({
@@ -205,7 +205,7 @@ export const useStore = create<StoreState>((set) => ({
     await useStore.getState().fetchControles();
   },
 
-  atualizarControle: async (controleId, dados) => {
+  atualizarControle: async (controleId, dados): Promise<ControleCarga | null> => {
     console.log('Iniciando atualizarControle...');
     try {
       console.log('Enviando requisição para /api/controles/atualizar com dados:', {
@@ -241,13 +241,14 @@ export const useStore = create<StoreState>((set) => ({
       
       // Atualiza a lista de controles após a atualização
       console.log('Atualizando lista de controles...');
-      await useStore.getState().fetchControles();
       const result = await response.json();
+      await useStore.getState().fetchControles();
       console.log('Controle atualizado com sucesso:', result);
-      return result;
+      return result as ControleCarga;
+      
     } catch (error) {
       console.error('Erro ao atualizar controle:', error);
-      throw error;
+      return null;
     }
   },
 }));

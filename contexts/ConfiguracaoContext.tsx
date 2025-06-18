@@ -23,8 +23,8 @@ export function ConfiguracaoProvider({ children }: { children: ReactNode }) {
   } = useConfiguracoes();
 
   // Função auxiliar para obter uma configuração com tipo seguro
-  const getConfig = (chave: string, valorPadrao: any = null) => {
-    return getConfiguracao(chave, valorPadrao);
+  const getConfig = <T = any>(chave: string, valorPadrao: T = null as any): T => {
+    return getConfiguracao(chave, valorPadrao) as T;
   };
 
   return (
@@ -34,7 +34,13 @@ export function ConfiguracaoProvider({ children }: { children: ReactNode }) {
         loading,
         error,
         getConfig,
-        atualizarConfigs: atualizarConfiguracoes,
+        atualizarConfigs: async (novasConfigs: Record<string, any>) => {
+          // Convert the Record into individual updates
+          for (const [chave, novoValor] of Object.entries(novasConfigs)) {
+            await atualizarConfiguracoes(chave, novoValor);
+          }
+          return novasConfigs;
+        },
         recarregarConfigs: carregarConfiguracoes
       }}
     >
