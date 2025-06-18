@@ -25,7 +25,7 @@ import {
   Warning as WarningIcon,
   Refresh as RefreshIcon
 } from '@mui/icons-material';
-import AdminLayout from '../../../components/admin/AdminLayout';
+import AdminLayout from '../../components/admin/AdminLayout';
 import { api } from '../../../services/api';
 
 interface DashboardStats {
