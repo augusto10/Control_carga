@@ -21,8 +21,9 @@ import {
 import { Search, FilterList, Refresh } from '@mui/icons-material';
 import { useStore } from '../store/store';
 import { format } from 'date-fns';
-import { formatISO9075 } from 'date-fns/formatISO9075';
 import { ptBR } from 'date-fns/locale';
+import { formatISO9075 } from 'date-fns/formatISO9075';
+
 
 interface FiltrosNotas {
   numeroNota?: string;
@@ -113,14 +114,14 @@ const ConsultarNotas = () => {
             label="Número da Nota"
             size="small"
             value={filtros.numeroNota || ''}
-            onChange={(e) => setFiltros({ ...filtros, numeroNota: e.target.value })}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFiltros({ ...filtros, numeroNota: e.target.value })}
             sx={{ minWidth: 200 }}
           />
           <TextField
             label="Código"
             size="small"
             value={filtros.codigo || ''}
-            onChange={(e) => setFiltros({ ...filtros, codigo: e.target.value })}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFiltros({ ...filtros, codigo: e.target.value })}
             sx={{ minWidth: 200 }}
           />
           <TextField
@@ -129,7 +130,7 @@ const ConsultarNotas = () => {
             size="small"
             InputLabelProps={{ shrink: true }}
             value={filtros.dataInicio || ''}
-            onChange={(e) => setFiltros({ ...filtros, dataInicio: e.target.value })}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFiltros({ ...filtros, dataInicio: e.target.value })}
           />
           <TextField
             label="Data Fim"
@@ -137,14 +138,16 @@ const ConsultarNotas = () => {
             size="small"
             InputLabelProps={{ shrink: true }}
             value={filtros.dataFim || ''}
-            onChange={(e) => setFiltros({ ...filtros, dataFim: e.target.value })}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFiltros({ ...filtros, dataFim: e.target.value })}
           />
           <TextField
             select
             label="Status"
             size="small"
             value={filtros.status || 'TODAS'}
-            onChange={(e) => setFiltros({ ...filtros, status: e.target.value as any })}
+            onChange={(e: React.ChangeEvent<HTMLSelectElement>) => 
+              setFiltros({ ...filtros, status: e.target.value as FiltrosNotas['status'] })
+            }
             sx={{ minWidth: 150 }}
             SelectProps={{ native: true }}
           >
@@ -212,7 +215,7 @@ const ConsultarNotas = () => {
                       }).format(nota.valor || 0)}
                     </TableCell>
                     <TableCell>
-                      {formatISO9075(new Date(nota.dataCriacao), { locale: ptBR })}
+                    {formatISO9075(new Date(nota.dataCriacao))}
                     </TableCell>
                     <TableCell>
                       {nota.controleId ? (
