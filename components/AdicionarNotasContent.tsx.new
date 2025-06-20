@@ -1,0 +1,424 @@
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import {
+  Box,
+  Button,
+  TextField,
+  Typography,
+  CircularProgress,
+  Chip,
+  IconButton,
+  InputAdornment,
+  Tooltip,
+  useTheme,
+  useMediaQuery,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Paper,
+} from '@mui/material';
+import {
+  Add as AddIcon,
+  Delete as DeleteIcon,
+  Save as SaveIcon,
+  QrCodeScanner as QrCodeScannerIcon,
+  DeleteSweep as DeleteSweepIcon,
+  Receipt as ReceiptIcon,
+  Info as InfoIcon,
+  Create as CreateIcon,
+} from '@mui/icons-material';
+import { useSnackbar } from 'notistack';
+import { useStore } from '../store/store';
+
+interface NotaAdicionada {
+  id: string;
+  numero: string;
+  valor: string;
+  status?: string;
+}
+
+export const AdicionarNotasContent: React.FC = () => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const { enqueueSnackbar } = useSnackbar();
+  const { addNota, status, fetchNotas } = useStore();
+  
+  // Estados
+  const [loading, setLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [erro, setErro] = useState('');
+  const [numeroNota, setNumeroNota] = useState('');
+  const [notas, setNotas] = useState<NotaAdicionada[]>([]);
+  const [notaEmEdicao, setNotaEmEdicao] = useState<NotaAdicionada | null>(null);
+  const [scannerAberto, setScannerAberto] = useState(false);
+  const notaAdicionadaRef = useRef<HTMLDivElement>(null);
+
+  // Função para formatar valor monetário
+  const formatarMoeda = (valor: string | number): string => {
+    const numero = typeof valor === 'string' ? 
+      parseFloat(valor.replace(/[^0-9,]/g, '').replace(',', '.')) || 0 : 
+      valor;
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(numero);
+  };
+
+  // Função para converter string de valor para número
+  const parseValor = (valor: string): number => {
+    return parseFloat(valor.replace(/[^0-9,]/g, '').replace(',', '.')) || 0;
+  };
+
+  // Efeito para rolar para a última nota adicionada
+  useEffect(() => {
+    if (notaAdicionadaRef.current) {
+      notaAdicionadaRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [notas.length]);
+
+  // Efeito para verificar se há notas não salvas ao sair da página
+  useEffect(() => {
+    if (notas.length === 0) return;
+    
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = 'Você tem notas não salvas. Tem certeza que deseja sair?';
+      return e.returnValue;
+    };
+    
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [notas]);
+
+  // Função para adicionar uma nova nota
+  const handleAdicionarNota = () => {
+    if (!numeroNota.trim()) {
+      enqueueSnackbar('Informe o número da nota', { variant: 'warning' });
+      return;
+    }
+
+    // Verifica se a nota já foi adicionada
+    if (notas.some(nota => nota.numero === numeroNota.trim())) {
+      enqueueSnackbar('Esta nota já foi adicionada', { variant: 'warning' });
+      return;
+    }
+
+    const novaNota: NotaAdicionada = {
+      id: Date.now().toString(),
+      numero: numeroNota.trim(),
+      valor: '0,00',
+      status: 'pendente'
+    };
+
+    setNotas(prevNotas => [...prevNotas, novaNota]);
+    setNumeroNota('');
+    enqueueSnackbar('Nota adicionada com sucesso!', { variant: 'success' });
+  };
+
+  // Função para salvar as notas
+  const handleSalvarNotas = async () => {
+    if (isSaving) return;
+    
+    // Validar se todas as notas têm valor preenchido
+    const notaSemValor = notas.find(nota => !nota.valor || nota.valor.trim() === '');
+    if (notaSemValor) {
+      enqueueSnackbar(`Preencha o valor para a nota ${notaSemValor.numero}`, { variant: 'warning' });
+      return;
+    }
+    
+    try {
+      setIsSaving(true);
+      
+      // Processar em lotes para evitar sobrecarga
+      const batchSize = 5;
+      const batches = [];
+      for (let i = 0; i < notas.length; i += batchSize) {
+        batches.push(notas.slice(i, i + batchSize));
+      }
+      
+      for (const batch of batches) {
+        await Promise.all(batch.map(nota => 
+          addNota({
+            numero: nota.numero,
+            valor: parseValor(nota.valor),
+            status: 'pendente'
+          })
+        ));
+      }
+      
+      // Limpar notas após salvar com sucesso
+      setNotas([]);
+      enqueueSnackbar('Notas salvas com sucesso!', { variant: 'success' });
+      
+    } catch (error) {
+      console.error('Erro ao salvar notas:', error);
+      enqueueSnackbar(
+        error instanceof Error ? error.message : 'Erro ao salvar notas. Tente novamente.',
+        { variant: 'error' }
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Calcular valor total
+  const valorTotal = useMemo(() => {
+    return notas.reduce((total: number, nota: NotaAdicionada) => {
+      const valor = parseValor(nota.valor) || 0;
+      return total + valor;
+    }, 0);
+  }, [notas]);
+
+  // Função para abrir o scanner de código de barras
+  const handleAbrirScanner = () => {
+    setScannerAberto(true);
+  };
+
+  // Função para lidar com o código de barras escaneado
+  const handleBarcodeScanned = (codigo: string) => {
+    try {
+      // Lógica para processar o código de barras
+      // Exemplo: extrair número da nota do código de barras
+      const numeroNota = codigo.substring(25, 34);
+      setNumeroNota(numeroNota);
+      setScannerAberto(false);
+      enqueueSnackbar('Código de barras lido com sucesso!', { variant: 'success' });
+    } catch (error) {
+      console.error('Erro ao processar código de barras:', error);
+      enqueueSnackbar('Erro ao processar código de barras', { variant: 'error' });
+    }
+  };
+
+  return (
+    <Box sx={{ p: 3 }}>
+      <Typography variant="h5" gutterBottom>
+        Adicionar Notas Fiscais
+      </Typography>
+      
+      {/* Barra de ações */}
+      <Box 
+        sx={{ 
+          display: 'flex', 
+          flexDirection: { xs: 'column', sm: 'row' }, 
+          gap: 2, 
+          mb: 3,
+          alignItems: { xs: 'stretch', sm: 'center' }
+        }}
+      >
+        <TextField
+          fullWidth
+          variant="outlined"
+          label="Número da Nota"
+          value={numeroNota}
+          onChange={(e) => setNumeroNota(e.target.value)}
+          onKeyPress={(e) => e.key === 'Enter' && handleAdicionarNota()}
+          disabled={loading || isSaving}
+          InputProps={{
+            endAdornment: (
+              <InputAdornment position="end">
+                <IconButton 
+                  onClick={handleAdicionarNota} 
+                  disabled={!numeroNota.trim() || loading || isSaving}
+                  color="primary"
+                >
+                  <AddIcon />
+                </IconButton>
+              </InputAdornment>
+            ),
+          }}
+        />
+        
+        <Button
+          variant="outlined"
+          onClick={handleAbrirScanner}
+          disabled={loading || isSaving}
+          startIcon={<QrCodeScannerIcon />}
+        >
+          Ler Código de Barras
+        </Button>
+      </Box>
+
+      {/* Lista de notas */}
+      <Box sx={{ mt: 3 }}>
+        {notas.map((nota, index) => (
+          <Box 
+            key={nota.id} 
+            ref={index === notas.length - 1 ? notaAdicionadaRef : null}
+            sx={{ 
+              mb: 2, 
+              p: 2, 
+              border: '1px solid', 
+              borderColor: 'divider',
+              borderRadius: 1,
+              backgroundColor: 'background.paper',
+              '&:hover': {
+                boxShadow: 1,
+              }
+            }}
+          >
+            <Box display="flex" alignItems="center" gap={2}>
+              <Typography variant="body1" sx={{ minWidth: 120 }}>
+                Nota: {nota.numero}
+              </Typography>
+              <TextField
+                type="text"
+                variant="outlined"
+                size="small"
+                label="Valor"
+                value={nota.valor}
+                onChange={(e) => {
+                  const valor = e.target.value;
+                  // Permite apenas números, vírgula e ponto
+                  if (/^\d*[,.]?\d{0,2}$/.test(valor) || valor === '') {
+                    const novasNotas = [...notas];
+                    novasNotas[index] = { ...nota, valor };
+                    setNotas(novasNotas);
+                  }
+                }}
+                onBlur={() => {
+                  // Formata o valor ao sair do campo
+                  if (nota.valor) {
+                    const valorFormatado = formatarMoeda(nota.valor);
+                    const novasNotas = [...notas];
+                    novasNotas[index] = { ...nota, valor: valorFormatado };
+                    setNotas(novasNotas);
+                  }
+                }}
+                sx={{ flex: 1, maxWidth: 200 }}
+                InputProps={{
+                  startAdornment: <InputAdornment position="start">R$</InputAdornment>,
+                }}
+              />
+              <IconButton 
+                onClick={() => {
+                  if (window.confirm('Deseja remover esta nota?')) {
+                    setNotas(notas.filter((_, i) => i !== index));
+                  }
+                }}
+                color="error"
+                disabled={isSaving}
+              >
+                <DeleteIcon />
+              </IconButton>
+            </Box>
+          </Box>
+        ))}
+      </Box>
+      
+      {/* Rodapé com ações */}
+      <Box 
+        sx={{ 
+          mt: 3, 
+          pt: 2, 
+          borderTop: '1px solid', 
+          borderColor: 'divider',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: 2
+        }}
+      >
+        {valorTotal > 0 && (
+          <Chip 
+            label={`Total: ${formatarMoeda(valorTotal)}`} 
+            color="success" 
+            variant="outlined"
+            sx={{ fontSize: '1rem' }}
+          />
+        )}
+        
+        <Box display="flex" gap={1} width={isMobile ? '100%' : 'auto'}>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={handleSalvarNotas}
+            startIcon={isSaving ? <CircularProgress size={20} color="inherit" /> : <SaveIcon />}
+            disabled={notas.length === 0 || isSaving || loading}
+            aria-busy={isSaving}
+            aria-live="polite"
+            sx={{
+              minWidth: 180,
+              '&:disabled': {
+                backgroundColor: theme.palette.action.disabledBackground,
+                color: theme.palette.action.disabled
+              },
+              transition: 'all 0.2s ease-in-out'
+            }}
+          >
+            {isSaving ? 'Salvando...' : `Salvar ${notas.length} nota${notas.length !== 1 ? 's' : ''}`}
+          </Button>
+          
+          {notas.length > 0 && (
+            <Tooltip title="Limpar todas as notas">
+              <Button
+                variant="outlined"
+                color="error"
+                onClick={() => {
+                  if (window.confirm('Tem certeza que deseja limpar todas as notas?')) {
+                    setNotas([]);
+                  }
+                }}
+                disabled={loading || isSaving}
+                startIcon={<DeleteSweepIcon />}
+                sx={{
+                  minWidth: 150,
+                  '&:disabled': {
+                    borderColor: theme.palette.action.disabled,
+                    color: theme.palette.action.disabled
+                  }
+                }}
+              >
+                Limpar Tudo
+              </Button>
+            </Tooltip>
+          )}
+        </Box>
+      </Box>
+
+      {/* Diálogo do Scanner de Código de Barras */}
+      <Dialog 
+        open={scannerAberto} 
+        onClose={() => setScannerAberto(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>Leitor de Código de Barras</DialogTitle>
+        <DialogContent>
+          {/* Componente do Scanner de Código de Barras */}
+          <Box 
+            sx={{ 
+              minHeight: 300, 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center',
+              border: '2px dashed',
+              borderColor: 'divider',
+              borderRadius: 1,
+              p: 3,
+              textAlign: 'center'
+            }}
+          >
+            <Typography variant="body1" color="text.secondary">
+              Área do Scanner de Código de Barras
+              <br />
+              <small>(Implemente a lógica do scanner aqui)</small>
+            </Typography>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setScannerAberto(false)} color="primary">
+            Fechar
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
+  );
+};
+
+export default AdicionarNotasContent;

@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
+import { useAuth } from '../contexts/AuthContext';
 import { styled, useTheme, Theme, CSSObject } from '@mui/material/styles';
 import { 
   Box, 
@@ -18,7 +20,10 @@ import {
   Collapse,
   alpha,
   Tooltip,
-  Avatar
+  Avatar,
+  Button,
+  Menu,
+  MenuItem
 } from '@mui/material';
 import {
   Menu as MenuIcon,
@@ -35,10 +40,10 @@ import {
   ExpandMore,
   Person as PersonIcon,
   LocalShipping as TruckIcon,
-  Assessment as ReportIcon
+  Assessment as ReportIcon,
+  Logout as LogoutIcon
 } from '@mui/icons-material';
 import Link from 'next/link';
-import { useRouter } from 'next/router';
 
 const drawerWidth = 260;
 
@@ -214,10 +219,27 @@ const menuItems = [
 
 const Layout = ({ children }: { children: React.ReactNode }) => {
   const theme = useTheme();
+  const { user, logout } = useAuth();
   const router = useRouter();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [open, setOpen] = useState(!isMobile);
   const [openSubmenus, setOpenSubmenus] = useState<Record<string, boolean>>({});
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const menuOpen = Boolean(anchorEl);
+
+  const handleMenuClick = (event: React.MouseEvent<HTMLElement>) => {
+    setAnchorEl(event.currentTarget);
+  };
+
+  const handleMenuClose = () => {
+    setAnchorEl(null);
+  };
+
+  const handleLogout = async () => {
+    handleMenuClose();
+    await logout();
+    router.push('/login');
+  };
 
   // Inicializa os submenus abertos com base na rota atual
   useEffect(() => {
@@ -359,13 +381,85 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
             </Typography>
           </Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Tooltip title="Perfil">
-              <IconButton sx={{ p: 0 }}>
-                <Avatar sx={{ bgcolor: 'primary.main' }}>
-                  <PersonIcon />
+            <Button
+              onClick={handleMenuClick}
+              size="small"
+              sx={{ ml: 2, textTransform: 'none' }}
+              aria-controls={menuOpen ? 'user-menu' : undefined}
+              aria-haspopup="true"
+              aria-expanded={menuOpen ? 'true' : undefined}
+              startIcon={
+                <Avatar sx={{ width: 32, height: 32, bgcolor: 'primary.main' }}>
+                  {user?.nome?.charAt(0).toUpperCase() || <PersonIcon />}
                 </Avatar>
-              </IconButton>
-            </Tooltip>
+              }
+            >
+              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', mr: 1 }}>
+                <Typography variant="subtitle2" color="text.primary" noWrap>
+                  {user?.nome || 'Usuário'}
+                </Typography>
+                <Typography variant="caption" color="text.secondary" noWrap>
+                  {user?.tipo || 'Nível de Acesso'}
+                </Typography>
+              </Box>
+            </Button>
+            <Menu
+              anchorEl={anchorEl}
+              id="user-menu"
+              open={menuOpen}
+              onClose={handleMenuClose}
+              onClick={handleMenuClose}
+              PaperProps={{
+                elevation: 3,
+                sx: {
+                  overflow: 'visible',
+                  filter: 'drop-shadow(0px 2px 8px rgba(0,0,0,0.32))',
+                  mt: 1.5,
+                  '& .MuiAvatar-root': {
+                    width: 32,
+                    height: 32,
+                    ml: -0.5,
+                    mr: 1,
+                  },
+                  '&:before': {
+                    content: '""',
+                    display: 'block',
+                    position: 'absolute',
+                    top: 0,
+                    right: 14,
+                    width: 10,
+                    height: 10,
+                    bgcolor: 'background.paper',
+                    transform: 'translateY(-50%) rotate(45deg)',
+                    zIndex: 0,
+                  },
+                },
+              }}
+              transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+              anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+            >
+              <MenuItem onClick={() => router.push('/perfil')}>
+                <ListItemIcon>
+                  <PersonIcon fontSize="small" />
+                </ListItemIcon>
+                Meu Perfil
+              </MenuItem>
+              {user?.tipo === 'ADMIN' && (
+                <MenuItem onClick={() => router.push('/admin')}>
+                  <ListItemIcon>
+                    <DashboardIcon fontSize="small" />
+                  </ListItemIcon>
+                  Painel Admin
+                </MenuItem>
+              )}
+              <Divider />
+              <MenuItem onClick={handleLogout}>
+                <ListItemIcon>
+                  <LogoutIcon fontSize="small" />
+                </ListItemIcon>
+                Sair
+              </MenuItem>
+            </Menu>
           </Box>
         </Toolbar>
       </AppBar>
@@ -407,15 +501,15 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
           </List>
           
           {/* Espaço para informações do usuário no rodapé */}
-          <Box sx={{ p: 2, mt: 'auto', borderTop: `1px solid ${theme.palette.divider}` }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, opacity: open ? 1 : 0 }}>
+          <Box sx={{ p: 2, mt: 'auto', borderTop: `1px solid ${theme.palette.divider}`, opacity: open ? 1 : 0 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <Avatar sx={{ width: 32, height: 32, bgcolor: 'primary.main' }}>
-                <PersonIcon fontSize="small" />
+                {user?.nome?.charAt(0).toUpperCase() || <PersonIcon fontSize="small" />}
               </Avatar>
               <Box>
-                <Typography variant="subtitle2" noWrap>Usuário</Typography>
+                <Typography variant="subtitle2" noWrap>{user?.nome || 'Usuário'}</Typography>
                 <Typography variant="caption" color="text.secondary" noWrap>
-                  Admin
+                  {user?.tipo || 'Nível de Acesso'}
                 </Typography>
               </Box>
             </Box>

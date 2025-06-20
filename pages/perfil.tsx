@@ -14,8 +14,9 @@ import {
 } from '@mui/material';
 import { Person as PersonIcon, Edit as EditIcon, Check as CheckIcon, Close as CloseIcon } from '@mui/icons-material';
 import Layout from '../components/Layout';
+import ProtectedRoute from '../components/ProtectedRoute';
 
-const Perfil = () => {
+const PerfilContent = () => {
   const [editMode, setEditMode] = useState(false);
   const [userData, setUserData] = useState({
     nome: 'Usuário Teste',
@@ -217,6 +218,14 @@ const Perfil = () => {
         </Paper>
       </Container>
     </Layout>
+  );
+};
+
+const Perfil = () => {
+  return (
+    <ProtectedRoute>
+      <PerfilContent />
+    </ProtectedRoute>
   );
 };
 

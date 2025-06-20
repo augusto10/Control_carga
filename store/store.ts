@@ -10,13 +10,21 @@ export type NotaFiscal = {
   controleId: string | null;
 };
 
+export type Transportadora = {
+  id: string;
+  nome: string;
+  cnpj: string;
+  ativo: boolean;
+};
+
 export type ControleCarga = {
   id: string;
   dataCriacao: Date;
   motorista: string;
   cpfMotorista: string;
   responsavel: string;
-  transportadora: 'ACERT' | 'EXPRESSO_GOIAS';
+  transportadoraId: string;
+  transportadora?: Transportadora;
   numeroManifesto: string;
   qtdPallets: number;
   observacao?: string;
@@ -27,20 +35,25 @@ export type ControleCarga = {
 interface StoreState {
   notas: NotaFiscal[];
   controles: ControleCarga[];
+  transportadoras: Transportadora[];
   status: 'success' | 'error' | null;
+  loading: boolean;
   fetchNotas: (start?: string, end?: string) => Promise<void>;
   fetchControles: () => Promise<void>;
+  fetchTransportadoras: () => Promise<void>;
   addNota: (nota: Omit<NotaFiscal, 'id' | 'dataCriacao' | 'controleId'>) => Promise<NotaFiscal>;
-  criarControle: (controle: Omit<ControleCarga, 'id' | 'dataCriacao' | 'finalizado' | 'notas'> & { notasIds: string[] }) => Promise<ControleCarga>;
+  criarControle: (controle: Omit<ControleCarga, 'id' | 'dataCriacao' | 'finalizado' | 'notas' | 'transportadora'> & { notasIds?: string[], transportadora: 'ACERT' | 'EXPRESSO_GOIAS' }) => Promise<ControleCarga>;
   vincularNotas: (controleId: string, notasIds: string[]) => Promise<void>;
   finalizarControle: (controleId: string) => Promise<void>;
-  atualizarControle: (controleId: string, dados: Partial<Omit<ControleCarga, 'id' | 'dataCriacao' | 'notas'>>) => Promise<ControleCarga | null>;
+  atualizarControle: (controleId: string, dados: Partial<Omit<ControleCarga, 'id' | 'dataCriacao' | 'notas' | 'transportadora'>>) => Promise<ControleCarga | null>;
 }
 
 export const useStore = create<StoreState>((set) => ({
   notas: [],
   controles: [],
+  transportadoras: [],
   status: null,
+  loading: false,
 
   fetchNotas: async (start?: string, end?: string) => {
     const params = new URLSearchParams();
@@ -51,7 +64,8 @@ export const useStore = create<StoreState>((set) => ({
         'Cache-Control': 'no-cache, no-store, must-revalidate',
         'Pragma': 'no-cache',
         'Expires': '0'
-      }
+      },
+      credentials: 'include' // Inclui cookies na requisição
     });
     const notas = await response.json();
     set({ notas });
@@ -59,13 +73,15 @@ export const useStore = create<StoreState>((set) => ({
 
   fetchControles: async () => {
     console.log('Iniciando fetchControles...');
+    set({ loading: true });
     try {
       const response = await fetch('/api/controles', {
         headers: {
           'Cache-Control': 'no-cache, no-store, must-revalidate',
           'Pragma': 'no-cache',
           'Expires': '0'
-        }
+        },
+        credentials: 'include'
       });
       
       console.log('Resposta do fetchControles recebida, status:', response.status);
@@ -79,9 +95,37 @@ export const useStore = create<StoreState>((set) => ({
       
       const controles = await response.json();
       console.log('Controles carregados com sucesso, quantidade:', controles.length);
-      set({ controles });
+      set({ controles, loading: false });
     } catch (error) {
       console.error('Erro em fetchControles:', error);
+      set({ loading: false });
+      throw error;
+    }
+  },
+  
+  fetchTransportadoras: async () => {
+    set({ loading: true });
+    try {
+      const response = await fetch('/api/transportadoras', {
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        },
+        credentials: 'include'
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Erro ao buscar transportadoras');
+      }
+      
+      const transportadoras = await response.json();
+      set({ transportadoras, loading: false });
+      return transportadoras;
+    } catch (error) {
+      console.error('Erro ao buscar transportadoras:', error);
+      set({ loading: false });
       throw error;
     }
   },
@@ -89,19 +133,49 @@ export const useStore = create<StoreState>((set) => ({
   addNota: async (nota) => {
     try {
       console.log('Dados sendo enviados:', nota);
+      
+      // Verifica se o usuário está autenticado antes de tentar salvar
+      const authCheck = await fetch('/api/auth/me', {
+        credentials: 'include'
+      });
+      
+      if (!authCheck.ok) {
+        throw new Error('Usuário não autenticado');
+      }
+      
       const response = await fetch('/api/addNota', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest'
         },
+        credentials: 'include', // Importante para enviar cookies de autenticação
         body: JSON.stringify(nota),
       });
       
       console.log('Status da resposta:', response.status);
+      
+      // Se for erro 401, força o logout
+      if (response.status === 401) {
+        window.dispatchEvent(new Event('unauthorized'));
+        throw new Error('Sessão expirada. Por favor, faça login novamente.');
+      }
+      
       if (!response.ok) {
-        const errorData = await response.text();
-        console.error('Detalhes do erro:', errorData);
-        throw new Error(`Erro ao salvar nota: ${response.status} - ${errorData}`);
+        let errorData;
+        try {
+          errorData = await response.json();
+          console.error('Detalhes do erro:', errorData);
+        } catch (e) {
+          errorData = await response.text();
+        }
+        
+        const errorMessage = typeof errorData === 'object' 
+          ? errorData.error || errorData.message || 'Erro desconhecido'
+          : errorData || 'Erro ao processar a requisição';
+        
+        throw new Error(`Erro ao salvar nota: ${response.status} - ${errorMessage}`);
       }
       
       const newNota = await response.json();
@@ -112,12 +186,18 @@ export const useStore = create<StoreState>((set) => ({
       }));
       
       return newNota;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao adicionar nota:', error);
       set((state) => ({
         ...state,
         status: 'error'
       }));
+      
+      // Se for erro de autenticação, redireciona para o login
+      if (error.message.includes('não autenticado') || error.message.includes('Sessão expirada')) {
+        window.dispatchEvent(new Event('unauthorized'));
+      }
+      
       throw error;
     }
   },

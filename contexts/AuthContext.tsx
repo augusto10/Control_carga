@@ -75,81 +75,100 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const router = useRouter();
 
   // Atualizar estado de forma segura
-  const updateAuthState = useCallback((updates: Partial<AuthState>) => {
-    setState(prev => ({
-      ...prev,
-      ...updates
-    }));
-  }, []);
+  const updateAuthState = useCallback(
+    (updates: Partial<AuthState> | ((prev: AuthState) => Partial<AuthState>)) => {
+      if (typeof updates === 'function') {
+        setState(prev => ({
+          ...prev,
+          ...updates(prev)
+        }));
+      } else {
+        setState(prev => ({
+          ...prev,
+          ...updates
+        }));
+      }
+    }, 
+    []
+  );
+
+  // Lista de rotas públicas que não requerem autenticação
+  const publicRoutes = useMemo(() => ['/login', '/esqueci-senha', '/cadastro'], []);
 
   // Carregar usuário do armazenamento
-  const loadUserFromStorage = useCallback(async () => {
-    // Evita múltiplas chamadas simultâneas
-    if (state.isLoading) {
-      console.log('[AuthContext] Já existe uma verificação de autenticação em andamento');
+  const loadUserFromStorage = useCallback(async (forceCheck: boolean = false) => {
+    // Função auxiliar para verificar se deve atualizar o estado
+    const shouldUpdateState = (updates: Partial<AuthState>): boolean => {
+      return Object.entries(updates).some(([key, value]) => {
+        const stateKey = key as keyof AuthState;
+        const currentValue = state[stateKey];
+        return JSON.stringify(currentValue) !== JSON.stringify(value);
+      });
+    };
+    // Se já estiver carregando e não for uma verificação forçada, não faz nada
+    if (state.isLoading && !forceCheck) {
+      console.log('[AuthContext] Já está carregando, pulando...');
       return;
     }
-    
+
     console.log('[AuthContext] Iniciando verificação de autenticação...');
-    console.log('[AuthContext] Cookies atuais:', document.cookie);
-    console.log('[AuthContext] URL da API:', process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000');
+    console.log('[AuthContext] Rota atual:', router.pathname);
+    
+    // Se for uma rota pública, não precisa verificar autenticação
+    if (publicRoutes.includes(router.pathname)) {
+      console.log('[AuthContext] Rota pública, pulando verificação de autenticação');
+      const newState: Partial<AuthState> = {
+        user: null,
+        token: null,
+        isAuthenticated: false,
+        isLoading: false,
+        error: null
+      };
+      
+      if (shouldUpdateState(newState)) {
+        updateAuthState(newState);
+      }
+      return;
+    }
 
     try {
       console.log('[AuthContext] Verificando autenticação...');
       
-      // Atualiza o estado para carregamento
-      updateAuthState({
-        ...state,
+      // Atualiza o estado para carregamento apenas se não for uma verificação forçada
+      updateAuthState(prev => ({
+        ...prev,
         isLoading: true,
         error: null
-      });
+      }));
       
-      // Tenta buscar os dados do usuário diretamente da API
-      // O cookie HTTP-only será enviado automaticamente
       console.log('[AuthContext] Fazendo requisição para /api/auth/me');
-      console.log('[AuthContext] Configuração da API:', {
-        baseURL: api.defaults.baseURL,
-        withCredentials: api.defaults.withCredentials,
-        headers: api.defaults.headers
-      });
       const response = await api.get('/api/auth/me');
-      console.log('[AuthContext] Resposta de /api/auth/me:', response.data);
       
       if (response.data && response.data.success) {
-        console.log('[AuthContext] Usuário autenticado:', response.data.user.email);
+        console.log('[AuthContext] Usuário autenticado:', response.data.user);
         updateAuthState({
           user: response.data.user,
-          token: 'http-only-cookie', // Não armazenamos mais o token no cliente
+          token: 'http-only-cookie',
           isAuthenticated: true,
           isLoading: false,
           error: null
         });
         
-        // Se estiver na página de login, redireciona para o dashboard
+        // Se estiver na página de login, redireciona para o dashboard apropriado
         if (router.pathname === '/login') {
-          console.log('[AuthContext] Redirecionando para dashboard...');
-          const redirectPath = response.data.user.tipo === 'ADMIN' ? '/admin' : '/dashboard';
+          const redirectPath = response.data.user.tipo === USER_TYPES.ADMIN ? '/admin' : '/dashboard';
+          console.log(`[AuthContext] Redirecionando para ${redirectPath}...`);
           router.push(redirectPath);
         }
       } else {
+        console.log('[AuthContext] Nenhum usuário autenticado encontrado');
         throw new Error('Falha ao carregar dados do usuário');
       }
     } catch (error: any) {
-      console.error('[AuthContext] Erro ao verificar autenticação:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status,
-        headers: error.response?.headers,
-        config: {
-          url: error.config?.url,
-          method: error.config?.method,
-          headers: error.config?.headers,
-          withCredentials: error.config?.withCredentials
-        }
-      });
+      console.error('[AuthContext] Erro ao carregar usuário:', error);
       
-      // Se não estiver autenticado, limpa o estado
-      updateAuthState({
+      // Só atualiza o estado se for diferente do estado atual
+      const newState: Partial<AuthState> = {
         user: null,
         token: null,
         isAuthenticated: false,
@@ -157,22 +176,24 @@ export function AuthProvider({ children }: AuthProviderProps) {
         error: error.response?.status === 401 
           ? 'Sessão expirada' 
           : 'Erro na autenticação'
-      });
+      };
       
-      // Força o redirecionamento para login se não estiver na página de login
-      if (router.pathname !== '/login') {
-        console.log('[AuthContext] Redirecionando para login...');
-        router.push('/login');
+      if (shouldUpdateState(newState)) {
+        updateAuthState(newState);
+        
+        // Se não estiver em uma rota pública, redireciona para o login
+        if (!publicRoutes.includes(router.pathname) && router.pathname !== '/') {
+          console.log(`[AuthContext] Redirecionando para login de ${router.pathname}...`);
+          router.push('/login');
+        }
       }
     }
-  }, [router, updateAuthState, state.isLoading]);
+  }, [router, state, updateAuthState, publicRoutes]);
 
   // Efeito para carregar o usuário ao montar o componente
   useEffect(() => {
-    // Só carrega o usuário se não estiver já carregando
-    if (!state.isLoading) {
-      loadUserFromStorage();
-    }
+    // Carrega o usuário apenas uma vez ao montar o componente
+    loadUserFromStorage(true); // força a verificação
     
     // Adiciona listener para eventos de não autorizado
     const handleUnauthorized = () => {
@@ -202,7 +223,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     return () => {
       window.removeEventListener('unauthorized', handleUnauthorized);
     };
-  }, [state.isLoading, state.isAuthenticated, loadUserFromStorage, router]);
+  }, []); // Removidas as dependências para evitar loops
 
   const login = useCallback(async ({ email, senha }: LoginCredentials): Promise<void> => {
     try {
