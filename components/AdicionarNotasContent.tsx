@@ -5,30 +5,24 @@ import {
   Paper, 
   Typography, 
   CircularProgress,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  IconButton,
   TextField,
+  IconButton,
+  InputAdornment,
   useTheme,
   useMediaQuery,
+  keyframes,
   SxProps,
-  Theme,
-  LinearProgress
+  Theme
 } from '@mui/material';
 import { useSnackbar } from 'notistack';
 import { useStore } from '../store/store';
 import { 
   Add as AddIcon, 
   Delete as DeleteIcon, 
-  Save as SaveIcon, 
-  Edit as EditIcon,
-  QrCodeScanner as QrCodeScannerIcon,
+  Save as SaveIcon,
   Close as CloseIcon
 } from '@mui/icons-material';
 import { NumericFormat } from 'react-number-format';
-import { BrowserQRCodeReader, BrowserMultiFormatReader, IScannerControls } from '@zxing/browser';
 
 interface NotaFiscal {
   id: string;
@@ -46,7 +40,7 @@ interface CurrencyInputProps {
   onChange: (val: string) => void;
   fullWidth?: boolean;
   size?: 'small' | 'medium';
-  sx?: SxProps<Theme>;
+  sx?: any;
   autoFocus?: boolean;
 }
 
@@ -83,19 +77,16 @@ const CurrencyInput: React.FC<CurrencyInputProps> = ({
 const AdicionarNotasContent: React.FC = () => {
   // Estados
   const [notas, setNotas] = useState<NotaFiscal[]>([]);
-  const [showScanner, setShowScanner] = useState(false);
-  const [scannerAtivo, setScannerAtivo] = useState(false);
   const [loading, setLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [erro, setErro] = useState('');
-  const [manualCodigo, setManualCodigo] = useState('');
+  const [codigoBarras, setCodigoBarras] = useState('');
   const [manualNumero, setManualNumero] = useState('');
   const [manualValor, setManualValor] = useState('0,00');
-  const [notaEmEdicao, setNotaEmEdicao] = useState<{index: number; valor: string} | null>(null);
+  const [notaEditandoValor, setNotaEditandoValor] = useState<string | null>(null);
   
-  // Refs
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const controlsRef = useRef<IScannerControls | null>(null);
+  // Ref para o campo de entrada do scanner
+  const inputRef = useRef<HTMLInputElement>(null);
   
   // Hooks
   const { enqueueSnackbar } = useSnackbar();
@@ -142,34 +133,70 @@ const AdicionarNotasContent: React.FC = () => {
   };
 
   const extrairNumeroNota = (codigo: string): string => {
-    // DANFE (44 dígitos)
-    if (/^\d{44}$/.test(codigo)) {
-      return codigo.substring(35, 44);
+    // Remove espaços e caracteres não numéricos
+    const codigoLimpo = codigo.replace(/[^\d]/g, '');
+    
+    // Formato DANFE (44 dígitos) - Número da nota está entre as posições 25 e 34 (9 dígitos)
+    if (codigoLimpo.length === 44) {
+      // Extrai os 9 dígitos do número da nota (posições 25 a 34, 0-based)
+      return codigoLimpo.substring(25, 34);
     }
     
-    // Código com hífen
+    // Para códigos mais longos que 44 dígitos, tenta encontrar o padrão DANFE
+    if (codigoLimpo.length > 44) {
+      // Procura por um bloco de 44 dígitos no código
+      for (let i = 0; i <= codigoLimpo.length - 44; i++) {
+        const bloco = codigoLimpo.substring(i, i + 44);
+        // Verifica se o bloco começa com 8 ou 9 (indicando DANFE)
+        if (['8', '9'].includes(bloco[0])) {
+          return bloco.substring(25, 34);
+        }
+      }
+    }
+    
+    // Código com hífen (ex: 123-4567890123)
     if (codigo.includes('-')) {
-      return codigo.split('-')[1] || '';
+      const partes = codigo.split('-');
+      // Retorna a parte após o hífen, removendo qualquer caractere não numérico
+      return partes[1] ? partes[1].replace(/[^\d]/g, '') : '';
     }
     
-    // Código curto
-    if (codigo.length <= 20) {
-      return codigo;
+    // Se for um código curto (até 20 dígitos), retorna o próprio código
+    if (codigoLimpo.length <= 20) {
+      return codigoLimpo;
     }
     
-    return codigo;
+    // Se não se encaixar em nenhum formato conhecido, retorna os últimos 9 dígitos
+    return codigoLimpo.slice(-9);
+  };
+
+  // Função para atualizar o valor de uma nota
+  const atualizarValorNota = (id: string, valor: string) => {
+    setNotas(prevNotas => 
+      prevNotas.map(nota => 
+        nota.id === id ? { ...nota, valor } : nota
+      )
+    );
   };
 
   // Funções de manipulação
   const processarCodigoBarras = useCallback(async (codigo: string) => {
     if (!codigo.trim()) return;
     
+    // Limpar espaços em branco extras e caracteres especiais
+    codigo = codigo.trim();
+    
+    console.log('Processando código de barras:', codigo);
+    
     const validacao = validarCodigoBarras(codigo);
     if (!validacao.valido) {
-      setErro(validacao.erro || 'Código de barras inválido');
-      enqueueSnackbar(validacao.erro || 'Código de barras inválido', { 
+      const mensagemErro = validacao.erro || 'Código de barras inválido';
+      console.warn(mensagemErro, codigo);
+      setErro(mensagemErro);
+      enqueueSnackbar(mensagemErro, { 
         variant: 'error',
-        autoHideDuration: 5000
+        autoHideDuration: 5000,
+        preventDuplicate: true
       });
       return;
     }
@@ -179,43 +206,75 @@ const AdicionarNotasContent: React.FC = () => {
     
     try {
       const codigoLimpo = codigo.trim();
+      console.log('Código limpo:', codigoLimpo);
+      
+      // Extrai o número da nota do código de barras
       const numeroNota = extrairNumeroNota(codigoLimpo);
+      console.log('Número da nota extraído:', numeroNota);
+      
+      if (!numeroNota) {
+        throw new Error('Não foi possível extrair o número da nota do código de barras');
+      }
+      
+      // Formata o número da nota para exibição (remove zeros à esquerda)
+      const numeroNotaFormatado = numeroNota.replace(/^0+/, '');
       
       // Verificar se a nota já foi adicionada
       const notaExistente = notas.find(n => 
-        n.codigo === codigoLimpo || n.numeroNota === numeroNota
+        n.codigo === codigoLimpo || n.numeroNota === numeroNotaFormatado
       );
       
       if (notaExistente) {
-        enqueueSnackbar('Esta nota já foi adicionada', { 
+        enqueueSnackbar(`Nota ${numeroNotaFormatado} já foi adicionada`, { 
           variant: 'warning',
           autoHideDuration: 3000
         });
         return;
       }
       
-      // Criar nova nota
+      // Criar nova nota com o número formatado
       const novaNota: NotaFiscal = {
         id: Date.now().toString(),
         codigo: codigoLimpo,
-        numeroNota,
-        valor: '0,00',
+        numeroNota: numeroNotaFormatado, // Usa o número formatado (sem zeros à esquerda)
+        valor: '', // Inicia sem valor para forçar o preenchimento
         status: 'pendente',
-        dataHora: new Date().toISOString()
+        dataHora: new Date().toLocaleString('pt-BR'),
+        editando: true
       };
       
+      // Define esta nota como a que está sendo editada
+      setNotaEditandoValor(novaNota.id);
+      
+      console.log('Nova nota a ser adicionada:', novaNota);
+      
       // Adicionar à lista de notas
-      setNotas(prev => [...prev, novaNota]);
+      setNotas(prev => {
+        const novasNotas = [...prev, novaNota];
+        console.log('Lista de notas atualizada:', novasNotas);
+        return novasNotas;
+      });
       
-      // Fechar o scanner se estiver aberto
-      if (showScanner) {
-        setShowScanner(false);
-      }
-      
-      enqueueSnackbar('Nota adicionada com sucesso!', { 
+      // Mostrar mensagem de sucesso com o número da nota formatado
+      enqueueSnackbar(`Nota ${numeroNotaFormatado} adicionada com sucesso!`, { 
         variant: 'success',
         autoHideDuration: 3000
       });
+      
+      // Rolar até a nota recém-adicionada
+      setTimeout(() => {
+        const notaElement = document.querySelector(`[data-nota-id="${novaNota.id}"]`);
+        if (notaElement) {
+          notaElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      }, 100);
+      
+      // Focar no campo de entrada para a próxima leitura
+      setTimeout(() => {
+        if (inputRef.current) {
+          inputRef.current.focus();
+        }
+      }, 200);
       
     } catch (error) {
       console.error('Erro ao processar código de barras:', error);
@@ -227,42 +286,17 @@ const AdicionarNotasContent: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [notas, showScanner, enqueueSnackbar]);
+  }, [notas, enqueueSnackbar]);
 
   const handleAddManual = (e: React.FormEvent) => {
     e.preventDefault();
-    processarCodigoBarras(manualCodigo);
+    if (!codigoBarras.trim()) return;
+    
+    processarCodigoBarras(codigoBarras);
+    setCodigoBarras('');
   };
 
-  const handleEditarNota = (index: number) => {
-    const nota = notas[index];
-    if (!nota) return;
-    
-    setNotaEmEdicao({ index, valor: nota.valor });
-  };
 
-  const handleSalvarNota = () => {
-    if (notaEmEdicao === null) return;
-    
-    const { index, valor } = notaEmEdicao;
-    
-    setNotas(prev => {
-      const novasNotas = [...prev];
-      if (novasNotas[index]) {
-        novasNotas[index] = {
-          ...novasNotas[index],
-          valor: valor || '0,00'
-        };
-      }
-      return novasNotas;
-    });
-    
-    setNotaEmEdicao(null);
-    enqueueSnackbar('Valor da nota atualizado com sucesso!', { 
-      variant: 'success',
-      autoHideDuration: 3000
-    });
-  };
 
   const handleRemoverNota = (index: number) => {
     const nota = notas[index];
@@ -278,26 +312,123 @@ const AdicionarNotasContent: React.FC = () => {
   };
 
   const handleSalvarTodasNotas = async () => {
-    if (notas.length === 0) return;
+    if (notas.length === 0) {
+      enqueueSnackbar('Nenhuma nota para salvar.', { variant: 'info' });
+      return;
+    }
+    
+    // Verifica se todas as notas têm valor preenchido
+    const notasSemValor = notas.filter(nota => !nota.valor || nota.valor.trim() === '');
+    
+    if (notasSemValor.length > 0) {
+      // Encontra a primeira nota sem valor e a coloca em modo de edição
+      const primeiraNotaSemValor = notasSemValor[0];
+      setNotaEditandoValor(primeiraNotaSemValor.id);
+      
+      // Rola até a primeira nota sem valor
+      setTimeout(() => {
+        const elemento = document.querySelector(`[data-nota-id="${primeiraNotaSemValor.id}"]`);
+        if (elemento) {
+          elemento.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      }, 100);
+      
+      enqueueSnackbar('Preencha o valor de todas as notas antes de salvar', { 
+        variant: 'error',
+        autoHideDuration: 5000
+      });
+      return;
+    }
+    
+    // Confirmação antes de salvar
+    const confirmSave = window.confirm(`Deseja salvar ${notas.length} nota${notas.length !== 1 ? 's' : ''}?`);
+    if (!confirmSave) return;
+    
+    setIsSaving(true);
+    let sucessos = 0;
+    let falhas = 0;
+    const notasComErro: string[] = [];
     
     try {
-      setIsSaving(true);
+      // Salva cada nota individualmente
+      for (const [index, nota] of notas.entries()) {
+        try {
+          // Atualiza o status da nota para processando
+          setNotas(prev => {
+            const novasNotas = [...prev];
+            novasNotas[index] = { ...novasNotas[index], status: 'processando' };
+            return novasNotas;
+          });
+          
+          await addNota({
+            codigo: nota.codigo,
+            numeroNota: nota.numeroNota,
+            valor: parseFloat(nota.valor.replace(/\./g, '').replace(',', '.')) || 0
+          });
+          
+          // Atualiza o status da nota para concluído
+          setNotas(prev => {
+            const novasNotas = [...prev];
+            novasNotas[index] = { ...novasNotas[index], status: 'concluido' };
+            return novasNotas;
+          });
+          
+          sucessos++;
+          
+        } catch (error) {
+          console.error(`Erro ao salvar nota ${nota.numeroNota}:`, error);
+          
+          // Atualiza o status da nota para erro
+          setNotas(prev => {
+            const novasNotas = [...prev];
+            novasNotas[index] = { ...novasNotas[index], status: 'erro' };
+            return novasNotas;
+          });
+          
+          falhas++;
+          notasComErro.push(nota.numeroNota);
+          
+          enqueueSnackbar(`Falha ao salvar nota ${nota.numeroNota}`, { 
+            variant: 'error',
+            autoHideDuration: 3000
+          });
+        }
+      }
       
-      // Aqui você faria a chamada para a API para salvar as notas
-      // Por enquanto, apenas simulamos um delay
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Exibe resumo da operação
+      let mensagem = '';
+      if (sucessos > 0 && falhas === 0) {
+        mensagem = `${sucessos} nota${sucessos !== 1 ? 's' : ''} salva${sucessos !== 1 ? 's' : ''} com sucesso!`;
+      } else if (sucessos > 0 && falhas > 0) {
+        mensagem = `${sucessos} nota${sucessos !== 1 ? 's' : ''} salva${sucessos !== 1 ? 's' : ''} com sucesso, `;
+        mensagem += `${falhas} nota${falhas !== 1 ? 's' : ''} com erro.`;
+      } else {
+        mensagem = `Falha ao salvar ${falhas} nota${falhas !== 1 ? 's' : ''}.`;
+      }
       
-      // Limpa as notas após salvar
-      setNotas([]);
-      
-      enqueueSnackbar(`${notas.length} notas salvas com sucesso!`, { 
-        variant: 'success',
+      enqueueSnackbar(mensagem, { 
+        variant: falhas > 0 ? 'warning' : 'success',
         autoHideDuration: 5000
       });
       
+      // Se todas as notas foram salvas com sucesso, limpa a lista
+      if (falhas === 0) {
+        setNotas([]);
+      }
+      
+      // Se houve falhas, rola a página para mostrar as notas com erro
+      if (falhas > 0) {
+        setTimeout(() => {
+          const primeiroErro = document.querySelector('[data-status="erro"]');
+          if (primeiroErro) {
+            primeiroErro.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }, 100);
+      }
+      
     } catch (error) {
-      console.error('Erro ao salvar notas:', error);
-      enqueueSnackbar('Erro ao salvar notas. Tente novamente.', { 
+      console.error('Erro ao processar notas:', error);
+      enqueueSnackbar('Ocorreu um erro inesperado ao processar as notas.', { 
         variant: 'error',
         autoHideDuration: 5000
       });
@@ -306,143 +437,56 @@ const AdicionarNotasContent: React.FC = () => {
     }
   };
 
-  const handleFecharScanner = useCallback(() => {
-    setShowScanner(false);
-    setScannerAtivo(false);
-    setErro('');
-
-    // Parar o stream de vídeo
-    if (videoRef.current?.srcObject) {
-      const stream = videoRef.current.srcObject as MediaStream;
-      const tracks = stream.getTracks();
-      tracks.forEach(track => track.stop());
-      videoRef.current.srcObject = null;
-    }
-
-    // Parar o leitor de códigos de barras
-    if (controlsRef.current) {
-      controlsRef.current.stop();
-      controlsRef.current = null;
-    }
-  }, []);
-
-  // Efeito para o scanner
+  // Animação para notas em processamento
+  const pulseAnimation = keyframes`
+    0% { opacity: 0.7; }
+    50% { opacity: 0.4; }
+    100% { opacity: 0.7; }
+  `;
+  
+  // Efeito para focar e rolar até o campo de valor quando uma nota for adicionada
+  const [isInitialMount, setIsInitialMount] = useState(true);
+  
   useEffect(() => {
-    if (!showScanner) return;
-    
-    // Ativar o scanner quando o diálogo for aberto
-    setScannerAtivo(true);
-    setErro('');
-    
-    const codeReader = new BrowserMultiFormatReader();
-    let isMounted = true;
-    let timeoutId: NodeJS.Timeout;
-
-    const startScanner = async () => {
-      try {
-        // Listar dispositivos de vídeo disponíveis
-        const videoInputDevices = await codeReader.listVideoInputDevices();
-        const deviceId = videoInputDevices[0]?.deviceId;
-
-        if (!deviceId) {
-          setErro('Nenhuma câmera encontrada');
-          return;
+    if (notaEditandoValor) {
+      // Rola até o campo de valor da nota que está sendo editada
+      setTimeout(() => {
+        const elemento = document.querySelector(`[data-nota-id="${notaEditandoValor}"] .MuiInputBase-input`);
+        if (elemento) {
+          (elemento as HTMLElement).focus();
+          elemento.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'nearest' 
+          });
         }
-
-        const videoElement = videoRef.current;
-        if (!videoElement) return;
-
-        // Limpar qualquer stream anterior
-        if (videoElement.srcObject) {
-          const stream = videoElement.srcObject as MediaStream;
-          stream.getTracks().forEach(track => track.stop());
-          videoElement.srcObject = null;
-        }
-
-        // Iniciar o scanner
-        const controls = await codeReader.decodeFromVideoDevice(
-          deviceId, 
-          videoElement, 
-          (result, error) => {
-            if (!isMounted) return;
-
-            if (error) {
-              if (error.name !== 'NotFoundException') {
-                console.error('Erro ao ler código de barras:', error);
-              }
-              return;
-            }
-
-
-            if (result) {
-              const text = result.getText();
-              if (text) {
-                console.log('Código lido:', text);
-                processarCodigoBarras(text);
-              }
-            }
-          }
-        );
-        
-        // Armazenar controles para limpeza posterior
-        controlsRef.current = controls;
-        
-        // Timeout para verificar se a câmera foi iniciada
-        timeoutId = setTimeout(() => {
-          if (isMounted && !controls.isStopped() && !videoElement.srcObject) {
-            setErro('Não foi possível acessar a câmera. Verifique as permissões.');
-          }
-        }, 2000);
-
-      } catch (error) {
-        console.error('Erro ao iniciar o scanner:', error);
-        if (isMounted) {
-          setErro('Erro ao iniciar a câmera. Verifique as permissões.');
-        }
-      }
-    };
-
-    startScanner();
-
-    return () => {
-      isMounted = false;
-      clearTimeout(timeoutId);
+      }, 100);
+    } else if (inputRef.current) {
+      // Se não houver nota sendo editada, foca no campo de entrada
+      inputRef.current.focus();
       
-      try {
-        // Limpar recursos do scanner
-        if (controlsRef.current) {
-          controlsRef.current.stop().catch(error => {
-            console.warn('Erro ao parar controles do scanner:', error);
-          });
-          controlsRef.current = null;
-        }
-        
-        // Tentar limpar o codeReader de forma segura
-        if (codeReader && typeof codeReader.reset === 'function') {
-          try {
-            codeReader.reset();
-          } catch (error) {
-            console.warn('Erro ao resetar codeReader:', error);
-          }
-        }
-        
-        // Parar stream de vídeo
-        if (videoRef.current?.srcObject) {
-          const stream = videoRef.current.srcObject as MediaStream;
-          stream.getTracks().forEach(track => {
-            try {
-              track.stop();
-            } catch (error) {
-              console.warn('Erro ao parar track de vídeo:', error);
-            }
-          });
-          videoRef.current.srcObject = null;
-        }
-      } catch (error) {
-        console.error('Erro durante a limpeza do scanner:', error);
+      // Evita rolagem desnecessária no carregamento inicial
+      if (!isInitialMount) {
+        // Rola suavemente até o campo de entrada apenas quando uma nota é adicionada
+        inputRef.current.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'center' 
+        });
+      } else {
+        // Marca que o carregamento inicial foi concluído
+        setIsInitialMount(false);
       }
-    };
-  }, [showScanner, processarCodigoBarras]);
+    }
+  }, [notaEditandoValor, notas.length, isInitialMount]); // Executa quando a nota sendo editada ou o número de notas muda
+
+  // Manipulador de teclas para o campo de entrada
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    // Se a tecla Enter for pressionada, processa o código de barras
+    if (e.key === 'Enter' && codigoBarras.trim()) {
+      e.preventDefault();
+      processarCodigoBarras(codigoBarras);
+      setCodigoBarras('');
+    }
+  };
 
   // Calcular valor total
   const valorTotal = useMemo(() => {
@@ -453,335 +497,293 @@ const AdicionarNotasContent: React.FC = () => {
   }, [notas]);
 
   // Renderização
-  const renderListaNotas = () => (
-    <Paper sx={{ p: 3, mb: 3 }}>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-        <Typography variant="h6">
-          Notas a serem salvas <small>({notas.length})</small>
-        </Typography>
-        {notas.length > 0 && (
-          <Box display="flex" gap={2}>
-            <Typography variant="subtitle1" color="primary">
-              Total: {formatarMoeda(valorTotal)}
-            </Typography>
-            <Button 
-              color="error" 
-              size="small" 
-              variant="outlined"
-              onClick={() => {
-                if (window.confirm('Tem certeza que deseja remover todas as notas?')) {
-                  setNotas([]);
-                  enqueueSnackbar('Todas as notas foram removidas', { 
-                    variant: 'info',
-                    autoHideDuration: 3000
-                  });
-                }
-              }}
-              disabled={loading || isSaving}
-              startIcon={<DeleteIcon />}
-            >
-              Limpar Tudo
-            </Button>
-            <Button
-              variant="contained"
-              color="primary"
-              size="small"
-              onClick={handleSalvarTodasNotas}
-              disabled={notas.length === 0 || loading || isSaving}
-              startIcon={isSaving ? <CircularProgress size={20} color="inherit" /> : <SaveIcon />}
-            >
-              {isSaving ? 'Salvando...' : 'Salvar Todas'}
-            </Button>
-          </Box>
-        )}
-      </Box>
-
-      {notas.length === 0 ? (
-        <Box textAlign="center" py={4}>
-          <Typography variant="body1" color="textSecondary">
-            Nenhuma nota adicionada. Use o leitor de código de barras ou adicione manualmente.
+  const renderListaNotas = () => {
+    return (
+      <Paper sx={{ p: 3, mb: 3 }}>
+        <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+          <Typography variant="h6">
+            Notas a serem salvas <small>({notas.length})</small>
           </Typography>
-        </Box>
-      ) : (
-        <Box>
-          {notas.map((nota, index) => (
-            <Box 
-              key={nota.id}
-              id={`nota-${index}`}
-              display="flex" 
-              alignItems="center" 
-              p={2} 
-              mb={1} 
-              bgcolor="background.paper"
-              borderRadius={1}
-              boxShadow={1}
-            >
-              <Box flexGrow={1}>
-                <Typography variant="subtitle2">Nota: {nota.numeroNota}</Typography>
-                <Typography variant="body2" color="textSecondary">
-                  Código: {nota.codigo}
-                </Typography>
-                <Typography variant="body1" color="primary" fontWeight="bold">
-                  Valor: {nota.valor}
-                </Typography>
-              </Box>
-              <Box>
-                <IconButton 
-                  size="small" 
-                  color="primary" 
-                  onClick={() => handleEditarNota(index)}
-                  disabled={loading || isSaving}
+          {notas.length > 0 && (
+            <Box display="flex" gap={2} alignItems="center">
+              <Typography variant="subtitle1" color="primary" fontWeight="bold">
+                Total: {formatarMoeda(valorTotal)}
+              </Typography>
+              <Button 
+                color="error" 
+                size="small" 
+                variant="outlined"
+                onClick={() => {
+                  if (window.confirm('Tem certeza que deseja remover todas as notas?')) {
+                    setNotas([]);
+                    enqueueSnackbar('Todas as notas foram removidas', { 
+                      variant: 'info',
+                      autoHideDuration: 3000
+                    });
+                  }
+                }}
+                disabled={loading || isSaving}
+                startIcon={<DeleteIcon />}
+              >
+                Limpar Tudo
+              </Button>
+              <Box sx={{ position: 'relative' }}>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  onClick={handleSalvarTodasNotas}
+                  disabled={loading || isSaving || notas.length === 0}
+                  startIcon={isSaving ? undefined : <SaveIcon />}
+                  sx={{
+                    minWidth: 180,
+                    '&.Mui-disabled': {
+                      bgcolor: 'action.disabledBackground',
+                      color: 'action.disabled',
+                    },
+                  }}
                 >
-                  <EditIcon />
-                </IconButton>
-                <IconButton 
-                  size="small" 
-                  color="error" 
-                  onClick={() => handleRemoverNota(index)}
-                  disabled={loading || isSaving}
-                >
-                  <DeleteIcon />
-                </IconButton>
+                  {isSaving ? 'Salvando...' : `Salvar ${notas.length} Nota${notas.length !== 1 ? 's' : ''}`}
+                </Button>
+                {isSaving && (
+                  <CircularProgress 
+                    size={24}
+                    sx={{
+                      color: 'primary.main',
+                      position: 'absolute',
+                      top: '50%',
+                      left: '50%',
+                      marginTop: '-12px',
+                      marginLeft: '-12px',
+                    }}
+                  />
+                )}
               </Box>
             </Box>
-          ))}
+          )}
         </Box>
-      )}
-    </Paper>
-  );
+        
+        {notas.length === 0 ? (
+          <Typography variant="body2" color="textSecondary" align="center" sx={{ py: 4 }}>
+            Nenhuma nota adicionada ainda. Use o scanner para adicionar notas.
+          </Typography>
+        ) : (
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {notas.map((nota, index) => (
+              <Paper 
+                key={nota.id}
+                elevation={1}
+                data-status={nota.status}
+                data-nota-id={nota.id}
+                sx={{
+                  p: 2,
+                  borderLeft: '4px solid',
+                  borderColor: nota.status === 'erro' ? 'error.main' : 
+                              nota.status === 'processando' ? 'warning.main' :
+                              nota.status === 'concluido' ? 'success.main' : 'primary.main',
+                  borderRadius: 1,
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  backgroundColor: 'background.paper',
+                  position: 'relative',
+                  overflow: 'hidden',
+                  '&:hover': {
+                    boxShadow: 2,
+                  },
+                  ...(nota.status === 'processando' ? {
+                    '&::before': {
+                      content: '""',
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      backgroundColor: 'warning.light',
+                      opacity: 0.1,
+                      animation: `${pulseAnimation} 1.5s ease-in-out infinite`,
+                      zIndex: 0
+                    }
+                  } : {})
+                } as SxProps<Theme>}
+              >
+                <Box sx={{ flex: 1 }}>
+                  <Box display="flex" alignItems="center" gap={1} mb={1}>
+                    <Typography variant="subtitle1" fontWeight="bold">
+                      NFE {nota.numeroNota}
+                    </Typography>
+                    <Box 
+                      component="span" 
+                      sx={{
+                        px: 1,
+                        py: 0.5,
+                        bgcolor: 'primary.light',
+                        color: 'primary.contrastText',
+                        borderRadius: 1,
+                        fontSize: '0.7rem',
+                        fontWeight: 'bold',
+                        textTransform: 'uppercase'
+                      }}
+                    >
+                      {nota.status}
+                    </Box>
+                  </Box>
+                  <Typography variant="body2" color="text.secondary">
+                    Código: {nota.codigo}
+                  </Typography>
+                  {notaEditandoValor === nota.id ? (
+                    <Box mt={1} mb={1}>
+                      <Typography variant="subtitle2" gutterBottom>Digite o valor da nota:</Typography>
+                      <CurrencyInput
+                        label="Valor da nota"
+                        value={nota.valor}
+                        onChange={(valor) => atualizarValorNota(nota.id, valor)}
+                        autoFocus
+                        size="small"
+                        sx={{ 
+                          bgcolor: 'background.paper',
+                          '& .MuiOutlinedInput-root': {
+                            '&.Mui-focused fieldset': {
+                              borderColor: 'primary.main',
+                              borderWidth: 2
+                            }
+                          },
+                          '&:hover': {
+                            '& .MuiOutlinedInput-notchedOutline': {
+                              borderColor: 'primary.light',
+                            }
+                          }
+                        }}
+                      />
+                      <Box mt={1} display="flex" gap={1}>
+                        <Button 
+                          variant="contained" 
+                          color="primary" 
+                          size="small"
+                          onClick={() => {
+                            if (nota.valor && nota.valor.trim() !== '') {
+                              setNotaEditandoValor(null);
+                            } else {
+                              enqueueSnackbar('Informe o valor da nota', { variant: 'error' });
+                            }
+                          }}
+                        >
+                          OK
+                        </Button>
+                        <Button 
+                          variant="outlined" 
+                          size="small"
+                          onClick={() => handleRemoverNota(notas.findIndex(n => n.id === nota.id))}
+                        >
+                          Remover
+                        </Button>
+                      </Box>
+                    </Box>
+                  ) : (
+                    <>
+                      <Typography 
+                        variant="body1" 
+                        color={!nota.valor ? 'error' : 'primary'} 
+                        fontWeight="medium"
+                        onClick={() => setNotaEditandoValor(nota.id)}
+                        sx={{
+                          cursor: 'pointer',
+                          '&:hover': {
+                            textDecoration: 'underline',
+                            textUnderlineOffset: '2px'
+                          },
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 1
+                        }}
+                      >
+                        <span>Valor:</span>
+                        <span style={{ 
+                          padding: '2px 8px',
+                          borderRadius: '4px',
+                          backgroundColor: !nota.valor ? 'rgba(244, 67, 54, 0.1)' : 'rgba(25, 118, 210, 0.1)'
+                        }}>
+                          {nota.valor ? `R$ ${nota.valor}` : 'Clique para informar o valor'}
+                        </span>
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary" display="block" mt={0.5}>
+                        {new Date(nota.dataHora).toLocaleString('pt-BR')}
+                      </Typography>
+                    </>
+                  )}
+                </Box>
+                <Box>
+                  <IconButton 
+                    size="small" 
+                    color="error" 
+                    onClick={() => handleRemoverNota(index)}
+                    disabled={isSaving}
+                    title="Remover nota"
+                  >
+                    <DeleteIcon />
+                  </IconButton>
+                </Box>
+              </Paper>
+            ))}
+          </Box>
+        )}
+      </Paper>
+    );
+  };
 
   return (
     <Box>
-      {/* Formulário de adição manual */}
-      <Paper sx={{ p: 3, mb: 3 }}>
+      {/* Campo para leitura do scanner óptico */}
+      <Paper component="form" onSubmit={handleAddManual} sx={{ p: 3, mb: 3 }}>
         <Typography variant="h6" gutterBottom>
-          Adicionar Nota Fiscal
+          Leitor de Código de Barras
         </Typography>
-        
-        <form onSubmit={handleAddManual}>
-          <Box display="flex" gap={2} mb={2}>
-            <TextField
-              label="Código de Barras"
-              value={manualCodigo}
-              onChange={(e) => setManualCodigo(e.target.value)}
-              fullWidth
-              disabled={loading || isSaving}
-              InputProps={{
-                endAdornment: (
-                  <Button 
-                    type="button"
-                    variant="outlined"
-                    onClick={() => setShowScanner(true)}
-                    disabled={loading || isSaving}
-                    startIcon={<QrCodeScannerIcon />}
+        <Box display="flex" gap={2} alignItems="flex-end">
+          <TextField
+            fullWidth
+            label="Aponte o scanner e leia o código"
+            variant="outlined"
+            value={codigoBarras}
+            onChange={(e) => setCodigoBarras(e.target.value)}
+            onKeyDown={handleKeyDown}
+            inputRef={inputRef}
+            disabled={loading || isSaving}
+            autoFocus
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton
+                    onClick={() => {
+                      setCodigoBarras('');
+                      inputRef.current?.focus();
+                    }}
+                    edge="end"
                   >
-                    Ler Código
-                  </Button>
-                ),
-              }}
-            />
-            <Button 
-              type="submit" 
-              variant="contained" 
-              color="primary"
-              disabled={!manualCodigo.trim() || loading || isSaving}
-              startIcon={<AddIcon />}
-            >
-              Adicionar
-            </Button>
-          </Box>
-        </form>
+                    <CloseIcon />
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
+          />
+          <Button 
+            type="submit" 
+            variant="contained" 
+            color="primary" 
+            disabled={!codigoBarras.trim() || loading || isSaving}
+            startIcon={<AddIcon />}
+          >
+            Adicionar
+          </Button>
+        </Box>
+        <Typography variant="caption" color="textSecondary" display="block" mt={1}>
+          Posicione o cursor no campo acima e leia o código com o scanner
+        </Typography>
       </Paper>
 
       {/* Lista de Notas */}
       {renderListaNotas()}
 
-      {/* Diálogo de Edição */}
-      <Dialog 
-        open={notaEmEdicao !== null} 
-        onClose={() => setNotaEmEdicao(null)}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>Editar Valor da Nota</DialogTitle>
-        <DialogContent>
-          <Box sx={{ minWidth: 300, pt: 2 }}>
-            <Typography variant="subtitle2" gutterBottom>
-              Nota: {notaEmEdicao !== null ? notas[notaEmEdicao.index]?.numeroNota : ''}
-            </Typography>
-            <CurrencyInput
-              label="Valor"
-              value={notaEmEdicao?.valor || '0,00'}
-              onChange={(value) => {
-                if (notaEmEdicao) {
-                  setNotaEmEdicao({ ...notaEmEdicao, valor: value });
-                }
-              }}
-              fullWidth
-              autoFocus
-            />
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button 
-            onClick={() => setNotaEmEdicao(null)}
-            disabled={loading || isSaving}
-          >
-            Cancelar
-          </Button>
-          <Button 
-            onClick={handleSalvarNota} 
-            variant="contained" 
-            color="primary"
-            disabled={loading || isSaving}
-          >
-            {loading ? <CircularProgress size={24} /> : 'Salvar'}
-          </Button>
-        </DialogActions>
-      </Dialog>
-      
-      {/* Scanner de Código de Barras */}
-      <Dialog 
-        open={showScanner} 
-        onClose={handleFecharScanner}
-        maxWidth="md"
-        fullWidth
-        fullScreen={isMobile}
-      >
-        <DialogTitle sx={{ m: 0, p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Typography variant="h6">
-            {scannerAtivo ? 'Aponte para o código de barras' : 'Preparando scanner...'}
-          </Typography>
-          <IconButton
-            aria-label="fechar"
-            onClick={handleFecharScanner}
-            sx={{
-              color: (theme) => theme.palette.grey[500],
-            }}
-          >
-            <CloseIcon />
-          </IconButton>
-        </DialogTitle>
-        <DialogContent sx={{ p: 0, position: 'relative' }}>
-          <Box sx={{ 
-            position: 'relative',
-            width: '100%',
-            height: isMobile ? 'calc(100vh - 200px)' : 400,
-            backgroundColor: '#000',
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            overflow: 'hidden'
-          }}>
-            {erro ? (
-              <Box sx={{ p: 3, textAlign: 'center' }}>
-                <Typography color="error" gutterBottom>{erro}</Typography>
-                <Button 
-                  variant="contained" 
-                  color="primary" 
-                  onClick={() => setScannerAtivo(true)}
-                  sx={{ mt: 2 }}
-                >
-                  Tentar Novamente
-                </Button>
-              </Box>
-            ) : (
-              <>
-                <video 
-                  ref={videoRef}
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    objectFit: 'contain',
-                    transform: 'scaleX(-1)' // Espelhar a imagem da câmera
-                  }}
-                  playsInline
-                  autoPlay
-                  muted
-                />
-                <Box sx={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  border: '2px solid rgba(255, 255, 255, 0.5)',
-                  borderRadius: 1,
-                  pointerEvents: 'none',
-                  boxShadow: 'inset 0 0 0 2000px rgba(0, 0, 0, 0.3)'
-                }}>
-                  <Box sx={{
-                    position: 'absolute',
-                    top: '50%',
-                    left: '50%',
-                    transform: 'translate(-50%, -50%)',
-                    width: '80%',
-                    height: '30%',
-                    border: '2px solid #fff',
-                    borderRadius: 1,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    backgroundColor: 'rgba(255, 255, 255, 0.1)'
-                  }}>
-                    <Typography variant="body2" color="white" align="center" sx={{ mb: 1 }}>
-                      Posicione o código de barras aqui
-                    </Typography>
-                    <Box sx={{ 
-                      width: '60%', 
-                      height: 2, 
-                      backgroundColor: 'white',
-                      mt: 1,
-                      position: 'relative',
-                      '&:before': {
-                        content: '""',
-                        position: 'absolute',
-                        top: -4,
-                        left: 0,
-                        right: 0,
-                        height: 2,
-                        backgroundColor: 'red',
-                        animation: 'scan 2s infinite',
-                        '@keyframes scan': {
-                          '0%': { top: '0%' },
-                          '50%': { top: '100%' },
-                          '100%': { top: '0%' }
-                        }
-                      }
-                    }} />
-                  </Box>
-                </Box>
-              </>
-            )}
-          </Box>
-          
-          {loading && (
-            <Box sx={{ width: '100%', position: 'absolute', top: 0 }}>
-              <LinearProgress color="primary" />
-            </Box>
-          )}
-          
-          <Box sx={{ p: 2, textAlign: 'center' }}>
-            <Typography variant="body2" color="textSecondary">
-              {scannerAtivo 
-                ? 'Aponte a câmera para o código de barras da nota fiscal'
-                : 'Iniciando câmera...'}
-            </Typography>
-            {scannerAtivo && (
-              <Button 
-                variant="outlined" 
-                color="primary" 
-                onClick={handleFecharScanner}
-                sx={{ mt: 2 }}
-                startIcon={<CloseIcon />}
-              >
-                Cancelar
-              </Button>
-            )}
-          </Box>
-        </DialogContent>
-      </Dialog>
+
+
     </Box>
   );
 };

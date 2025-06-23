@@ -282,7 +282,7 @@ function GerenciarControlesContent() {
                   <TableCell>{controle.motorista || '-'}</TableCell>
                   <TableCell>{controle.responsavel || '-'}</TableCell>
                   <TableCell>
-                    {controle.notasFiscais.length > 0 ? (
+                    {controle.notasFiscais && controle.notasFiscais.length > 0 ? (
                       <Chip 
                         label={`${controle.notasFiscais.length} nota(s)`} 
                         size="small"
@@ -307,7 +307,7 @@ function GerenciarControlesContent() {
                   <TableCell>
                     {format(new Date(controle.dataCriacao), "dd/MM/yyyy HH:mm", { locale: ptBR })}
                   </TableCell>
-                  <TableCell>{controle.usuario.nome}</TableCell>
+                  <TableCell>{controle.usuario?.nome || '-'}</TableCell>
                   <TableCell align="right">
                     <IconButton 
                       onClick={() => handleOpenEditarControle(controle)}

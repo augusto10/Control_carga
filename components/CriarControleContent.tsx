@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../store/store';
+import { CriarControleDTO } from '../types';
 import { 
   Container,
   Typography,
@@ -82,12 +83,20 @@ const CriarControleContent: React.FC = () => {
     submit: false
   });
   
+  // Opções fixas de transportadoras
+  const transportadorasFixas = [
+    { id: 'ACERT', nome: 'ACERT', descricao: 'ACERT' },
+    { id: 'EXPRESSO_GOIAS', nome: 'EXPRESSO_GOIAS', descricao: 'EXPRESSO GOIÁS' }
+  ];
+
+  // Encontra a transportadora padrão (ACERT)
+  const transportadoraPadrao = transportadorasFixas.find(t => t.id === 'ACERT');
+
   const [formData, setFormData] = useState({
-    motorista: '',
-    transportadoraId: 'ACERT', // Valor padrão para ACERT
-    responsavel: '',
-    observacoes: '',
-    numeroManifesto: '',
+    motorista: 'PENDENTE',
+    transportadora: transportadoraPadrao?.id || 'ACERT',
+    responsavel: 'PENDENTE',
+    observacao: '',
     qtdPallets: 0,
   });
   
@@ -102,12 +111,6 @@ const CriarControleContent: React.FC = () => {
   console.log('Todas as notas da store:', notas);
   console.log('Notas disponíveis (array):', notasDisponiveis);
   console.log('Notas não vinculadas:', notasNaoVinculadas);
-  
-  // Opções fixas de transportadoras
-  const transportadorasFixas = [
-    { id: 'ACERT', nome: 'ACERT', descricao: 'ACERT Transportes' },
-    { id: 'EXPRESSO_GOIAS', nome: 'EXPRESSO_GOIAS', descricao: 'Expresso Goiás' },
-  ];
 
   useEffect(() => {
     const carregarDados = async () => {
@@ -156,63 +159,102 @@ const CriarControleContent: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const newErrors: Record<string, string> = {};
-    
-    if (!formData.transportadoraId) {
-      newErrors.transportadoraId = 'Transportadora é obrigatória';
-    }
-    
-    if (!formData.motorista) {
-      newErrors.motorista = 'Nome do motorista é obrigatório';
-    }
-    
-    if (!formData.responsavel) {
-      newErrors.responsavel = 'Nome do responsável é obrigatório';
-    }
-    
-    if (!formData.numeroManifesto) {
-      newErrors.numeroManifesto = 'Número do manifesto é obrigatório';
-    }
-    
-    if (formData.qtdPallets <= 0) {
-      newErrors.qtdPallets = 'Quantidade de pallets deve ser maior que zero';
-    }
-    
-    if (Object.keys(newErrors).length > 0) {
-      setErrors(newErrors);
-      enqueueSnackbar('Corrija os erros no formulário', { variant: 'error' });
-      return;
-    }
-    
     try {
+      // Limpa erros anteriores
+      setErrors({});
+      
+      // Validação dos campos
+      const newErrors: Record<string, string> = {};
+      
+      if (!formData.transportadora) {
+        newErrors.transportadora = 'Transportadora é obrigatória';
+      }
+      
+      if (!formData.motorista?.trim()) {
+        newErrors.motorista = 'Nome do motorista é obrigatório';
+      }
+      
+      if (!formData.responsavel?.trim()) {
+        newErrors.responsavel = 'Nome do responsável é obrigatório';
+      }
+      
+      if (formData.qtdPallets <= 0) {
+        newErrors.qtdPallets = 'Quantidade de pallets deve ser maior que zero';
+      }
+      
+      // Se houver erros de validação, exibe e interrompe o processo
+      if (Object.keys(newErrors).length > 0) {
+        setErrors(newErrors);
+        enqueueSnackbar('Corrija os erros no formulário', { 
+          variant: 'error',
+          autoHideDuration: 5000
+        });
+        return;
+      }
+      
+      // Ativa o estado de carregamento
       setIsLoading(prev => ({ ...prev, submit: true }));
       
-      // Envia apenas os campos necessários para a API
-      const dadosControle = {
-        motorista: formData.motorista,
-        cpfMotorista: 'PENDENTE',
-        responsavel: formData.responsavel,
-        transportadora: formData.transportadoraId as 'ACERT' | 'EXPRESSO_GOIAS',
-        transportadoraId: formData.transportadoraId,
-        qtdPallets: formData.qtdPallets,
-        numeroManifesto: formData.numeroManifesto,
-        observacao: formData.observacoes || undefined,
-        notasIds: selectedNotas,
+      // Garante que todos os campos obrigatórios tenham valores válidos
+      const dadosControle: CriarControleDTO = {
+        motorista: (formData.motorista || 'PENDENTE').trim(),
+        responsavel: (formData.responsavel || 'PENDENTE').trim(),
+        transportadora: formData.transportadora as 'ACERT' | 'EXPRESSO_GOIAS',
+        qtdPallets: Number(formData.qtdPallets) || 0,
+        observacao: formData.observacao?.trim(),
+        notasIds: Array.isArray(selectedNotas) ? selectedNotas : []
       };
       
-      console.log('Dados do controle a serem enviados:', dadosControle);
+      console.log('Dados do controle formatados para envio:', JSON.stringify(dadosControle, null, 2));
       
-      await criarControle(dadosControle);
+      console.log('Dados do controle formatados para envio:', JSON.stringify(dadosControle, null, 2));
       
-      enqueueSnackbar('Controle criado com sucesso!', { variant: 'success' });
-      router.push('/listar-controles');
+      console.log('Dados do controle antes do envio:', JSON.stringify(dadosControle, null, 2));
+      
+      console.log('[CriarControle] Dados do controle a serem enviados:', dadosControle);
+      
+      // Chama a função para criar o controle
+      const controleCriado = await criarControle(dadosControle);
+      
+      console.log('[CriarControle] Controle criado com sucesso:', controleCriado);
+      
+      // Exibe mensagem de sucesso e redireciona
+      enqueueSnackbar('Controle criado com sucesso!', { 
+        variant: 'success',
+        autoHideDuration: 3000
+      });
+      
+      // Redireciona para a lista de controles após um pequeno atraso
+      setTimeout(() => {
+        router.push('/listar-controles');
+      }, 1000);
+      
     } catch (error) {
-      console.error('Erro ao criar controle:', error);
-      enqueueSnackbar(
-        error instanceof Error ? error.message : 'Erro ao criar controle', 
-        { variant: 'error' }
-      );
+      console.error('[CriarControle] Erro ao criar controle:', error);
+      
+      let mensagemErro = 'Erro ao criar controle. Por favor, tente novamente.';
+      
+      if (error instanceof Error) {
+        // Mensagens de erro mais amigáveis para o usuário
+        if (error.message.includes('já existe')) {
+          mensagemErro = 'Já existe um controle com esses dados. Verifique as informações e tente novamente.';
+        } else if (error.message.includes('não autenticado') || error.message.includes('Sessão expirada')) {
+          mensagemErro = 'Sua sessão expirou. Por favor, faça login novamente.';
+          // Redireciona para a página de login após mostrar a mensagem
+          setTimeout(() => router.push('/login'), 1500);
+        } else {
+          mensagemErro = error.message || mensagemErro;
+        }
+      }
+      
+      enqueueSnackbar(mensagemErro, { 
+        variant: 'error',
+        autoHideDuration: 7000,
+        persist: false
+      });
+      
     } finally {
+      // Desativa o estado de carregamento independentemente do resultado
       setIsLoading(prev => ({ ...prev, submit: false }));
     }
   };
@@ -242,51 +284,15 @@ const CriarControleContent: React.FC = () => {
           <Box display="grid" gridTemplateColumns="repeat(auto-fill, minmax(300px, 1fr))" gap={2}>
             <TextField
               fullWidth
-              label="Número do Manifesto"
-              name="numeroManifesto"
-              value={formData.numeroManifesto}
+              label="Responsável"
+              name="responsavel"
+              value={formData.responsavel}
               onChange={handleChange}
-              error={!!errors.numeroManifesto}
-              helperText={errors.numeroManifesto}
+              error={!!errors.responsavel}
+              helperText={errors.responsavel}
               margin="normal"
               required
             />
-            
-            <TextField
-              fullWidth
-              label="Quantidade de Pallets"
-              name="qtdPallets"
-              type="number"
-              value={formData.qtdPallets}
-              onChange={(e) => setFormData({...formData, qtdPallets: parseInt(e.target.value) || 0})}
-              error={!!errors.qtdPallets}
-              helperText={errors.qtdPallets}
-              margin="normal"
-              inputProps={{ min: 1 }}
-              required
-            />
-            
-            <FormControl fullWidth sx={{ mb: 2 }} error={!!errors.transportadoraId}>
-              <InputLabel id="transportadora-label">Transportadora *</InputLabel>
-              <Select
-                labelId="transportadora-label"
-                id="transportadora"
-                name="transportadoraId"
-                value={formData.transportadoraId}
-                onChange={handleChange}
-                label="Transportadora *"
-                required
-              >
-                {transportadorasFixas.map((transp) => (
-                  <MenuItem key={transp.id} value={transp.id}>
-                    {transp.descricao}
-                  </MenuItem>
-                ))}
-              </Select>
-              {errors.transportadoraId && (
-                <FormHelperText>{errors.transportadoraId}</FormHelperText>
-              )}
-            </FormControl>
             
             <TextField
               fullWidth
@@ -302,92 +308,114 @@ const CriarControleContent: React.FC = () => {
             
             <TextField
               fullWidth
-              label="Responsável"
-              name="responsavel"
-              value={formData.responsavel}
+              label="CPF do Motorista"
+              name="cpfMotorista"
+              value={formData.cpfMotorista}
               onChange={handleChange}
-              error={!!errors.responsavel}
-              helperText={errors.responsavel}
+              error={!!errors.cpfMotorista}
+              helperText={errors.cpfMotorista || "Apenas números"}
               margin="normal"
+              required
+            />
+            
+            <FormControl fullWidth error={!!errors.transportadora}>
+              <InputLabel id="transportadora-label">Transportadora</InputLabel>
+              <Select
+                labelId="transportadora-label"
+                id="transportadora"
+                name="transportadora"
+                value={formData.transportadora}
+                onChange={handleChange}
+                label="Transportadora"
+              >
+                {transportadorasFixas.map((t) => (
+                  <MenuItem key={t.id} value={t.id}>
+                    {t.descricao}
+                  </MenuItem>
+                ))}
+              </Select>
+              {errors.transportadora && (
+                <FormHelperText>{errors.transportadora}</FormHelperText>
+              )}
+            </FormControl>
+            
+            <TextField
+              fullWidth
+              label="Quantidade de Pallets"
+              name="qtdPallets"
+              type="number"
+              value={formData.qtdPallets}
+              onChange={(e) => setFormData({...formData, qtdPallets: parseInt(e.target.value) || 0})}
+              error={!!errors.qtdPallets}
+              helperText={errors.qtdPallets}
+              margin="normal"
+              inputProps={{ min: 1 }}
               required
             />
             
             <TextField
               fullWidth
               label="Observações"
-              name="observacoes"
-              value={formData.observacoes}
+              name="observacao"
+              value={formData.observacao}
               onChange={handleChange}
               margin="normal"
               multiline
               rows={4}
             />
           </Box>
-          
-          <Typography variant="h6" gutterBottom sx={{ mt: 4, mb: 2 }}>
+          <Typography variant="h6" gutterBottom sx={{ mt: 2, mb: 2 }}>
             Notas Fiscais
           </Typography>
-          
-          <Box sx={{ mb: 4, p: 2, border: '1px solid #e0e0e0', borderRadius: 1 }}>
-            <Typography variant="subtitle1" gutterBottom>
-              Selecione as notas fiscais para vincular a este controle:
+          {notasDisponiveis.length === 0 ? (
+            <Typography variant="body2" color="textSecondary" sx={{ fontStyle: 'italic' }}>
+              Nenhuma nota fiscal disponível para vincular.
             </Typography>
+          ) : (
+            <List dense sx={{ maxHeight: 300, overflow: 'auto' }}>
+              {notasNaoVinculadas.map((nota) => (
+                <ListItem 
+                  key={nota.id}
+                  button 
+                  onClick={() => {
+                    setSelectedNotas(prev => 
+                      prev.includes(nota.id)
+                        ? prev.filter(id => id !== nota.id)
+                        : [...prev, nota.id]
+                    );
+                  }}
+                  sx={{
+                    '&:hover': { backgroundColor: 'action.hover' },
+                    backgroundColor: selectedNotas.includes(nota.id) ? 'action.selected' : 'transparent',
+                    borderRadius: 1,
+                    mb: 0.5
+                  }}
+                >
+                  <Checkbox
+                    edge="start"
+                    checked={selectedNotas.includes(nota.id)}
+                    tabIndex={-1}
+                    disableRipple
+                    inputProps={{ 'aria-labelledby': `nota-${nota.id}` }}
+                  />
+                  <ListItemText 
+                    id={`nota-${nota.id}`}
+                    primary={`Nota ${nota.numeroNota} - ${new Intl.NumberFormat('pt-BR', { 
+                      style: 'currency', 
+                      currency: 'BRL' 
+                    }).format(nota.valor)}`}
+                    secondary={`Código: ${nota.codigo} • Data: ${format(new Date(nota.dataCriacao), "dd/MM/yyyy HH:mm", { locale: ptBR })}`}
+                  />
+                </ListItem>
+              ))}
+            </List>
+          )}
             
-            {isLoading.notas ? (
-              <Box display="flex" justifyContent="center" p={2}>
-                <CircularProgress size={24} />
-              </Box>
-            ) : notasDisponiveis.length === 0 ? (
-              <Typography variant="body2" color="textSecondary" sx={{ fontStyle: 'italic' }}>
-                Nenhuma nota fiscal disponível para vincular.
-              </Typography>
-            ) : (
-              <List dense sx={{ maxHeight: 300, overflow: 'auto' }}>
-                {notasNaoVinculadas.map((nota) => (
-                  <ListItem 
-                    key={nota.id}
-                    button 
-                    onClick={() => {
-                      setSelectedNotas(prev => 
-                        prev.includes(nota.id)
-                          ? prev.filter(id => id !== nota.id)
-                          : [...prev, nota.id]
-                      );
-                    }}
-                    sx={{
-                      '&:hover': { backgroundColor: 'action.hover' },
-                      backgroundColor: selectedNotas.includes(nota.id) ? 'action.selected' : 'transparent',
-                      borderRadius: 1,
-                      mb: 0.5
-                    }}
-                  >
-                    <Checkbox
-                      edge="start"
-                      checked={selectedNotas.includes(nota.id)}
-                      tabIndex={-1}
-                      disableRipple
-                      inputProps={{ 'aria-labelledby': `nota-${nota.id}` }}
-                    />
-                    <ListItemText 
-                      id={`nota-${nota.id}`}
-                      primary={`Nota ${nota.numeroNota} - ${new Intl.NumberFormat('pt-BR', { 
-                        style: 'currency', 
-                        currency: 'BRL' 
-                      }).format(nota.valor)}`}
-                      secondary={`Código: ${nota.codigo} • Data: ${format(new Date(nota.dataCriacao), "dd/MM/yyyy HH:mm", { locale: ptBR })}`}
-                    />
-                  </ListItem>
-                ))}
-              </List>
-            )}
-            
-            {selectedNotas.length > 0 && (
-              <Typography variant="body2" color="textSecondary" sx={{ mt: 1, fontStyle: 'italic' }}>
-                {selectedNotas.length} nota(s) selecionada(s)
-              </Typography>
-            )}
-          </Box>
-          
+          {selectedNotas.length > 0 && (
+            <Typography variant="body2" color="textSecondary" sx={{ mt: 1, fontStyle: 'italic' }}>
+              {selectedNotas.length} nota(s) selecionada(s)
+            </Typography>
+          )}
           <Box sx={{ mt: 4, display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
             <Button 
               variant="outlined" 

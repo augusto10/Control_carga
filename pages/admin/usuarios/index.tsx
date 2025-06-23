@@ -1,16 +1,16 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { 
-  Container, 
-  Typography, 
-  Paper, 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableContainer, 
-  TableHead, 
-  TableRow, 
-  Button, 
+import {
+  Container,
+  Typography,
+  Paper,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Button,
   IconButton,
   Dialog,
   DialogTitle,
@@ -295,91 +295,92 @@ function GerenciarUsuariosContent() {
                 usuarios.map((usuario) => (
                   <TableRow key={usuario.id}>
                     <TableCell>{usuario.nome}</TableCell>
-                  <TableCell>{usuario.email}</TableCell>
-                  <TableCell>
-                    <Box 
-                      sx={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        px: 1.5,
-                        py: 0.5,
-                        borderRadius: 1,
-                        bgcolor: usuario.tipo === 'ADMIN' ? 'primary.light' : 
-                                 usuario.tipo === 'GERENTE' ? 'secondary.light' : 'grey.200',
-                        color: usuario.tipo === 'ADMIN' ? 'primary.contrastText' : 
-                               usuario.tipo === 'GERENTE' ? 'secondary.contrastText' : 'text.primary',
-                        fontWeight: 'medium',
-                        fontSize: '0.75rem',
-                      }}
-                    >
-                      {usuario.tipo === 'ADMIN' ? 'Administrador' : 
-                       usuario.tipo === 'GERENTE' ? 'Gerente' : 'Usuário'}
-                    </Box>
-                  </TableCell>
-                  <TableCell>
-                    <Box 
-                      sx={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        px: 1.5,
-                        py: 0.5,
-                        borderRadius: 1,
-                        bgcolor: usuario.ativo ? 'success.light' : 'error.light',
-                        color: 'white',
-                        fontWeight: 'medium',
-                        fontSize: '0.75rem',
-                      }}
-                    >
-                      {usuario.ativo ? 'Ativo' : 'Inativo'}
-                    </Box>
-                  </TableCell>
-                  <TableCell>
-                    {usuario.ultimoAcesso 
-                      ? new Date(usuario.ultimoAcesso).toLocaleString() 
-                      : 'Nunca acessou'}
-                  </TableCell>
-                  <TableCell align="right">
-                    <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
-                      <Tooltip title="Editar usuário">
-                        <span>
-                          <IconButton 
-                            onClick={() => handleOpenEditarUsuario(usuario)}
-                            color="primary"
-                            disabled={usuario.id === user?.id}
-                            size="small"
-                            sx={{
-                              '&:hover': { backgroundColor: 'primary.light', color: 'white' },
-                            }}
-                          >
-                            <EditIcon fontSize="small" />
-                          </IconButton>
-                        </span>
-                      </Tooltip>
-                      <Tooltip title={usuario.ativo ? 'Desativar usuário' : 'Ativar usuário'}>
-                        <span>
-                          <IconButton 
-                            onClick={() => handleToggleStatus(usuario.id, usuario.ativo)}
-                            color={usuario.ativo ? 'error' : 'success'}
-                            disabled={usuario.id === user?.id}
-                            size="small"
-                            sx={{
-                              '&:hover': { 
-                                backgroundColor: usuario.ativo ? 'error.light' : 'success.light', 
-                                color: 'white' 
-                              },
-                            }}
-                          >
-                            {usuario.ativo ? 
-                              <DeleteIcon fontSize="small" /> : 
-                              <span style={{ fontSize: '0.8rem' }}>Ativar</span>
-                            }
-                          </IconButton>
-                        </span>
-                      </Tooltip>
-                    </Box>
-                  </TableCell>
-                </TableRow>
-              ))}
+                    <TableCell>{usuario.email}</TableCell>
+                    <TableCell>
+                      <Box 
+                        sx={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          px: 1.5,
+                          py: 0.5,
+                          borderRadius: 1,
+                          bgcolor: usuario.tipo === 'ADMIN' ? 'primary.light' : 
+                                    usuario.tipo === 'GERENTE' ? 'secondary.light' : 'grey.200',
+                          color: usuario.tipo === 'ADMIN' ? 'primary.contrastText' : 
+                                   usuario.tipo === 'GERENTE' ? 'secondary.contrastText' : 'text.primary',
+                          fontWeight: 'medium',
+                          fontSize: '0.75rem',
+                        }}
+                      >
+                        {usuario.tipo === 'ADMIN' ? 'Administrador' : 
+                         usuario.tipo === 'GERENTE' ? 'Gerente' : 'Usuário'}
+                      </Box>
+                    </TableCell>
+                    <TableCell>
+                      <Box 
+                        sx={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          px: 1.5,
+                          py: 0.5,
+                          borderRadius: 1,
+                          bgcolor: usuario.ativo ? 'success.light' : 'error.light',
+                          color: 'white',
+                          fontWeight: 'medium',
+                          fontSize: '0.75rem',
+                        }}
+                      >
+                        {usuario.ativo ? 'Ativo' : 'Inativo'}
+                      </Box>
+                    </TableCell>
+                    <TableCell>
+                      {usuario.ultimoAcesso 
+                        ? new Date(usuario.ultimoAcesso).toLocaleString() 
+                        : 'Nunca acessou'}
+                    </TableCell>
+                    <TableCell align="right">
+                      <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+                        <Tooltip title="Editar usuário">
+                          <span>
+                            <IconButton 
+                              onClick={() => handleOpenEditarUsuario(usuario)}
+                              color="primary"
+                              disabled={usuario.id === user?.id}
+                              size="small"
+                              sx={{
+                                '&:hover': { backgroundColor: 'primary.light', color: 'white' },
+                              }}
+                            >
+                              <EditIcon fontSize="small" />
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                        <Tooltip title={usuario.ativo ? 'Desativar usuário' : 'Ativar usuário'}>
+                          <span>
+                            <IconButton 
+                              onClick={() => handleToggleStatus(usuario.id, usuario.ativo)}
+                              color={usuario.ativo ? 'error' : 'success'}
+                              disabled={usuario.id === user?.id}
+                              size="small"
+                              sx={{
+                                '&:hover': { 
+                                  backgroundColor: usuario.ativo ? 'error.light' : 'success.light', 
+                                  color: 'white' 
+                                },
+                              }}
+                            >
+                              {usuario.ativo ? 
+                                <DeleteIcon fontSize="small" /> : 
+                                <span style={{ fontSize: '0.8rem' }}>Ativar</span>
+                              }
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </TableContainer>
@@ -558,10 +559,12 @@ function GerenciarUsuariosContent() {
   );
 }
 
-export default function GerenciarUsuarios() {
+const GerenciarUsuarios = () => {
   return (
     <AdminRoute>
       <GerenciarUsuariosContent />
     </AdminRoute>
   );
-}
+};
+
+export default GerenciarUsuarios;

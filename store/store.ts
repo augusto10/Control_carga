@@ -21,11 +21,10 @@ export type ControleCarga = {
   id: string;
   dataCriacao: Date;
   motorista: string;
-  cpfMotorista: string;
+  cpfMotorista?: string;  // Tornando opcional
   responsavel: string;
-  transportadoraId: string;
-  transportadora?: Transportadora;
-  numeroManifesto: string;
+  transportadora: 'ACERT' | 'EXPRESSO_GOIAS';
+  numeroManifesto?: string;
   qtdPallets: number;
   observacao?: string;
   finalizado: boolean;
@@ -42,10 +41,10 @@ interface StoreState {
   fetchControles: () => Promise<void>;
   fetchTransportadoras: () => Promise<void>;
   addNota: (nota: Omit<NotaFiscal, 'id' | 'dataCriacao' | 'controleId'>) => Promise<NotaFiscal>;
-  criarControle: (controle: Omit<ControleCarga, 'id' | 'dataCriacao' | 'finalizado' | 'notas' | 'transportadora'> & { notasIds?: string[], transportadora: 'ACERT' | 'EXPRESSO_GOIAS' }) => Promise<ControleCarga>;
+  criarControle: (controle: Omit<ControleCarga, 'id' | 'dataCriacao' | 'finalizado' | 'notas'> & { notasIds?: string[] }) => Promise<ControleCarga>;
   vincularNotas: (controleId: string, notasIds: string[]) => Promise<void>;
   finalizarControle: (controleId: string) => Promise<void>;
-  atualizarControle: (controleId: string, dados: Partial<Omit<ControleCarga, 'id' | 'dataCriacao' | 'notas' | 'transportadora'>>) => Promise<ControleCarga | null>;
+  atualizarControle: (controleId: string, dados: Partial<Omit<ControleCarga, 'id' | 'dataCriacao' | 'notas'>>) => Promise<ControleCarga | null>;
 }
 
 export const useStore = create<StoreState>((set) => ({
@@ -204,39 +203,100 @@ export const useStore = create<StoreState>((set) => ({
 
   criarControle: async (controle) => {
     try {
-      console.log('Enviando requisição para criar controle com notas:', controle);
+      console.log('[criarControle] Dados recebidos:', JSON.stringify(controle, null, 2));
+      
+      // Validação dos dados obrigatórios
+      if (!controle.motorista?.trim()) {
+        throw new Error('Nome do motorista é obrigatório');
+      }
+      if (!controle.responsavel?.trim()) {
+        throw new Error('Nome do responsável é obrigatório');
+      }
+      
+      console.log('[criarControle] Transportadora recebida:', controle.transportadora);
+      
+      if (!['ACERT', 'EXPRESSO_GOIAS'].includes(controle.transportadora)) {
+        console.error('[criarControle] Transportadora inválida:', controle.transportadora);
+        throw new Error('Transportadora inválida. Valor recebido: ' + controle.transportadora);
+      }
+
+      // Garante que notasIds seja um array
+      const notasIds = Array.isArray(controle.notasIds) ? controle.notasIds : [];
+
+      // Prepara os dados para envio
+      const dadosEnvio = {
+        ...controle,
+        motorista: controle.motorista.trim(),
+        responsavel: controle.responsavel.trim(),
+        cpfMotorista: controle.cpfMotorista ? controle.cpfMotorista.replace(/[^\d]/g, '') : 'PENDENTE',
+        qtdPallets: Number(controle.qtdPallets) || 0,
+        observacao: controle.observacao || null,
+        notasIds: notasIds
+      };
+
+      console.log('[criarControle] Dados formatados para envio:', JSON.stringify(dadosEnvio, null, 2));
+      
+      console.log('[criarControle] Enviando requisição para /api/controles');
       
       const response = await fetch('/api/controles', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
         },
-        body: JSON.stringify(controle),
+        credentials: 'include',
+        body: JSON.stringify(dadosEnvio),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || 'Erro ao criar controle');
+      console.log('[criarControle] Resposta recebida. Status:', response.status);
+      
+      let responseData;
+      try {
+        responseData = await response.json();
+        console.log('[criarControle] Corpo da resposta:', JSON.stringify(responseData, null, 2));
+      } catch (error) {
+        console.error('[criarControle] Erro ao fazer parse da resposta:', error);
+        responseData = {};
       }
 
-      const novoControle = await response.json();
+      if (!response.ok) {
+        console.error('[criarControle] Erro na resposta da API. Status:', response.status);
+        console.error('[criarControle] Dados do erro:', responseData);
+        
+        const errorMessage = responseData.error || 
+                            responseData.message || 
+                            `Erro ao criar controle: ${response.status} ${response.statusText}`;
+                            
+        console.error('[criarControle] Mensagem de erro:', errorMessage);
+        throw new Error(errorMessage);
+      }
+
+      const novoControle = responseData;
       
       // Se houver notas para vincular, faz o vínculo
-      if (controle.notasIds && controle.notasIds.length > 0) {
+      if (notasIds.length > 0) {
         try {
-          await fetch('/api/controles/vincular-notas', {
+          const vinculoResponse = await fetch('/api/controles/vincular-notas', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
+              'Accept': 'application/json',
             },
+            credentials: 'include',
             body: JSON.stringify({
               controleId: novoControle.id,
-              notasIds: controle.notasIds
+              notasIds: notasIds
             }),
           });
+
+          if (!vinculoResponse.ok) {
+            const errorData = await vinculoResponse.json().catch(() => ({}));
+            console.warn('Aviso ao vincular notas:', errorData);
+            // Não interrompe o fluxo, apenas registra o aviso
+          }
           
           // Atualiza o controle com as notas vinculadas
-          novoControle.notas = controle.notasIds.map((id: string) => ({
+          novoControle.notas = notasIds.map((id: string) => ({
             id,
             // Adicione outros campos necessários da nota aqui
           }));
@@ -248,13 +308,26 @@ export const useStore = create<StoreState>((set) => ({
       }
       
       // Atualiza a lista de controles
-      const controles = await (await fetch('/api/controles')).json();
-      set({ controles });
+      try {
+        const controlesResponse = await fetch('/api/controles', {
+          credentials: 'include',
+          headers: { 'Accept': 'application/json' }
+        });
+        if (controlesResponse.ok) {
+          const controles = await controlesResponse.json();
+          set({ controles });
+        }
+      } catch (updateError) {
+        console.error('Erro ao atualizar lista de controles:', updateError);
+      }
       
       return novoControle;
     } catch (error) {
       console.error('Erro na função criarControle:', error);
-      throw error;
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error('Erro desconhecido ao criar controle');
     }
   },
 

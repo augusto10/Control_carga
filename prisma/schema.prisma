@@ -5,7 +5,6 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
-  // Configuração recomendada para Neon
   relationMode = "prisma"
 }
 
@@ -13,11 +12,10 @@ model ControleCarga {
   id              String         @id @default(uuid())
   dataCriacao     DateTime       @default(now())
   motorista       String
-  cpfMotorista    String
   responsavel     String
   transportadora  Transportadora @default(ACERT)
-  numeroManifesto String
-  qtdPallets      Int
+  numeroManifesto String?
+  qtdPallets      Int            @default(0)
   observacao      String?
   finalizado      Boolean        @default(false)
   notas           NotaFiscal[]
@@ -75,14 +73,14 @@ model AuditoriaAcesso {
 }
 
 model ConfiguracaoSistema {
-  id          String   @id @default(uuid())
-  chave       String   @unique
-  valor       String
-  descricao   String?
-  tipo        String   @default("string") // string, number, boolean, json
-  opcoes      String?  // Opções para selects, separadas por vírgula
-  editavel    Boolean  @default(true)
-  dataCriacao DateTime @default(now())
+  id              String   @id @default(uuid())
+  chave           String   @unique
+  valor           String
+  descricao       String?
+  tipo            String   @default("string") // string, number, boolean, json
+  opcoes          String?  // Opções para selects, separadas por vírgula
+  editavel        Boolean  @default(true)
+  dataCriacao     DateTime @default(now())
   dataAtualizacao DateTime @updatedAt
   
   @@index([chave])
