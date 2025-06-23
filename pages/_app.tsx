@@ -5,41 +5,31 @@ import { AppProps } from 'next/app';
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
 import Layout from '../components/Layout';
-import { AuthProvider } from '../contexts/AuthContext';
+import { AuthProvider, useAuth } from '../contexts/AuthContext';
 import { ConfiguracaoProvider } from '../contexts/ConfiguracaoContext';
 import ProtectedRoute from '../components/ProtectedRoute';
 
 // Lista de rotas públicas que não requerem autenticação
 const publicRoutes = ['/login', '/esqueci-senha', '/cadastro'];
 
-function MyApp({ Component, pageProps }: AppProps) {
-  const [mounted, setMounted] = useState(false);
-  const [loading, setLoading] = useState(false); // Inicialmente false, pode ser alterado conforme necessário
+function AppContent({ Component, pageProps, isPublicRoute }: { Component: React.ComponentType<any>, pageProps: any, isPublicRoute: boolean }) {
+  const { isLoading, isAuthenticated } = useAuth();
   const router = useRouter();
-  const isPublicRoute = publicRoutes.includes(router.pathname);
-
+  const [showContent, setShowContent] = useState(false);
+  
   useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  // Evita a renderização do lado do servidor para evitar problemas de hidratação
-  if (!mounted) {
-    return null;
-  }
-
-  // Determinar se o layout deve ser aplicado (não aplicar na página de login, por exemplo)
-  const getLayout = (page: React.ReactNode) => {
-    if (isPublicRoute) {
-      return page;
+    // Se não está carregando e não está autenticado, redireciona para o login
+    if (!isLoading && !isAuthenticated && !isPublicRoute) {
+      router.push('/login');
+      return;
     }
     
-    return (
-      <ProtectedRoute>
-        <Layout>{page}</Layout>
-      </ProtectedRoute>
-    );
-  };
-
+    // Se está autenticado ou é rota pública, mostra o conteúdo
+    if (isAuthenticated || isPublicRoute) {
+      setShowContent(true);
+    }
+  }, [isLoading, isAuthenticated, isPublicRoute, router]);
+  
   // Componente de carregamento global
   const GlobalLoader = () => (
     <Box
@@ -59,6 +49,50 @@ function MyApp({ Component, pageProps }: AppProps) {
       <CircularProgress size={60} />
     </Box>
   );
+  
+  // Determinar se o layout deve ser aplicado (não aplicar na página de login, por exemplo)
+  const getLayout = (page: React.ReactNode) => {
+    if (isPublicRoute || !isAuthenticated) {
+      return page;
+    }
+    
+    return (
+      <ProtectedRoute>
+        <Layout>{page}</Layout>
+      </ProtectedRoute>
+    );
+  };
+  
+  // Se estiver carregando, mostra o loader global
+  if (isLoading) {
+    return <GlobalLoader />;
+  }
+  
+  // Se não estiver em uma rota pública e não estiver autenticado, redireciona para o login
+  if (!isPublicRoute && !isAuthenticated && !isLoading) {
+    if (typeof window !== 'undefined') {
+      router.push('/login');
+      return <GlobalLoader />;
+    }
+    return null;
+  }
+  
+  return getLayout(<Component {...pageProps} />);
+}
+
+function MyApp({ Component, pageProps }: AppProps) {
+  const [mounted, setMounted] = useState(false);
+  const router = useRouter();
+  const isPublicRoute = publicRoutes.includes(router.pathname);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Evita a renderização do lado do servidor para evitar problemas de hidratação
+  if (!mounted) {
+    return null;
+  }
 
   return (
     <ThemeProvider theme={professionalTheme}>
@@ -70,14 +104,17 @@ function MyApp({ Component, pageProps }: AppProps) {
       >
         <AuthProvider>
           <ConfiguracaoProvider>
-            {/* Mostrar o loader global quando estiver carregando configurações */}
-            {loading && <GlobalLoader />}
-            {getLayout(<Component {...pageProps} />)}
+            <AppContent 
+              Component={Component} 
+              pageProps={pageProps} 
+              isPublicRoute={isPublicRoute} 
+            />
           </ConfiguracaoProvider>
         </AuthProvider>
       </SnackbarProvider>
     </ThemeProvider>
   );
+
 }
 
 // Adicionando tipo para o componente MyApp

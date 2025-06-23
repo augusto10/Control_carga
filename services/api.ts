@@ -1,5 +1,4 @@
-import axios, { AxiosInstance, AxiosRequestConfig } from 'axios';
-import Cookies from 'js-cookie';
+import axios, { AxiosInstance } from 'axios';
 
 // Cria uma instância do Axios com configurações padrão
 const createApi = (): AxiosInstance => {
@@ -11,30 +10,31 @@ const createApi = (): AxiosInstance => {
     baseURL: cleanBaseURL,
     headers: {
       'Content-Type': 'application/json',
+      'Accept': 'application/json',
     },
+    withCredentials: true, // Importante para enviar cookies HTTP-only
+    xsrfCookieName: 'XSRF-TOKEN',
+    xsrfHeaderName: 'X-XSRF-TOKEN',
   });
-
-  // Adiciona o token JWT às requisições
+  
+  // Configuração global para todas as requisições
+  instance.defaults.withCredentials = true;
+  
+  // Interceptor de requisição
   instance.interceptors.request.use(
     (config) => {
       console.log('[API] Enviando requisição para:', config.url);
       console.log('[API] Método:', config.method);
+      console.log('[API] withCredentials:', config.withCredentials);
       
-      // Verifica se estamos no navegador antes de acessar os cookies
-      if (typeof window !== 'undefined') {
-        const token = Cookies.get('auth_token');
-        if (token) {
-          console.log('[API] Token JWT encontrado, adicionando ao cabeçalho');
-          config.headers.Authorization = `Bearer ${token}`;
-        } else {
-          console.log('[API] Nenhum token JWT encontrado');
-        }
-      }
+      // Adiciona o header X-Requested-With para identificar requisições AJAX
+      config.headers['X-Requested-With'] = 'XMLHttpRequest';
       
-      // Adiciona cabeçalhos CORS
-      config.headers['Access-Control-Allow-Origin'] = '*';
-      config.headers['Access-Control-Allow-Methods'] = 'GET,PUT,POST,DELETE,PATCH,OPTIONS';
-      config.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization';
+      // Garante que withCredentials está habilitado para enviar cookies
+      config.withCredentials = true;
+      
+      // Log dos headers da requisição para depuração
+      console.log('[API] Headers da requisição:', JSON.stringify(config.headers, null, 2));
       
       return config;
     },
@@ -44,17 +44,27 @@ const createApi = (): AxiosInstance => {
     }
   );
 
-  // Intercepta respostas para tratar erros de autenticação
+  // Interceptor de resposta
   instance.interceptors.response.use(
     (response) => {
       console.log('[API] Resposta recebida:', {
         status: response.status,
         url: response.config.url,
-        data: response.data
+        data: response.data,
+        headers: response.headers,
+        cookies: document.cookie
       });
+      
+      // Log detalhado dos cookies (apenas no navegador)
+      if (typeof window !== 'undefined') {
+        console.log('[API] Cookies disponíveis:', document.cookie);
+      }
+      
       return response;
     },
-    (error) => {
+    async (error) => {
+      const originalRequest = error.config;
+      
       console.error('[API] Erro na resposta:', {
         status: error.response?.status,
         url: error.config?.url,
@@ -62,15 +72,24 @@ const createApi = (): AxiosInstance => {
         response: error.response?.data
       });
       
-      if (error.response?.status === 401) {
-        console.log('[API] Erro 401 - Não autorizado');
-        // Remove o token inválido
+      // Se o erro for 401 (não autorizado) e não for uma tentativa de refresh
+      if (error.response?.status === 401 && !originalRequest._retry) {
+        console.log('[API] Erro 401 - Token expirado ou inválido');
+        console.log('[API] URL da requisição:', error.config?.url);
+        console.log('[API] Método:', error.config?.method);
+        console.log('[API] Headers da requisição:', error.config?.headers);
+        
+        // Se estivermos no navegador e não for a rota de login
         if (typeof window !== 'undefined') {
-          console.log('[API] Removendo token inválido');
-          Cookies.remove('auth_token');
-          // Não redireciona automaticamente, deixa o AuthContext lidar com isso
+          console.log('[API] Path atual:', window.location.pathname);
+          if (!window.location.pathname.includes('/login')) {
+            console.log('[API] Disparando evento de não autorizado');
+            // Limpa qualquer estado de autenticação
+            window.dispatchEvent(new Event('unauthorized'));
+          }
         }
       }
+      
       return Promise.reject(error);
     }
   );

@@ -17,12 +17,10 @@ type CookieOptions = Cookies.CookieAttributes;
 
 // Função para obter cookie no servidor
 function getServerCookie(name: string, req?: NextPageContext['req']): string | undefined {
-  if (!req?.headers.cookie) return undefined;
-  const cookieValue = req.headers.cookie
-    .split('; ')
-    .find(row => row.startsWith(`${name}=`))
-    ?.split('=')[1];
-  return cookieValue ? decodeURIComponent(cookieValue) : undefined;
+  if (!req?.headers?.cookie) return undefined;
+  const cookie = require('cookie');
+  const cookies = cookie.parse(req.headers.cookie || '');
+  return cookies[name] ? decodeURIComponent(cookies[name]) : undefined;
 }
 
 // Funções para uso no cliente
@@ -77,93 +75,159 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const router = useRouter();
 
   // Atualizar estado de forma segura
-  const updateAuthState = useCallback((updates: Partial<AuthState>) => {
-    setState(prev => ({
-      ...prev,
-      ...updates
-    }));
-  }, []);
+  const updateAuthState = useCallback(
+    (updates: Partial<AuthState> | ((prev: AuthState) => Partial<AuthState>)) => {
+      if (typeof updates === 'function') {
+        setState(prev => ({
+          ...prev,
+          ...updates(prev)
+        }));
+      } else {
+        setState(prev => ({
+          ...prev,
+          ...updates
+        }));
+      }
+    }, 
+    []
+  );
+
+  // Lista de rotas públicas que não requerem autenticação
+  const publicRoutes = useMemo(() => ['/login', '/esqueci-senha', '/cadastro'], []);
 
   // Carregar usuário do armazenamento
-  const loadUserFromStorage = useCallback(async () => {
-    try {
-      console.log('[AuthContext] Carregando usuário do armazenamento...');
-      const token = getCookie('auth_token');
+  const loadUserFromStorage = useCallback(async (forceCheck: boolean = false) => {
+    // Função auxiliar para verificar se deve atualizar o estado
+    const shouldUpdateState = (updates: Partial<AuthState>): boolean => {
+      return Object.entries(updates).some(([key, value]) => {
+        const stateKey = key as keyof AuthState;
+        const currentValue = state[stateKey];
+        return JSON.stringify(currentValue) !== JSON.stringify(value);
+      });
+    };
+    // Se já estiver carregando e não for uma verificação forçada, não faz nada
+    if (state.isLoading && !forceCheck) {
+      console.log('[AuthContext] Já está carregando, pulando...');
+      return;
+    }
+
+    console.log('[AuthContext] Iniciando verificação de autenticação...');
+    console.log('[AuthContext] Rota atual:', router.pathname);
+    
+    // Se for uma rota pública, não precisa verificar autenticação
+    if (publicRoutes.includes(router.pathname)) {
+      console.log('[AuthContext] Rota pública, pulando verificação de autenticação');
+      const newState: Partial<AuthState> = {
+        user: null,
+        token: null,
+        isAuthenticated: false,
+        isLoading: false,
+        error: null
+      };
       
-      if (!token) {
-        console.log('[AuthContext] Nenhum token encontrado');
-        updateAuthState({ 
-          isLoading: false, 
-          isAuthenticated: false,
-          user: null,
-          token: null,
-          error: null
-        });
-        return;
+      if (shouldUpdateState(newState)) {
+        updateAuthState(newState);
       }
+      return;
+    }
 
-      console.log('[AuthContext] Token encontrado, verificando validade...');
-      try {
-        // Verificar se o token é válido
-        const decoded = jwt.verify(token, process.env.NEXT_PUBLIC_JWT_SECRET || '') as { exp?: number };
-        if (decoded?.exp && decoded.exp * 1000 < Date.now()) {
-          throw new Error('Token expirado');
-        }
-
-        // Buscar informações do usuário
-        const response = await api.get('/api/auth/me');
-        const userData = response.data;
-        
+    try {
+      console.log('[AuthContext] Verificando autenticação...');
+      
+      // Atualiza o estado para carregamento apenas se não for uma verificação forçada
+      updateAuthState(prev => ({
+        ...prev,
+        isLoading: true,
+        error: null
+      }));
+      
+      console.log('[AuthContext] Fazendo requisição para /api/auth/me');
+      const response = await api.get('/api/auth/me');
+      
+      if (response.data && response.data.success) {
+        console.log('[AuthContext] Usuário autenticado:', response.data.user);
         updateAuthState({
-          user: userData,
-          token,
+          user: response.data.user,
+          token: 'http-only-cookie',
           isAuthenticated: true,
           isLoading: false,
           error: null
         });
         
-        // Atualizar header de autorização
-        api.defaults.headers.Authorization = `Bearer ${token}`;
+        // Se estiver na página de login, redireciona para o dashboard apropriado
+        if (router.pathname === '/login') {
+          const redirectPath = response.data.user.tipo === USER_TYPES.ADMIN ? '/admin' : '/dashboard';
+          console.log(`[AuthContext] Redirecionando para ${redirectPath}...`);
+          router.push(redirectPath);
+        }
+      } else {
+        console.log('[AuthContext] Nenhum usuário autenticado encontrado');
+        throw new Error('Falha ao carregar dados do usuário');
+      }
+    } catch (error: any) {
+      console.error('[AuthContext] Erro ao carregar usuário:', error);
+      
+      // Só atualiza o estado se for diferente do estado atual
+      const newState: Partial<AuthState> = {
+        user: null,
+        token: null,
+        isAuthenticated: false,
+        isLoading: false,
+        error: error.response?.status === 401 
+          ? 'Sessão expirada' 
+          : 'Erro na autenticação'
+      };
+      
+      if (shouldUpdateState(newState)) {
+        updateAuthState(newState);
         
-      } catch (err) {
-        console.error('[AuthContext] Erro ao verificar token:', err);
-        // Se houver erro, limpa o estado e redireciona para o login
+        // Se não estiver em uma rota pública, redireciona para o login
+        if (!publicRoutes.includes(router.pathname) && router.pathname !== '/') {
+          console.log(`[AuthContext] Redirecionando para login de ${router.pathname}...`);
+          router.push('/login');
+        }
+      }
+    }
+  }, [router, state, updateAuthState, publicRoutes]);
+
+  // Efeito para carregar o usuário ao montar o componente
+  useEffect(() => {
+    // Carrega o usuário apenas uma vez ao montar o componente
+    loadUserFromStorage(true); // força a verificação
+    
+    // Adiciona listener para eventos de não autorizado
+    const handleUnauthorized = () => {
+      console.log('[AuthContext] Evento de não autorizado recebido');
+      
+      // Atualiza o estado apenas se ainda estiver autenticado
+      if (state.isAuthenticated) {
         updateAuthState({
           user: null,
           token: null,
           isAuthenticated: false,
           isLoading: false,
-          error: 'Sessão expirada. Faça login novamente.'
+          error: 'Sua sessão expirou. Por favor, faça login novamente.'
         });
         
-        // Remover token inválido
-        removeCookie('auth_token');
-        delete api.defaults.headers.Authorization;
-        
-        // Redirecionar para login se não estiver na página de login
+        // Redireciona para a página de login se não estiver nela
         if (router.pathname !== '/login') {
+          console.log('[AuthContext] Redirecionando para login...');
           router.push('/login');
         }
       }
-    } catch (err) {
-      console.error('[AuthContext] Erro ao carregar autenticação:', err);
-      updateAuthState({
-        user: null,
-        token: null,
-        isAuthenticated: false,
-        isLoading: false,
-        error: 'Erro ao carregar autenticação'
-      });
-    }
-  }, [router, updateAuthState]);
-
-  // Efeito para carregar o usuário ao montar o componente
-  useEffect(() => {
-    loadUserFromStorage();
-  }, [loadUserFromStorage]);
+    };
+    
+    window.addEventListener('unauthorized', handleUnauthorized);
+    
+    // Limpa o listener ao desmontar o componente
+    return () => {
+      window.removeEventListener('unauthorized', handleUnauthorized);
+    };
+  }, []); // Removidas as dependências para evitar loops
 
   const login = useCallback(async ({ email, senha }: LoginCredentials): Promise<void> => {
     try {
+      // Atualiza o estado para carregamento
       updateAuthState({ 
         isLoading: true, 
         error: null,
@@ -173,46 +237,43 @@ export function AuthProvider({ children }: AuthProviderProps) {
       });
       setAuthError(null);
       
-      console.log('[AuthContext] Fazendo login com:', { email });
+      console.log('[AuthContext] Iniciando processo de login...');
+      
+      // Faz a requisição de login - o cookie HTTP-only será definido na resposta
       const response = await api.post('/api/auth/login', { email, senha });
       
       if (!response.data || !response.data.success) {
         throw new Error(response.data?.message || 'Erro ao fazer login. Tente novamente.');
       }
       
-      const { user, token } = response.data;
+      const { data: user } = response.data;
       
-      if (!token) {
-        throw new Error('Token não recebido do servidor');
+      if (!user) {
+        throw new Error('Dados do usuário não recebidos');
       }
       
-      // Armazenar token em cookie seguro
-      setCookie('auth_token', token, { 
-        path: '/',
-        expires: TOKEN_EXPIRATION_DAYS,
-        sameSite: 'lax',
-        secure: process.env.NODE_ENV === 'production',
-        httpOnly: false // Necessário para ser acessível pelo cliente
-      });
+      console.log('[AuthContext] Login bem-sucedido, buscando dados do usuário...');
       
-      // Atualizar header de autorização
-      api.defaults.headers.Authorization = `Bearer ${token}`;
+      // Após o login, busca os dados completos do usuário para garantir que está autenticado
+      const userResponse = await api.get('/api/auth/me');
       
-      // Atualizar estado
+      if (!userResponse.data || !userResponse.data.success) {
+        throw new Error('Falha ao carregar dados do usuário após login');
+      }
+      
+      // Atualiza o estado com os dados do usuário
       updateAuthState({
-        user,
-        token,
+        user: userResponse.data.user,
+        token: 'http-only-cookie', // Indica que estamos usando cookie HTTP-only
         isAuthenticated: true,
         isLoading: false,
         error: null
       });
       
-      // Redirecionar com base no tipo de usuário
-      if (user.tipo === USER_TYPES.ADMIN) {
-        await router.push('/admin');
-      } else {
-        await router.push('/dashboard');
-      }
+      // Redireciona com base no tipo de usuário
+      const redirectPath = userResponse.data.user.tipo === USER_TYPES.ADMIN ? '/admin' : '/dashboard';
+      console.log(`[AuthContext] Redirecionando para: ${redirectPath}`);
+      await router.push(redirectPath);
       
     } catch (error: any) {
       console.error('[AuthContext] Erro no login:', error);
@@ -256,16 +317,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, [router, updateAuthState]);
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
     try {
-      // Remove os cookies
-      removeCookie('auth_token');
-      removeCookie('user');
+      console.log('[AuthContext] Iniciando logout...');
       
-      // Limpa o header de autorização
-      delete api.defaults.headers.Authorization;
+      // Faz uma chamada para o endpoint de logout no servidor
+      // Isso garantirá que o cookie HTTP-only seja removido
+      try {
+        await api.post('/api/auth/logout');
+      } catch (error) {
+        console.error('[AuthContext] Erro ao chamar endpoint de logout:', error);
+        // Continua mesmo que haja erro, para garantir que o estado seja limpo
+      }
       
-      // Atualiza o estado
+      // Limpa o estado local
       updateAuthState({
         user: null,
         token: null,
@@ -274,8 +339,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
         error: null
       });
       
+      console.log('[AuthContext] Logout concluído, redirecionando para login...');
+      
       // Redireciona para a página de login
-      router.push('/login');
+      await router.push('/login');
     } catch (error) {
       console.error('[AuthContext] Erro durante o logout:', error);
       // Garante que o estado seja limpo mesmo em caso de erro
@@ -286,6 +353,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
         isLoading: false,
         error: 'Ocorreu um erro durante o logout'
       });
+      
+      // Força o redirecionamento mesmo em caso de erro
+      router.push('/login');
     }
   }, [router, updateAuthState]);
 
@@ -296,38 +366,98 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }));
   }, []);
 
-  const checkTokenExpiration = useCallback((): boolean => {
-    const token = getCookie('auth_token');
-    if (!token) return false;
-    
-    try {
-      const decoded = jwt.decode(token) as { exp?: number };
-      const isExpired = decoded?.exp && decoded.exp * 1000 < Date.now();
-      
-      if (isExpired) {
-        console.log('[AuthContext] Token expirado');
-        logout();
-        return false;
-      }
-      
-      return true;
-    } catch (error) {
-      console.error('Error checking token expiration:', error);
-      logout();
+  const checkTokenExpiration = useCallback(async (): Promise<boolean> => {
+    // Se já não estiver autenticado, não precisa verificar
+    if (!state.isAuthenticated) {
+      console.log('[AuthContext] Usuário não autenticado, pulando verificação de token');
       return false;
     }
-  }, [logout]);
+
+    try {
+      console.log('[AuthContext] Verificando expiração do token...');
+      
+      // Tenta fazer uma requisição para verificar a autenticação
+      const response = await api.get('/api/auth/me');
+      
+      // Se chegou aqui, o token ainda é válido
+      if (response.data?.success) {
+        console.log('[AuthContext] Token válido');
+        return true;
+      }
+      
+      // Se a resposta não for bem-sucedida, considera como expirado
+      console.log('[AuthContext] Sessão expirada ou inválida');
+      
+      // Atualiza o estado para não autenticado
+      updateAuthState({
+        user: null,
+        token: null,
+        isAuthenticated: false,
+        isLoading: false,
+        error: 'Sessão expirada. Por favor, faça login novamente.'
+      });
+      
+      // Só redireciona se não estiver na página de login
+      if (router.pathname !== '/login') {
+        console.log('[AuthContext] Redirecionando para login...');
+        await router.push('/login');
+      }
+      
+      return false;
+      
+    } catch (error) {
+      console.error('[AuthContext] Erro ao verificar expiração do token:', error);
+      
+      // Em caso de erro, apenas atualiza o estado sem redirecionar
+      // O redirecionamento será tratado pelo componente ProtectedRoute
+      updateAuthState({
+        user: null,
+        token: null,
+        isAuthenticated: false,
+        isLoading: false,
+        error: 'Erro ao verificar autenticação'
+      });
+      
+      return false;
+    }
+  }, [state.isAuthenticated, router, updateAuthState]);
 
   useEffect(() => {
+    // Função para verificar a expiração do token
+    const checkAuth = async () => {
+      try {
+        // Só verifica se estiver autenticado
+        if (state.isAuthenticated) {
+          console.log('[AuthContext] Verificando expiração do token...');
+          await checkTokenExpiration();
+        }
+      } catch (error) {
+        console.error('Erro ao verificar autenticação:', error);
+      }
+    };
+
     // Verificação inicial ao montar o componente
-    checkTokenExpiration();
+    // Só executa se estiver autenticado
+    if (state.isAuthenticated) {
+      console.log('[AuthContext] Iniciando verificação periódica de autenticação...');
+      checkAuth();
+    }
     
     // Configura verificação periódica a cada 5 minutos
-    const interval = setInterval(checkTokenExpiration, 5 * 60 * 1000);
+    // Só se estiver autenticado
+    let interval: NodeJS.Timeout | null = null;
+    
+    if (state.isAuthenticated) {
+      interval = setInterval(checkAuth, 5 * 60 * 1000);
+    }
     
     // Limpa o intervalo ao desmontar o componente
-    return () => clearInterval(interval);
-  }, [checkTokenExpiration]);
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
+  }, [checkTokenExpiration, state.isAuthenticated]);
 
   return (
     <AuthContext.Provider 

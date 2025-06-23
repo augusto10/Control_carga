@@ -1,16 +1,16 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { 
-  Container, 
-  Typography, 
-  Paper, 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableContainer, 
-  TableHead, 
-  TableRow, 
-  Button, 
+import {
+  Container,
+  Typography,
+  Paper,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Button,
   IconButton,
   Dialog,
   DialogTitle,
@@ -26,12 +26,15 @@ import {
   Box,
   CircularProgress,
   Alert,
-  Snackbar
+  Snackbar,
+  Tooltip,
+  DialogContentText
 } from '@mui/material';
 import { Edit as EditIcon, Delete as DeleteIcon, Add as AddIcon } from '@mui/icons-material';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../../contexts/AuthContext';
+import AdminRoute from '../../../components/admin/AdminRoute';
 import { TipoUsuario } from '@prisma/client';
-import { api } from '../../../services/api';
+import { api } from '@/services/api';
 
 interface Usuario {
   id: string;
@@ -41,9 +44,11 @@ interface Usuario {
   ativo: boolean;
   dataCriacao: string;
   ultimoAcesso?: string | null;
+  senha?: string;
+  confirmarSenha?: string;
 }
 
-export default function GerenciarUsuarios() {
+function GerenciarUsuariosContent() {
   const { user, isAuthenticated, logout } = useAuth();
   const router = useRouter();
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
@@ -52,28 +57,30 @@ export default function GerenciarUsuarios() {
   const [openDialog, setOpenDialog] = useState(false);
   const [currentUsuario, setCurrentUsuario] = useState<Partial<Usuario> | null>(null);
   const [isEditing, setIsEditing] = useState(false);
-  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+  const [snackbar, setSnackbar] = useState<{ 
+    open: boolean; 
+    message: string; 
+    severity: 'success' | 'error' | 'warning' | 'info' 
+  }>({ 
+    open: false, 
+    message: '', 
+    severity: 'success' 
+  });
 
-  // Verificar se o usuário tem permissão
+  // Carregar usuários quando o componente for montado
   useEffect(() => {
-    if (!isAuthenticated) {
-      router.push('/login');
-    } else if (user?.tipo !== 'ADMIN') {
-      setError('Acesso negado. Você não tem permissão para acessar esta página.');
-      setLoading(false);
-    } else {
-      carregarUsuarios();
-    }
-  }, [isAuthenticated, user, router]);
+    carregarUsuarios();
+  }, []);
 
   const carregarUsuarios = async () => {
     try {
       setLoading(true);
       const response = await api.get('/api/admin/usuarios');
       setUsuarios(response.data);
-    } catch (err) {
-      console.error('Erro ao carregar usuários:', err);
-      setError('Erro ao carregar usuários. Tente novamente mais tarde.');
+    } catch (error: unknown) {
+      console.error('Erro ao carregar usuários:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Erro ao carregar usuários';
+      setError(`Erro ao carregar usuários: ${errorMessage}`);
     } finally {
       setLoading(false);
     }
@@ -107,11 +114,11 @@ export default function GerenciarUsuarios() {
     setCurrentUsuario(null);
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value, checked, type } = e.target;
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | { name?: string; value: unknown }>) => {
+    const { name, value } = e.target as { name: string; value: unknown };
     setCurrentUsuario(prev => ({
       ...prev!,
-      [name]: type === 'checkbox' ? checked : value
+      [name]: value
     }));
   };
 
@@ -133,42 +140,78 @@ export default function GerenciarUsuarios() {
       
       handleCloseDialog();
       await carregarUsuarios();
-    } catch (err) {
-      console.error('Erro ao salvar usuário:', err);
+    } catch (error: unknown) {
+      console.error('Erro ao salvar usuário:', error);
+      const errorMessage = error && typeof error === 'object' && 'response' in error && 
+                         error.response && typeof error.response === 'object' && 
+                         'data' in error.response && 
+                         error.response.data && typeof error.response.data === 'object' &&
+                         'message' in error.response.data ?
+                         String(error.response.data.message) : 'Erro ao salvar usuário';
+      
       setSnackbar({ 
         open: true, 
-        message: err.response?.data?.message || 'Erro ao salvar usuário', 
-        severity: 'error' 
+        message: errorMessage, 
+        severity: 'error' as const
       });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleToggleStatus = async (id: string, ativo: boolean) => {
-    if (!window.confirm(`Tem certeza que deseja ${ativo ? 'desativar' : 'ativar'} este usuário?`)) {
-      return;
-    }
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean;
+    title: string;
+    content: string;
+    onConfirm: () => Promise<void>;
+  }>({
+    open: false,
+    title: '',
+    content: '',
+    onConfirm: async () => {}
+  });
 
-    try {
-      setLoading(true);
-      await api.patch(`/api/admin/usuarios/${id}/status`, { ativo: !ativo });
-      await carregarUsuarios();
-      setSnackbar({ 
-        open: true, 
-        message: `Usuário ${!ativo ? 'ativado' : 'desativado'} com sucesso!`, 
-        severity: 'success' 
-      });
-    } catch (err) {
-      console.error('Erro ao atualizar status do usuário:', err);
-      setSnackbar({ 
-        open: true, 
-        message: 'Erro ao atualizar status do usuário', 
-        severity: 'error' 
-      });
-    } finally {
-      setLoading(false);
-    }
+  const handleToggleStatus = (id: string, ativo: boolean) => {
+    setConfirmDialog({
+      open: true,
+      title: ativo ? 'Desativar Usuário' : 'Ativar Usuário',
+      content: ativo 
+        ? 'Tem certeza que deseja desativar este usuário? Ele não poderá mais acessar o sistema até que seja ativado novamente.'
+        : 'Tem certeza que deseja ativar este usuário? Ele terá acesso ao sistema de acordo com as permissões do seu perfil.',
+      onConfirm: async () => {
+        try {
+          setLoading(true);
+          await api.patch(`/api/admin/usuarios/${id}/status`, { ativo: !ativo });
+          await carregarUsuarios();
+          setSnackbar({ 
+            open: true, 
+            message: `Usuário ${!ativo ? 'ativado' : 'desativado'} com sucesso!`, 
+            severity: 'success' 
+          });
+        } catch (error: unknown) {
+          console.error('Erro ao atualizar status do usuário:', error);
+          const errorMessage = error && typeof error === 'object' && 'response' in error && 
+                            error.response && typeof error.response === 'object' && 
+                            'data' in error.response && 
+                            error.response.data && typeof error.response.data === 'object' &&
+                            'message' in error.response.data ?
+                            String(error.response.data.message) : 'Erro ao atualizar status do usuário';
+          
+          setSnackbar({ 
+            open: true, 
+            message: errorMessage,
+            severity: 'error' as const
+          });
+        } finally {
+          setLoading(false);
+          setConfirmDialog(prev => ({ ...prev, open: false }));
+        }
+      }
+    });
+  };
+
+  const handleCloseConfirmDialog = () => {
+    setConfirmDialog(prev => ({ ...prev, open: false }));
   };
 
   const handleCloseSnackbar = () => {
@@ -194,76 +237,150 @@ export default function GerenciarUsuarios() {
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h4" component="h1">
-          Gerenciar Usuários
-        </Typography>
+        <Box>
+          <Typography variant="h4" component="h1" gutterBottom>
+            Gerenciar Usuários
+          </Typography>
+          <Typography variant="body1" color="text.secondary">
+            Gerencie os usuários e suas permissões de acesso ao sistema
+          </Typography>
+        </Box>
         <Button 
           variant="contained" 
           color="primary" 
           startIcon={<AddIcon />}
           onClick={handleOpenNovoUsuario}
+          sx={{ height: 'fit-content' }}
         >
           Novo Usuário
         </Button>
       </Box>
 
-      <Paper sx={{ width: '100%', overflow: 'hidden' }}>
+      <Paper sx={{ width: '100%', overflow: 'hidden', boxShadow: 3 }}>
         <TableContainer sx={{ maxHeight: 600 }}>
           <Table stickyHeader>
             <TableHead>
               <TableRow>
-                <TableCell>Nome</TableCell>
-                <TableCell>E-mail</TableCell>
-                <TableCell>Tipo</TableCell>
-                <TableCell>Status</TableCell>
-                <TableCell>Último Acesso</TableCell>
-                <TableCell align="right">Ações</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>Nome</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>E-mail</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>Tipo</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>Último Acesso</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 'bold' }}>Ações</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {usuarios.map((usuario) => (
-                <TableRow key={usuario.id}>
-                  <TableCell>{usuario.nome}</TableCell>
-                  <TableCell>{usuario.email}</TableCell>
-                  <TableCell>
-                    {usuario.tipo === 'ADMIN' ? 'Administrador' : 
-                     usuario.tipo === 'GERENTE' ? 'Gerente' : 'Usuário'}
-                  </TableCell>
-                  <TableCell>
-                    <FormControlLabel
-                      control={
-                        <Switch
-                          checked={usuario.ativo}
-                          onChange={() => handleToggleStatus(usuario.id, usuario.ativo)}
-                          color="primary"
-                        />
-                      }
-                      label={usuario.ativo ? 'Ativo' : 'Inativo'}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    {usuario.ultimoAcesso 
-                      ? new Date(usuario.ultimoAcesso).toLocaleString() 
-                      : 'Nunca acessou'}
-                  </TableCell>
-                  <TableCell align="right">
-                    <IconButton 
-                      onClick={() => handleOpenEditarUsuario(usuario)}
-                      color="primary"
-                      disabled={usuario.id === user?.id}
-                    >
-                      <EditIcon />
-                    </IconButton>
-                    <IconButton 
-                      onClick={() => handleToggleStatus(usuario.id, usuario.ativo)}
-                      color={usuario.ativo ? 'error' : 'success'}
-                      disabled={usuario.id === user?.id}
-                    >
-                      {usuario.ativo ? <DeleteIcon /> : <span>Ativar</span>}
-                    </IconButton>
+              {usuarios.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                    <Box display="flex" flexDirection="column" alignItems="center">
+                      <Typography variant="body1" color="text.secondary" gutterBottom>
+                        {loading ? 'Carregando usuários...' : 'Nenhum usuário encontrado'}
+                      </Typography>
+                      {!loading && (
+                        <Button 
+                          variant="outlined" 
+                          color="primary" 
+                          startIcon={<AddIcon />}
+                          onClick={handleOpenNovoUsuario}
+                          sx={{ mt: 1 }}
+                        >
+                          Adicionar Usuário
+                        </Button>
+                      )}
+                    </Box>
                   </TableCell>
                 </TableRow>
-              ))}
+              ) : (
+                usuarios.map((usuario) => (
+                  <TableRow key={usuario.id}>
+                    <TableCell>{usuario.nome}</TableCell>
+                    <TableCell>{usuario.email}</TableCell>
+                    <TableCell>
+                      <Box 
+                        sx={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          px: 1.5,
+                          py: 0.5,
+                          borderRadius: 1,
+                          bgcolor: usuario.tipo === 'ADMIN' ? 'primary.light' : 
+                                    usuario.tipo === 'GERENTE' ? 'secondary.light' : 'grey.200',
+                          color: usuario.tipo === 'ADMIN' ? 'primary.contrastText' : 
+                                   usuario.tipo === 'GERENTE' ? 'secondary.contrastText' : 'text.primary',
+                          fontWeight: 'medium',
+                          fontSize: '0.75rem',
+                        }}
+                      >
+                        {usuario.tipo === 'ADMIN' ? 'Administrador' : 
+                         usuario.tipo === 'GERENTE' ? 'Gerente' : 'Usuário'}
+                      </Box>
+                    </TableCell>
+                    <TableCell>
+                      <Box 
+                        sx={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          px: 1.5,
+                          py: 0.5,
+                          borderRadius: 1,
+                          bgcolor: usuario.ativo ? 'success.light' : 'error.light',
+                          color: 'white',
+                          fontWeight: 'medium',
+                          fontSize: '0.75rem',
+                        }}
+                      >
+                        {usuario.ativo ? 'Ativo' : 'Inativo'}
+                      </Box>
+                    </TableCell>
+                    <TableCell>
+                      {usuario.ultimoAcesso 
+                        ? new Date(usuario.ultimoAcesso).toLocaleString() 
+                        : 'Nunca acessou'}
+                    </TableCell>
+                    <TableCell align="right">
+                      <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+                        <Tooltip title="Editar usuário">
+                          <span>
+                            <IconButton 
+                              onClick={() => handleOpenEditarUsuario(usuario)}
+                              color="primary"
+                              disabled={usuario.id === user?.id}
+                              size="small"
+                              sx={{
+                                '&:hover': { backgroundColor: 'primary.light', color: 'white' },
+                              }}
+                            >
+                              <EditIcon fontSize="small" />
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                        <Tooltip title={usuario.ativo ? 'Desativar usuário' : 'Ativar usuário'}>
+                          <span>
+                            <IconButton 
+                              onClick={() => handleToggleStatus(usuario.id, usuario.ativo)}
+                              color={usuario.ativo ? 'error' : 'success'}
+                              disabled={usuario.id === user?.id}
+                              size="small"
+                              sx={{
+                                '&:hover': { 
+                                  backgroundColor: usuario.ativo ? 'error.light' : 'success.light', 
+                                  color: 'white' 
+                                },
+                              }}
+                            >
+                              {usuario.ativo ? 
+                                <DeleteIcon fontSize="small" /> : 
+                                <span style={{ fontSize: '0.8rem' }}>Ativar</span>
+                              }
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </TableContainer>
@@ -305,9 +422,30 @@ export default function GerenciarUsuarios() {
                   label="Tipo de Usuário"
                   required
                 >
-                  <MenuItem value="ADMIN">Administrador</MenuItem>
-                  <MenuItem value="GERENTE">Gerente</MenuItem>
-                  <MenuItem value="USUARIO">Usuário</MenuItem>
+                  <MenuItem value="ADMIN">
+                    <Box>
+                      <Box fontWeight="medium">Administrador</Box>
+                      <Box variant="caption" color="text.secondary" fontSize="0.75rem">
+                        Acesso total ao sistema
+                      </Box>
+                    </Box>
+                  </MenuItem>
+                  <MenuItem value="GERENTE">
+                    <Box>
+                      <Box fontWeight="medium">Gerente</Box>
+                      <Box variant="caption" color="text.secondary" fontSize="0.75rem">
+                        Acesso a relatórios e gestão de operações
+                      </Box>
+                    </Box>
+                  </MenuItem>
+                  <MenuItem value="USUARIO">
+                    <Box>
+                      <Box fontWeight="medium">Usuário</Box>
+                      <Box variant="caption" color="text.secondary" fontSize="0.75rem">
+                        Acesso básico ao sistema
+                      </Box>
+                    </Box>
+                  </MenuItem>
                 </Select>
               </FormControl>
               <TextField
@@ -382,6 +520,51 @@ export default function GerenciarUsuarios() {
           {snackbar.message}
         </Alert>
       </Snackbar>
+
+      {/* Diálogo de Confirmação */}
+      <Dialog
+        open={confirmDialog.open}
+        onClose={handleCloseConfirmDialog}
+        aria-labelledby="alert-dialog-title"
+        aria-describedby="alert-dialog-description"
+      >
+        <DialogTitle id="alert-dialog-title">
+          {confirmDialog.title}
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText id="alert-dialog-description">
+            {confirmDialog.content}
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button 
+            onClick={handleCloseConfirmDialog} 
+            color="inherit"
+            disabled={loading}
+          >
+            Cancelar
+          </Button>
+          <Button 
+            onClick={confirmDialog.onConfirm} 
+            color={confirmDialog.title.includes('Desativar') ? 'error' : 'primary'}
+            variant="contained"
+            autoFocus
+            disabled={loading}
+          >
+            {loading ? <CircularProgress size={24} /> : 'Confirmar'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 }
+
+const GerenciarUsuarios = () => {
+  return (
+    <AdminRoute>
+      <GerenciarUsuariosContent />
+    </AdminRoute>
+  );
+};
+
+export default GerenciarUsuarios;

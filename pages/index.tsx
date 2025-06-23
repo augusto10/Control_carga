@@ -1,4 +1,4 @@
-import { Container, Typography, Box, Card, CardContent, CardActionArea, Grid } from '@mui/material';
+import { Container, Typography, Box, Card, CardContent, CardActionArea, Grid, CircularProgress } from '@mui/material';
 import Link from 'next/link';
 import {
   Add as AddIcon,
@@ -6,6 +6,9 @@ import {
   Search as SearchIcon,
   ListAlt as ListAltIcon
 } from '@mui/icons-material';
+import { useAuth } from '../contexts/AuthContext';
+import { useRouter } from 'next/router';
+import { useEffect, useState } from 'react';
 
 type MenuCard = {
   title: string;
@@ -15,7 +18,7 @@ type MenuCard = {
   color: string;
 };
 
-export default function Home() {
+function HomeContent() {
   const menuCards: MenuCard[] = [
     {
       title: 'Adicionar Notas',
@@ -100,4 +103,30 @@ export default function Home() {
       </Grid>
     </Container>
   );
+}
+
+export default function Home() {
+  const { isAuthenticated, isLoading } = useAuth();
+  const router = useRouter();
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+
+  useEffect(() => {
+    if (isLoading) return;
+    
+    if (!isAuthenticated) {
+      router.push('/login');
+    } else {
+      setIsCheckingAuth(false);
+    }
+  }, [isAuthenticated, isLoading, router]);
+
+  if (isLoading || isCheckingAuth) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  return <HomeContent />;
 }

@@ -24,6 +24,7 @@ import {
 } from '@mui/material';
 import { Save as SaveIcon, Refresh as RefreshIcon } from '@mui/icons-material';
 import AdminLayout from '../../components/admin/AdminLayout';
+import AdminRoute from '../../components/admin/AdminRoute';
 import { api } from '../../services/api';
 import { ApiError, ApiResponse } from '../../types/api';
 
@@ -39,7 +40,7 @@ interface Configuracoes {
   dataAtualizacao?: string;
 }
 
-export default function ConfiguracoesSistema() {
+function ConfiguracoesSistemaContent() {
   const [configuracoes, setConfiguracoes] = useState<Configuracoes[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -330,5 +331,13 @@ export default function ConfiguracoesSistema() {
         </Alert>
       </Snackbar>
     </AdminLayout>
+  );
+}
+
+export default function ConfiguracoesSistema() {
+  return (
+    <AdminRoute>
+      <ConfiguracoesSistemaContent />
+    </AdminRoute>
   );
 }

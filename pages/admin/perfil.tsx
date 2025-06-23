@@ -1,6 +1,7 @@
 import { useState, useEffect, useContext } from 'react';
 import { useRouter } from 'next/router';
 import { ApiError, ApiResponse } from '../../types/api';
+import { api } from '../../services/api';
 import { 
   Container, 
   Typography, 
@@ -18,6 +19,7 @@ import {
 import { Edit as EditIcon, Save as SaveIcon, Cancel as CancelIcon } from '@mui/icons-material';
 import { AuthContext } from '../../contexts/AuthContext';
 import AdminLayout from '../../components/admin/AdminLayout';
+import AdminRoute from '../../components/admin/AdminRoute';
 
 interface PerfilFormData {
   nome: string;
@@ -35,7 +37,7 @@ interface PerfilFormErrors {
   confirmarSenha?: string;
 }
 
-export default function PerfilUsuario() {
+function PerfilUsuarioContent() {
   const auth = useContext(AuthContext);
   if (!auth) {
     throw new Error('useAuth must be used within an AuthProvider');
@@ -356,5 +358,13 @@ export default function PerfilUsuario() {
         </Alert>
       </Snackbar>
     </AdminLayout>
+  );
+}
+
+export default function PerfilUsuario() {
+  return (
+    <AdminRoute>
+      <PerfilUsuarioContent />
+    </AdminRoute>
   );
 }

@@ -1,6 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getSession } from 'next-auth/react';
 import { PrismaClient } from '@prisma/client';
+import jwt from 'jsonwebtoken';
+import { parseCookies } from 'nookies';
 
 const prisma = new PrismaClient();
 
@@ -15,9 +16,29 @@ export default async function handler(
   res: NextApiResponse
 ) {
   // Verificar autenticação
-  const session = await getSession({ req });
-  if (!session?.user?.email) {
-    return res.status(401).json({ error: 'Não autorizado' });
+  const cookies = parseCookies({ req });
+  const token = cookies.auth_token;
+  
+  if (!token) {
+    return res.status(401).json({ error: 'Não autenticado' });
+  }
+  
+  try {
+    // Verificar o token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'seu_segredo_secreto');
+    
+    // Verificar se o usuário existe e está ativo
+    const usuario = await prisma.usuario.findUnique({
+      where: { id: (decoded as any).id },
+      select: { id: true, ativo: true }
+    });
+    
+    if (!usuario || !usuario.ativo) {
+      return res.status(401).json({ error: 'Usuário não autorizado' });
+    }
+  } catch (error) {
+    console.error('Erro ao verificar token:', error);
+    return res.status(401).json({ error: 'Sessão inválida ou expirada' });
   }
 
   if (req.method === 'POST') {

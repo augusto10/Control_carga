@@ -25,8 +25,9 @@ import {
   Warning as WarningIcon,
   Refresh as RefreshIcon
 } from '@mui/icons-material';
-import AdminLayout from '../../../components/admin/AdminLayout';
-import { api } from '../../../services/api';
+import AdminLayout from '../../components/admin/AdminLayout';
+import AdminRoute from '../../components/admin/AdminRoute';
+import { api } from '../../services/api';
 
 interface DashboardStats {
   totalUsuarios: number;
@@ -42,7 +43,7 @@ interface DashboardStats {
   }>;
 }
 
-export default function AdminDashboard() {
+function AdminDashboardContent() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const theme = useTheme();
@@ -212,5 +213,13 @@ export default function AdminDashboard() {
         </Grid>
       </Grid>
     </AdminLayout>
+  );
+}
+
+export default function AdminDashboard() {
+  return (
+    <AdminRoute>
+      <AdminDashboardContent />
+    </AdminRoute>
   );
 }

@@ -91,18 +91,14 @@ export function useConfiguracoes() {
     return configuracoes[chave] ?? valorPadrao;
   }, [configuracoes]);
 
-  // Carregar configurações quando o componente é montado
+  // Removido o carregamento automático para ser controlado pelo ConfiguracaoProvider
   const isMounted = useRef(true);
 
   useEffect(() => {
-    if (Object.keys(configuracoes).length === 0) {
-      carregarConfiguracoes();
-    }
-
     return () => {
       isMounted.current = false;
     };
-  }, [carregarConfiguracoes, configuracoes]);
+  }, []);
 
   return {
     configuracoes,

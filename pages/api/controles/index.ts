@@ -3,7 +3,7 @@ import { Prisma, PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-type Transportadora = 'ACERT' | 'EXPRESSO_GOIAS';
+type Transportadora = 'ACERT' | 'ACCERT' | 'EXPRESSO_GOIAS';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   switch (req.method) {
@@ -30,13 +30,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
     case 'POST': {
       try {
-        const { motorista, responsavel, cpfMotorista, transportadora, qtdPallets, observacao, numeroManifesto, notasIds } = req.body;
+        const { motorista, responsavel, cpfMotorista = 'PENDENTE', transportadora, qtdPallets, observacao, numeroManifesto, notasIds } = req.body;
 
         // Validar campos obrigatórios
         const camposObrigatorios = [];
         if (!motorista?.trim()) camposObrigatorios.push('motorista');
         if (!responsavel?.trim()) camposObrigatorios.push('responsavel');
-        if (!cpfMotorista?.trim()) camposObrigatorios.push('cpfMotorista');
+        
+        // CPF do motorista é opcional, se não for fornecido, usamos 'PENDENTE'
+        const cpfMotoristaFormatado = cpfMotorista?.trim() || 'PENDENTE';
 
         if (camposObrigatorios.length > 0) {
           return res.status(400).json({ 
@@ -65,48 +67,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           }
         }
 
-        // Se não veio um número de manifesto, gera um sequencial
-        let numeroManifestoFinal = numeroManifesto;
-        if (!numeroManifestoFinal) {
-          // Encontra o maior número de manifesto existente
-          // Busca o maior número de manifesto existente
-          const todosControles = await prisma.controleCarga.findMany({
-            select: { 
-              numeroManifesto: true
-            },
-            orderBy: { 
-              id: 'desc' 
-            }
-          });
-          
-          // Filtra e converte para números inteiros
-          const numerosManifesto = todosControles
-            .map(controle => controle.numeroManifesto)
-            .filter((num): num is string => {
-              if (!num) return false;
-              // Verifica se é um número inteiro positivo
-              return /^\d+$/.test(num) && !num.startsWith('0');
-            })
-            .map(num => parseInt(num, 10));
-          
-          // Encontra o maior número ou usa 0 se não houver nenhum
-          const ultimoNumero = numerosManifesto.length > 0 
-            ? Math.max(...numerosManifesto) 
-            : 0;
-            
-          // Gera o próximo número sequencial
-          numeroManifestoFinal = (ultimoNumero + 1).toString();
-          console.log('Último número de manifesto:', ultimoNumero, '| Novo número:', numeroManifestoFinal);
-        }
+        // Se não veio um número de manifesto, define como nulo
+        // Já que o campo é opcional no banco de dados
+        const numeroManifestoFinal = numeroManifesto || null;
 
         // Garantir que a transportadora tenha um valor válido
-        const transportadoraValida = transportadora || 'ACERT';
+        const transportadoraValida = (transportadora === 'ACERT' || transportadora === 'EXPRESSO_GOIAS') 
+          ? transportadora 
+          : 'ACERT';
         
         // Criar o controle com os dados fornecidos
         const controle = await prisma.controleCarga.create({
           data: {
             motorista: motorista.trim(),
-            cpfMotorista: cpfMotorista.replace(/[\D]/g, ''),
+            cpfMotorista: cpfMotorista ? cpfMotorista.replace(/[\D]/g, '') : 'PENDENTE',
             responsavel: responsavel.trim(),
             transportadora: transportadoraValida as Transportadora,
             numeroManifesto: numeroManifestoFinal,
