@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { useStore } from '../store/store';
-import { 
+import {
   Container,
   Typography,
   Paper,
@@ -13,30 +13,50 @@ import {
   TableRow,
   Button,
   Chip,
-  CircularProgress
+  CircularProgress,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem
 } from '@mui/material';
 import { useRouter } from 'next/router';
+import { useAuth } from '../contexts/AuthContext';
 import { useSnackbar } from 'notistack';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 
+
+
 interface Controle {
   id: string;
   motorista: string;
   responsavel: string;
-  numeroManifesto: string;
+  numeroManifesto?: string | null;
   dataCriacao: Date;
+  cpfMotorista?: string;
+  transportadora: 'ACERT' | 'EXPRESSO_GOIAS';
+  qtdPallets: number;
+  observacao?: string;
   notas: { id: string; numeroNota: string; codigo: string; valor: number }[];
   finalizado: boolean;
 }
 
 const ListarControlesContent: React.FC = () => {
-  const { controles, fetchControles, finalizarControle } = useStore();
+  const { user } = useAuth();
+  const { controles, fetchControles, finalizarControle, atualizarControle } = useStore();
   const router = useRouter();
   const { enqueueSnackbar } = useSnackbar();
   const [loading, setLoading] = React.useState(false);
-
+  const [editing, setEditing] = React.useState<Controle | null>(null);
+  const [editData, setEditData] = React.useState<Partial<Controle>>({});
+  const [pdfUrl, setPdfUrl] = React.useState<string | null>(null);
+  const [pdfOpen, setPdfOpen] = React.useState(false);
   useEffect(() => {
     const carregarControles = async () => {
       try {
@@ -53,57 +73,107 @@ const ListarControlesContent: React.FC = () => {
     carregarControles();
   }, [fetchControles, enqueueSnackbar]);
 
-  const gerarPdf = async (controle: Controle) => {
+  const gerarPdf = async (controle: Controle, numeroControle: number) => {
     try {
-      // Load template PDF from public folder
       const existingBytes = await fetch('/templates/modelo-romaneio.pdf').then(res => res.arrayBuffer());
       const doc = await PDFDocument.load(existingBytes);
       const page = doc.getPage(0);
-      const { width, height } = page.getSize();
-
+      const { height } = page.getSize();
       const font = await doc.embedFont(StandardFonts.Helvetica);
       const fontSize = 12;
-      
-      // Adicionar dados ao PDF
-      page.drawText(`Nº Controle: ${controle.id}`, {
+      const yStart = height - 140; // desloca 3 linhas (~40px) para baixo
+
+      page.drawText(`Nº Controle: ${numeroControle}`, {
         x: 50,
-        y: height - 100,
+        y: yStart,
         size: fontSize,
         font,
         color: rgb(0, 0, 0),
       });
-      
       page.drawText(`Motorista: ${controle.motorista}`, {
         x: 50,
-        y: height - 130,
+        y: yStart - 20,
         size: fontSize,
         font,
-        color: rgb(0, 0, 0),
       });
-      
       page.drawText(`Responsável: ${controle.responsavel}`, {
         x: 50,
-        y: height - 160,
+        y: yStart - 40,
         size: fontSize,
         font,
-        color: rgb(0, 0, 0),
       });
-      
-      // Salvar o PDF
+
+      // Lista de notas
+      let yPos = yStart - 80;
+      page.drawText('Notas:', { x: 50, y: yPos, size: fontSize, font });
+      yPos -= 20;
+      let totalValor = 0;
+      controle.notas.forEach((n, idx) => {
+        totalValor += n.valor;
+        page.drawText(`${idx + 1}. ${n.numeroNota} - R$ ${n.valor.toFixed(2)}`, {
+          x: 60,
+          y: yPos,
+          size: fontSize,
+          font,
+        });
+        yPos -= 20;
+      });
+      // Totais
+      page.drawText(`Quantidade de Notas: ${controle.notas.length}`, {
+        x: 50,
+        y: yPos - 10,
+        size: fontSize,
+        font,
+      });
+      page.drawText(`Valor Total: R$ ${totalValor.toFixed(2)}`, {
+        x: 300,
+        y: yPos - 10,
+        size: fontSize,
+        font,
+      });
+
       const pdfBytes = await doc.save();
-      
-      // Criar blob e baixar
       const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = `romaneio-${controle.id}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
+      const url = URL.createObjectURL(blob);
+      setPdfUrl(url);
+      setPdfOpen(true);
     } catch (error) {
       console.error('Erro ao gerar PDF:', error);
       enqueueSnackbar('Erro ao gerar PDF', { variant: 'error' });
+    }
+  };
+
+
+  const canEdit = (c: Controle): boolean => {
+    if (!c.finalizado) return true;
+    return user?.tipo === 'GERENTE' || user?.tipo === 'ADMIN';
+  };
+
+  const handleOpenEdit = (c: Controle) => {
+    setEditing(c);
+    setEditData({
+      motorista: c.motorista,
+      responsavel: c.responsavel,
+      cpfMotorista: c.cpfMotorista ?? '',
+      transportadora: c.transportadora,
+      qtdPallets: c.qtdPallets,
+      observacao: c.observacao ?? '',
+    });
+  };
+
+  const handleCloseEdit = () => {
+    setEditing(null);
+    setEditData({});
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editing) return;
+    try {
+      await atualizarControle(editing.id, editData as any);
+      enqueueSnackbar('Controle atualizado com sucesso', { variant: 'success' });
+      handleCloseEdit();
+    } catch (e) {
+      enqueueSnackbar('Erro ao atualizar controle', { variant: 'error' });
     }
   };
 
@@ -145,7 +215,7 @@ const ListarControlesContent: React.FC = () => {
           <Table stickyHeader aria-label="tabela de controles">
             <TableHead>
               <TableRow>
-                <TableCell>ID</TableCell>
+                <TableCell>Nº</TableCell>
                 <TableCell>Data</TableCell>
                 <TableCell>Motorista</TableCell>
                 <TableCell>Responsável</TableCell>
@@ -155,9 +225,9 @@ const ListarControlesContent: React.FC = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {controles.map((controle) => (
+              {controles.map((controle, idx) => (
                 <TableRow key={controle.id} hover>
-                  <TableCell>{controle.id}</TableCell>
+                  <TableCell>{idx + 1}</TableCell>
                   <TableCell>
                     {format(new Date(controle.dataCriacao), "dd/MM/yyyy HH:mm", { locale: ptBR })}
                   </TableCell>
@@ -183,10 +253,19 @@ const ListarControlesContent: React.FC = () => {
                       <Button 
                         variant="outlined" 
                         size="small"
-                        onClick={() => gerarPdf(controle as unknown as Controle)}
+                        onClick={() => gerarPdf(controle as unknown as Controle, idx + 1)}
                       >
                         PDF
                       </Button>
+                      {canEdit(controle) && (
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          onClick={() => handleOpenEdit(controle)}
+                        >
+                          Editar
+                        </Button>
+                      )}
                       {!controle.finalizado && (
                         <Button 
                           variant="contained" 
@@ -205,6 +284,98 @@ const ListarControlesContent: React.FC = () => {
           </Table>
         </TableContainer>
       </Paper>
+          {editing && (
+        <Dialog open onClose={handleCloseEdit} maxWidth="sm" fullWidth>
+          <DialogTitle>Editar Controle</DialogTitle>
+          <DialogContent dividers>
+            <TextField
+              margin="normal"
+              fullWidth
+              label="Motorista"
+              value={editData.motorista ?? ''}
+              onChange={e => setEditData({ ...editData, motorista: e.target.value })}
+            />
+            <TextField
+              margin="normal"
+              fullWidth
+              label="Responsável"
+              value={editData.responsavel ?? ''}
+              onChange={e => setEditData({ ...editData, responsavel: e.target.value })}
+            />
+            <TextField
+              margin="normal"
+              fullWidth
+              label="CPF Motorista"
+              value={editData.cpfMotorista ?? ''}
+              onChange={e => setEditData({ ...editData, cpfMotorista: e.target.value })}
+            />
+            <FormControl fullWidth margin="normal">
+              <InputLabel id="transportadora-label">Transportadora</InputLabel>
+              <Select
+                labelId="transportadora-label"
+                value={editData.transportadora ?? 'ACERT'}
+                label="Transportadora"
+                onChange={e => setEditData({ ...editData, transportadora: e.target.value as any })}
+              >
+                <MenuItem value="ACERT">ACERT</MenuItem>
+                <MenuItem value="EXPRESSO_GOIAS">EXPRESSO GOIÁS</MenuItem>
+              </Select>
+            </FormControl>
+            <TextField
+              margin="normal"
+              type="number"
+              fullWidth
+              label="Quantidade de Pallets"
+              value={editData.qtdPallets ?? 0}
+              onChange={e => setEditData({ ...editData, qtdPallets: Number(e.target.value) })}
+            />
+            <TextField
+              margin="normal"
+              fullWidth
+              multiline
+              minRows={3}
+              label="Observação"
+              value={editData.observacao ?? ''}
+              onChange={e => setEditData({ ...editData, observacao: e.target.value })}
+            />
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleCloseEdit}>Cancelar</Button>
+            <Button variant="contained" onClick={handleSaveEdit}>Salvar</Button>
+          </DialogActions>
+        </Dialog>
+      )}
+          {/* Dialog de visualização do PDF */}
+      {pdfUrl && (
+        <Dialog open={pdfOpen} onClose={() => setPdfOpen(false)} fullWidth maxWidth="md">
+          <DialogTitle>Pré-visualização do PDF</DialogTitle>
+          <DialogContent dividers sx={{ height: 600 }}>
+            <iframe src={pdfUrl} width="100%" height="100%" style={{ border: 'none' }} />
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setPdfOpen(false)}>Fechar</Button>
+            <Button
+              onClick={() => {
+                const a = document.createElement('a');
+                a.href = pdfUrl;
+                a.download = 'romaneio.pdf';
+                a.click();
+              }}
+            >
+              Baixar
+            </Button>
+            {navigator.share && (
+              <Button
+                onClick={() => {
+                  navigator.share({ title: 'Romaneio', url: pdfUrl });
+                }}
+              >
+                Compartilhar
+              </Button>
+            )}
+          </DialogActions>
+        </Dialog>
+      )}
     </Container>
   );
 };
