@@ -12,6 +12,7 @@ model ControleCarga {
   id              String         @id @default(uuid())
   dataCriacao     DateTime       @default(now())
   motorista       String
+  cpfMotorista    String      @default("PENDENTE")
   responsavel     String
   transportadora  Transportadora @default(ACERT)
   numeroManifesto String?
@@ -55,6 +56,8 @@ enum TipoUsuario {
   ADMIN
   GERENTE
   USUARIO
+  FUNCIONARIO
+  CLIENTE
 }
 
 model AuditoriaAcesso {

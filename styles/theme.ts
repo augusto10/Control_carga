@@ -3,18 +3,22 @@ import { createTheme } from '@mui/material/styles';
 export const professionalTheme = createTheme({
   palette: {
     primary: {
-      main: '#1a237e',
+      main: '#F79A00',   // Dark Orange
+      light: '#FFC04D',  // Light Orange
+      dark: '#C77800',   // Slightly darker shade
+      contrastText: '#FFFFFF',
     },
     secondary: {
-      main: '#ff4081',
+      main: '#232323',   // Graphite / Dark Gray
+      contrastText: '#FFFFFF',
     },
     background: {
-      default: '#f5f7fb',
+      default: '#ffffff',
       paper: '#ffffff',
     },
     text: {
-      primary: '#263238',
-      secondary: '#546e7a',
+      primary: '#232323',
+      secondary: '#646464',
     },
   },
   typography: {

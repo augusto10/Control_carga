@@ -216,6 +216,8 @@ const handler = async (req: LoginRequest, res: NextApiResponse) => {
       });
     }
     
+    console.log("Login attempt for email:", email); // Log the email
+
     // Buscar usuário no banco de dados
     console.log('5. Buscando usuário no banco de dados');
     console.log('   - Email:', email);
@@ -249,7 +251,7 @@ const handler = async (req: LoginRequest, res: NextApiResponse) => {
     // Verificar se o usuário existe
     console.log('6. Verificando se o usuário existe');
     if (!usuario) {
-      console.log('   - Usuário não encontrado com o email fornecido');
+      console.log("User not found for email:", email); // Log user not found
       return res.status(401).json({
         success: false,
         message: 'Credenciais inválidas',
@@ -257,6 +259,8 @@ const handler = async (req: LoginRequest, res: NextApiResponse) => {
       });
     }
     
+    console.log("User found:", usuario.email); // Log user found
+
     // Verificar se o usuário está ativo
     console.log('7. Verificando se o usuário está ativo');
     if (!usuario.ativo) {
@@ -286,8 +290,10 @@ const handler = async (req: LoginRequest, res: NextApiResponse) => {
       });
     }
     
+    console.log("Password comparison result:", senhaValida); // Log comparison result
+
     if (!senhaValida) {
-      console.log('8.4. Senha inválida fornecida');
+      console.log("Password invalid for email:", email); // Log invalid password
       return res.status(401).json({
         success: false,
         message: 'Credenciais inválidas',

@@ -1,4 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
+import { verify } from 'jsonwebtoken';
+import { parseCookies } from 'nookies';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import prisma from '../../../lib/prisma';
 
@@ -43,6 +45,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       success: false,
       error: errorMsg 
     });
+  }
+
+  // === Verificação de autenticação ===
+  const cookies = parseCookies({ req });
+  const token = cookies.auth_token;
+  const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+
+  let usuarioTipo: string | null = null;
+  if (token) {
+    try {
+      const decoded = verify(token, JWT_SECRET) as { id: string; tipo: string };
+      usuarioTipo = decoded.tipo;
+    } catch (err) {
+      console.warn('Token inválido ou expirado ao atualizar controle:', err);
+    }
   }
 
   try {
@@ -159,12 +176,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       if (controleExistente.finalizado) {
-        const errorMsg = 'Não é possível editar um controle finalizado';
-        console.error('Erro:', errorMsg);
-        return res.status(400).json({ 
-          success: false, 
-          error: errorMsg 
-        });
+        const podeEditarFinalizado = usuarioTipo === 'GERENTE' || usuarioTipo === 'ADMIN';
+        if (!podeEditarFinalizado) {
+          const errorMsg = 'Somente GERENTE ou ADMIN podem editar um controle finalizado';
+          console.error('Erro:', errorMsg);
+          return res.status(403).json({ 
+            success: false, 
+            error: errorMsg 
+          });
+        }
       }
     } catch (error: unknown) {
       console.error('Erro ao buscar controle existente:', error);

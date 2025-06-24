@@ -44,6 +44,7 @@ import {
   Logout as LogoutIcon
 } from '@mui/icons-material';
 import Link from 'next/link';
+import Image from 'next/image';
 
 const drawerWidth = 260;
 
@@ -97,8 +98,8 @@ const AppBar = styled(MuiAppBar, {
     easing: theme.transitions.easing.sharp,
     duration: theme.transitions.duration.leavingScreen,
   }),
-  backgroundColor: theme.palette.background.paper,
-  color: theme.palette.text.primary,
+  backgroundColor: theme.palette.primary.main,
+  color: theme.palette.primary.contrastText,
   boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
   ...(open && {
     marginLeft: drawerWidth,
@@ -182,11 +183,7 @@ const menuItems = [
         icon: <SearchIcon fontSize="small" />, 
         path: '/consultar-notas' 
       },
-      { 
-        text: 'Vincular Notas', 
-        icon: <LinkIcon fontSize="small" />, 
-        path: '/vincular-notas' 
-      },
+
     ]
   },
   { 
@@ -477,19 +474,6 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
           },
         }}
       >
-        <DrawerHeader>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <TruckIcon />
-            <Typography variant="subtitle1" noWrap sx={{ fontWeight: 600 }}>
-              {open && 'Controle Carga'}
-            </Typography>
-          </Box>
-          <IconButton onClick={toggleDrawer} size="small" sx={{ color: 'inherit' }}>
-            {theme.direction === 'rtl' ? <ChevronRightIcon /> : <ChevronLeftIcon />}
-          </IconButton>
-        </DrawerHeader>
-        
-        <Divider />
         
         <Box sx={{ overflow: 'auto', height: 'calc(100vh - 64px)', py: 1 }}>
           <List>
