@@ -32,14 +32,18 @@ export default async function handler(
     }
   } else if (req.method === 'POST') {
     try {
-      const { codigo, numeroNota, valor } = req.body;
+      const { codigo, numeroNota, volumes } = req.body;
+      
+      if (!codigo || !numeroNota || !volumes) {
+        return res.status(400).json({ error: 'Código, número da nota e volumes são obrigatórios' });
+      }
       
       const nota = await prisma.notaFiscal.create({
         data: {
           codigo,
           numeroNota,
-          valor,
-        },
+          volumes: volumes.toString() // Garantindo que volumes seja uma string
+        }
       });
       
       res.status(200).json(nota);

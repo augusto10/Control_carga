@@ -400,10 +400,7 @@ const CriarControleContent: React.FC = () => {
                   />
                   <ListItemText 
                     id={`nota-${nota.id}`}
-                    primary={`Nota ${nota.numeroNota} - ${new Intl.NumberFormat('pt-BR', { 
-                      style: 'currency', 
-                      currency: 'BRL' 
-                    }).format(nota.valor)}`}
+                    primary={`Nota ${nota.numeroNota} - ${nota.volumes} volume${parseInt(nota.volumes) !== 1 ? 's' : ''}`}
                     secondary={`Código: ${nota.codigo} • Data: ${format(new Date(nota.dataCriacao), "dd/MM/yyyy HH:mm", { locale: ptBR })}`}
                   />
                 </ListItem>

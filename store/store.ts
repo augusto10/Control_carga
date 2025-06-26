@@ -6,7 +6,7 @@ export type NotaFiscal = {
   dataCriacao: Date;
   codigo: string;
   numeroNota: string;
-  valor: number;
+  volumes: string;
   controleId: string | null;
 };
 

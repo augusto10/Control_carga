@@ -184,7 +184,7 @@ const ConsultarNotas = () => {
               <TableRow>
                 <TableCell>Número da Nota</TableCell>
                 <TableCell>Código</TableCell>
-                <TableCell align="right">Valor (R$)</TableCell>
+                <TableCell align="right">Volumes</TableCell>
                 <TableCell>Data de Criação</TableCell>
                 <TableCell>Status</TableCell>
                 <TableCell>Controle</TableCell>
@@ -209,10 +209,7 @@ const ConsultarNotas = () => {
                     <TableCell>{nota.numeroNota}</TableCell>
                     <TableCell>{nota.codigo}</TableCell>
                     <TableCell align="right">
-                      {new Intl.NumberFormat('pt-BR', {
-                        style: 'currency',
-                        currency: 'BRL'
-                      }).format(nota.valor || 0)}
+                      {nota.volumes || '1'}
                     </TableCell>
                     <TableCell>
                     {formatISO9075(new Date(nota.dataCriacao))}

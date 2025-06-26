@@ -43,7 +43,7 @@ interface Controle {
   transportadora: 'ACERT' | 'EXPRESSO_GOIAS';
   qtdPallets: number;
   observacao?: string;
-  notas: { id: string; numeroNota: string; codigo: string; valor: number }[];
+  notas: { id: string; numeroNota: string; codigo: string; volumes: string }[];
   finalizado: boolean;
 }
 
@@ -107,10 +107,11 @@ const ListarControlesContent: React.FC = () => {
       let yPos = yStart - 80;
       page.drawText('Notas:', { x: 50, y: yPos, size: fontSize, font });
       yPos -= 20;
-      let totalValor = 0;
+      let totalVolumes = 0;
       controle.notas.forEach((n, idx) => {
-        totalValor += n.valor;
-        page.drawText(`${idx + 1}. ${n.numeroNota} - R$ ${n.valor.toFixed(2)}`, {
+        const volumes = parseInt(n.volumes) || 0;
+        totalVolumes += volumes;
+        page.drawText(`${idx + 1}. ${n.numeroNota} - ${volumes} volume${volumes !== 1 ? 's' : ''}`, {
           x: 60,
           y: yPos,
           size: fontSize,
@@ -125,7 +126,7 @@ const ListarControlesContent: React.FC = () => {
         size: fontSize,
         font,
       });
-      page.drawText(`Valor Total: R$ ${totalValor.toFixed(2)}`, {
+      page.drawText(`Total de Volumes: ${totalVolumes}`, {
         x: 300,
         y: yPos - 10,
         size: fontSize,
