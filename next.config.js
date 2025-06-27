@@ -1,5 +1,17 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Garante que o Prisma seja incluído no bundle de produção
+  experimental: {
+    serverComponentsExternalPackages: ['@prisma/client'],
+  },
+  // Otimizações de build
+  webpack: (config, { isServer }) => {
+    // Adiciona o Prisma ao bundle do lado do servidor
+    if (isServer) {
+      config.externals.push('@prisma/client');
+    }
+    return config;
+  },
   reactStrictMode: true,
   swcMinify: true,
   images: {
