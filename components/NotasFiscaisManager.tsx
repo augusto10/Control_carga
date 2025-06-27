@@ -43,7 +43,7 @@ interface NotaFiscal {
   id: string;
   codigo: string;
   numero: string;
-  valor: string;
+  volumes: string;
   status: StatusNota;
   dataHora: string;
   editando?: boolean;
@@ -62,7 +62,7 @@ const NotasFiscaisManager: React.FC = () => {
   // Form states
   const [codigo, setCodigo] = useState('');
   const [numero, setNumero] = useState('');
-  const [valor, setValor] = useState('0,00');
+  const [volumes, setVolumes] = useState('1');
   
   // Refs
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -85,12 +85,8 @@ const NotasFiscaisManager: React.FC = () => {
   }, []);
   
   // Funções auxiliares
-  const formatarMoeda = (valor: number): string => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-      minimumFractionDigits: 2
-    }).format(valor);
+  const formatarVolumes = (quantidade: number): string => {
+    return `${quantidade} volume${quantidade !== 1 ? 's' : ''}`;
   };
   
   const validarCodigoBarras = (codigo: string): { valido: boolean; mensagem?: string } => {
@@ -125,7 +121,7 @@ const NotasFiscaisManager: React.FC = () => {
       id: Date.now().toString(),
       codigo,
       numero,
-      valor,
+      volumes,
       status: 'pendente',
       dataHora: new Date().toISOString(),
       editando: true
@@ -134,10 +130,10 @@ const NotasFiscaisManager: React.FC = () => {
     setNotas(prev => [...prev, novaNota]);
     setCodigo('');
     setNumero('');
-    setValor('0,00');
+    setVolumes('1');
     
     enqueueSnackbar('Nota adicionada com sucesso!', { variant: 'success' });
-  }, [codigo, numero, valor, enqueueSnackbar]);
+  }, [codigo, numero, volumes, enqueueSnackbar]);
   
   const removerNota = (id: string) => {
     setNotas(prev => prev.filter(nota => nota.id !== id));
@@ -210,11 +206,10 @@ const NotasFiscaisManager: React.FC = () => {
     setIsScanning(false);
   };
   
-  // Cálculo do valor total
-  const valorTotal = useMemo(() => {
+  // Cálculo do total de volumes
+  const totalVolumes = useMemo(() => {
     return notas.reduce((total, nota) => {
-      const valorNumerico = parseFloat(nota.valor.replace(/\./g, '').replace(',', '.')) || 0;
-      return total + valorNumerico;
+      return total + (parseInt(nota.volumes) || 0);
     }, 0);
   }, [notas]);
   
@@ -286,17 +281,12 @@ const NotasFiscaisManager: React.FC = () => {
               sx={{ flex: 1, minWidth: 150 }}
             />
             
-            <NumericFormat
-              customInput={TextField}
-              label="Valor"
-              value={valor}
-              onValueChange={(values) => setValor(values.formattedValue)}
-              thousandSeparator="."
-              decimalSeparator=","
-              decimalScale={2}
-              fixedDecimalScale
-              allowNegative={false}
-              prefix="R$ "
+            <TextField
+              label="Volumes"
+              type="number"
+              value={volumes}
+              onChange={(e) => setVolumes(e.target.value)}
+              inputProps={{ min: 1 }}
               fullWidth={isMobile}
               sx={{ flex: 1, minWidth: 150 }}
             />
@@ -324,7 +314,7 @@ const NotasFiscaisManager: React.FC = () => {
           
           <Box>
             <Typography variant="subtitle1" color="primary">
-              Total: {formatarMoeda(valorTotal)}
+              Total: {totalVolumes} volume{totalVolumes !== 1 ? 's' : ''}
             </Typography>
           </Box>
         </Box>
@@ -348,7 +338,7 @@ const NotasFiscaisManager: React.FC = () => {
                 >
                   <ListItemText
                     primary={`Nota: ${nota.numero}`}
-                    secondary={`Código: ${nota.codigo || 'N/A'} • Valor: ${nota.valor}`}
+                    secondary={`Código: ${nota.codigo || 'N/A'} • Volumes: ${nota.volumes}`}
                   />
                   
                   <ListItemSecondaryAction>
@@ -521,19 +511,14 @@ const NotasFiscaisManager: React.FC = () => {
                 margin="normal"
               />
               
-              <NumericFormat
-                customInput={TextField}
-                label="Valor"
-                value={notaEditando.valor}
-                onValueChange={(values) => 
-                  setNotaEditando({...notaEditando, valor: values.formattedValue})
+              <TextField
+                label="Volumes"
+                type="number"
+                value={notaEditando.volumes}
+                onChange={(e) => 
+                  setNotaEditando({...notaEditando, volumes: e.target.value})
                 }
-                thousandSeparator="."
-                decimalSeparator=","
-                decimalScale={2}
-                fixedDecimalScale
-                allowNegative={false}
-                prefix="R$ "
+                inputProps={{ min: 1 }}
                 fullWidth
                 margin="normal"
               />

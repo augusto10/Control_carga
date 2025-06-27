@@ -1,9 +1,10 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { Prisma, PrismaClient } from '@prisma/client';
+import { gerarProximoNumeroManifesto } from '../../../lib/gerarNumeroManifesto';
 
 const prisma = new PrismaClient();
 
-type Transportadora = 'ACERT' | 'ACCERT' | 'EXPRESSO_GOIAS';
+type Transportadora = 'ACERT' | 'EXPRESSO_GOIAS'; // Removido ACCERT que não é mais usado
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   switch (req.method) {
@@ -67,14 +68,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           }
         }
 
-        // Se não veio um número de manifesto, define como nulo
-        // Já que o campo é opcional no banco de dados
-        const numeroManifestoFinal = numeroManifesto || null;
-
         // Garantir que a transportadora tenha um valor válido
         const transportadoraValida = (transportadora === 'ACERT' || transportadora === 'EXPRESSO_GOIAS') 
           ? transportadora 
           : 'ACERT';
+          
+        // Gera o próximo número de manifesto automaticamente
+        const numeroManifestoFinal = numeroManifesto || await gerarProximoNumeroManifesto(transportadoraValida);
         
         // Criar o controle com os dados fornecidos
         const controle = await prisma.controleCarga.create({

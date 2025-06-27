@@ -2,8 +2,10 @@ import axios, { AxiosInstance } from 'axios';
 
 // Cria uma instância do Axios com configurações padrão
 const createApi = (): AxiosInstance => {
-  // Remove a barra final da URL base, se existir
-  const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+  // Define a URL base da API.
+  // Se a variável de ambiente não estiver definida, usamos string vazia para
+  // que as requisições sejam relativas ao mesmo host/porta do front-end.
+  const baseURL = process.env.NEXT_PUBLIC_API_URL || '';
   const cleanBaseURL = baseURL.endsWith('/') ? baseURL.slice(0, -1) : baseURL;
   
   const instance = axios.create({

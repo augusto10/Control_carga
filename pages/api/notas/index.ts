@@ -18,7 +18,24 @@ export default async function handler(
           where.dataCriacao.lte = new Date(`${end}T23:59:59`);
         }
       }
-      const notas = await prisma.notaFiscal.findMany({ where });
+      const notas = await prisma.notaFiscal.findMany({ 
+        where,
+        include: {
+          controle: {
+            select: {
+              id: true,
+              numeroManifesto: true,
+              motorista: true,
+              responsavel: true,
+              transportadora: true,
+              dataCriacao: true
+            }
+          }
+        },
+        orderBy: {
+          dataCriacao: 'desc'
+        }
+      });
       
       // Adiciona cabeçalhos para evitar cache
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
@@ -32,14 +49,18 @@ export default async function handler(
     }
   } else if (req.method === 'POST') {
     try {
-      const { codigo, numeroNota, valor } = req.body;
+      const { codigo, numeroNota, volumes } = req.body;
+      
+      if (!codigo || !numeroNota || !volumes) {
+        return res.status(400).json({ error: 'Código, número da nota e volumes são obrigatórios' });
+      }
       
       const nota = await prisma.notaFiscal.create({
         data: {
           codigo,
           numeroNota,
-          valor,
-        },
+          volumes: volumes.toString() // Garantindo que volumes seja uma string
+        }
       });
       
       res.status(200).json(nota);

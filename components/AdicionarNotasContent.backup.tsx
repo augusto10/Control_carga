@@ -36,7 +36,19 @@ interface NotaAdicionada {
   codigo: string;
   numeroNota: string;
   valor: string;
+  volumes: string;
   editando?: boolean;
+  isScanned?: boolean;
+  status?: string;
+  dataHora?: string;
+}
+
+interface NotaEmEdicao {
+  index: number;
+  numero: string;
+  valor: string;
+  volumes: string;
+  isScanned: boolean;
 }
 
 interface CurrencyInputProps {
@@ -73,7 +85,7 @@ const AdicionarNotasContent: FC = (): JSX.Element => {
   // Estados para gerenciamento de notas
   const [notas, setNotas] = useState<NotaAdicionada[]>([]);
   const [notaAdicionada, setNotaAdicionada] = useState<number | null>(null);
-  const [notaEmEdicao, setNotaEmEdicao] = useState<{index: number; valor: string; numero: string} | null>(null);
+  const [notaEmEdicao, setNotaEmEdicao] = useState<NotaEmEdicao | null>(null);
   
   // Estados para controle do formulário
   const [manualCodigo, setManualCodigo] = useState('');
@@ -262,9 +274,11 @@ const AdicionarNotasContent: FC = (): JSX.Element => {
       const novaNota: NotaAdicionada = {
         codigo: codigoLimpo,
         numeroNota,
-        valor: '0,00',
+        valor: '',
+        volumes: '1',
         status: 'pendente',
-        dataHora: new Date().toISOString()
+        dataHora: new Date().toISOString(),
+        isScanned: true
       };
       
       // Adicionar à lista de notas
@@ -340,8 +354,10 @@ const AdicionarNotasContent: FC = (): JSX.Element => {
       codigo,
       numeroNota: manualNumero.trim(),
       valor: manualValor || '0,00',
+      volumes: '1',
       status: 'pendente',
-      dataHora: new Date().toISOString()
+      dataHora: new Date().toISOString(),
+      isScanned: false
     };
     
     // Adiciona à lista de notas
@@ -382,7 +398,9 @@ const AdicionarNotasContent: FC = (): JSX.Element => {
     setNotaEmEdicao({
       index,
       numero: nota.numeroNota,
-      valor: nota.valor || '0,00'
+      valor: nota.isScanned ? '' : (nota.valor || '0,00'),
+      volumes: nota.volumes || '1',
+      isScanned: nota.isScanned || false
     });
   };
   
@@ -390,21 +408,23 @@ const AdicionarNotasContent: FC = (): JSX.Element => {
   const handleSalvarNota = () => {
     if (notaEmEdicao === null) return;
     
-    const { index, valor } = notaEmEdicao;
+    const { index, valor, volumes, isScanned } = notaEmEdicao;
     
     setNotas(prev => {
       const novasNotas = [...prev];
       if (novasNotas[index]) {
         novasNotas[index] = {
           ...novasNotas[index],
-          valor: valor || '0,00'
+          valor: isScanned ? '0,00' : (valor || '0,00'),
+          volumes: isScanned ? (volumes || '1') : '1',
+          isScanned
         };
       }
       return novasNotas;
     });
     
     setNotaEmEdicao(null);
-    enqueueSnackbar('Valor da nota atualizado com sucesso!', { 
+    enqueueSnackbar(isScanned ? 'Volumes da nota atualizados com sucesso!' : 'Valor da nota atualizado com sucesso!', { 
       variant: 'success',
       autoHideDuration: 3000
     });
@@ -1501,37 +1521,73 @@ const handleBarcodeScanned = useCallback((barcode: string) => {
     const nota = notas[index];
     setNotaEmEdicao({
       index,
-      valor: nota.valor,
-      numero: nota.numeroNota
+      valor: nota.isScanned ? '' : (nota.valor || '0,00'),
+      volumes: nota.volumes || '1',
+      numero: nota.numeroNota,
+      isScanned: nota.isScanned || false
     });
   };
 
   const handleSalvarNota = () => {
     if (!notaEmEdicao) return;
 
-    const { index, valor } = notaEmEdicao;
-    const valorFormatado = valor || '0,00';
-    const valorNumerico = parseFloat(valor.replace(/\./g, '').replace(',', '.')) || 0;
-
-    if (isNaN(valorNumerico) || valorNumerico <= 0) {
-      enqueueSnackbar('Informe um valor válido para a nota', { 
-        variant: 'error',
+    const { index, valor, volumes, isScanned } = notaEmEdicao;
+    
+    if (isScanned) {
+      // Validação para volumes
+      const volumesNum = parseInt(volumes) || 0;
+      if (volumesNum <= 0) {
+        enqueueSnackbar('Informe uma quantidade válida de volumes', { 
+          variant: 'error',
+          autoHideDuration: 3000
+        });
+        return;
+      }
+      
+      setNotas(prevNotas =>
+        prevNotas.map((nota, i) =>
+          i === index ? { 
+            ...nota, 
+            volumes: volumesNum.toString(),
+            valor: '0,00' 
+          } : nota
+        )
+      );
+      
+      setNotaEmEdicao(null);
+      enqueueSnackbar('Quantidade de volumes atualizada com sucesso', { 
+        variant: 'success',
         autoHideDuration: 3000
       });
-      return;
-    }
+    } else {
+      // Validação para valor monetário
+      const valorFormatado = valor || '0,00';
+      const valorNumerico = parseFloat(valor.replace(/\./g, '').replace(',', '.')) || 0;
 
-    setNotas(prevNotas =>
-      prevNotas.map((nota, i) =>
-        i === index ? { ...nota, valor: valorFormatado } : nota
-      )
-    );
-    
-    setNotaEmEdicao(null);
-    enqueueSnackbar('Valor da nota atualizado com sucesso', { 
-      variant: 'success',
-      autoHideDuration: 3000
-    });
+      if (isNaN(valorNumerico) || valorNumerico <= 0) {
+        enqueueSnackbar('Informe um valor válido para a nota', { 
+          variant: 'error',
+          autoHideDuration: 3000
+        });
+        return;
+      }
+
+      setNotas(prevNotas =>
+        prevNotas.map((nota, i) =>
+          i === index ? { 
+            ...nota, 
+            valor: valorFormatado,
+            volumes: '1' 
+          } : nota
+        )
+      );
+      
+      setNotaEmEdicao(null);
+      enqueueSnackbar('Valor da nota atualizado com sucesso', { 
+        variant: 'success',
+        autoHideDuration: 3000
+      });
+    }
   };
 
   const handleRemoverNota = (index: number) => {
@@ -1553,8 +1609,12 @@ const handleBarcodeScanned = useCallback((barcode: string) => {
 
   const valorTotal = useMemo(() => {
     return notas.reduce((total: number, nota: NotaAdicionada) => {
-      const valor = parseFloat(nota.valor.replace(/\./g, '').replace(',', '.')) || 0;
-      return total + valor;
+      // Só soma valores de notas não escaneadas (manuais)
+      if (!nota.isScanned) {
+        const valor = parseFloat(nota.valor.replace(/\./g, '').replace(',', '.')) || 0;
+        return total + valor;
+      }
+      return total;
     }, 0);
   }, [notas]);
 

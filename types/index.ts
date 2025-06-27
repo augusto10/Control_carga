@@ -1,6 +1,8 @@
 import { NotaFiscal as PrismaNotaFiscal, ControleCarga as PrismaControleCarga } from '@prisma/client';
 
-export interface INotaFiscal extends PrismaNotaFiscal {}
+export interface INotaFiscal extends Omit<PrismaNotaFiscal, 'volumes'> {
+  volumes: string;
+}
 
 export interface IControleCarga extends PrismaControleCarga {
   notas: INotaFiscal[];
@@ -16,4 +18,8 @@ export type CriarControleDTO = {
   notasIds?: string[];
 };
 
-export type AdicionarNotaDTO = Pick<INotaFiscal, 'codigo' | 'numeroNota' | 'valor'>;
+export type AdicionarNotaDTO = {
+  codigo: string;
+  numeroNota: string;
+  volumes: string;
+};

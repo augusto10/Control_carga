@@ -28,7 +28,8 @@ interface NotaFiscal {
   id: string;
   codigo: string;
   numeroNota: string;
-  valor: string;
+  volumes: string;
+  isScanned: boolean;
   status: 'pendente' | 'processando' | 'concluido' | 'erro';
   dataHora: string;
   editando?: boolean;
@@ -95,14 +96,6 @@ const AdicionarNotasContent: React.FC = () => {
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   // Funções auxiliares
-  const formatarMoeda = (valor: number): string => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-      minimumFractionDigits: 2
-    }).format(valor);
-  };
-
   const validarCodigoBarras = (codigo: string): { valido: boolean; erro?: string } => {
     const codigoLimpo = codigo.trim();
     
@@ -170,11 +163,11 @@ const AdicionarNotasContent: React.FC = () => {
     return codigoLimpo.slice(-9);
   };
 
-  // Função para atualizar o valor de uma nota
-  const atualizarValorNota = (id: string, valor: string) => {
+  // Função para atualizar os volumes de uma nota
+  const atualizarVolumesNota = (id: string, volumes: string) => {
     setNotas(prevNotas => 
       prevNotas.map(nota => 
-        nota.id === id ? { ...nota, valor } : nota
+        nota.id === id ? { ...nota, volumes } : nota
       )
     );
   };
@@ -219,28 +212,31 @@ const AdicionarNotasContent: React.FC = () => {
       // Formata o número da nota para exibição (remove zeros à esquerda)
       const numeroNotaFormatado = numeroNota.replace(/^0+/, '');
       
-      // Verificar se a nota já foi adicionada
+      // Verificar se a nota já foi adicionada (verifica tanto por código quanto por número da nota)
       const notaExistente = notas.find(n => 
-        n.codigo === codigoLimpo || n.numeroNota === numeroNotaFormatado
+        (n.codigo && codigoLimpo && n.codigo === codigoLimpo) ||
+        (n.numeroNota && n.numeroNota === numeroNotaFormatado)
       );
       
       if (notaExistente) {
-        enqueueSnackbar(`Nota ${numeroNotaFormatado} já foi adicionada`, { 
+        enqueueSnackbar('Nota já escaneada anteriormente', { 
           variant: 'warning',
-          autoHideDuration: 3000
+          autoHideDuration: 4000,
+          anchorOrigin: { vertical: 'top', horizontal: 'center' }
         });
         return;
       }
       
-      // Criar nova nota com o número formatado
+      // Criar nova nota escaneada com volumes
       const novaNota: NotaFiscal = {
         id: Date.now().toString(),
         codigo: codigoLimpo,
         numeroNota: numeroNotaFormatado, // Usa o número formatado (sem zeros à esquerda)
-        valor: '', // Inicia sem valor para forçar o preenchimento
+        volumes: '1', // Valor padrão de volumes
+        isScanned: true, // Marca como nota escaneada
         status: 'pendente',
         dataHora: new Date().toLocaleString('pt-BR'),
-        editando: true
+        editando: true // Abre para edição dos volumes
       };
       
       // Define esta nota como a que está sendo editada
@@ -288,12 +284,95 @@ const AdicionarNotasContent: React.FC = () => {
     }
   }, [notas, enqueueSnackbar]);
 
+  const handleEditarNota = (index: number) => {
+    setNotas(prev => {
+      const novasNotas = [...prev];
+      novasNotas[index] = { ...novasNotas[index], editando: true };
+      return novasNotas;
+    });
+    setNotaEditandoValor(notas[index].id);
+  };
+
+  const handleCancelarEdicao = (index: number) => {
+    setNotas(prev => {
+      const novasNotas = [...prev];
+      novasNotas[index] = { ...novasNotas[index], editando: false };
+      return novasNotas;
+    });
+    setNotaEditandoValor(null);
+  };
+
+  const handleSalvarNota = (index: number) => {
+    const notaAtualizada = { ...notas[index] };
+    
+    // Valida o volume para todas as notas
+    if (!notaAtualizada.volumes || isNaN(parseInt(notaAtualizada.volumes)) || parseInt(notaAtualizada.volumes) <= 0) {
+      enqueueSnackbar('Informe uma quantidade de volumes válida', { variant: 'error' });
+      return;
+    }
+    
+    // Atualiza a nota
+    setNotas(prev => {
+      const novasNotas = [...prev];
+      novasNotas[index] = {
+        ...notas[index],
+        volumes: notaAtualizada.volumes,
+        editando: false
+      };
+      return novasNotas;
+    });
+    
+    setNotaEditandoValor(null);
+    enqueueSnackbar('Nota atualizada com sucesso!', { variant: 'success' });
+  };
+
   const handleAddManual = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!codigoBarras.trim()) return;
     
-    processarCodigoBarras(codigoBarras);
-    setCodigoBarras('');
+    if (!manualNumero.trim()) {
+      enqueueSnackbar('Informe o número da nota', { variant: 'error' });
+      return;
+    }
+    
+    // Verifica se a nota já foi adicionada (verifica por número da nota)
+    const notaExistente = notas.find(n => n.numeroNota === manualNumero.trim());
+    if (notaExistente) {
+      enqueueSnackbar('Nota já escaneada anteriormente', { 
+        variant: 'warning',
+        autoHideDuration: 4000,
+        anchorOrigin: { vertical: 'top', horizontal: 'center' }
+      });
+      return;
+    }
+    
+    // Cria uma nova nota manual
+    const novaNota: NotaFiscal = {
+      id: Date.now().toString(),
+      codigo: `MANUAL-${Date.now()}`,
+      numeroNota: manualNumero.trim(),
+      volumes: '1', // Valor padrão de volumes para notas manuais
+      isScanned: false, // Marca como nota manual
+      status: 'pendente',
+      dataHora: new Date().toLocaleString('pt-BR'),
+      editando: true // Abre para edição dos volumes
+    };
+    
+    // Adiciona a nova nota
+    setNotas(prev => [...prev, novaNota]);
+    setNotaEditandoValor(novaNota.id);
+    
+    // Limpa o formulário
+    setManualNumero('');
+    
+    enqueueSnackbar(`Nota ${manualNumero} adicionada com sucesso!`, { variant: 'success' });
+    
+    // Rola até a nota recém-adicionada
+    setTimeout(() => {
+      const notaElement = document.querySelector(`[data-nota-id="${novaNota.id}"]`);
+      if (notaElement) {
+        notaElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }, 100);
   };
 
 
@@ -316,119 +395,68 @@ const AdicionarNotasContent: React.FC = () => {
       enqueueSnackbar('Nenhuma nota para salvar.', { variant: 'info' });
       return;
     }
-    
-    // Verifica se todas as notas têm valor preenchido
-    const notasSemValor = notas.filter(nota => !nota.valor || nota.valor.trim() === '');
-    
-    if (notasSemValor.length > 0) {
-      // Encontra a primeira nota sem valor e a coloca em modo de edição
-      const primeiraNotaSemValor = notasSemValor[0];
-      setNotaEditandoValor(primeiraNotaSemValor.id);
-      
-      // Rola até a primeira nota sem valor
-      setTimeout(() => {
-        const elemento = document.querySelector(`[data-nota-id="${primeiraNotaSemValor.id}"]`);
-        if (elemento) {
-          elemento.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        }
-      }, 100);
-      
-      enqueueSnackbar('Preencha o valor de todas as notas antes de salvar', { 
-        variant: 'error',
-        autoHideDuration: 5000
-      });
-      return;
-    }
-    
-    // Confirmação antes de salvar
-    const confirmSave = window.confirm(`Deseja salvar ${notas.length} nota${notas.length !== 1 ? 's' : ''}?`);
-    if (!confirmSave) return;
-    
-    setIsSaving(true);
-    let sucessos = 0;
-    let falhas = 0;
-    const notasComErro: string[] = [];
-    
+
     try {
-      // Salva cada nota individualmente
-      for (const [index, nota] of notas.entries()) {
-        try {
-          // Atualiza o status da nota para processando
-          setNotas(prev => {
-            const novasNotas = [...prev];
-            novasNotas[index] = { ...novasNotas[index], status: 'processando' };
-            return novasNotas;
-          });
-          
-          await addNota({
-            codigo: nota.codigo,
-            numeroNota: nota.numeroNota,
-            valor: parseFloat(nota.valor.replace(/\./g, '').replace(',', '.')) || 0
-          });
-          
-          // Atualiza o status da nota para concluído
-          setNotas(prev => {
-            const novasNotas = [...prev];
-            novasNotas[index] = { ...novasNotas[index], status: 'concluido' };
-            return novasNotas;
-          });
-          
-          sucessos++;
-          
-        } catch (error) {
-          console.error(`Erro ao salvar nota ${nota.numeroNota}:`, error);
-          
-          // Atualiza o status da nota para erro
-          setNotas(prev => {
-            const novasNotas = [...prev];
-            novasNotas[index] = { ...novasNotas[index], status: 'erro' };
-            return novasNotas;
-          });
-          
-          falhas++;
-          notasComErro.push(nota.numeroNota);
-          
-          enqueueSnackbar(`Falha ao salvar nota ${nota.numeroNota}`, { 
-            variant: 'error',
-            autoHideDuration: 3000
-          });
-        }
-      }
+      setIsSaving(true);
       
-      // Exibe resumo da operação
-      let mensagem = '';
-      if (sucessos > 0 && falhas === 0) {
-        mensagem = `${sucessos} nota${sucessos !== 1 ? 's' : ''} salva${sucessos !== 1 ? 's' : ''} com sucesso!`;
-      } else if (sucessos > 0 && falhas > 0) {
-        mensagem = `${sucessos} nota${sucessos !== 1 ? 's' : ''} salva${sucessos !== 1 ? 's' : ''} com sucesso, `;
-        mensagem += `${falhas} nota${falhas !== 1 ? 's' : ''} com erro.`;
-      } else {
-        mensagem = `Falha ao salvar ${falhas} nota${falhas !== 1 ? 's' : ''}.`;
-      }
+      // Prepara os dados para envio
+      const notasParaEnviar = notas.map(nota => {
+        const notaProcessada = {
+          ...nota,
+          // Garante que volumes seja um número válido
+          volumes: (nota.volumes && !isNaN(Number(nota.volumes))) ? String(nota.volumes) : '1'
+        };
+        console.log('Nota processada para envio:', JSON.stringify(notaProcessada, null, 2));
+        return notaProcessada;
+      });
+
+      console.log('Dados a serem enviados:', JSON.stringify({ notas: notasParaEnviar }, null, 2));
       
-      enqueueSnackbar(mensagem, { 
-        variant: falhas > 0 ? 'warning' : 'success',
-        autoHideDuration: 5000
+      // 1. Primeiro salva as notas no backend
+      const response = await fetch('/api/notas/salvar-multiplas', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Cache': 'no-cache',
+          'credentials': 'include'
+        },
+        body: JSON.stringify({ notas: notasParaEnviar })
       });
       
-      // Se todas as notas foram salvas com sucesso, limpa a lista
-      if (falhas === 0) {
-        setNotas([]);
-      }
+      console.log('Resposta do servidor (status):', response.status);
       
-      // Se houve falhas, rola a página para mostrar as notas com erro
-      if (falhas > 0) {
-        setTimeout(() => {
-          const primeiroErro = document.querySelector('[data-status="erro"]');
-          if (primeiroErro) {
-            primeiroErro.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          }
-        }, 100);
+      const data = await response.json();
+      console.log('Resposta do servidor:', data);
+
+      if (!response.ok) {
+        // Se for erro de duplicação, mostra a mensagem específica
+        if (data.error === 'Nota já escaneada anteriormente' || data.message === 'Nota já escaneada anteriormente') {
+          throw new Error('Nota já escaneada anteriormente');
+        }
+        // Para outros erros, usa a mensagem do servidor ou uma mensagem padrão
+        throw new Error(data.error || data.message || 'Erro ao salvar notas');
       }
+
+      // 2. Mostra mensagem de sucesso
+      enqueueSnackbar(`Notas salvas com sucesso!`, { 
+        variant: 'success',
+        autoHideDuration: 3000
+      });
+
+      // 3. Limpa as notas locais e reseta o estado
+      setNotas([]);
+      setNotaEditandoValor(null);
       
+      // 4. Mostra mensagem de sucesso
+      enqueueSnackbar('Notas salvas com sucesso!', { 
+        variant: 'success',
+        autoHideDuration: 3000
+      });
+
     } catch (error) {
-      console.error('Erro ao processar notas:', error);
-      enqueueSnackbar('Ocorreu um erro inesperado ao processar as notas.', { 
+      console.error('Erro ao salvar notas:', error);
+      enqueueSnackbar(error.message || 'Erro ao salvar notas', { 
         variant: 'error',
         autoHideDuration: 5000
       });
@@ -488,11 +516,29 @@ const AdicionarNotasContent: React.FC = () => {
     }
   };
 
-  // Calcular valor total
-  const valorTotal = useMemo(() => {
+  // Função para converter valor para número de forma segura
+  const converterParaNumero = (valor: any): number => {
+    if (valor === null || valor === undefined) return 0;
+    
+    // Se for número, retorna direto
+    if (typeof valor === 'number') return valor;
+    
+    // Se for string, faz o parse
+    if (typeof valor === 'string') {
+      // Remove pontos de milhar e troca vírgula por ponto
+      const valorLimpo = valor.replace(/\./g, '').replace(',', '.');
+      const numero = parseFloat(valorLimpo);
+      return isNaN(numero) ? 0 : numero;
+    }
+    
+    // Para outros tipos, tenta converter para número
+    return Number(valor) || 0;
+  };
+
+  // Calcular total de volumes
+  const totalVolumes = useMemo(() => {
     return notas.reduce((total, nota) => {
-      const valorNumerico = parseFloat(nota.valor.replace(/\./g, '').replace(',', '.')) || 0;
-      return total + valorNumerico;
+      return total + (parseInt(nota.volumes) || 0);
     }, 0);
   }, [notas]);
 
@@ -507,7 +553,7 @@ const AdicionarNotasContent: React.FC = () => {
           {notas.length > 0 && (
             <Box display="flex" gap={2} alignItems="center">
               <Typography variant="subtitle1" color="primary" fontWeight="bold">
-                Total: {formatarMoeda(valorTotal)}
+                Total de Volumes: {totalVolumes}
               </Typography>
               <Button 
                 color="error" 
@@ -632,83 +678,87 @@ const AdicionarNotasContent: React.FC = () => {
                   </Typography>
                   {notaEditandoValor === nota.id ? (
                     <Box mt={1} mb={1}>
-                      <Typography variant="subtitle2" gutterBottom>Digite o valor da nota:</Typography>
-                      <CurrencyInput
-                        label="Valor da nota"
-                        value={nota.valor}
-                        onChange={(valor) => atualizarValorNota(nota.id, valor)}
-                        autoFocus
-                        size="small"
-                        sx={{ 
-                          bgcolor: 'background.paper',
-                          '& .MuiOutlinedInput-root': {
-                            '&.Mui-focused fieldset': {
-                              borderColor: 'primary.main',
-                              borderWidth: 2
-                            }
-                          },
-                          '&:hover': {
-                            '& .MuiOutlinedInput-notchedOutline': {
-                              borderColor: 'primary.light',
-                            }
-                          }
-                        }}
-                      />
-                      <Box mt={1} display="flex" gap={1}>
-                        <Button 
-                          variant="contained" 
-                          color="primary" 
-                          size="small"
-                          onClick={() => {
-                            if (nota.valor && nota.valor.trim() !== '') {
-                              setNotaEditandoValor(null);
-                            } else {
-                              enqueueSnackbar('Informe o valor da nota', { variant: 'error' });
-                            }
+                      <Typography variant="subtitle2" gutterBottom>
+                        {nota.isScanned ? 'Digite a quantidade de volumes:' : 'Digite o valor da nota:'}
+                      </Typography>
+                      {nota.isScanned ? (
+                        <TextField
+                          label="Volumes"
+                          type="number"
+                          value={nota.volumes}
+                          onChange={(e) => {
+                            const valor = e.target.value;
+                            setNotas(prev => 
+                              prev.map(n => 
+                                n.id === nota.id ? { ...n, volumes: valor } : n
+                              )
+                            );
                           }}
-                        >
-                          OK
-                        </Button>
-                        <Button 
-                          variant="outlined" 
+                          autoFocus
                           size="small"
-                          onClick={() => handleRemoverNota(notas.findIndex(n => n.id === nota.id))}
+                          sx={{ maxWidth: '120px' }}
+                          inputProps={{
+                            min: 1,
+                            step: 1,
+                            inputMode: 'numeric',
+                            pattern: '[0-9]*',
+                            style: { textAlign: 'center' }
+                          }}
+                        />
+                      ) : (
+                        <TextField
+                          label="Volumes"
+                          type="number"
+                          value={nota.volumes}
+                          onChange={(e) => atualizarVolumesNota(nota.id, e.target.value)}
+                          autoFocus
+                          size="small"
+                          sx={{ maxWidth: '120px' }}
+                          inputProps={{
+                            min: 1,
+                            style: { textAlign: 'center' }
+                          }}
+                        />
+                      )}
+                      <Box mt={1} display="flex" gap={1}>
+                        <Button
+                          variant="contained"
+                          color="primary"
+                          size="small"
+                          onClick={() => handleSalvarNota(index)}
                         >
-                          Remover
+                          Salvar
+                        </Button>
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          onClick={() => setNotaEditandoValor(null)}
+                        >
+                          Cancelar
                         </Button>
                       </Box>
                     </Box>
                   ) : (
-                    <>
-                      <Typography 
-                        variant="body1" 
-                        color={!nota.valor ? 'error' : 'primary'} 
-                        fontWeight="medium"
+                    <Box>
+                      <Box 
                         onClick={() => setNotaEditandoValor(nota.id)}
                         sx={{
-                          cursor: 'pointer',
-                          '&:hover': {
-                            textDecoration: 'underline',
-                            textUnderlineOffset: '2px'
-                          },
                           display: 'flex',
                           alignItems: 'center',
-                          gap: 1
+                          gap: 1,
+                          cursor: 'pointer',
+                          '&:hover': { textDecoration: 'underline' },
+                          color: nota.isScanned ? 'primary.main' : 'inherit'
                         }}
                       >
-                        <span>Valor:</span>
-                        <span style={{ 
-                          padding: '2px 8px',
-                          borderRadius: '4px',
-                          backgroundColor: !nota.valor ? 'rgba(244, 67, 54, 0.1)' : 'rgba(25, 118, 210, 0.1)'
-                        }}>
-                          {nota.valor ? `R$ ${nota.valor}` : 'Clique para informar o valor'}
-                        </span>
-                      </Typography>
+                        <Typography variant="body2">
+                          {`${nota.volumes} ${parseInt(nota.volumes) === 1 ? 'volume' : 'volumes'}`}
+                        </Typography>
+                      </Box>
                       <Typography variant="caption" color="text.secondary" display="block" mt={0.5}>
                         {new Date(nota.dataHora).toLocaleString('pt-BR')}
                       </Typography>
-                    </>
+                    </Box>
                   )}
                 </Box>
                 <Box>

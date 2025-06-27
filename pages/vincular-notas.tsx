@@ -35,7 +35,7 @@ interface Nota {
   id: string;
   numeroNota: string;
   codigo: string;
-  valor: number;
+  volumes: string;
   controleId?: string;
 }
 
@@ -510,7 +510,7 @@ const VincularNotasPage = () => {
                     />
                     <ListItemText
                       primary={`Nota: ${nota.numeroNota}`}
-                      secondary={`Código: ${nota.codigo} | Valor: R$ ${nota.valor.toFixed(2)}`}
+                      secondary={`Código: ${nota.codigo} | Volumes: ${nota.volumes || '1'}`}
                     />
                     {nota.controleId && nota.controleId !== controleId && (
                       <Chip 

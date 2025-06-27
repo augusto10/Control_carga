@@ -1,13 +1,23 @@
 import { create } from 'zustand';
 import { useSnackbar } from 'notistack';
 
+export type ControleResumido = {
+  id: string;
+  numeroManifesto: string | null;
+  motorista: string;
+  responsavel: string;
+  transportadora: string;
+  dataCriacao: Date;
+};
+
 export type NotaFiscal = {
   id: string;
   dataCriacao: Date;
   codigo: string;
   numeroNota: string;
-  valor: number;
+  volumes: string;
   controleId: string | null;
+  controle?: ControleResumido | null;
 };
 
 export type Transportadora = {

@@ -8,7 +8,7 @@ const prisma = new PrismaClient();
 interface AddNotaRequest {
   codigo: string;
   numeroNota: string;
-  valor: number | string;
+  volumes: string;
 }
 
 export default async function handler(
@@ -43,7 +43,7 @@ export default async function handler(
 
   if (req.method === 'POST') {
     try {
-      const { codigo, numeroNota, valor } = req.body as Partial<AddNotaRequest>;
+      const { codigo, numeroNota, volumes } = req.body as Partial<AddNotaRequest>;
       
       // Validação dos campos obrigatórios
       if (!codigo?.trim()) {
@@ -53,9 +53,10 @@ export default async function handler(
         return res.status(400).json({ error: 'Número da nota é obrigatório' });
       }
 
-      // Converter valor para número
-      const numericValor = typeof valor === 'number' ? valor : 
-                         valor ? parseFloat(valor as string) || 0 : 0;
+      // Validar volumes
+      if (!volumes?.trim()) {
+        return res.status(400).json({ error: 'Quantidade de volumes é obrigatória' });
+      }
 
       // Verificar se a nota já existe
       const notaExistente = await prisma.notaFiscal.findFirst({
@@ -82,14 +83,14 @@ export default async function handler(
         data: {
           codigo: codigo.trim(),
           numeroNota: numeroNota.trim(),
-          valor: numericValor,
+          volumes: volumes.trim(),
           controleId: null
         },
         select: {
           id: true,
           codigo: true,
           numeroNota: true,
-          valor: true,
+          volumes: true,
           dataCriacao: true
         }
       });

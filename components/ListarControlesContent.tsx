@@ -43,7 +43,7 @@ interface Controle {
   transportadora: 'ACERT' | 'EXPRESSO_GOIAS';
   qtdPallets: number;
   observacao?: string;
-  notas: { id: string; numeroNota: string; codigo: string; valor: number }[];
+  notas: { id: string; numeroNota: string; codigo: string; volumes: string }[];
   finalizado: boolean;
 }
 
@@ -78,59 +78,104 @@ const ListarControlesContent: React.FC = () => {
       const existingBytes = await fetch('/templates/modelo-romaneio.pdf').then(res => res.arrayBuffer());
       const doc = await PDFDocument.load(existingBytes);
       const page = doc.getPage(0);
-      const { height } = page.getSize();
+      const { width, height } = page.getSize();
       const font = await doc.embedFont(StandardFonts.Helvetica);
-      const fontSize = 12;
-      const yStart = height - 140; // desloca 3 linhas (~40px) para baixo
+      const fontSize = 10; // Reduzindo o tamanho da fonte para 10
+      const lineHeight = 18; // Ajustando o espaçamento para a fonte menor
+      let yPos = height - 50;
 
-      page.drawText(`Nº Controle: ${numeroControle}`, {
-        x: 50,
-        y: yStart,
-        size: fontSize,
-        font,
+      // Cabeçalho
+      const dataAtual = new Date().toLocaleDateString('pt-BR');
+      const horaAtual = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+      
+      // Ajustando posição inicial mais para baixo
+      yPos -= lineHeight * 6; // Aumentado de 3 para 6 linhas (3 linhas a mais)
+      
+      // Linha 1
+      page.drawText(`Transportadora: ${controle.transportadora}`, { x: 50, y: yPos, size: fontSize, font });
+      page.drawText(`Usuário: ${controle.responsavel || '-'}`, { x: 250, y: yPos, size: fontSize, font });
+      
+      // Linha 2
+      yPos -= lineHeight * 1.5;
+      page.drawText(`Placa Veículo: -`, { x: 50, y: yPos, size: fontSize, font });
+      page.drawText(`Nome Motorista: ${controle.motorista || '-'}`, { x: 250, y: yPos, size: fontSize, font });
+      
+      // Linha 3
+      yPos -= lineHeight * 1.5;
+      page.drawText(`CPF Motorista: ${controle.cpfMotorista || '-'}`, { x: 50, y: yPos, size: fontSize, font });
+      page.drawText(`Horário: ${horaAtual}`, { x: 250, y: yPos, size: fontSize, font });
+      
+      // Linha 4
+      yPos -= lineHeight * 1.5;
+      page.drawText(`Quantidade de Pallets: ${controle.qtdPallets || '0'}`, { x: 50, y: yPos, size: fontSize, font });
+      page.drawText(`Data: ${dataAtual}`, { x: 250, y: yPos, size: fontSize, font });
+      
+      // Tabela de Notas
+      yPos -= lineHeight * 2; // Espaço antes da tabela
+      
+      // Cabeçalho da Tabela
+      const headerY = yPos;
+      const col1 = 50;   // Qtd
+      const col2 = 80;   // Nota Fiscal
+      const col3 = 150;  // Data
+      const col4 = 250;  // Volumes
+      
+      // Desenha linhas do cabeçalho
+      page.drawText('Qtd', { x: col1, y: headerY, size: fontSize, font, color: rgb(0, 0, 0) });
+      page.drawText('Nota Fiscal', { x: col2, y: headerY, size: fontSize, font, color: rgb(0, 0, 0) });
+      page.drawText('Data', { x: col3, y: headerY, size: fontSize, font, color: rgb(0, 0, 0) });
+      page.drawText('Volumes', { x: col4, y: headerY, size: fontSize, font, color: rgb(0, 0, 0) });
+      
+      // Linha divisória
+      yPos -= 5;
+      page.drawLine({
+        start: { x: 50, y: yPos },
+        end: { x: width - 50, y: yPos },
+        thickness: 1,
         color: rgb(0, 0, 0),
       });
-      page.drawText(`Motorista: ${controle.motorista}`, {
-        x: 50,
-        y: yStart - 20,
-        size: fontSize,
-        font,
+      
+      // Dados das notas
+      yPos -= 25;
+      let totalVolumes = 0;
+      
+      controle.notas.forEach((nota, index) => {
+        if (yPos < 100) {
+          // Se estiver chegando no final da página, cria uma nova página
+          page.drawText('Continua na próxima página...', { x: 50, y: 50, size: fontSize - 2, font, color: rgb(0.5, 0.5, 0.5) });
+          yPos = height - 50; // Volta para o topo da nova página
+        }
+        
+        const volumes = parseInt(nota.volumes) || 1;
+        totalVolumes += volumes;
+        const dataNota = nota.dataCriacao ? new Date(nota.dataCriacao).toLocaleDateString('pt-BR') : '-';
+        
+        page.drawText((index + 1).toString(), { x: col1, y: yPos, size: fontSize, font });
+        page.drawText(nota.numeroNota || '-', { x: col2, y: yPos, size: fontSize, font });
+        page.drawText(dataNota, { x: col3, y: yPos, size: fontSize, font });
+        page.drawText(volumes.toString(), { x: col4, y: yPos, size: fontSize, font });
+        
+        yPos -= lineHeight;
       });
-      page.drawText(`Responsável: ${controle.responsavel}`, {
-        x: 50,
-        y: yStart - 40,
-        size: fontSize,
-        font,
+      
+      // Totalizadores
+      yPos -= lineHeight;
+      page.drawLine({
+        start: { x: 50, y: yPos },
+        end: { x: width - 50, y: yPos },
+        thickness: 1,
+        color: rgb(0, 0, 0),
       });
-
-      // Lista de notas
-      let yPos = yStart - 80;
-      page.drawText('Notas:', { x: 50, y: yPos, size: fontSize, font });
-      yPos -= 20;
-      let totalValor = 0;
-      controle.notas.forEach((n, idx) => {
-        totalValor += n.valor;
-        page.drawText(`${idx + 1}. ${n.numeroNota} - R$ ${n.valor.toFixed(2)}`, {
-          x: 60,
-          y: yPos,
-          size: fontSize,
-          font,
-        });
-        yPos -= 20;
-      });
-      // Totais
-      page.drawText(`Quantidade de Notas: ${controle.notas.length}`, {
-        x: 50,
-        y: yPos - 10,
-        size: fontSize,
-        font,
-      });
-      page.drawText(`Valor Total: R$ ${totalValor.toFixed(2)}`, {
-        x: 300,
-        y: yPos - 10,
-        size: fontSize,
-        font,
-      });
+      
+      yPos -= lineHeight;
+      page.drawText('TOTAL:', { x: col2, y: yPos, size: fontSize, font, color: rgb(0, 0, 0) });
+      page.drawText(controle.notas.length.toString(), { x: col1, y: yPos, size: fontSize, font, color: rgb(0, 0, 0) });
+      page.drawText(totalVolumes.toString(), { x: col4, y: yPos, size: fontSize, font, color: rgb(0, 0, 0) });
+      
+      // Rodapé
+      yPos -= lineHeight * 2;
+      page.drawText(`Nº Controle: ${controle.numeroManifesto || '-'}`, { x: 50, y: yPos, size: fontSize - 1, font });
+      page.drawText(`Total de Volumes: ${totalVolumes}`, { x: 250, y: yPos, size: fontSize - 1, font });
 
       const pdfBytes = await doc.save();
       const blob = new Blob([pdfBytes], { type: 'application/pdf' });
@@ -227,7 +272,7 @@ const ListarControlesContent: React.FC = () => {
             <TableBody>
               {controles.map((controle, idx) => (
                 <TableRow key={controle.id} hover>
-                  <TableCell>{idx + 1}</TableCell>
+                  <TableCell>{controle.numeroManifesto || 'N/A'}</TableCell>
                   <TableCell>
                     {format(new Date(controle.dataCriacao), "dd/MM/yyyy HH:mm", { locale: ptBR })}
                   </TableCell>

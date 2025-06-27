@@ -145,9 +145,9 @@ const ConsultarNotas = () => {
             label="Status"
             size="small"
             value={filtros.status || 'TODAS'}
-            onChange={(e: React.ChangeEvent<HTMLSelectElement>) => 
-              setFiltros({ ...filtros, status: e.target.value as FiltrosNotas['status'] })
-            }
+            onChange={(e: any) => {
+              setFiltros({ ...filtros, status: e.target.value });
+            }}
             sx={{ minWidth: 150 }}
             SelectProps={{ native: true }}
           >
@@ -184,7 +184,7 @@ const ConsultarNotas = () => {
               <TableRow>
                 <TableCell>Número da Nota</TableCell>
                 <TableCell>Código</TableCell>
-                <TableCell align="right">Valor (R$)</TableCell>
+                <TableCell align="right">Volumes</TableCell>
                 <TableCell>Data de Criação</TableCell>
                 <TableCell>Status</TableCell>
                 <TableCell>Controle</TableCell>
@@ -209,10 +209,7 @@ const ConsultarNotas = () => {
                     <TableCell>{nota.numeroNota}</TableCell>
                     <TableCell>{nota.codigo}</TableCell>
                     <TableCell align="right">
-                      {new Intl.NumberFormat('pt-BR', {
-                        style: 'currency',
-                        currency: 'BRL'
-                      }).format(nota.valor || 0)}
+                      {nota.volumes || '1'}
                     </TableCell>
                     <TableCell>
                     {formatISO9075(new Date(nota.dataCriacao))}
@@ -234,12 +231,26 @@ const ConsultarNotas = () => {
                       )}
                     </TableCell>
                     <TableCell>
-                      {nota.controleId ? (
-                        <Chip 
-                          label={`#${nota.controleId.substring(0, 8)}`} 
-                          size="small"
-                          variant="outlined"
-                        />
+                      {nota.controle ? (
+                        <Tooltip 
+                          title={
+                            <>
+                              <div>Nº: {nota.controle.numeroManifesto || 'N/A'}</div>
+                              <div>Motorista: {nota.controle.motorista}</div>
+                              <div>Responsável: {nota.controle.responsavel}</div>
+                              <div>Transportadora: {nota.controle.transportadora}</div>
+                              <div>Data: {new Date(nota.controle.dataCriacao).toLocaleString()}</div>
+                            </>
+                          }
+                          arrow
+                        >
+                          <Chip 
+                            label={`${nota.controle.numeroManifesto || nota.controle.id.substring(0, 8)}`} 
+                            size="small"
+                            variant="outlined"
+                            sx={{ cursor: 'pointer' }}
+                          />
+                        </Tooltip>
                       ) : '-'}
                     </TableCell>
                   </TableRow>

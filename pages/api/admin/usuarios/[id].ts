@@ -1,26 +1,35 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getSession } from 'next-auth/react';
+import { verify } from 'jsonwebtoken';
+import { parseCookies } from 'nookies';
 import prisma from '../../../../lib/prisma';
 import { hash } from 'bcryptjs';
 
 const SALT_ROUNDS = 10;
+const JWT_SECRET = process.env.JWT_SECRET || 'seu_segredo_secreto';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  // Verificar autenticação e permissão
-  const session = await getSession({ req });
-  
-  // Verificar se o usuário está autenticado e tem um email
-  if (!session?.user?.email) {
+  // Verificar autenticação via cookie JWT
+  const cookies = parseCookies({ req });
+  const token = cookies.auth_token;
+
+  if (!token) {
     return res.status(401).json({ message: 'Não autorizado' });
   }
 
-  // Buscar o usuário atual pelo email da sessão
+  let decoded: any;
+  try {
+    decoded = verify(token, JWT_SECRET) as { id: string; tipo: string; email: string };
+  } catch (error) {
+    return res.status(401).json({ message: 'Token inválido ou expirado' });
+  }
+
+  // Buscar o usuário atual pelo ID do token
   const currentUser = await prisma.usuario.findUnique({
-    where: { email: session.user.email },
-    select: { id: true, tipo: true }
+    where: { id: decoded.id },
+    select: { id: true, tipo: true, ativo: true }
   });
 
-  if (!currentUser || currentUser.tipo !== 'ADMIN') {
+  if (!currentUser || currentUser.tipo !== 'ADMIN' || !currentUser.ativo) {
     return res.status(403).json({ message: 'Acesso negado. Permissão de administrador necessária.' });
   }
 
