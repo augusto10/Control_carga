@@ -145,9 +145,9 @@ const ConsultarNotas = () => {
             label="Status"
             size="small"
             value={filtros.status || 'TODAS'}
-            onChange={(e: React.ChangeEvent<HTMLSelectElement>) => 
-              setFiltros({ ...filtros, status: e.target.value as FiltrosNotas['status'] })
-            }
+            onChange={(e: any) => {
+              setFiltros({ ...filtros, status: e.target.value });
+            }}
             sx={{ minWidth: 150 }}
             SelectProps={{ native: true }}
           >
@@ -231,12 +231,26 @@ const ConsultarNotas = () => {
                       )}
                     </TableCell>
                     <TableCell>
-                      {nota.controleId ? (
-                        <Chip 
-                          label={`#${nota.controleId.substring(0, 8)}`} 
-                          size="small"
-                          variant="outlined"
-                        />
+                      {nota.controle ? (
+                        <Tooltip 
+                          title={
+                            <>
+                              <div>Nº: {nota.controle.numeroManifesto || 'N/A'}</div>
+                              <div>Motorista: {nota.controle.motorista}</div>
+                              <div>Responsável: {nota.controle.responsavel}</div>
+                              <div>Transportadora: {nota.controle.transportadora}</div>
+                              <div>Data: {new Date(nota.controle.dataCriacao).toLocaleString()}</div>
+                            </>
+                          }
+                          arrow
+                        >
+                          <Chip 
+                            label={`${nota.controle.numeroManifesto || nota.controle.id.substring(0, 8)}`} 
+                            size="small"
+                            variant="outlined"
+                            sx={{ cursor: 'pointer' }}
+                          />
+                        </Tooltip>
                       ) : '-'}
                     </TableCell>
                   </TableRow>
