@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
+import { SelectChangeEvent } from '@mui/material/Select';
 import {
   Container,
   Typography,
@@ -114,7 +115,10 @@ function GerenciarUsuariosContent() {
     setCurrentUsuario(null);
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | { name?: string; value: unknown }>) => {
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | { name?: string; value: unknown }> | 
+    SelectChangeEvent<TipoUsuario>
+  ) => {
     const { name, value } = e.target as { name: string; value: unknown };
     setCurrentUsuario(prev => ({
       ...prev!,
@@ -425,25 +429,25 @@ function GerenciarUsuariosContent() {
                   <MenuItem value="ADMIN">
                     <Box>
                       <Box fontWeight="medium">Administrador</Box>
-                      <Box variant="caption" color="text.secondary" fontSize="0.75rem">
+                      <Typography variant="caption" color="text.secondary" fontSize="0.75rem">
                         Acesso total ao sistema
-                      </Box>
+                      </Typography>
                     </Box>
                   </MenuItem>
                   <MenuItem value="GERENTE">
                     <Box>
                       <Box fontWeight="medium">Gerente</Box>
-                      <Box variant="caption" color="text.secondary" fontSize="0.75rem">
+                      <Typography variant="caption" color="text.secondary" fontSize="0.75rem">
                         Acesso a relatórios e gestão de operações
-                      </Box>
+                      </Typography>
                     </Box>
                   </MenuItem>
                   <MenuItem value="USUARIO">
                     <Box>
                       <Box fontWeight="medium">Usuário</Box>
-                      <Box variant="caption" color="text.secondary" fontSize="0.75rem">
+                      <Typography variant="caption" color="text.secondary" fontSize="0.75rem">
                         Acesso básico ao sistema
-                      </Box>
+                      </Typography>
                     </Box>
                   </MenuItem>
                 </Select>

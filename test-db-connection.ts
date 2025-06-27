@@ -1,6 +1,12 @@
 import { PrismaClient } from '@prisma/client';
 import dotenv from 'dotenv';
 
+// Interface para o erro do banco de dados
+interface DatabaseError extends Error {
+  code?: string;
+  message: string;
+}
+
 // Carrega as variáveis de ambiente do arquivo .env
 dotenv.config();
 
@@ -39,24 +45,27 @@ async function testConnection() {
     console.log('📊 Tabelas encontradas no banco de dados:');
     console.log(tables);
     
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('❌ Erro ao conectar ao banco de dados:');
     console.error(error);
     
+    // Converte o erro para o tipo DatabaseError
+    const dbError = error as DatabaseError;
+    
     // Detalhes adicionais sobre o erro
-    if (error.code === 'ENOTFOUND') {
+    if (dbError.code === 'ENOTFOUND') {
       console.error('\n🔴 Erro de DNS: Não foi possível resolver o endereço do servidor de banco de dados.');
       console.error('Verifique sua conexão com a internet e se o endereço do servidor está correto.');
-    } else if (error.code === 'ETIMEDOUT') {
+    } else if (dbError.code === 'ETIMEDOUT') {
       console.error('\n🔴 Tempo limite de conexão excedido.');
       console.error('O servidor de banco de dados pode estar inativo ou inacessível.');
-    } else if (error.code === '3D000') {
+    } else if (dbError.code === '3D000') {
       console.error('\n🔴 Banco de dados não encontrado.');
       console.error('Verifique se o nome do banco de dados está correto.');
-    } else if (error.code === '28P01') {
+    } else if (dbError.code === '28P01') {
       console.error('\n🔴 Falha na autenticação.');
       console.error('Verifique o nome de usuário e senha no arquivo .env');
-    } else if (error.code === 'ECONNREFUSED') {
+    } else if (dbError.code === 'ECONNREFUSED') {
       console.error('\n🔴 Conexão recusada pelo servidor.');
       console.error('Verifique se o servidor de banco de dados está em execução e acessível.');
     }

@@ -83,12 +83,12 @@ const VincularNotasPage = () => {
           const controle = controles.find(c => c.id === controleId);
           if (controle) {
             setControleEncontrado(true);
-            setMotorista(controle.motorista);
-            setCpfMotorista(controle.cpfMotorista);
-            setResponsavel(controle.responsavel);
-            setTransportadora(controle.transportadora);
-            setNumeroManifesto(controle.numeroManifesto);
-            setQtdPallets(controle.qtdPallets);
+            setMotorista(controle.motorista || '');
+            setCpfMotorista(controle.cpfMotorista || '');
+            setResponsavel(controle.responsavel || '');
+            setTransportadora(controle.transportadora || 'ACERT');
+            setNumeroManifesto(controle.numeroManifesto || '');
+            setQtdPallets(controle.qtdPallets || 0);
             setObservacao(controle.observacao || '');
             
             // Marca as notas já vinculadas como selecionadas
