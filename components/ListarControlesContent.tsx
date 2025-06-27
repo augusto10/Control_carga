@@ -43,7 +43,13 @@ interface Controle {
   transportadora: 'ACERT' | 'EXPRESSO_GOIAS';
   qtdPallets: number;
   observacao?: string;
-  notas: { id: string; numeroNota: string; codigo: string; volumes: string }[];
+  notas: { 
+    id: string; 
+    numeroNota: string; 
+    codigo: string; 
+    volumes: string;
+    dataCriacao?: Date;
+  }[];
   finalizado: boolean;
 }
 
