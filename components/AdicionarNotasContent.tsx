@@ -456,7 +456,8 @@ const AdicionarNotasContent: React.FC = () => {
 
     } catch (error) {
       console.error('Erro ao salvar notas:', error);
-      enqueueSnackbar(error.message || 'Erro ao salvar notas', { 
+      const errorMessage = error instanceof Error ? error.message : 'Erro ao salvar notas';
+      enqueueSnackbar(errorMessage, { 
         variant: 'error',
         autoHideDuration: 5000
       });
