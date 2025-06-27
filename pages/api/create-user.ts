@@ -3,7 +3,12 @@ import { hash } from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
-export default async function handler(req, res) {
+import { NextApiRequest, NextApiResponse } from 'next';
+
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
   if (req.method === 'POST') {
     try {
       const user = await prisma.usuario.create({
