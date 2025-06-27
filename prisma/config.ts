@@ -48,12 +48,17 @@ export interface ApiResponse<T> {
 }
 
 // Mapeamento dos modelos do Prisma
-export interface PrismaClientWithConfiguracaoSistema extends PrismaClient {
+export type PrismaClientWithConfiguracaoSistema = PrismaClient & {
   configuracaoSistema: {
-    create: (data: ConfiguracaoSistemaInput) => Promise<ConfiguracaoSistema>;
-    createMany: (data: { data: ConfiguracaoSistemaInput[] }) => Promise<ConfiguracaoSistema[]>;
-    count: () => Promise<number>;
+    findUnique: (args: { where: { id: string } | { chave: string } }) => Promise<ConfiguracaoSistema | null>;
     findMany: (args?: any) => Promise<ConfiguracaoSistema[]>;
-    update: (args: { where: { id: string }, data: Partial<ConfiguracaoSistemaInput> }) => Promise<ConfiguracaoSistema>;
+    create: (data: { data: ConfiguracaoSistemaInput }) => Promise<ConfiguracaoSistema>;
+    createMany: (args: { data: ConfiguracaoSistemaInput[] }) => Promise<{ count: number }>;
+    update: (args: { 
+      where: { id: string } | { chave: string }, 
+      data: { valor: string } 
+    }) => Promise<ConfiguracaoSistema>;
+    delete: (args: { where: { id: string } }) => Promise<ConfiguracaoSistema>;
+    count: (args?: any) => Promise<number>;
   };
-}
+};
