@@ -94,6 +94,7 @@ const CriarControleContent: React.FC = () => {
 
   const [formData, setFormData] = useState({
     motorista: 'PENDENTE',
+    cpfMotorista: '',
     transportadora: transportadoraPadrao?.id || 'ACERT',
     responsavel: 'PENDENTE',
     observacao: '',
