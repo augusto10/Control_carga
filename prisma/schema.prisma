@@ -6,6 +6,7 @@ datasource db {
   provider     = "postgresql"
   url          = env("DATABASE_URL")
   relationMode = "prisma"
+  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
 }
 
 model ControleCarga {
@@ -27,9 +28,9 @@ model NotaFiscal {
   dataCriacao DateTime       @default(now())
   codigo      String
   numeroNota  String
-  volumes     String        @default("1")
   controleId  String?
   usuarioId   String?
+  volumes     String         @default("1")
   controle    ControleCarga? @relation(fields: [controleId], references: [id])
   usuario     Usuario?       @relation(fields: [usuarioId], references: [id])
 }

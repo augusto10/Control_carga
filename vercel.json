@@ -3,7 +3,10 @@
   "builds": [
     {
       "src": "package.json",
-      "use": "@vercel/next"
+      "use": "@vercel/next",
+      "config": {
+        "includeFiles": ["prisma/schema.prisma"]
+      }
     }
   ],
   "build": {
@@ -14,10 +17,10 @@
   },
   "buildCommand": "npm install && npx prisma generate && npm run build",
   "installCommand": "npm install",
-  "routes": [
+  "rewrites": [
     {
-      "src": "/api/(.*)",
-      "dest": "/api/$1"
+      "source": "/(.*)",
+      "destination": "/"
     }
   ]
 }
