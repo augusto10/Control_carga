@@ -1,7 +1,5 @@
 {
   "version": 2,
-  "buildCommand": "npm install && npm run prisma:generate && npm run build",
-  "installCommand": "npm install",
   "builds": [
     {
       "src": "package.json",
@@ -11,9 +9,11 @@
   "build": {
     "env": {
       "PRISMA_GENERATE_DATAPROXY": "false",
-      "PRISMA_SKIP_POSTINSTALL_GENERATE": "true"
+      "PRISMA_SKIP_POSTINSTALL_GENERATE": "false"
     }
   },
+  "buildCommand": "npm install && npx prisma generate && npm run build",
+  "installCommand": "npm install",
   "routes": [
     {
       "src": "/api/(.*)",
