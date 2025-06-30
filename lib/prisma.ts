@@ -1,16 +1,24 @@
 import { PrismaClient } from '@prisma/client';
 
-declare global {
-  // eslint-disable-next-line no-var
-  var prisma: PrismaClient | undefined;
-}
+// Evita múltiplas instâncias do PrismaClient em desenvolvimento
+const globalForPrisma = global as unknown as {
+  prisma: PrismaClient | undefined;
+};
 
-const prisma: PrismaClient = global.prisma || new PrismaClient({
-  log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
+export const prisma = globalForPrisma.prisma ?? new PrismaClient({
+  log: process.env.NODE_ENV === 'development' 
+    ? ['query', 'error', 'warn'] 
+    : ['error'],
+  datasources: {
+    db: {
+      url: process.env.DATABASE_URL,
+    },
+  },
 });
 
-if (process.env.NODE_ENV === 'development') {
-  global.prisma = prisma;
+// Habilita o hot-reload em desenvolvimento
+if (process.env.NODE_ENV !== 'production') {
+  globalForPrisma.prisma = prisma;
 }
 
 export default prisma;

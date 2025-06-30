@@ -1,13 +1,8 @@
 import { compare } from 'bcryptjs';
 import { sign } from 'jsonwebtoken';
-import { PrismaClient } from '@prisma/client';
 import { NextApiRequest, NextApiResponse } from 'next';
 import { serialize } from 'cookie';
-
-// Inicialização do Prisma Client
-const prisma = new PrismaClient({
-  log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error']
-});
+import prisma from '../../../lib/prisma';
 
 // Constantes de configuração
 const JWT_SECRET = process.env.JWT_SECRET || 'seu_segredo_secreto';
@@ -96,6 +91,10 @@ const allowCors = (fn: any) => async (req: NextApiRequest, res: NextApiResponse)
 };
 
 const handler = async (req: LoginRequest, res: NextApiResponse) => {
+  // Log para depuração
+  console.log('=== INÍCIO DO HANDLER DE LOGIN ===');
+  console.log('Database URL:', process.env.DATABASE_URL ? '***CONFIGURADO***' : 'NÃO CONFIGURADO');
+  console.log('NODE_ENV:', process.env.NODE_ENV || 'development');
   console.log('=== INÍCIO DO HANDLER DE LOGIN ===');
   try {
     console.log('1. Recebida requisição de login');

@@ -6,6 +6,13 @@ const ALLOWED_ORIGINS = process.env.NODE_ENV === 'production'
   ? [
       'https://seu-dominio.com',
       'https://www.seu-dominio.com',
+      // Adiciona dinamicamente o domínio da Vercel se estiver disponível
+      ...(process.env.VERCEL_URL ? [
+        `https://${process.env.VERCEL_URL}`,
+        `https://${process.env.VERCEL_URL.replace('https://', '')}`
+      ] : []),
+      // Permite qualquer subdomínio da Vercel para desenvolvimento de preview
+      'https://*.vercel.app'
     ]
   : [
       'http://localhost:3000',
@@ -18,7 +25,14 @@ const ALLOWED_ORIGINS = process.env.NODE_ENV === 'production'
 
 // Domínios permitidos para cookies
 const ALLOWED_DOMAINS = process.env.NODE_ENV === 'production'
-  ? ['seu-dominio.com']
+  ? [
+      'seu-dominio.com',
+      // Adiciona o domínio da Vercel para cookies
+      ...(process.env.VERCEL_URL ? [
+        new URL(`https://${process.env.VERCEL_URL}`).hostname.replace('www.', '')
+      ] : []),
+      'vercel.app' // Permite cookies para todos os subdomínios da Vercel
+    ]
   : ['localhost', '127.0.0.1'];
 
 // Configurações de CORS
@@ -40,13 +54,15 @@ const CORS_HEADERS = {
 function isOriginAllowed(origin: string | null): boolean {
   if (!origin) return false;
   
-  // Em desenvolvimento, permite qualquer origem localhost
+  // Permite qualquer origem em desenvolvimento
   if (process.env.NODE_ENV !== 'production') {
     try {
       const originUrl = new URL(origin);
+      // Permite localhost e endereços IP locais
       if (originUrl.hostname === 'localhost' || 
           originUrl.hostname === '127.0.0.1' ||
-          originUrl.hostname.endsWith('.localhost')) {
+          originUrl.hostname.endsWith('.localhost') ||
+          originUrl.hostname.endsWith('.vercel.app')) { // Permite subdomínios da Vercel
         return true;
       }
     } catch (e) {
