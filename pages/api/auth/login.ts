@@ -2,7 +2,7 @@ import { compare } from 'bcryptjs';
 import { sign } from 'jsonwebtoken';
 import { NextApiRequest, NextApiResponse } from 'next';
 import { serialize } from 'cookie';
-import prisma from '../../../lib/prisma';
+import prisma from '@/lib/prisma';
 
 // Constantes de configuração
 const JWT_SECRET = process.env.JWT_SECRET || 'seu_segredo_secreto';
