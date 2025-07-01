@@ -25,6 +25,7 @@ import { useSnackbar } from 'notistack';
 import { Transportadora, NotaFiscal } from '@prisma/client';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { useAuth } from '../contexts/AuthContext';
 
 // Função para validar CPF
 function validarCPF(cpf: string): boolean {
@@ -56,6 +57,7 @@ function validarCPF(cpf: string): boolean {
 
 const CriarControleContent: React.FC = () => {
   const router = useRouter();
+  const { user } = useAuth();
   const { enqueueSnackbar } = useSnackbar();
   const { 
     transportadoras, 
@@ -85,7 +87,7 @@ const CriarControleContent: React.FC = () => {
   
   // Opções fixas de transportadoras
   const transportadorasFixas = [
-    { id: 'ACERT', nome: 'ACERT', descricao: 'ACERT' },
+    { id: 'ACCERT', nome: 'ACCERT', descricao: 'ACCERT' },
     { id: 'EXPRESSO_GOIAS', nome: 'EXPRESSO_GOIAS', descricao: 'EXPRESSO GOIÁS' }
   ];
 
@@ -95,12 +97,21 @@ const CriarControleContent: React.FC = () => {
   const [formData, setFormData] = useState({
     motorista: 'PENDENTE',
     cpfMotorista: '',
-    transportadora: transportadoraPadrao?.id || 'ACERT',
+    transportadora: transportadoraPadrao?.id || 'ACCERT',
     responsavel: 'PENDENTE',
     observacao: '',
     qtdPallets: 0,
   });
   
+  useEffect(() => {
+    if (user?.nome) {
+      setFormData(prev => ({
+        ...prev,
+        responsavel: user.nome
+      }));
+    }
+  }, [user]);
+
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [selectedNotas, setSelectedNotas] = useState<string[]>([]);
   
@@ -200,7 +211,7 @@ const CriarControleContent: React.FC = () => {
       const dadosControle: CriarControleDTO = {
         motorista: (formData.motorista || 'PENDENTE').trim(),
         responsavel: (formData.responsavel || 'PENDENTE').trim(),
-        transportadora: formData.transportadora as 'ACERT' | 'EXPRESSO_GOIAS',
+        transportadora: formData.transportadora as 'ACCERT' | 'EXPRESSO_GOIAS',
         qtdPallets: Number(formData.qtdPallets) || 0,
         observacao: formData.observacao?.trim(),
         notasIds: Array.isArray(selectedNotas) ? selectedNotas : []

@@ -1,4 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import { USER_TYPES } from '../types/auth-types';
 import { 
   Container, 
   Typography, 
@@ -12,30 +14,72 @@ import {
   IconButton,
   InputAdornment
 } from '@mui/material';
+import PhotoCamera from '@mui/icons-material/PhotoCamera';
 import { Person as PersonIcon, Edit as EditIcon, Check as CheckIcon, Close as CloseIcon } from '@mui/icons-material';
 import Layout from '../components/Layout';
 import ProtectedRoute from '../components/ProtectedRoute';
 
 const PerfilContent = () => {
+  const { user, isLoading } = useAuth();
   const [editMode, setEditMode] = useState(false);
   const [userData, setUserData] = useState({
-    nome: 'Usuário Teste',
-    email: 'usuario@exemplo.com',
-    telefone: '(11) 99999-9999',
-    cargo: 'Administrador',
-    dataCadastro: '15/06/2023'
+    nome: '',
+    email: '',
+    telefone: '',
+    cargo: '',
+    dataCadastro: '',
+    avatarUrl: ''
   });
 
+  const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  // Carrega dados do usuário quando disponíveis
+  useEffect(() => {
+    if (user) {
+      setUserData({
+        nome: user.nome || '',
+        email: user.email || '',
+        telefone: '', // Ajustar quando houver campo telefone no backend
+        cargo: user.tipo,
+        dataCadastro: new Date(user.dataCriacao).toLocaleDateString('pt-BR'),
+        avatarUrl: (user as any).avatarUrl || ''
+      });
+      // Se existe foto no usuário, define preview
+      if ((user as any).avatarUrl) {
+        setPreviewUrl((user as any).avatarUrl);
+      }
+    }
+  }, [user]);
+
   const handleEdit = () => {
-    setEditMode(true);
+    if (user?.tipo === USER_TYPES.ADMIN) {
+      setEditMode(true);
+    }
+  };
+
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedPhoto(file);
+      setPreviewUrl(URL.createObjectURL(file));
+    }
   };
 
   const handleSave = () => {
+    if (previewUrl) {
+      setUserData(prev => ({
+        ...prev,
+        avatarUrl: previewUrl
+      }));
+    }
     setEditMode(false);
-    // Aqui você pode adicionar a lógica para salvar as alterações
+    // TODO: Enviar as alterações (incluindo foto) para o backend
   };
 
   const handleCancel = () => {
+    setSelectedPhoto(null);
+    setPreviewUrl(null);
     setEditMode(false);
     // Aqui você pode reverter as alterações não salvas se necessário
   };
@@ -48,6 +92,17 @@ const PerfilContent = () => {
     }));
   };
 
+  // Se ainda carregando usuário, mostra loader simples
+  if (isLoading || !user) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="100vh">
+        <Typography variant="h6">Carregando...</Typography>
+      </Box>
+    );
+  }
+
+  const isAdmin = user.tipo === USER_TYPES.ADMIN;
+
   return (
     <Layout>
       <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
@@ -56,7 +111,7 @@ const PerfilContent = () => {
             <Typography variant="h5" component="h1">
               Meu Perfil
             </Typography>
-            {!editMode ? (
+            {isAdmin && !editMode ? (
               <Button 
                 variant="outlined" 
                 startIcon={<EditIcon />}
@@ -91,7 +146,15 @@ const PerfilContent = () => {
           
           <Grid container spacing={3}>
             <Grid item xs={12} md={4} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-              <Avatar 
+              <input
+                    type="file"
+                    accept="image/*"
+                    id="avatar-upload-input"
+                    hidden
+                    onChange={handlePhotoChange}
+                  />
+                  <Avatar 
+                src={previewUrl || userData.avatarUrl || undefined}
                 sx={{ 
                   width: 150, 
                   height: 150, 
@@ -102,12 +165,14 @@ const PerfilContent = () => {
               >
                 {userData.nome.charAt(0).toUpperCase()}
               </Avatar>
-              {editMode && (
+              {isAdmin && editMode && (
                 <Button 
                   variant="outlined" 
                   size="small"
-                  startIcon={<EditIcon />}
+                  startIcon={<PhotoCamera />}
                   sx={{ mt: 1 }}
+                  component="label"
+                  htmlFor="avatar-upload-input"
                 >
                   Alterar Foto
                 </Button>

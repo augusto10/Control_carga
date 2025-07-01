@@ -15,7 +15,7 @@ model ControleCarga {
   dataCriacao     DateTime       @default(now())
   motorista       String
   responsavel     String
-  transportadora  Transportadora @default(ACERT)
+  transportadora  Transportadora @default(ACCERT)
   numeroManifesto String?
   qtdPallets      Int            @default(0)
   observacao      String?
@@ -79,7 +79,8 @@ model ConfiguracaoSistema {
 }
 
 enum Transportadora {
-  ACERT
+  ACERT // valor legado (em desuso)
+  ACCERT
   EXPRESSO_GOIAS
 }
 
