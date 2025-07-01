@@ -2,6 +2,9 @@
   "name": "controle-carga-web",
   "version": "0.1.0",
   "private": true,
+  "prisma": {
+    "seed": "ts-node --compiler-options {\\\"module\\\":\\\"CommonJS\\\"} prisma/seed.ts"
+  },
   "scripts": {
     "dev": "node scripts/prisma/generate.js && next dev",
     "build": "node scripts/prisma/generate.js && next build",
@@ -18,7 +21,7 @@
     "@emotion/styled": "^11.14.0",
     "@mui/icons-material": "^5.17.1",
     "@mui/material": "^5.17.1",
-    "@prisma/client": "^6.10.0",
+    "@prisma/client": "^6.10.1",
     "@types/date-fns": "^2.5.3",
     "@types/js-cookie": "^3.0.6",
     "@types/react-redux": "^7.1.34",
@@ -52,6 +55,8 @@
     "@types/nookies": "^1.1.0",
     "@types/react": "^18.2.51",
     "@types/react-dom": "^18.2.18",
+    "dotenv": "^17.0.0",
+    "prisma": "^6.10.1",
     "ts-node": "^10.9.2",
     "typescript": "^5.8.3"
   }

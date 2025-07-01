@@ -5,7 +5,11 @@ const createApi = (): AxiosInstance => {
   // Define a URL base da API.
   // Se a variável de ambiente não estiver definida, usamos string vazia para
   // que as requisições sejam relativas ao mesmo host/porta do front-end.
-  const baseURL = process.env.NEXT_PUBLIC_API_URL || '';
+  let baseURL = process.env.NEXT_PUBLIC_API_URL || '';
+  // Remove /api do final da URL para evitar duplicação
+  if (baseURL.endsWith('/api')) {
+    baseURL = baseURL.slice(0, -4);
+  }
   const cleanBaseURL = baseURL.endsWith('/') ? baseURL.slice(0, -1) : baseURL;
   
   const instance = axios.create({

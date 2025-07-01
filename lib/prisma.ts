@@ -1,28 +1,23 @@
 import { PrismaClient } from '@prisma/client';
 
-// Log para depuração
-console.log('=== INICIALIZANDO PRISMA CLIENT ===');
-console.log('NODE_ENV:', process.env.NODE_ENV || 'development');
-console.log('DATABASE_URL:', process.env.DATABASE_URL ? '***CONFIGURADO***' : 'NÃO CONFIGURADO');
+// Adiciona o PrismaClient ao objeto global em desenvolvimento para evitar
+// esgotar o limite de conexões do banco de dados.
+// Saiba mais: https://pris.ly/d/help/next-js-best-practices
+
+const prismaClientSingleton = () => {
+  return new PrismaClient();
+};
 
 declare global {
   // eslint-disable-next-line no-var
-  var prisma: PrismaClient | undefined;
+  var prisma: undefined | ReturnType<typeof prismaClientSingleton>;
 }
 
-const prisma = global.prisma || new PrismaClient({
-  datasources: {
-    db: {
-      url: process.env.DATABASE_URL
-    }
-  },
-  log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error']
-});
-
-if (process.env.NODE_ENV !== 'production') {
-  global.prisma = prisma;
-}
-
-console.log('=== PRISMA CLIENT INICIALIZADO ===\n');
+const prisma = globalThis.prisma ?? prismaClientSingleton();
 
 export default prisma;
+
+if (process.env.NODE_ENV !== 'production') {
+  globalThis.prisma = prisma;
+}
+

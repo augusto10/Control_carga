@@ -162,11 +162,9 @@ export default function Login() {
               </Button>
               
               <Box sx={{ textAlign: 'center', mt: 2 }}>
-                <NextLink href="/esqueci-senha" passHref>
-                  <Link variant="body2">
-                    Esqueceu sua senha?
-                  </Link>
-                </NextLink>
+                <Link component={NextLink} href="/esqueci-senha" variant="body2">
+  Esqueceu sua senha?
+</Link>
               </Box>
             </Box>
           </Paper>
