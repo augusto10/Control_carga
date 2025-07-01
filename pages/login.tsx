@@ -14,6 +14,7 @@ import {
   InputAdornment,
   CircularProgress
 } from '@mui/material';
+import { useSnackbar } from 'notistack';
 import { Visibility, VisibilityOff } from '@mui/icons-material';
 import Head from 'next/head';
 import NextLink from 'next/link';
@@ -25,6 +26,7 @@ export default function Login() {
     senha: ''
   });
   const [error, setError] = useState<string | null>(null);
+  const { enqueueSnackbar } = useSnackbar();
   const { login, isLoading, isAuthenticated } = useAuth();
   const router = useRouter();
 
@@ -62,12 +64,24 @@ export default function Login() {
     try {
       console.log('Chamando a função login...');
       await login(formData);
-      console.log('Login realizado com sucesso!');
+      enqueueSnackbar('Login efetuado com sucesso!', { variant: 'success' });
     } catch (err: any) {
       console.error('Erro durante o login:', err);
-      const errorMessage = err.response?.data?.message || err.message || 'Erro ao fazer login. Verifique suas credenciais.';
-      console.log('Mensagem de erro:', errorMessage);
-      setError(errorMessage);
+      const rawMessage = err.response?.data?.message || err.message || 'Erro ao fazer login. Verifique suas credenciais.';
+      let friendlyMessage = rawMessage;
+      const lower = rawMessage.toLowerCase();
+      if (lower.includes('não encontrado')) {
+        friendlyMessage = 'Usuário não existe. Por favor, cadastre-se.';
+      } else if (
+        lower.includes('senha') ||
+        lower.includes('credenciais') ||
+        lower.includes('incorreta') ||
+        lower.includes('invalid')
+      ) {
+        friendlyMessage = 'Usuário ou senha inválida.';
+      }
+      enqueueSnackbar(friendlyMessage, { variant: 'error' });
+      setError(friendlyMessage);
     }
   };
 
