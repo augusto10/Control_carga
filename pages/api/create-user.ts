@@ -22,7 +22,7 @@ export default async function handler(
       });
       res.status(200).json(user);
     } catch (error) {
-      res.status(500).json({ error: 'User creation failed' });
+      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
     }
   } else {
     res.status(405).end();
