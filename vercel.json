@@ -1,23 +1,26 @@
 {
   "version": 2,
-  "buildCommand": "npm install && npm run prisma:generate && npm run build",
-  "installCommand": "npm install",
   "builds": [
     {
       "src": "package.json",
-      "use": "@vercel/next"
+      "use": "@vercel/next",
+      "config": {
+        "includeFiles": ["prisma/schema.prisma"]
+      }
     }
   ],
   "build": {
     "env": {
       "PRISMA_GENERATE_DATAPROXY": "false",
-      "PRISMA_SKIP_POSTINSTALL_GENERATE": "true"
+      "PRISMA_SKIP_POSTINSTALL_GENERATE": "false"
     }
   },
-  "routes": [
+  "buildCommand": "npm install && npx prisma generate && npm run build",
+  "installCommand": "npm install",
+  "rewrites": [
     {
-      "src": "/api/(.*)",
-      "dest": "/api/$1"
+      "source": "/(.*)",
+      "destination": "/"
     }
   ]
 }

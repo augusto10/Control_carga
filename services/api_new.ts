@@ -4,7 +4,11 @@ import Cookies from 'js-cookie';
 // Cria uma instância do Axios com configurações padrão
 const createApi = (): AxiosInstance => {
   // Remove a barra final da URL base, se existir
-  const baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+  let baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+  // Remove /api do final da URL para evitar duplicação
+  if (baseURL.endsWith('/api')) {
+    baseURL = baseURL.slice(0, -4);
+  }
   const cleanBaseURL = baseURL.endsWith('/') ? baseURL.slice(0, -1) : baseURL;
   
   const instance = axios.create({

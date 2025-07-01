@@ -19,18 +19,12 @@ const nextDirExists = fs.existsSync(nextDir);
 // Verifica se o diretório do Prisma Client existe
 const prismaClientExists = fs.existsSync(prismaClientDir);
 
-// Se estivermos em produção ou se o Prisma Client não existir, geramos ele
-if (isProduction || !prismaClientExists) {
-  console.log('🚀 Gerando Prisma Client...');
-  try {
-    // Gera o Prisma Client
-    execSync('npx prisma generate', { stdio: 'inherit' });
-    
-    console.log('✅ Prisma Client gerado com sucesso!');
-  } catch (error) {
-    console.error('❌ Erro ao gerar o Prisma Client:', error);
-    process.exit(1);
-  }
-} else {
-  console.log('ℹ️  Prisma Client já está gerado. Pulando geração.');
+// Sempre gere o Prisma Client para evitar versões desatualizadas (ex.: Data Proxy vs Engine local)
+console.log('🚀 Gerando Prisma Client...');
+try {
+  execSync('npx prisma generate', { stdio: 'inherit' });
+  console.log('✅ Prisma Client gerado com sucesso!');
+} catch (error) {
+  console.error('❌ Erro ao gerar o Prisma Client:', error);
+  process.exit(1);
 }
