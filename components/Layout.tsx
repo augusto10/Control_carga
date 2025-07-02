@@ -27,7 +27,6 @@ import {
 } from '@mui/material';
 import {
   Menu as MenuIcon,
-  Dashboard as DashboardIcon,
   Receipt as ReceiptIcon,
   PlaylistAdd as PlaylistAddIcon,
   ListAlt as ListAltIcon,
@@ -444,7 +443,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
               {user?.tipo === 'ADMIN' && (
                 <MenuItem onClick={() => router.push('/admin')}>
                   <ListItemIcon>
-                    <DashboardIcon fontSize="small" />
+                    fontSize="small" />
                   </ListItemIcon>
                   Painel Admin
                 </MenuItem>

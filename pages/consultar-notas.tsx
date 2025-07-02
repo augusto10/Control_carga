@@ -22,7 +22,7 @@ import { Search, FilterList, Refresh } from '@mui/icons-material';
 import { useStore } from '../store/store';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { formatISO9075 } from 'date-fns/formatISO9075';
+import formatISO9075 from 'date-fns/formatISO9075';
 
 
 interface FiltrosNotas {

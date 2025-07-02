@@ -25,6 +25,7 @@ import {
   Dashboard as DashboardIcon,
   People as PeopleIcon,
   Assignment as AssignmentIcon,
+  LocalShipping as LocalShippingIcon,
   ExitToApp as ExitToAppIcon,
   AccountCircle as AccountCircleIcon,
   ChevronLeft as ChevronLeftIcon,
@@ -52,6 +53,7 @@ export default function AdminLayout({ children, title }: AdminLayoutProps) {
   const menuItems = [
     { text: 'Dashboard', icon: <DashboardIcon />, path: '/admin' },
     { text: 'Usuários', icon: <PeopleIcon />, path: '/admin/usuarios' },
+    { text: 'Motoristas', icon: <LocalShippingIcon />, path: '/admin/motoristas' },
     { text: 'Controles', icon: <AssignmentIcon />, path: '/admin/controles' },
     { text: 'Configurações', icon: <SettingsIcon />, path: '/admin/configuracoes' },
   ];
