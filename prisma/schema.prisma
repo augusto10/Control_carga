@@ -78,6 +78,19 @@ model ConfiguracaoSistema {
   @@index([chave])
 }
 
+
+model Motorista {
+  id             String         @id @default(uuid())
+  dataCriacao    DateTime       @default(now())
+  nome           String
+  telefone       String
+  cpf            String         @unique
+  cnh            String
+  transportadoraId Transportadora
+}
+
+
+
 enum Transportadora {
   ACERT // valor legado (em desuso)
   ACCERT

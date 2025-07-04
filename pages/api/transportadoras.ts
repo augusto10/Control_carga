@@ -1,5 +1,4 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getSession } from 'next-auth/react';
 
 // Definindo o tipo Transportadora baseado no enum do Prisma
 type Transportadora = {
@@ -15,18 +14,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    // Verifica a sessão do usuário
-    const session = await getSession({ req });
-    
-    if (!session) {
-      return res.status(401).json({ error: 'Não autorizado' });
-    }
-
     // Retorna as opções do enum Transportadora
     const transportadoras: Transportadora[] = [
       {
-        id: 'ACERT',
-        nome: 'ACERT',
+        id: 'ACCERT',
+        nome: 'ACCERT',
         descricao: 'ACERT Transportes',
       },
       {
