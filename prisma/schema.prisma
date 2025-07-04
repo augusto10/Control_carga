@@ -1,5 +1,5 @@
 generator client {
-  provider = "prisma-client-js"
+  provider   = "prisma-client-js"
   engineType = "binary"
 }
 
@@ -7,95 +7,126 @@ datasource db {
   provider     = "postgresql"
   url          = env("DATABASE_URL")
   relationMode = "prisma"
-  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
+}
+
+// NextAuth Models
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  tipo          TipoUsuario @default(USUARIO)
+  accounts      Account[]
+  sessions      Session[]
+  checklists    ForkliftChecklist[]
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// Application Models
+
+model NotaFiscal {
+  id              String        @id @default(uuid())
+  numeroNota      String
+  codigo          String        @unique
+  emitente        String
+  destinatario    String
+  valor           Float
+  peso            Float
+  status          String        @default("Disponível")
+  dataCriacao     DateTime      @default(now())
+  dataAtualizacao DateTime      @updatedAt
+  controleId      String?
+  controle        ControleCarga? @relation(fields: [controleId], references: [id], onDelete: SetNull)
+
+  @@index([controleId])
 }
 
 model ControleCarga {
-  id              String         @id @default(uuid())
-  dataCriacao     DateTime       @default(now())
-  motorista       String
-  responsavel     String
-  transportadora  Transportadora @default(ACCERT)
-  numeroManifesto String?
-  qtdPallets      Int            @default(0)
-  observacao      String?
-  finalizado      Boolean        @default(false)
-  cpfMotorista    String         @default("PENDENTE")
-  notas           NotaFiscal[]
+  id                String        @id @default(uuid())
+  numeroManifesto   Int           @unique @default(autoincrement())
+  motorista         String
+  cpfMotorista      String?
+  transportadora    Transportadora
+  responsavel       String
+  qtdPallets        Int
+  observacao        String?
+  finalizado        Boolean       @default(false)
+  dataCriacao       DateTime      @default(now())
+  dataAtualizacao   DateTime      @updatedAt
+  notas             NotaFiscal[]
+  assinaturas       Assinatura[]
 }
 
-model NotaFiscal {
-  id          String         @id @default(uuid())
-  dataCriacao DateTime       @default(now())
-  codigo      String
-  numeroNota  String
-  controleId  String?
-  usuarioId   String?
-  volumes     String         @default("1")
-  controle    ControleCarga? @relation(fields: [controleId], references: [id])
-  usuario     Usuario?       @relation(fields: [usuarioId], references: [id])
+model Assinatura {
+  id                String           @id @default(uuid())
+  tipo              String
+  data              DateTime         @default(now())
+  imagemBase64      String?          @db.Text
+  statusAssinatura  StatusAssinatura @default(PENDENTE)
+  dataAtualizacao   DateTime         @updatedAt
+  controleId        String
+  controle          ControleCarga    @relation(fields: [controleId], references: [id], onDelete: Cascade)
+
+  @@index([controleId])
 }
 
-model Usuario {
-  id               String            @id @default(uuid())
-  nome             String
-  email            String            @unique
-  senha            String
-  tipo             TipoUsuario       @default(USUARIO)
-  ativo            Boolean           @default(true)
-  dataCriacao      DateTime          @default(now())
-  ultimoAcesso     DateTime?
-  notas            NotaFiscal[]
-  auditoriasAcesso AuditoriaAcesso[]
-}
-
-model AuditoriaAcesso {
-  id        String   @id @default(uuid())
-  usuarioId String
-  acao      String
-  descricao String?
-  ip        String?
-  userAgent String?
-  dataHora  DateTime @default(now())
-  usuario   Usuario  @relation(fields: [usuarioId], references: [id])
+model ForkliftChecklist {
+  id                 String   @id @default(uuid())
+  data               DateTime @default(now())
+  empilhadeiraNumero String
+  turno              String
+  operadorNome       String
+  horimetroInicial   Float
+  horimetroFinal     Float?
+  itens              Json
+  observacoesGeras   String?  @db.Text
+  usuarioId          String
+  usuario            User     @relation(fields: [usuarioId], references: [id])
 
   @@index([usuarioId])
-  @@index([dataHora])
-  @@map("auditoria_acesso")
-}
-
-model ConfiguracaoSistema {
-  id              String   @id @default(uuid())
-  chave           String   @unique
-  valor           String
-  descricao       String?
-  tipo            String   @default("string")
-  opcoes          String?
-  editavel        Boolean  @default(true)
-  dataCriacao     DateTime @default(now())
-  dataAtualizacao DateTime @updatedAt
-
-  @@index([chave])
 }
 
 
-model Motorista {
-  id             String         @id @default(uuid())
-  dataCriacao    DateTime       @default(now())
-  nome           String
-  telefone       String
-  cpf            String         @unique
-  cnh            String
-  transportadoraId Transportadora
-}
-
-
-
-enum Transportadora {
-  ACERT // valor legado (em desuso)
-  ACCERT
-  EXPRESSO_GOIAS
-}
+// Enums
 
 enum TipoUsuario {
   ADMIN
@@ -103,4 +134,15 @@ enum TipoUsuario {
   USUARIO
   FUNCIONARIO
   CLIENTE
+}
+
+enum Transportadora {
+  ACCERT
+  EXPRESSO_GOIAS
+}
+
+enum StatusAssinatura {
+  PENDENTE
+  CONCLUIDA
+  REJEITADA
 }

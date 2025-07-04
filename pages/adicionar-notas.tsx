@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { Box, CircularProgress } from '@mui/material';
 import dynamic from 'next/dynamic';
-import { useAuth } from '../contexts/AuthContext';
+import { useSession } from 'next-auth/react';
 import { USER_TYPES } from '../types/auth-types';
 import ProtectedRoute from '../components/ProtectedRoute';
 
@@ -21,10 +21,10 @@ const AdicionarNotasContent = dynamic(
 
 const AdicionarNotasPage = () => {
   const router = useRouter();
-  const { isAuthenticated, isLoading } = useAuth();
+  const { status, data: session } = useSession();
 
   // Se estiver carregando, mostra um loader
-  if (isLoading) {
+  if (status === 'loading') {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
         <CircularProgress />

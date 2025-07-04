@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { useAuth } from '../contexts/AuthContext';
+import { useSession } from 'next-auth/react';
 import { Box, CircularProgress } from '@mui/material';
 import dynamic from 'next/dynamic';
 
@@ -11,21 +11,21 @@ const ListarControlesContent = dynamic(
 );
 
 const ListarControlesPage = () => {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { status, data: session } = useSession();
   const router = useRouter();
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
   useEffect(() => {
-    if (isLoading) return;
+    if (status === 'loading') return;
     
-    if (!isAuthenticated) {
+    if (status !== 'authenticated') {
       router.push('/login');
     } else {
       setIsCheckingAuth(false);
     }
-  }, [isAuthenticated, isLoading, router]);
+  }, [status, router]);
 
-  if (isLoading || isCheckingAuth) {
+  if (status === 'loading' || isCheckingAuth) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
         <CircularProgress />

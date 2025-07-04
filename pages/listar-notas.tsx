@@ -1,9 +1,32 @@
 import { useState, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/router';
 import { Button, Container, Typography, Box, List, ListItem, ListItemText, CircularProgress, Chip, TextField } from '@mui/material';
 import { useStore } from '../store/store';
 import { format } from 'date-fns';
 
 const ListarNotas = () => {
+  const { data: session, status } = useSession();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.replace('/login');
+    }
+  }, [status, router]);
+
+  if (status === 'loading') {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (status !== 'authenticated') {
+    return null;
+  }
+
   const [loading, setLoading] = useState(true);
   const [start, setStart] = useState('');
   const [end, setEnd] = useState('');

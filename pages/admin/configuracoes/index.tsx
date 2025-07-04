@@ -19,7 +19,7 @@ import {
   Switch
 } from '@mui/material';
 import { Save as SaveIcon } from '@mui/icons-material';
-import { useAuth } from '../../../contexts/AuthContext';
+import { useSession } from 'next-auth/react';
 import AdminRoute from '../../../components/admin/AdminRoute';
 import { api } from '@/services/api';
 
@@ -33,7 +33,7 @@ interface ConfiguracoesSistema {
 }
 
 function ConfiguracoesContent() {
-  const { user } = useAuth();
+  const { data: session } = useSession();
   const [configuracoes, setConfiguracoes] = useState<ConfiguracoesSistema[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);

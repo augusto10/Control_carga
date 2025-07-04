@@ -18,14 +18,15 @@ import {
   ListItem,
   ListItemText,
   Checkbox,
-  CircularProgress
+  CircularProgress,
+  Autocomplete
 } from '@mui/material';
 import { useRouter } from 'next/router';
 import { useSnackbar } from 'notistack';
-import { Transportadora, NotaFiscal } from '@prisma/client';
+import { Transportadora, NotaFiscal, Motorista } from '@prisma/client';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { useAuth } from '../contexts/AuthContext';
+import { useSession } from 'next-auth/react';
 
 // Função para validar CPF
 function validarCPF(cpf: string): boolean {
@@ -57,7 +58,7 @@ function validarCPF(cpf: string): boolean {
 
 const CriarControleContent: React.FC = () => {
   const router = useRouter();
-  const { user } = useAuth();
+  const { data: session } = useSession();
   const { enqueueSnackbar } = useSnackbar();
   const { 
     transportadoras, 
@@ -74,17 +75,42 @@ const CriarControleContent: React.FC = () => {
     fetchNotas: state.fetchNotas,
     notas: state.notas
   }));
-  
+
   const [isLoading, setIsLoading] = useState<{
     transportadoras: boolean;
     notas: boolean;
     submit: boolean;
+    motoristas: boolean;
   }>({
     transportadoras: false,
     notas: false,
-    submit: false
+    submit: false,
+    motoristas: false
   });
-  
+
+  // Estado para motoristas
+  const [motoristas, setMotoristas] = useState<Motorista[]>([]);
+
+  // Carrega motoristas ao montar o componente
+  useEffect(() => {
+    const carregarMotoristas = async () => {
+      try {
+        setIsLoading(prev => ({ ...prev, motoristas: true }));
+        const res = await fetch('/api/motoristas', { credentials: 'include' });
+        if (res.ok) {
+          const data: Motorista[] = await res.json();
+          setMotoristas(data);
+        }
+      } catch (err) {
+        console.error('Erro ao carregar motoristas:', err);
+      } finally {
+        setIsLoading(prev => ({ ...prev, motoristas: false }));
+      }
+    };
+
+    carregarMotoristas();
+  }, []);
+
   // Opções fixas de transportadoras
   const transportadorasFixas = [
     { id: 'ACCERT', nome: 'ACCERT', descricao: 'ACCERT' },
@@ -95,7 +121,7 @@ const CriarControleContent: React.FC = () => {
   const transportadoraPadrao = transportadorasFixas.find(t => t.id === 'ACERT');
 
   const [formData, setFormData] = useState({
-    motorista: 'PENDENTE',
+    motorista: null as Motorista | null,
     cpfMotorista: '',
     transportadora: transportadoraPadrao?.id || 'ACCERT',
     responsavel: 'PENDENTE',
@@ -104,13 +130,13 @@ const CriarControleContent: React.FC = () => {
   });
   
   useEffect(() => {
-    if (user?.nome) {
+    if (session?.user?.nome) {
       setFormData(prev => ({
         ...prev,
-        responsavel: user.nome
+        responsavel: session.user.nome
       }));
     }
-  }, [user]);
+  }, [session?.user]);
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [selectedNotas, setSelectedNotas] = useState<string[]>([]);
@@ -177,17 +203,23 @@ const CriarControleContent: React.FC = () => {
       
       // Validação dos campos
       const newErrors: Record<string, string> = {};
-      
+
       if (!formData.transportadora) {
         newErrors.transportadora = 'Transportadora é obrigatória';
       }
       
-      if (!formData.motorista?.trim()) {
-        newErrors.motorista = 'Nome do motorista é obrigatório';
+      if (!formData.motorista) {
+        newErrors.motorista = 'Motorista é obrigatório';
       }
       
       if (!formData.responsavel?.trim()) {
         newErrors.responsavel = 'Nome do responsável é obrigatório';
+      }
+
+      if (!formData.cpfMotorista?.trim()) {
+        newErrors.cpfMotorista = 'CPF do motorista é obrigatório';
+      } else if (!validarCPF(formData.cpfMotorista)) {
+        newErrors.cpfMotorista = 'CPF inválido';
       }
       
       if (formData.qtdPallets <= 0) {
@@ -209,7 +241,8 @@ const CriarControleContent: React.FC = () => {
       
       // Garante que todos os campos obrigatórios tenham valores válidos
       const dadosControle: CriarControleDTO = {
-        motorista: (formData.motorista || 'PENDENTE').trim(),
+        motorista: formData.motorista?.nome || 'PENDENTE',
+        cpfMotorista: formData.motorista?.cpf || '',
         responsavel: (formData.responsavel || 'PENDENTE').trim(),
         transportadora: formData.transportadora as 'ACCERT' | 'EXPRESSO_GOIAS',
         qtdPallets: Number(formData.qtdPallets) || 0,
@@ -219,16 +252,8 @@ const CriarControleContent: React.FC = () => {
       
       console.log('Dados do controle formatados para envio:', JSON.stringify(dadosControle, null, 2));
       
-      console.log('Dados do controle formatados para envio:', JSON.stringify(dadosControle, null, 2));
-      
-      console.log('Dados do controle antes do envio:', JSON.stringify(dadosControle, null, 2));
-      
-      console.log('[CriarControle] Dados do controle a serem enviados:', dadosControle);
-      
       // Chama a função para criar o controle
       const controleCriado = await criarControle(dadosControle);
-      
-      console.log('[CriarControle] Controle criado com sucesso:', controleCriado);
       
       // Exibe mensagem de sucesso e redireciona
       enqueueSnackbar('Controle criado com sucesso!', { 
@@ -266,12 +291,11 @@ const CriarControleContent: React.FC = () => {
       });
       
     } finally {
-      // Desativa o estado de carregamento independentemente do resultado
       setIsLoading(prev => ({ ...prev, submit: false }));
     }
   };
 
-  if (isLoading.transportadoras || isLoading.notas) {
+  if (isLoading.transportadoras || isLoading.notas || isLoading.motoristas) {
     return (
       <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
         <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
@@ -282,169 +306,170 @@ const CriarControleContent: React.FC = () => {
   }
 
   return (
-    <Container maxWidth="md" sx={{ mt: 4, mb: 4 }}>
-      <Paper elevation={3} sx={{ p: 4 }}>
-        <Typography variant="h5" component="h1" gutterBottom>
-          Criar Novo Controle de Carga
-        </Typography>
-        
-        <Box component="form" onSubmit={handleSubmit} sx={{ mt: 3 }}>
-          <Typography variant="h6" gutterBottom sx={{ mt: 2, mb: 2 }}>
-            Dados do Motorista
+    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+      <Typography variant="h5" gutterBottom>
+        Criar Controle de Carga
+      </Typography>
+
+      <form onSubmit={handleSubmit}>
+        <FormControl fullWidth margin="normal">
+          <Autocomplete
+            options={motoristas}
+            getOptionLabel={(option) => option.nome}
+            value={formData.motorista || null}
+            onChange={(event, newValue) => {
+              setFormData(prev => ({
+                ...prev,
+                motorista: newValue || null,
+                cpfMotorista: newValue?.cpf || ''
+              }));
+              if (errors.motorista) {
+                setErrors(prev => ({
+                  ...prev,
+                  motorista: ''
+                }));
+              }
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="Motorista"
+                error={!!errors.motorista}
+                helperText={errors.motorista}
+                disabled={isLoading.submit || isLoading.motoristas}
+                margin="normal"
+                required
+              />
+            )}
+            disabled={isLoading.submit || isLoading.motoristas}
+          />
+        </FormControl>
+
+        <FormControl fullWidth margin="normal">
+          <TextField
+            label="CPF do Motorista"
+            name="cpfMotorista"
+            value={formData.cpfMotorista}
+            onChange={handleChange}
+            disabled={isLoading.submit || formData.motorista}
+            error={!!errors.cpfMotorista}
+            helperText={errors.cpfMotorista}
+            margin="normal"
+            required
+          />
+        </FormControl>
+
+        <FormControl fullWidth margin="normal">
+          <InputLabel>Transportadora</InputLabel>
+          <Select
+            name="transportadora"
+            value={formData.transportadora}
+            onChange={handleChange}
+            disabled={isLoading.submit}
+          >
+            <MenuItem value="ACCERT">ACCERT</MenuItem>
+            <MenuItem value="EXPRESSO_GOIAS">EXPRESSO GOIÁS</MenuItem>
+          </Select>
+          {errors.transportadora && <FormHelperText error>{errors.transportadora}</FormHelperText>}
+        </FormControl>
+
+        <FormControl fullWidth margin="normal">
+          <TextField
+            label="Responsável"
+            name="responsavel"
+            value={formData.responsavel}
+            onChange={handleChange}
+            disabled={isLoading.submit}
+            error={!!errors.responsavel}
+            helperText={errors.responsavel}
+            margin="normal"
+            required
+          />
+        </FormControl>
+
+        <FormControl fullWidth margin="normal">
+          <TextField
+            label="Quantidade de Pallets"
+            name="qtdPallets"
+            type="number"
+            value={formData.qtdPallets}
+            onChange={handleChange}
+            disabled={isLoading.submit}
+            error={!!errors.qtdPallets}
+            helperText={errors.qtdPallets}
+            margin="normal"
+            required
+          />
+        </FormControl>
+
+        <FormControl fullWidth margin="normal">
+          <TextField
+            label="Observações"
+            name="observacao"
+            value={formData.observacao}
+            onChange={handleChange}
+            multiline
+            rows={3}
+            disabled={isLoading.submit}
+            margin="normal"
+          />
+        </FormControl>
+
+        <FormControl fullWidth margin="normal">
+          <Typography variant="subtitle1" gutterBottom>
+            Selecione as notas fiscais
           </Typography>
-          
-          <Box display="grid" gridTemplateColumns="repeat(auto-fill, minmax(300px, 1fr))" gap={2}>
-            <TextField
-              fullWidth
-              label="Responsável"
-              name="responsavel"
-              value={formData.responsavel}
-              onChange={handleChange}
-              error={!!errors.responsavel}
-              helperText={errors.responsavel}
-              margin="normal"
-              required
-            />
-            
-            <TextField
-              fullWidth
-              label="Motorista"
-              name="motorista"
-              value={formData.motorista}
-              onChange={handleChange}
-              error={!!errors.motorista}
-              helperText={errors.motorista}
-              margin="normal"
-              required
-            />
-            
-            <TextField
-              fullWidth
-              label="CPF do Motorista"
-              name="cpfMotorista"
-              value={formData.cpfMotorista}
-              onChange={handleChange}
-              error={!!errors.cpfMotorista}
-              helperText={errors.cpfMotorista || "Apenas números"}
-              margin="normal"
-              required
-            />
-            
-            <FormControl fullWidth error={!!errors.transportadora}>
-              <InputLabel id="transportadora-label">Transportadora</InputLabel>
-              <Select
-                labelId="transportadora-label"
-                id="transportadora"
-                name="transportadora"
-                value={formData.transportadora}
-                onChange={handleChange}
-                label="Transportadora"
-              >
-                {transportadorasFixas.map((t) => (
-                  <MenuItem key={t.id} value={t.id}>
-                    {t.descricao}
-                  </MenuItem>
-                ))}
-              </Select>
-              {errors.transportadora && (
-                <FormHelperText>{errors.transportadora}</FormHelperText>
-              )}
-            </FormControl>
-            
-            <TextField
-              fullWidth
-              label="Quantidade de Pallets"
-              name="qtdPallets"
-              type="number"
-              value={formData.qtdPallets}
-              onChange={(e) => setFormData({...formData, qtdPallets: parseInt(e.target.value) || 0})}
-              error={!!errors.qtdPallets}
-              helperText={errors.qtdPallets}
-              margin="normal"
-              inputProps={{ min: 1 }}
-              required
-            />
-            
-            <TextField
-              fullWidth
-              label="Observações"
-              name="observacao"
-              value={formData.observacao}
-              onChange={handleChange}
-              margin="normal"
-              multiline
-              rows={4}
-            />
-          </Box>
-          <Typography variant="h6" gutterBottom sx={{ mt: 2, mb: 2 }}>
-            Notas Fiscais
-          </Typography>
-          {notasDisponiveis.length === 0 ? (
-            <Typography variant="body2" color="textSecondary" sx={{ fontStyle: 'italic' }}>
-              Nenhuma nota fiscal disponível para vincular.
-            </Typography>
-          ) : (
-            <List dense sx={{ maxHeight: 300, overflow: 'auto' }}>
-              {notasNaoVinculadas.map((nota) => (
-                <ListItem 
-                  key={nota.id}
-                  button 
-                  onClick={() => {
-                    setSelectedNotas(prev => 
-                      prev.includes(nota.id)
-                        ? prev.filter(id => id !== nota.id)
-                        : [...prev, nota.id]
-                    );
-                  }}
-                  sx={{
-                    '&:hover': { backgroundColor: 'action.hover' },
-                    backgroundColor: selectedNotas.includes(nota.id) ? 'action.selected' : 'transparent',
-                    borderRadius: 1,
-                    mb: 0.5
-                  }}
-                >
+          <List>
+            {notasNaoVinculadas.map((nota) => (
+              <ListItem
+                key={nota.id}
+                secondaryAction={
                   <Checkbox
-                    edge="start"
+                    edge="end"
                     checked={selectedNotas.includes(nota.id)}
-                    tabIndex={-1}
-                    disableRipple
-                    inputProps={{ 'aria-labelledby': `nota-${nota.id}` }}
+                    onChange={(event) => {
+                      const newValue = event.target.checked
+                        ? [...selectedNotas, nota.id]
+                        : selectedNotas.filter(id => id !== nota.id);
+                      setSelectedNotas(newValue);
+                    }}
                   />
-                  <ListItemText 
-                    id={`nota-${nota.id}`}
-                    primary={`Nota ${nota.numeroNota} - ${nota.volumes} volume${parseInt(nota.volumes) !== 1 ? 's' : ''}`}
-                    secondary={`Código: ${nota.codigo} • Data: ${format(new Date(nota.dataCriacao), "dd/MM/yyyy HH:mm", { locale: ptBR })}`}
-                  />
-                </ListItem>
-              ))}
-            </List>
-          )}
-            
-          {selectedNotas.length > 0 && (
-            <Typography variant="body2" color="textSecondary" sx={{ mt: 1, fontStyle: 'italic' }}>
-              {selectedNotas.length} nota(s) selecionada(s)
-            </Typography>
-          )}
-          <Box sx={{ mt: 4, display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
-            <Button 
-              variant="outlined" 
-              onClick={() => router.push('/')}
-              disabled={isLoading.transportadoras || isLoading.notas}
-            >
-              Cancelar
-            </Button>
-            <Button
-              type="submit"
-              variant="contained"
-              color="primary"
-              disabled={isLoading.submit}
-              startIcon={isLoading.submit ? <CircularProgress size={20} /> : null}
-            >
-              {isLoading.submit ? 'Salvando...' : 'Criar Controle'}
-            </Button>
-          </Box>
+                }
+              >
+                <ListItemText
+                  primary={`${nota.numeroNota} - ${format(nota.dataCriacao, 'dd/MM/yyyy', { locale: ptBR })}`}
+                  secondary={nota.codigo}
+                />
+              </ListItem>
+            ))}
+          </List>
+        </FormControl>
+
+        {selectedNotas.length > 0 && (
+          <Typography variant="body2" color="textSecondary" sx={{ mt: 1, fontStyle: 'italic' }}>
+            {selectedNotas.length} nota(s) selecionada(s)
+          </Typography>
+        )}
+
+        <Box sx={{ mt: 4, display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
+          <Button 
+            variant="outlined" 
+            onClick={() => router.push('/')}
+            disabled={isLoading.transportadoras || isLoading.notas || isLoading.motoristas}
+          >
+            Cancelar
+          </Button>
+          <Button
+            type="submit"
+            variant="contained"
+            color="primary"
+            disabled={isLoading.submit}
+            startIcon={isLoading.submit ? <CircularProgress size={20} /> : null}
+          >
+            {isLoading.submit ? 'Salvando...' : 'Criar Controle'}
+          </Button>
         </Box>
-      </Paper>
+      </form>
     </Container>
   );
 };

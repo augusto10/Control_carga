@@ -1,6 +1,6 @@
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
-import { useAuth } from '../../contexts/AuthContext';
+import { useSession } from 'next-auth/react';
 import CircularProgress from '@mui/material/CircularProgress';
 import Box from '@mui/material/Box';
 import { USER_TYPES } from '../../types/auth-types';
@@ -10,37 +10,30 @@ interface AdminRouteProps {
 }
 
 export default function AdminRoute({ children }: AdminRouteProps) {
-  const { user, isAuthenticated, isLoading } = useAuth();
+  const { status, data: session } = useSession();
   const router = useRouter();
   const [isChecking, setIsChecking] = useState(true);
 
   useEffect(() => {
-    // Se ainda está carregando, não faz nada
-    if (isLoading) return;
+    if (status === 'loading') return;
 
-    // Se não está autenticado, redireciona para o login
-    if (!isAuthenticated) {
-      console.log('[AdminRoute] Usuário não autenticado, redirecionando para login...');
+    if (status !== 'authenticated') {
       router.push('/login');
       return;
     }
 
-    // Se está autenticado, verifica se é administrador
-    if (user) {
-      const isAdmin = user.tipo === USER_TYPES.ADMIN;
+    if (session?.user) {
+      const isAdmin = session.user.tipo === USER_TYPES.ADMIN;
       if (!isAdmin) {
-        console.log('[AdminRoute] Acesso negado: usuário não é administrador');
         router.push('/acesso-negado');
         return;
       }
     }
 
-    // Se chegou até aqui, está tudo ok
     setIsChecking(false);
-  }, [isLoading, isAuthenticated, user, router]);
+  }, [status, session, router]);
 
-  // Mostra um loader enquanto verifica a autenticação
-  if (isLoading || isChecking) {
+  if (status === 'loading' || isChecking) {
     return (
       <Box 
         display="flex" 
@@ -54,7 +47,7 @@ export default function AdminRoute({ children }: AdminRouteProps) {
   }
 
   // Se o usuário está autenticado e é administrador, renderiza os filhos
-  if (isAuthenticated && user?.tipo === USER_TYPES.ADMIN) {
+  if (status === 'authenticated' && session?.user?.tipo === USER_TYPES.ADMIN) {
     return <>{children}</>;
   }
 

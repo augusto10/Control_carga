@@ -1,51 +1,68 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { useAuth } from '../contexts/AuthContext';
-import { styled, useTheme, Theme, CSSObject } from '@mui/material/styles';
+
+import { useSession, signOut } from 'next-auth/react';
 import { 
-  Box, 
-  Drawer, 
-  List, 
-  Divider, 
-  IconButton, 
-  ListItem, 
-  ListItemButton, 
-  ListItemIcon, 
-  ListItemText, 
-  Typography,
+  Drawer,
   Toolbar,
-  AppBar as MuiAppBar,
-  AppBarProps,
-  useMediaQuery,
-  Collapse,
-  alpha,
-  Tooltip,
-  Avatar,
+  List,
+  Typography,
+  Divider,
+  IconButton,
+  Badge,
+  Box,
   Button,
-  Menu,
-  MenuItem
+  ListItem,
+  ListItemIcon,
+  ListItemText,
+  Collapse,
+  Paper,
+  styled,
+  alpha,
+  useTheme,
+  CSSObject,
+  Avatar,
+  Tooltip,
+  AppBar as AppBarMaterial,
+  Theme,
+  ListItemButton,
+  Menu as MenuMaterial,
+  MenuItem as MenuItemMaterial,
+  useMediaQuery
 } from '@mui/material';
-import {
-  Menu as MenuIcon,
-  Receipt as ReceiptIcon,
-  PlaylistAdd as PlaylistAddIcon,
-  ListAlt as ListAltIcon,
-  ChevronLeft as ChevronLeftIcon,
-  ChevronRight as ChevronRightIcon,
-  Home as HomeIcon,
-  Search as SearchIcon,
-  Link as LinkIcon,
-  ExpandLess,
-  ExpandMore,
-  Person as PersonIcon,
-  LocalShipping as TruckIcon,
-  Assessment as ReportIcon,
-  Logout as LogoutIcon
-} from '@mui/icons-material';
+import PersonIcon from '@mui/icons-material/Person';
+import FireTruckIcon from '@mui/icons-material/FireTruck';
+import AddIcon from '@mui/icons-material/Add';
+import HomeIcon from '@mui/icons-material/Home';
+import Menu from '@mui/icons-material/Menu';
+import ChevronLeft from '@mui/icons-material/ChevronLeft';
+import ChevronRight from '@mui/icons-material/ChevronRight';
+import ExpandLess from '@mui/icons-material/ExpandLess';
+import ExpandMore from '@mui/icons-material/ExpandMore';
+import Settings from '@mui/icons-material/Settings';
+import PlaylistAdd from '@mui/icons-material/PlaylistAdd';
+import ListAlt from '@mui/icons-material/ListAlt';
+import Search from '@mui/icons-material/Search';
+import Assessment from '@mui/icons-material/Assessment';
+import LogoutIcon from '@mui/icons-material/Logout';
+import PlaylistAddCheck from '@mui/icons-material/PlaylistAddCheck';
+import { motion } from 'framer-motion';
+import { theme } from '../theme';
 import Link from 'next/link';
 import Image from 'next/image';
 
-const drawerWidth = 260;
+interface MenuItem {
+  text: string;
+  icon: React.ReactElement;
+  path: string;
+  exact?: boolean;
+}
+
+interface LayoutProps {
+  children: React.ReactNode;
+}
+
+const drawerWidth = 280;
 
 // Estilos para o menu expandido
 const openedMixin = (theme: Theme): CSSObject => ({
@@ -55,8 +72,8 @@ const openedMixin = (theme: Theme): CSSObject => ({
     duration: theme.transitions.duration.enteringScreen,
   }),
   overflowX: 'hidden',
-  backgroundColor: theme.palette.background.paper,
-  boxShadow: theme.shadows[3],
+  backgroundColor: theme.palette.primary.main,
+  color: theme.palette.primary.contrastText,
 });
 
 // Estilos para o menu recolhido
@@ -70,36 +87,29 @@ const closedMixin = (theme: Theme): CSSObject => ({
   [theme.breakpoints.up('sm')]: {
     width: `calc(${theme.spacing(8)} + 1px)`,
   },
-  backgroundColor: theme.palette.background.paper,
-  boxShadow: theme.shadows[3],
+  backgroundColor: theme.palette.primary.dark,
+  color: theme.palette.primary.contrastText,
 });
 
-const DrawerHeader = styled('div')(({ theme }) => ({
+const DrawerHeader = styled('div')(({ theme }: Theme) => ({
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'space-between',
-  padding: theme.spacing(0, 1.5),
+  padding: theme.spacing(0, 1),
   ...theme.mixins.toolbar,
-  borderBottom: `1px solid ${theme.palette.divider}`,
-  backgroundColor: theme.palette.primary.main,
-  color: theme.palette.primary.contrastText,
+  backgroundColor: alpha(theme.palette.primary.main, 0.9),
 }));
 
-interface AppBarPropsExtended extends AppBarProps {
-  open?: boolean;
-}
-
-const AppBar = styled(MuiAppBar, {
+const AppBar = styled(AppBarMaterial, {
   shouldForwardProp: (prop) => prop !== 'open',
-})<AppBarPropsExtended>(({ theme, open }) => ({
+})<{ open?: boolean }>(({ theme, open }) => ({
   zIndex: theme.zIndex.drawer + 1,
   transition: theme.transitions.create(['width', 'margin'], {
     easing: theme.transitions.easing.sharp,
     duration: theme.transitions.duration.leavingScreen,
   }),
-  backgroundColor: theme.palette.primary.main,
-  color: theme.palette.primary.contrastText,
-  boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+  backgroundColor: theme.palette.primary.light,
+  boxShadow: '0 2px 4px -1px rgb(0 0 0 / 0.2)',
   ...(open && {
     marginLeft: drawerWidth,
     width: `calc(100% - ${drawerWidth}px)`,
@@ -110,408 +120,321 @@ const AppBar = styled(MuiAppBar, {
   }),
 }));
 
-const StyledDrawer = styled(Drawer, {
-  shouldForwardProp: (prop) => prop !== 'open',
-})<{ open?: boolean }>(({ theme, open = false }) => ({
-  width: drawerWidth,
-  flexShrink: 0,
-  whiteSpace: 'nowrap',
-  '& .MuiDrawer-paper': {
-    position: 'relative',
-    whiteSpace: 'nowrap',
+const StyledDrawer = styled(Drawer, { shouldForwardProp: (prop) => prop !== 'open' })(
+  ({ theme, open }) => ({
     width: drawerWidth,
-    transition: theme.transitions.create('width', {
-      easing: theme.transitions.easing.sharp,
-      duration: theme.transitions.duration.enteringScreen,
+    flexShrink: 0,
+    whiteSpace: 'nowrap',
+    boxSizing: 'border-box',
+    '& .MuiDrawer-paper': {
+      width: drawerWidth,
+      boxSizing: 'border-box',
+    },
+    ...(open && {
+      ...openedMixin(theme),
+      '& .MuiDrawer-paper': openedMixin(theme),
     }),
-    borderRight: 'none',
-    ...(open ? openedMixin(theme) : closedMixin(theme)),
-  },
-}));
+    ...(!open && {
+      ...closedMixin(theme),
+      '& .MuiDrawer-paper': closedMixin(theme),
+    }),
+  }),
+);
 
-const MenuItemButton = styled(ListItemButton)(({ theme }) => ({
-  minHeight: 48,
-  borderRadius: theme.shape.borderRadius,
-  margin: theme.spacing(0.5, 1.5),
-  padding: theme.spacing(1, 2),
-  '&:hover': {
-    backgroundColor: alpha(theme.palette.primary.main, 0.1),
-  },
-  '&.active': {
-    backgroundColor: alpha(theme.palette.primary.main, 0.15),
-    '& .MuiListItemIcon-root': {
-      color: theme.palette.primary.main,
-    },
-    '& .MuiListItemText-primary': {
-      fontWeight: 600,
-      color: theme.palette.primary.main,
-    },
-  },
-}));
-
-const SubMenuItemButton = styled(MenuItemButton)(({ theme }) => ({
-  paddingLeft: theme.spacing(4),
-  minHeight: 40,
-  margin: theme.spacing(0.2, 1.5),
-  '&.active': {
-    backgroundColor: alpha(theme.palette.primary.main, 0.1),
-    '& .MuiListItemIcon-root': {
-      color: theme.palette.primary.main,
-    },
-  },
-}));
-
-const menuItems = [
-  { 
-    text: 'Início', 
-    icon: <HomeIcon />, 
-    path: '/',
-    exact: true
-  },
-  { 
-    text: 'Notas', 
-    icon: <ReceiptIcon />,
-    subItems: [
-      { 
-        text: 'Adicionar Notas', 
-        icon: <PlaylistAddIcon fontSize="small" />, 
-        path: '/adicionar-notas' 
-      },
-      { 
-        text: 'Consultar Notas', 
-        icon: <SearchIcon fontSize="small" />, 
-        path: '/consultar-notas' 
-      },
-
-    ]
-  },
-  { 
-    text: 'Controles', 
-    icon: <TruckIcon />,
-    subItems: [
-      { 
-        text: 'Criar Controle', 
-        icon: <PlaylistAddIcon fontSize="small" />, 
-        path: '/criar-controle' 
-      },
-      { 
-        text: 'Listar Controles', 
-        icon: <ListAltIcon fontSize="small" />, 
-        path: '/listar-controles' 
-      },
-    ]
-  },
-  { 
-    text: 'Relatórios', 
-    icon: <ReportIcon />,
-    path: '/relatorios'
-  },
-  { 
-    text: 'Perfil', 
-    icon: <PersonIcon />,
-    path: '/perfil'
-  },
-];
-
-const Layout = ({ children }: { children: React.ReactNode }) => {
+const Layout: React.FC<LayoutProps> = ({ children }: LayoutProps) => {
   const theme = useTheme();
-  const { user, logout } = useAuth();
-  const router = useRouter();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [open, setOpen] = useState(!isMobile);
-  const [openSubmenus, setOpenSubmenus] = useState<Record<string, boolean>>({});
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const menuOpen = Boolean(anchorEl);
+  const router = useRouter();
+  const { data: session, status } = useSession();
 
-  const handleMenuClick = (event: React.MouseEvent<HTMLElement>) => {
-    setAnchorEl(event.currentTarget);
-  };
-
-  const handleMenuClose = () => {
-    setAnchorEl(null);
-  };
-
-  const handleLogout = async () => {
-    handleMenuClose();
-    await logout();
-    router.push('/login');
-  };
-
-  // Inicializa os submenus abertos com base na rota atual
-  useEffect(() => {
-    const initialSubmenus: Record<string, boolean> = {};
-    menuItems.forEach((item) => {
-      if (item.subItems) {
-        const isActive = item.subItems.some(subItem => 
-          router.pathname === subItem.path || 
-          (subItem.path !== '/' && router.pathname.startsWith(subItem.path))
-        );
-        if (isActive) {
-          initialSubmenus[item.text] = true;
-        }
-      }
-    });
-    setOpenSubmenus(initialSubmenus);
-  }, [router.pathname]);
-
-  const toggleDrawer = () => {
+  const handleDrawerToggle = () => {
     setOpen(!open);
   };
 
-  const toggleSubmenu = (itemText: string) => {
-    setOpenSubmenus(prev => ({
-      ...prev,
-      [itemText]: !prev[itemText]
-    }));
+  const handleLogout = () => {
+    signOut({ callbackUrl: '/login' });
   };
 
-  const isActive = (path: string, exact = false) => {
-    return exact 
-      ? router.pathname === path
-      : router.pathname.startsWith(path);
+  const handleMenu = (event: React.MouseEvent<HTMLElement>) => {
+    setAnchorEl(event.currentTarget);
   };
 
-  const renderMenuItem = (item: any, isSubmenu = false) => {
-    const active = isActive(item.path, item.exact);
-    const hasSubItems = !!item.subItems;
-    const isSubmenuOpen = openSubmenus[item.text] || false;
-
-    const buttonProps = {
-      component: 'div',
-      className: active ? 'active' : '',
-      onClick: hasSubItems 
-        ? () => toggleSubmenu(item.text)
-        : () => {},
-    };
-
-    const content = (
-      <>
-        <ListItemIcon 
-          sx={{ 
-            minWidth: 0, 
-            mr: open ? 2 : 'auto',
-            justifyContent: 'center',
-            color: active ? 'primary.main' : 'text.secondary',
-          }}
-        >
-          {item.icon}
-        </ListItemIcon>
-        <ListItemText 
-          primary={item.text} 
-          primaryTypographyProps={{
-            fontWeight: active ? 600 : 'normal',
-            color: active ? 'text.primary' : 'text.secondary',
-          }} 
-          sx={{ opacity: open ? 1 : 0 }} 
-        />
-        {hasSubItems && open && (
-          isSubmenuOpen ? <ExpandLess /> : <ExpandMore />
-        )}
-      </>
-    );
-
-    const ButtonComponent = isSubmenu ? SubMenuItemButton : MenuItemButton;
-
-    if (hasSubItems) {
-      return (
-        <div key={item.text}>
-          <ButtonComponent {...buttonProps}>
-            {content}
-          </ButtonComponent>
-          <Collapse in={isSubmenuOpen} timeout="auto" unmountOnExit>
-            <List component="div" disablePadding>
-              {item.subItems.map((subItem: any) => (
-                <Link href={subItem.path} key={subItem.path} passHref>
-                  <SubMenuItemButton 
-                    className={isActive(subItem.path, true) ? 'active' : ''}
-                  >
-                    <ListItemIcon sx={{ minWidth: 0, mr: 2, justifyContent: 'center' }}>
-                      {subItem.icon}
-                    </ListItemIcon>
-                    <ListItemText 
-                      primary={subItem.text} 
-                      primaryTypographyProps={{
-                        fontSize: '0.9rem',
-                        color: isActive(subItem.path, true) ? 'primary.main' : 'text.secondary',
-                      }}
-                      sx={{ opacity: open ? 1 : 0 }} 
-                    />
-                  </SubMenuItemButton>
-                </Link>
-              ))}
-            </List>
-          </Collapse>
-        </div>
-      );
-    }
-
-    return (
-      <Link href={item.path} key={item.path} passHref>
-        <ButtonComponent className={active ? 'active' : ''}>
-          {content}
-        </ButtonComponent>
-      </Link>
-    );
+  const handleClose = () => {
+    setAnchorEl(null);
   };
 
+  const handleMenuItemClick = (path: string) => {
+    router.push(path);
+    if (isMobile) handleDrawerToggle();
+  };
+
+  const menuItems: MenuItem[] = [
+    { 
+      text: 'Início', 
+      icon: <HomeIcon sx={{ color: 'inherit' }} />,
+      path: '/',
+      exact: true 
+    },
+    { 
+      text: 'Adicionar Notas', 
+      icon: <AddIcon sx={{ color: 'inherit' }} />,
+      path: '/adicionar-notas',
+      exact: false 
+    },
+    { 
+      text: 'Consultar Notas', 
+      icon: <ListAlt sx={{ color: 'inherit' }} />,
+      path: '/listar-notas',
+      exact: false 
+    },
+    { 
+      text: 'Criar Controle', 
+      icon: <PlaylistAdd sx={{ color: 'inherit' }} />,
+      path: '/criar-controle',
+      exact: false 
+    },
+    { 
+      text: 'Listar Controles', 
+      icon: <FireTruckIcon sx={{ color: 'inherit' }} />,
+      path: '/listar-controles',
+      exact: false 
+    },
+    { 
+      text: 'Configurações', 
+      icon: <Settings sx={{ color: 'inherit' }} />,
+      path: '/configuracoes',
+      exact: true 
+    },
+  ];
+  // Fim do array de menuItems, iniciar retorno do componente
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh' }}>
-      <AppBar position="fixed" open={open} elevation={0}>
-        {/* Adicionado elevation={0} para remover a sombra padrão do AppBar */}
+      <AppBarMaterial position="fixed">
         <Toolbar>
           <IconButton
             color="inherit"
             aria-label="open drawer"
-            onClick={toggleDrawer}
+            onClick={handleDrawerToggle}
             edge="start"
-            sx={{
-              marginRight: 2,
-              color: 'text.primary',
-            }}
+            sx={{ mr: 2, ...(open && { display: 'none' }) }}
           >
-            <MenuIcon />
+            <Menu />
           </IconButton>
-          <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center' }}>
-            <Typography variant="h6" noWrap component="div" sx={{ color: 'text.primary' }}>
+          <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
+            <motion.span
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+            >
               Controle de Carga
-            </Typography>
-          </Box>
+            </motion.span>
+          </Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Button
-              onClick={handleMenuClick}
-              size="small"
-              sx={{ ml: 2, textTransform: 'none' }}
-              aria-controls={menuOpen ? 'user-menu' : undefined}
-              aria-haspopup="true"
-              aria-expanded={menuOpen ? 'true' : undefined}
-              startIcon={
-                <Avatar sx={{ width: 32, height: 32, bgcolor: 'primary.main' }}>
-                  {user?.nome?.charAt(0).toUpperCase() || <PersonIcon />}
-                </Avatar>
-              }
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.5 }}
             >
-              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', mr: 1 }}>
-                <Typography variant="subtitle2" color="text.primary" noWrap>
-                  {user?.nome || 'Usuário'}
-                </Typography>
-                <Typography variant="caption" color="text.secondary" noWrap>
-                  {user?.tipo || 'Nível de Acesso'}
-                </Typography>
-              </Box>
-            </Button>
-            <Menu
-              anchorEl={anchorEl}
-              id="user-menu"
-              open={menuOpen}
-              onClose={handleMenuClose}
-              onClick={handleMenuClose}
-              PaperProps={{
-                elevation: 3,
-                sx: {
-                  overflow: 'visible',
-                  filter: 'drop-shadow(0px 2px 8px rgba(0,0,0,0.32))',
-                  mt: 1.5,
-                  '& .MuiAvatar-root': {
-                    width: 32,
-                    height: 32,
-                    ml: -0.5,
-                    mr: 1,
-                  },
-                  '&:before': {
-                    content: '""',
-                    display: 'block',
-                    position: 'absolute',
-                    top: 0,
-                    right: 14,
-                    width: 10,
-                    height: 10,
-                    bgcolor: 'background.paper',
-                    transform: 'translateY(-50%) rotate(45deg)',
-                    zIndex: 0,
-                  },
-                },
-              }}
-              transformOrigin={{ horizontal: 'right', vertical: 'top' }}
-              anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+              <IconButton color="inherit" sx={{ borderRadius: '12px' }}>
+                <Search />
+              </IconButton>
+            </motion.div>
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.5, delay: 0.1 }}
             >
-              <MenuItem onClick={() => router.push('/perfil')}>
-                <ListItemIcon>
-                  <PersonIcon fontSize="small" />
-                </ListItemIcon>
-                Meu Perfil
-              </MenuItem>
-              {user?.tipo === 'ADMIN' && (
-                <MenuItem onClick={() => router.push('/admin')}>
-                  <ListItemIcon>
-                    fontSize="small" />
-                  </ListItemIcon>
-                  Painel Admin
-                </MenuItem>
-              )}
-              <Divider />
-              <MenuItem onClick={handleLogout}>
-                <ListItemIcon>
-                  <LogoutIcon fontSize="small" />
-                </ListItemIcon>
-                Sair
-              </MenuItem>
-            </Menu>
+              <IconButton color="inherit" sx={{ borderRadius: '12px' }}>
+                <Assessment />
+              </IconButton>
+            </motion.div>
+            {status === 'authenticated' ? (
+              <>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Avatar sx={{ width: 32, height: 32, bgcolor: theme.palette.primary.main }}>
+                    {session?.user?.nome ? session.user.nome[0].toUpperCase() : (session?.user?.name ? session.user.name[0].toUpperCase() : <PersonIcon />)}
+                  </Avatar>
+                  <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                    {session?.user?.nome || session?.user?.name}
+                  </Typography>
+                </Box>
+                <motion.div
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.5, delay: 0.2 }}
+                >
+                  <IconButton color="inherit" onClick={handleMenu} sx={{ borderRadius: '12px' }}>
+                    <PersonIcon />
+                  </IconButton>
+                </motion.div>
+                <MenuMaterial
+                  anchorEl={anchorEl}
+                  open={Boolean(anchorEl)}
+                  onClose={handleClose}
+                  PaperProps={{
+                    sx: {
+                      borderRadius: '12px',
+                      boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
+                    },
+                  }}
+                >
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5 }}
+                  >
+                    <MenuItemMaterial onClick={() => { router.push('/perfil'); handleClose(); }} sx={{ borderRadius: '12px' }}>
+                      <ListItemIcon>
+                        <PersonIcon sx={{ color: theme.palette.primary.main }} />
+                      </ListItemIcon>
+                      <ListItemText primary="Perfil" />
+                    </MenuItemMaterial>
+                    {session?.user?.tipo === 'ADMIN' && (
+                      <MenuItemMaterial onClick={() => { router.push('/admin'); handleClose(); }} sx={{ borderRadius: '12px' }}>
+                        <ListItemIcon>
+                          <FireTruckIcon sx={{ color: theme.palette.secondary.main }} />
+                        </ListItemIcon>
+                        <ListItemText primary="Painel Admin" />
+                      </MenuItemMaterial>
+                    )}
+                    <MenuItemMaterial onClick={handleLogout} sx={{ borderRadius: '12px' }}>
+                      <ListItemIcon>
+                        <LogoutIcon sx={{ color: theme.palette.error.main }} />
+                      </ListItemIcon>
+                      <ListItemText primary="Sair" />
+                    </MenuItemMaterial>
+                  </motion.div>
+                </MenuMaterial>
+              </>
+            ) : (
+              <>
+                <Button color="inherit" href="/login" sx={{ fontWeight: 600 }}>
+                  Entrar
+                </Button>
+                <Button color="primary" variant="contained" href="/cadastro" sx={{ fontWeight: 600 }}>
+                  Cadastrar
+                </Button>
+              </>
+            )}
           </Box>
         </Toolbar>
-      </AppBar>
-      
-      <StyledDrawer 
-        variant="permanent" 
-        open={open}
-        sx={{
-          '& .MuiDrawer-paper': {
-            width: open ? drawerWidth : `calc(${theme.spacing(7)} + 1px)`,
-            transition: theme.transitions.create('width', {
-              easing: theme.transitions.easing.sharp,
-              duration: theme.transitions.duration.enteringScreen,
-            }),
-          },
-        }}
-      >
-        
-        <Box sx={{ overflow: 'auto', height: 'calc(100vh - 64px)', py: 1 }}>
-          <List>
-            {menuItems.map((item) => (
-              <ListItem key={item.text} disablePadding sx={{ display: 'block' }}>
-                {renderMenuItem(item)}
+      </AppBarMaterial>
+      <StyledDrawer variant="permanent" open={open}>
+        <DrawerHeader>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.5 }}
+          >
+            <IconButton onClick={handleDrawerToggle}>
+              {open ? <ChevronLeft /> : <ChevronRight />}
+            </IconButton>
+          </motion.div>
+        </DrawerHeader>
+        <Divider />
+        <List>
+           {status === 'authenticated' && menuItems
+              .filter(item => item.text !== 'Configurações' || session?.user?.tipo === 'ADMIN')
+              .map((item) => (
+                <motion.div
+                  key={item.text}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.5, delay: item.text.length * 0.1 }}
+                >
+                  <ListItem
+                    button
+                    key={item.text}
+                    onClick={() => handleMenuItemClick(item.path)}
+                    selected={router.pathname === item.path}
+                    sx={{
+                      '&.Mui-selected': {
+                        backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                        '&:hover': {
+                          backgroundColor: alpha(theme.palette.primary.main, 0.2),
+                        },
+                      },
+                      transition: 'all 0.3s ease',
+                      '&:hover': {
+                        backgroundColor: alpha(theme.palette.primary.main, 0.05),
+                        transform: 'translateX(4px)',
+                      }
+                    }}
+                  >
+                    <ListItemIcon>{item.icon}</ListItemIcon>
+                    <ListItemText primary={item.text} />
+                  </ListItem>
+                </motion.div>
+              ))}
+           {status !== 'authenticated' && (
+              <ListItem button onClick={() => router.push('/login')}>
+                <ListItemIcon><PersonIcon /></ListItemIcon>
+                <ListItemText primary="Entrar" />
               </ListItem>
-            ))}
-          </List>
-          
-          {/* Espaço para informações do usuário no rodapé */}
-          <Box sx={{ p: 2, mt: 'auto', borderTop: `1px solid ${theme.palette.divider}`, opacity: open ? 1 : 0 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Avatar sx={{ width: 32, height: 32, bgcolor: 'primary.main' }}>
-                {user?.nome?.charAt(0).toUpperCase() || <PersonIcon fontSize="small" />}
-              </Avatar>
-              <Box>
-                <Typography variant="subtitle2" noWrap>{user?.nome || 'Usuário'}</Typography>
-                <Typography variant="caption" color="text.secondary" noWrap>
-                  {user?.tipo || 'Nível de Acesso'}
-                </Typography>
-              </Box>
-            </Box>
-          </Box>
+            )}
+            <ListItem disablePadding>
+              <ListItemButton component={Link} href="/checklist">
+                <ListItemIcon>
+                  <PlaylistAddCheck />
+                </ListItemIcon>
+                <ListItemText primary="Checklist Empilhadeira" />
+              </ListItemButton>
+            </ListItem>
+        </List>
+        <Divider />
+        <List>
+          {['Motoristas', 'Transportadoras'].map((text, index) => (
+            <motion.div
+              key={text}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: index * 0.1 }}
+            >
+              <ListItem button key={text}>
+                <ListItemIcon>
+                  {text === 'Motoristas' ? <PersonIcon sx={{ color: 'inherit' }} /> : <FireTruckIcon sx={{ color: 'inherit' }} />}
+                </ListItemIcon>
+                <ListItemText primary={text} />
+              </ListItem>
+            </motion.div>
+          ))}
+        </List>
+        <Box sx={{ mt: 'auto', p: 2, bgcolor: alpha(theme.palette.primary.main, 0.05) }}>
+          <Typography variant="caption" align="center" color="text.secondary">
+            {new Date().getFullYear()} Controle de Carga
+          </Typography>
         </Box>
       </StyledDrawer>
-      
-      <Box 
-        component="main" 
-        sx={{ 
-          flexGrow: 1, 
-          p: 3, 
-          width: '100%', 
-          mt: '64px',
+      <Box
+        component="main"
+        sx={{
+          flexGrow: 1,
+          p: 3,
+          width: { sm: `calc(100% - ${drawerWidth}px)` },
+          transition: theme.transitions.create(['margin', 'width'], {
+            easing: theme.transitions.easing.easeInOut,
+            duration: theme.transitions.duration.enteringScreen,
+          }),
+          ...(open && {
+            ml: 0,
+            width: { sm: `calc(100% - ${drawerWidth}px)` },
+          }),
           backgroundColor: theme.palette.background.default,
-          minHeight: 'calc(100vh - 64px)'
+          minHeight: '100vh',
+          display: 'flex',
+          flexDirection: 'column',
         }}
       >
-        {children}
+        <DrawerHeader />
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+        >
+          {children}
+        </motion.div>
       </Box>
     </Box>
   );

@@ -1,4 +1,5 @@
-import { useState, useEffect, useContext } from 'react';
+import { useState, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import { ApiError, ApiResponse } from '../../types/api';
 import { api } from '../../services/api';
@@ -17,7 +18,7 @@ import {
   CircularProgress
 } from '@mui/material';
 import { Edit as EditIcon, Save as SaveIcon, Cancel as CancelIcon } from '@mui/icons-material';
-import { AuthContext } from '../../contexts/AuthContext';
+
 import AdminLayout from '../../components/admin/AdminLayout';
 import AdminRoute from '../../components/admin/AdminRoute';
 
@@ -38,11 +39,8 @@ interface PerfilFormErrors {
 }
 
 function PerfilUsuarioContent() {
-  const auth = useContext(AuthContext);
-  if (!auth) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  const { user, updateUser } = auth;
+  const { data: session, status } = useSession();
+  const user = session?.user;
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -70,8 +68,8 @@ function PerfilUsuarioContent() {
     if (user) {
       setFormData(prev => ({
         ...prev,
-        nome: user.nome || '',
-        email: user.email || ''
+        nome: session?.user.nome || '',
+        email: session?.user.email || ''
       }));
     }
   }, [user]);
@@ -219,20 +217,20 @@ function PerfilUsuarioContent() {
                   mb: 2
                 }}
               >
-                {user.nome?.charAt(0).toUpperCase() || 'U'}
+                {session?.user.nome?.charAt(0).toUpperCase() || 'U'}
               </Avatar>
-              <Typography variant="h6">{user.nome}</Typography>
+              <Typography variant="h6">{session?.user.nome}</Typography>
               <Typography variant="body2" color="textSecondary">
-                {user.tipo === 'ADMIN' ? 'Administrador' : 
-                 user.tipo === 'GERENTE' ? 'Gerente' : 'Usuário'}
+                {session?.user.tipo === 'ADMIN' ? 'Administrador' : 
+                 session?.user.tipo === 'GERENTE' ? 'Gerente' : 'Usuário'}
               </Typography>
               <Typography variant="body2" color="textSecondary">
-                {user.email}
+                {session?.user.email}
               </Typography>
               
-              {user.ultimoAcesso && (
+              {session?.user.ultimoAcesso && (
                 <Typography variant="caption" color="textSecondary" mt={1}>
-                  Último acesso: {new Date(user.ultimoAcesso).toLocaleString()}
+                  Último acesso: {new Date(session?.user.ultimoAcesso).toLocaleString()}
                 </Typography>
               )}
             </Box>

@@ -1,6 +1,6 @@
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
-import { useAuth } from '../contexts/AuthContext';
+import { useSession } from 'next-auth/react';
 import CircularProgress from '@mui/material/CircularProgress';
 import Box from '@mui/material/Box';
 import { USER_TYPES } from '../types/auth-types';
@@ -21,14 +21,14 @@ export default function ProtectedRoute({
   allowedRoles = [USER_TYPES.ADMIN, USER_TYPES.GERENTE, USER_TYPES.USUARIO],
   redirectTo = '/login' 
 }: ProtectedRouteProps) {
-  const { user, isAuthenticated, isLoading } = useAuth();
+  const { status, data: session } = useSession();
   const router = useRouter();
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [shouldRedirect, setShouldRedirect] = useState(false);
 
   useEffect(() => {
     // Se ainda está carregando, não faz nada
-    if (isLoading) return;
+    if (status === 'loading') return;
 
     // Se é uma rota pública, não precisa verificar autenticação
     if (PUBLIC_ROUTES.includes(router.pathname)) {
@@ -37,15 +37,15 @@ export default function ProtectedRoute({
     }
 
     // Se não está autenticado, marca para redirecionar
-    if (!isAuthenticated) {
+    if (status !== 'authenticated') {
       console.log('[ProtectedRoute] Usuário não autenticado, redirecionando para login...');
       setShouldRedirect(true);
       return;
     }
 
     // Se está autenticado, verifica as permissões
-    if (user) {
-      const hasPermission = allowedRoles.includes(user.tipo);
+    if (session?.user) {
+      const hasPermission = allowedRoles.includes(session.user.tipo);
       if (!hasPermission) {
         console.log('[ProtectedRoute] Usuário não autorizado, redirecionando...');
         router.push('/acesso-negado');
@@ -55,17 +55,17 @@ export default function ProtectedRoute({
 
     // Se chegou até aqui, está tudo ok
     setIsCheckingAuth(false);
-  }, [isLoading, isAuthenticated, user, router, allowedRoles]);
+  }, [status, session, router, allowedRoles]);
 
   // Efeito para lidar com o redirecionamento
   useEffect(() => {
-    if (shouldRedirect && !isLoading && !isAuthenticated) {
+    if (shouldRedirect && status !== 'loading' && status !== 'authenticated') {
       router.push(redirectTo);
     }
-  }, [shouldRedirect, isLoading, isAuthenticated, router, redirectTo]);
+  }, [shouldRedirect, status, router, redirectTo]);
 
   // Mostra um loader enquanto verifica a autenticação
-  if (isLoading || isCheckingAuth) {
+  if (status === 'loading' || isCheckingAuth) {
     return (
       <Box 
         display="flex" 
@@ -79,7 +79,10 @@ export default function ProtectedRoute({
   }
 
   // Se é uma rota pública ou o usuário está autenticado e autorizado, renderiza os filhos
-  if (PUBLIC_ROUTES.includes(router.pathname) || (isAuthenticated && user && allowedRoles.includes(user.tipo))) {
+  if (
+    PUBLIC_ROUTES.includes(router.pathname) ||
+    (status === 'authenticated' && session?.user && allowedRoles.includes(session.user.tipo))
+  ) {
     return <>{children}</>;
   }
 

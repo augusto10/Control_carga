@@ -45,7 +45,8 @@ async function criar(req: NextApiRequest, res: NextApiResponse) {
   };
 
   if (!nome?.trim()) return res.status(400).json({ error: 'Nome é obrigatório' });
-  if (!telefone?.trim()) return res.status(400).json({ error: 'Telefone é obrigatório' });
+  // Telefone não é obrigatório para salvar, mas garantimos string
+  const telefoneVal = telefone?.trim() || '';
   if (!cpf?.trim()) return res.status(400).json({ error: 'CPF é obrigatório' });
   if (!cnh?.trim()) return res.status(400).json({ error: 'CNH é obrigatório' });
   if (!transportadoraId?.trim())
@@ -59,7 +60,7 @@ async function criar(req: NextApiRequest, res: NextApiResponse) {
     }
 
     const novo = await prisma.motorista.create({
-      data: { nome, telefone, cpf, cnh, transportadoraId },
+      data: { nome, telefone: telefoneVal, cpf, cnh, transportadoraId },
     });
     return res.status(201).json(novo);
   } catch (error: any) {

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { useAuth } from '../contexts/AuthContext';
+import { useSession, signIn } from 'next-auth/react';
 import { 
   Container, 
   Box, 
@@ -27,18 +27,19 @@ export default function Login() {
   });
   const [error, setError] = useState<string | null>(null);
   const { enqueueSnackbar } = useSnackbar();
-  const { login, isLoading, isAuthenticated } = useAuth();
   const router = useRouter();
+  const { data: session, status } = useSession();
+  const [loading, setLoading] = useState(false);
 
   // Redireciona usuários já autenticados
   useEffect(() => {
-    if (isAuthenticated) {
+    if (status === 'authenticated') {
       router.push('/');
     }
-  }, [isAuthenticated, router]);
+  }, [status, router]);
 
   // Mostra um loader enquanto verifica a autenticação
-  if (isLoading) {
+  if (status === 'loading' || loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
         <CircularProgress />
@@ -57,19 +58,34 @@ export default function Login() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    
-    console.log('Iniciando tentativa de login...');
-    console.log('Dados do formulário:', formData);
-    
+    setLoading(true);
     try {
-      console.log('Chamando a função login...');
-      await login(formData);
-      enqueueSnackbar('Login efetuado com sucesso!', { variant: 'success' });
-    } catch (err: any) {
-      console.error('Erro durante o login:', err);
-      const rawMessage = err.response?.data?.message || err.message || 'Erro ao fazer login. Verifique suas credenciais.';
-      let friendlyMessage = rawMessage;
-      const lower = rawMessage.toLowerCase();
+      const res = await signIn('credentials', {
+        redirect: false,
+        email: formData.email,
+        senha: formData.senha
+      });
+      if (res?.error) {
+        let friendlyMessage = res.error;
+        const lower = res.error.toLowerCase();
+        if (lower.includes('não encontrado')) {
+          friendlyMessage = 'Usuário não existe. Por favor, cadastre-se.';
+        } else if (
+          lower.includes('senha') ||
+          lower.includes('credenciais') ||
+          lower.includes('incorreta') ||
+          lower.includes('invalid')
+        ) {
+          friendlyMessage = 'Usuário ou senha inválida.';
+        }
+        enqueueSnackbar(friendlyMessage, { variant: 'error' });
+        setError(friendlyMessage);
+        setLoading(false);
+        return;
+      }
+    } catch (error: any) {
+      let friendlyMessage = typeof error === 'object' && error && 'message' in error ? error.message : String(error) || 'Erro desconhecido.';
+      const lower = typeof error === 'object' && error && 'message' in error ? String(error.message).toLowerCase() : String(error).toLowerCase();
       if (lower.includes('não encontrado')) {
         friendlyMessage = 'Usuário não existe. Por favor, cadastre-se.';
       } else if (
@@ -83,6 +99,8 @@ export default function Login() {
       enqueueSnackbar(friendlyMessage, { variant: 'error' });
       setError(friendlyMessage);
     }
+
+    setLoading(false);
   };
 
   const handleClickShowPassword = () => {
@@ -131,7 +149,7 @@ export default function Login() {
                 autoFocus
                 value={formData.email}
                 onChange={handleChange}
-                disabled={isLoading}
+                disabled={loading}
               />
               
               <TextField
@@ -145,7 +163,7 @@ export default function Login() {
                 autoComplete="current-password"
                 value={formData.senha}
                 onChange={handleChange}
-                disabled={isLoading}
+                disabled={loading}
                 InputProps={{
                   endAdornment: (
                     <InputAdornment position="end">
@@ -166,9 +184,9 @@ export default function Login() {
                 fullWidth
                 variant="contained"
                 sx={{ mt: 3, mb: 2, py: 1.5 }}
-                disabled={isLoading}
+                disabled={loading}
               >
-                {isLoading ? (
+                {loading ? (
                   <CircularProgress size={24} color="inherit" />
                 ) : (
                   'Entrar'

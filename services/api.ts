@@ -12,8 +12,24 @@ const createApi = (): AxiosInstance => {
   }
   const cleanBaseURL = baseURL.endsWith('/') ? baseURL.slice(0, -1) : baseURL;
   
+  // Se estivermos no navegador, e a porta definida no baseURL for diferente da porta
+  // onde o front-end está rodando (ex.: baseURL aponta para 3000 mas Next.js roda em 3002),
+  // então usamos URL relativa para evitar erros de CORS/404.
+  let finalBaseURL = cleanBaseURL;
+  if (typeof window !== 'undefined' && cleanBaseURL) {
+    try {
+      const url = new URL(cleanBaseURL);
+      if (url.hostname === 'localhost' && url.port && window.location.port && url.port !== window.location.port) {
+        console.warn('[API] Porta do NEXT_PUBLIC_API_URL difere da porta atual. Usando baseURL relativa.');
+        finalBaseURL = '';
+      }
+    } catch {
+      // cleanBaseURL não é uma URL absoluta; deixa como está
+    }
+  }
+  
   const instance = axios.create({
-    baseURL: cleanBaseURL,
+    baseURL: finalBaseURL,
     headers: {
       'Content-Type': 'application/json',
       'Accept': 'application/json',

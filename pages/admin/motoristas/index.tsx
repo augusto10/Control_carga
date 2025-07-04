@@ -48,21 +48,31 @@ function MotoristasContent() {
 
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success'|'error' }>({ open:false, message:'', severity:'success' });
 
-  useEffect(()=>{ carregar(); },[]);
+  useEffect(() => {
+    carregar();
+  }, []);
 
-  const carregar = async()=>{
-    try{
-      setLoading(true);
-      const [motRes, transRes] = await Promise.all([
-        api.get<Motorista[]>('/api/motoristas'),
-        api.get<Transportadora[]>('/api/transportadoras')
-      ]);
-      setMotoristas(motRes.data);
+  const carregar = async () => {
+    setLoading(true);
+    try {
+      // Sempre tenta carregar transportadoras primeiro, pois são essenciais para o formulário
+      const transRes = await api.get<Transportadora[]>('/api/transportadoras');
       setTransportadoras(transRes.data);
-    }catch(err){
-      console.error(err);
-      setSnackbar({open:true,message:'Erro ao carregar dados', severity:'error'});
-    }finally{setLoading(false);}
+    } catch (err) {
+      console.error('[Motoristas] Erro ao carregar transportadoras:', err);
+      setSnackbar({ open: true, message: 'Erro ao carregar transportadoras', severity: 'error' });
+    }
+
+    try {
+      // A listagem de motoristas não é obrigatória para criar novos
+      const motRes = await api.get<Motorista[]>('/api/motoristas');
+      setMotoristas(motRes.data);
+    } catch (err) {
+      console.error('[Motoristas] Erro ao carregar motoristas:', err);
+      setSnackbar({ open: true, message: 'Erro ao carregar motoristas', severity: 'error' });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleOpenNovo = ()=>{

@@ -34,7 +34,7 @@ import {
   Pending as PendingIcon,
   Refresh as RefreshIcon
 } from '@mui/icons-material';
-import { useAuth } from '../../../contexts/AuthContext';
+import { useSession } from 'next-auth/react';
 import AdminRoute from '../../../components/admin/AdminRoute';
 import { api } from '@/services/api';
 import { format } from 'date-fns';
@@ -59,7 +59,7 @@ interface Controle {
 }
 
 function GerenciarControlesContent() {
-  const { user } = useAuth();
+  const { data: session } = useSession();
   const [controles, setControles] = useState<Controle[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

@@ -1,6 +1,6 @@
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
-import { useAuth } from '../contexts/AuthContext';
+import { useSession } from 'next-auth/react';
 import CircularProgress from '@mui/material/CircularProgress';
 import Box from '@mui/material/Box';
 import { USER_TYPES } from '../types/auth-types';
@@ -14,37 +14,20 @@ export default function AdminRoute({
   children, 
   redirectTo = '/acesso-negado' 
 }: AdminRouteProps) {
-  const { user, isAuthenticated, isLoading } = useAuth();
+  const { status, data: session } = useSession();
   const router = useRouter();
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
   useEffect(() => {
-    // Se ainda está carregando, não faz nada
-    if (isLoading) return;
-
-    // Se não está autenticado, redireciona para o login
-    if (!isAuthenticated) {
-      console.log('[AdminRoute] Usuário não autenticado, redirecionando para login...');
-      router.push('/login');
-      return;
-    }
-
-    // Se está autenticado, verifica se é administrador
-    if (user) {
-      const isAdmin = user.tipo === USER_TYPES.ADMIN;
-      if (!isAdmin) {
-        console.log('[AdminRoute] Acesso negado: usuário não é administrador');
-        router.push(redirectTo);
-        return;
+    if (status !== 'loading') {
+      setIsCheckingAuth(false);
+      if (status !== 'authenticated' || session?.user?.tipo !== USER_TYPES.ADMIN) {
+        router.replace(redirectTo);
       }
     }
+  }, [status, session, router, redirectTo]);
 
-    // Se chegou até aqui, está tudo ok
-    setIsCheckingAuth(false);
-  }, [isLoading, isAuthenticated, user, router, redirectTo]);
-
-  // Mostra um loader enquanto verifica a autenticação
-  if (isLoading || isCheckingAuth) {
+  if (status === 'loading' || isCheckingAuth) {
     return (
       <Box 
         display="flex" 
@@ -57,11 +40,9 @@ export default function AdminRoute({
     );
   }
 
-  // Se o usuário está autenticado e é administrador, renderiza os filhos
-  if (isAuthenticated && user?.tipo === USER_TYPES.ADMIN) {
+  if (status === 'authenticated' && session?.user?.tipo === USER_TYPES.ADMIN) {
     return <>{children}</>;
   }
 
-  // Se não está autorizado e não está carregando, não renderiza nada
-  return null;
+  return null; // Não autorizado
 }

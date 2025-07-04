@@ -32,7 +32,7 @@ import {
   DialogContentText
 } from '@mui/material';
 import { Edit as EditIcon, Delete as DeleteIcon, Add as AddIcon } from '@mui/icons-material';
-import { useAuth } from '../../../contexts/AuthContext';
+import { useSession, signOut } from 'next-auth/react';
 import AdminRoute from '../../../components/admin/AdminRoute';
 import { TipoUsuario } from '@prisma/client';
 import { api } from '@/services/api';
@@ -50,7 +50,7 @@ interface Usuario {
 }
 
 function GerenciarUsuariosContent() {
-  const { user, isAuthenticated, logout } = useAuth();
+  const { data: session } = useSession();
   const router = useRouter();
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [loading, setLoading] = useState(true);
@@ -349,7 +349,7 @@ function GerenciarUsuariosContent() {
                             <IconButton 
                               onClick={() => handleOpenEditarUsuario(usuario)}
                               color="primary"
-                              disabled={usuario.id === user?.id}
+                              disabled={usuario.id === session?.user?.id}
                               size="small"
                               sx={{
                                 '&:hover': { backgroundColor: 'primary.light', color: 'white' },
@@ -364,7 +364,7 @@ function GerenciarUsuariosContent() {
                             <IconButton 
                               onClick={() => handleToggleStatus(usuario.id, usuario.ativo)}
                               color={usuario.ativo ? 'error' : 'success'}
-                              disabled={usuario.id === user?.id}
+                              disabled={usuario.id === session?.user?.id}
                               size="small"
                               sx={{
                                 '&:hover': { 

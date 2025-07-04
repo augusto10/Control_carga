@@ -32,7 +32,7 @@ import {
   ChevronRight as ChevronRightIcon,
   Settings as SettingsIcon
 } from '@mui/icons-material';
-import { useAuth } from '../../contexts/AuthContext';
+import { useSession, signOut } from 'next-auth/react';
 
 const drawerWidth = 240;
 
@@ -42,7 +42,7 @@ interface AdminLayoutProps {
 }
 
 export default function AdminLayout({ children, title }: AdminLayoutProps) {
-  const { user, logout } = useAuth();
+  const { data: session } = useSession();
   const router = useRouter();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
@@ -72,8 +72,7 @@ export default function AdminLayout({ children, title }: AdminLayoutProps) {
 
   const handleLogout = () => {
     handleClose();
-    logout();
-    router.push('/login');
+    signOut({ callbackUrl: '/login' });
   };
 
   const handleProfile = () => {
@@ -136,7 +135,7 @@ export default function AdminLayout({ children, title }: AdminLayoutProps) {
           </Typography>
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
             <Typography variant="body2" sx={{ mr: 2, display: { xs: 'none', sm: 'block' } }}>
-              {user?.nome}
+              {session?.user?.nome}
             </Typography>
             <Tooltip title="Configurações da conta">
               <IconButton
@@ -148,7 +147,7 @@ export default function AdminLayout({ children, title }: AdminLayoutProps) {
                 aria-expanded={open ? 'true' : undefined}
               >
                 <Avatar sx={{ width: 32, height: 32 }}>
-                  {user?.nome?.charAt(0) || <AccountCircleIcon />}
+                  {session?.user?.nome?.charAt(0) || <AccountCircleIcon />}
                 </Avatar>
               </IconButton>
             </Tooltip>

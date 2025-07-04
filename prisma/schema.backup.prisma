@@ -1,0 +1,121 @@
+generator client {
+  provider = "prisma-client-js"
+  engineType = "binary"
+}
+
+datasource db {
+  provider     = "postgresql"
+  url          = env("DATABASE_URL")
+  relationMode = "prisma"
+  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
+}
+
+model ControleCarga {
+  id              String         @id @default(uuid())
+  dataCriacao     DateTime       @default(now())
+  motorista       String
+  responsavel     String
+  transportadora  Transportadora @default(ACCERT)
+  numeroManifesto String?
+  qtdPallets      Int            @default(0)
+  observacao      String?
+  finalizado      Boolean        @default(false)
+  cpfMotorista    String         @default("PENDENTE")
+  notas           NotaFiscal[]
+  assinaturas     Assinatura[]
+}
+
+model NotaFiscal {
+  id          String         @id @default(uuid())
+  dataCriacao DateTime       @default(now())
+  codigo      String
+  numeroNota  String
+  controleId  String?
+  usuarioId   String?
+  volumes     String         @default("1")
+  controle    ControleCarga? @relation(fields: [controleId], references: [id])
+  usuario     Usuario?       @relation(fields: [usuarioId], references: [id])
+}
+
+model Usuario {
+  id               String            @id @default(uuid())
+  nome             String
+  email            String            @unique
+  senha            String
+  tipo             TipoUsuario       @default(USUARIO)
+  ativo            Boolean           @default(true)
+  dataCriacao      DateTime          @default(now())
+  ultimoAcesso     DateTime?
+  notas            NotaFiscal[]
+  auditoriasAcesso AuditoriaAcesso[]
+}
+
+model AuditoriaAcesso {
+  id        String   @id @default(uuid())
+  usuarioId String
+  acao      String
+  descricao String?
+  ip        String?
+  userAgent String?
+  dataHora  DateTime @default(now())
+  usuario   Usuario  @relation(fields: [usuarioId], references: [id])
+
+  @@index([usuarioId])
+  @@index([dataHora])
+  @@map("auditoria_acesso")
+}
+
+model ConfiguracaoSistema {
+  id              String   @id @default(uuid())
+  chave           String   @unique
+  valor           String
+  descricao       String?
+  tipo            String   @default("string")
+  opcoes          String?
+  editavel        Boolean  @default(true)
+  dataCriacao     DateTime @default(now())
+  dataAtualizacao DateTime @updatedAt
+
+  @@index([chave])
+}
+
+
+model Motorista {
+  id             String         @id @default(uuid())
+  dataCriacao    DateTime       @default(now())
+  nome           String
+  telefone       String
+  cpf            String         @unique
+  cnh            String
+  transportadoraId Transportadora
+}
+
+model Assinatura {
+  id              String        @id @default(uuid())
+  controleId      String
+  tipo            String @db.Enum("TipoAssinatura")
+  status          String @db.Enum("StatusAssinatura") @default("PENDENTE")
+  urlAssinatura   String?
+  signedFileUrl   String?
+  dataCriacao     DateTime      @default(now())
+  dataAtualizacao DateTime      @updatedAt
+  controle        ControleCarga @relation(fields: [controleId], references: [id])
+
+  @@index([controleId])
+  @@index([tipo])
+}
+
+
+enum Transportadora {
+  ACERT // valor legado (em desuso)
+  ACCERT
+  EXPRESSO_GOIAS
+}
+
+enum TipoUsuario {
+  ADMIN
+  GERENTE
+  USUARIO
+  FUNCIONARIO
+  CLIENTE
+}

@@ -1,35 +1,33 @@
 import { ThemeProvider, CssBaseline, Box, CircularProgress } from '@mui/material';
+import { SessionProvider, useSession } from 'next-auth/react';
 import { professionalTheme } from '../styles/theme';
 import { SnackbarProvider } from 'notistack';
 import { AppProps } from 'next/app';
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
 import Layout from '../components/Layout';
-import { AuthProvider, useAuth } from '../contexts/AuthContext';
 import { ConfiguracaoProvider } from '../contexts/ConfiguracaoContext';
-import ProtectedRoute from '../components/ProtectedRoute';
 
 // Lista de rotas públicas que não requerem autenticação
 const publicRoutes = ['/login', '/esqueci-senha', '/cadastro'];
 
 function AppContent({ Component, pageProps, isPublicRoute }: { Component: React.ComponentType<any>, pageProps: any, isPublicRoute: boolean }) {
-  const { isLoading, isAuthenticated } = useAuth();
+  const { status } = useSession();
   const router = useRouter();
   const [showContent, setShowContent] = useState(false);
-  
+
   useEffect(() => {
-    // Se não está carregando e não está autenticado, redireciona para o login
-    if (!isLoading && !isAuthenticated && !isPublicRoute) {
+    // Se não está autenticado e não é rota pública, redireciona para login
+    if (status === 'unauthenticated' && !isPublicRoute) {
       router.push('/login');
       return;
     }
-    
     // Se está autenticado ou é rota pública, mostra o conteúdo
-    if (isAuthenticated || isPublicRoute) {
+    if (status === 'authenticated' || isPublicRoute) {
       setShowContent(true);
     }
-  }, [isLoading, isAuthenticated, isPublicRoute, router]);
-  
+  }, [status, isPublicRoute, router]);
+
   // Componente de carregamento global
   const GlobalLoader = () => (
     <Box
@@ -49,34 +47,31 @@ function AppContent({ Component, pageProps, isPublicRoute }: { Component: React.
       <CircularProgress size={60} />
     </Box>
   );
-  
+
   // Determinar se o layout deve ser aplicado (não aplicar na página de login, por exemplo)
   const getLayout = (page: React.ReactNode) => {
-    if (isPublicRoute || !isAuthenticated) {
+    if (isPublicRoute || status !== 'authenticated') {
       return page;
     }
-    
     return (
-      <ProtectedRoute>
-        <Layout>{page}</Layout>
-      </ProtectedRoute>
+      <Layout>{page}</Layout>
     );
   };
   
-  // Se estiver carregando, mostra o loader global
-  if (isLoading) {
+  // Se estiver carregando a sessão, mostra o loader global
+  if (status === 'loading') {
     return <GlobalLoader />;
   }
-  
+
   // Se não estiver em uma rota pública e não estiver autenticado, redireciona para o login
-  if (!isPublicRoute && !isAuthenticated && !isLoading) {
+  if (!isPublicRoute && status === 'unauthenticated') {
     if (typeof window !== 'undefined') {
       router.push('/login');
       return <GlobalLoader />;
     }
     return null;
   }
-  
+
   return getLayout(<Component {...pageProps} />);
 }
 
@@ -95,14 +90,14 @@ function MyApp({ Component, pageProps }: AppProps) {
   }
 
   return (
-    <ThemeProvider theme={professionalTheme}>
-      <CssBaseline />
-      <SnackbarProvider 
-        maxSnack={3}
-        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-        autoHideDuration={3000}
-      >
-        <AuthProvider>
+    <SessionProvider session={pageProps.session}>
+      <ThemeProvider theme={professionalTheme}>
+        <CssBaseline />
+        <SnackbarProvider 
+          maxSnack={3}
+          anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+          autoHideDuration={3000}
+        >
           <ConfiguracaoProvider>
             <AppContent 
               Component={Component} 
@@ -110,9 +105,9 @@ function MyApp({ Component, pageProps }: AppProps) {
               isPublicRoute={isPublicRoute} 
             />
           </ConfiguracaoProvider>
-        </AuthProvider>
-      </SnackbarProvider>
-    </ThemeProvider>
+        </SnackbarProvider>
+      </ThemeProvider>
+    </SessionProvider>
   );
 
 }

@@ -1,6 +1,6 @@
 import { createContext, useContext, ReactNode, useEffect } from 'react';
 import { useConfiguracoes, ConfiguracaoSistema } from '../hooks/useConfiguracoes';
-import { useAuth } from './AuthContext';
+import { useSession } from 'next-auth/react';
 
 interface ConfiguracaoContextType {
   configs: Record<string, any>;
@@ -14,7 +14,7 @@ interface ConfiguracaoContextType {
 const ConfiguracaoContext = createContext<ConfiguracaoContextType | undefined>(undefined);
 
 export function ConfiguracaoProvider({ children }: { children: ReactNode }) {
-  const { isAuthenticated } = useAuth();
+  const { status } = useSession();
   const {
     configuracoes,
     loading,
@@ -26,14 +26,14 @@ export function ConfiguracaoProvider({ children }: { children: ReactNode }) {
 
   // Só carrega as configurações se o usuário estiver autenticado
   useEffect(() => {
-    if (isAuthenticated) {
+    if (status === 'authenticated') {
       carregarConfiguracoes();
     }
-  }, [isAuthenticated, carregarConfiguracoes]);
+  }, [status, carregarConfiguracoes]);
 
   // Função auxiliar para obter uma configuração com tipo seguro
   const getConfig = <T = any>(chave: string, valorPadrao: T = null as any): T => {
-    if (!isAuthenticated) return valorPadrao;
+    if (status !== 'authenticated') return valorPadrao;
     return getConfiguracao(chave, valorPadrao) as T;
   };
 

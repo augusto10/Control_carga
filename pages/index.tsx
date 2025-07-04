@@ -6,7 +6,7 @@ import {
   Search as SearchIcon,
   ListAlt as ListAltIcon
 } from '@mui/icons-material';
-import { useAuth } from '../contexts/AuthContext';
+import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
 
@@ -106,21 +106,21 @@ function HomeContent() {
 }
 
 export default function Home() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { status, data: session } = useSession();
   const router = useRouter();
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
   useEffect(() => {
-    if (isLoading) return;
+    if (status === 'loading') return;
     
-    if (!isAuthenticated) {
+    if (status !== 'authenticated') {
       router.push('/login');
     } else {
       setIsCheckingAuth(false);
     }
-  }, [isAuthenticated, isLoading, router]);
+  }, [status, router]);
 
-  if (isLoading || isCheckingAuth) {
+  if (status === 'loading' || isCheckingAuth) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
         <CircularProgress />

@@ -22,7 +22,7 @@ import { Search, FilterList, Refresh } from '@mui/icons-material';
 import { useStore } from '../store/store';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import formatISO9075 from 'date-fns/formatISO9075';
+
 
 
 interface FiltrosNotas {
@@ -187,7 +187,7 @@ const ConsultarNotas = () => {
                 <TableCell align="right">Volumes</TableCell>
                 <TableCell>Data de Criação</TableCell>
                 <TableCell>Status</TableCell>
-                <TableCell>Controle</TableCell>
+                <TableCell>Controle Vinculado</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -208,50 +208,19 @@ const ConsultarNotas = () => {
                   <TableRow key={nota.id} hover>
                     <TableCell>{nota.numeroNota}</TableCell>
                     <TableCell>{nota.codigo}</TableCell>
-                    <TableCell align="right">
-                      {nota.volumes || '1'}
-                    </TableCell>
+                    <TableCell align="right">{nota.volumes || '1'}</TableCell>
                     <TableCell>
-                    {formatISO9075(new Date(nota.dataCriacao))}
+                      {format(new Date(nota.dataCriacao), 'dd/MM/yyyy HH:mm', { locale: ptBR })}
                     </TableCell>
                     <TableCell>
                       {nota.controleId ? (
-                        <Chip 
-                          label="Vinculada" 
-                          color="success" 
-                          size="small" 
-                        />
+                        <Chip label="Vinculada" color="primary" size="small" />
                       ) : (
-                        <Chip 
-                          label="Disponível" 
-                          color="warning" 
-                          size="small" 
-                          variant="outlined"
-                        />
+                        <Chip label="Disponível" color="success" size="small" />
                       )}
                     </TableCell>
                     <TableCell>
-                      {nota.controle ? (
-                        <Tooltip 
-                          title={
-                            <>
-                              <div>Nº: {nota.controle.numeroManifesto || 'N/A'}</div>
-                              <div>Motorista: {nota.controle.motorista}</div>
-                              <div>Responsável: {nota.controle.responsavel}</div>
-                              <div>Transportadora: {nota.controle.transportadora}</div>
-                              <div>Data: {new Date(nota.controle.dataCriacao).toLocaleString()}</div>
-                            </>
-                          }
-                          arrow
-                        >
-                          <Chip 
-                            label={`${nota.controle.numeroManifesto || nota.controle.id.substring(0, 8)}`} 
-                            size="small"
-                            variant="outlined"
-                            sx={{ cursor: 'pointer' }}
-                          />
-                        </Tooltip>
-                      ) : '-'}
+                      {nota.controle ? nota.controle.numeroManifesto : '--'}
                     </TableCell>
                   </TableRow>
                 ))

@@ -1,11 +1,11 @@
 import { AppBar, Toolbar, Button, Box, Container, useMediaQuery, useTheme } from '@mui/material';
 import Link from 'next/link';
-import { useAuth } from '../contexts/AuthContext';
+import { useSession } from 'next-auth/react';
 import UserMenu from './UserMenu';
 import { useRouter } from 'next/router';
 
 export default function Navbar() {
-  const { user, isAuthenticated } = useAuth();
+  const { data: session, status } = useSession();
   const router = useRouter();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));

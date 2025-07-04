@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useRouter } from 'next/router';
-import { useAuth } from '../contexts/AuthContext';
+import { useSession, signOut } from 'next-auth/react';
 import {
   Avatar,
   Box,
@@ -21,12 +21,12 @@ import {
 } from '@mui/icons-material';
 
 export default function UserMenu() {
-  const { user, logout } = useAuth();
+  const { data: session } = useSession();
   const router = useRouter();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const open = Boolean(anchorEl);
 
-  if (!user) return null;
+  if (!session?.user) return null;
 
   const handleClick = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
@@ -38,7 +38,7 @@ export default function UserMenu() {
 
   const handleLogout = async () => {
     handleClose();
-    await logout();
+    await signOut({ callbackUrl: '/login' });
     router.push('/login');
   };
 

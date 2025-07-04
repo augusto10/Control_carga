@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { useAuth } from '../../contexts/AuthContext';
+import { useSession } from 'next-auth/react';
 import {
   Container,
   Typography,
@@ -42,7 +42,7 @@ type FormData = {
 };
 
 function PerfilContent() {
-  const { user, updateUser } = useAuth();
+  const { data: session, status } = useSession();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -60,22 +60,17 @@ function PerfilContent() {
   });
 
   useEffect(() => {
-    if (user) {
-      setUserData({
-        id: user.id,
-        nome: user.nome || '',
-        email: user.email || '',
-        tipo: user.tipo as 'ADMIN' | 'USUARIO',
-        ativo: user.ativo !== false,
+    if (session?.user) {
+      setUserData(session.user);
+      setFormData({
+        nome: session.user.name || '',
+        email: session.user.email || '',
+        senhaAtual: '',
+        novaSenha: '',
+        confirmarSenha: '',
       });
-      
-      setFormData(prev => ({
-        ...prev,
-        nome: user.nome || '',
-        email: user.email || '',
-      }));
     }
-  }, [user]);
+  }, [session]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -109,7 +104,7 @@ function PerfilContent() {
         novaSenha: formData.novaSenha || undefined,
       });
 
-      updateUser(response.data.user);
+      setUserData(response.data.user);
       setSuccess('Perfil atualizado com sucesso!');
       setEditing(false);
       
@@ -127,12 +122,15 @@ function PerfilContent() {
     }
   };
 
-  if (!userData) {
+  if (status === 'loading') {
     return (
-      <Container maxWidth="md" sx={{ py: 4 }}>
-        <Typography variant="h6" align="center">Carregando...</Typography>
-      </Container>
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+        <CircularProgress />
+      </Box>
     );
+  }
+  if (!session?.user) {
+    return null;
   }
 
   return (
@@ -162,21 +160,21 @@ function PerfilContent() {
               bgcolor: 'primary.main',
             }}
           >
-            {userData.nome?.charAt(0).toUpperCase() || 'U'}
+            {userData?.nome?.charAt(0).toUpperCase() || session?.user?.nome?.charAt(0).toUpperCase() || 'U'}
           </Avatar>
           
           <Box sx={{ textAlign: 'center', mb: 2 }}>
             <Typography variant="h5" component="div" fontWeight="bold">
-              {userData.nome}
+              {userData?.nome || session?.user?.nome || ''}
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              {userData.email}
+              {userData?.email || session?.user?.email || ''}
             </Typography>
             <Box
               component="span"
               sx={{
                 display: 'inline-block',
-                bgcolor: userData.tipo === 'ADMIN' ? 'secondary.main' : 'primary.main',
+                bgcolor: (userData?.tipo || session?.user?.tipo) === 'ADMIN' ? 'secondary.main' : 'primary.main',
                 color: 'white',
                 px: 1.5,
                 py: 0.5,
@@ -186,7 +184,7 @@ function PerfilContent() {
                 mt: 1,
               }}
             >
-              {userData.tipo === 'ADMIN' ? 'Administrador' : 'Usuário'}
+              {(userData?.tipo || session?.user?.tipo) === 'ADMIN' ? 'Administrador' : 'Usuário'}
             </Box>
           </Box>
         </Box>
