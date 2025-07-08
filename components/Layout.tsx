@@ -40,7 +40,8 @@ import {
   Person as PersonIcon,
   LocalShipping as TruckIcon,
   Assessment as ReportIcon,
-  Logout as LogoutIcon
+  Logout as LogoutIcon,
+  AdminPanelSettings as AdminIcon
 } from '@mui/icons-material';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -443,7 +444,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
               {user?.tipo === 'ADMIN' && (
                 <MenuItem onClick={() => router.push('/admin')}>
                   <ListItemIcon>
-                    fontSize="small" />
+                    <AdminIcon fontSize="small" />
                   </ListItemIcon>
                   Painel Admin
                 </MenuItem>

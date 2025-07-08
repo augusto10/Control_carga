@@ -87,7 +87,7 @@ const CriarControleContent: React.FC = () => {
   
   // Opções fixas de transportadoras
   const transportadorasFixas = [
-    { id: 'ACCERT', nome: 'ACCERT', descricao: 'ACCERT' },
+    { id: 'ACERT', nome: 'ACERT', descricao: 'ACERT' },
     { id: 'EXPRESSO_GOIAS', nome: 'EXPRESSO_GOIAS', descricao: 'EXPRESSO GOIÁS' }
   ];
 
@@ -97,7 +97,7 @@ const CriarControleContent: React.FC = () => {
   const [formData, setFormData] = useState({
     motorista: 'PENDENTE',
     cpfMotorista: '',
-    transportadora: transportadoraPadrao?.id || 'ACCERT',
+    transportadora: transportadoraPadrao?.id || 'ACERT',
     responsavel: 'PENDENTE',
     observacao: '',
     qtdPallets: 0,
@@ -211,7 +211,7 @@ const CriarControleContent: React.FC = () => {
       const dadosControle: CriarControleDTO = {
         motorista: (formData.motorista || 'PENDENTE').trim(),
         responsavel: (formData.responsavel || 'PENDENTE').trim(),
-        transportadora: formData.transportadora as 'ACCERT' | 'EXPRESSO_GOIAS',
+        transportadora: formData.transportadora as 'ACERT' | 'EXPRESSO_GOIAS',
         qtdPallets: Number(formData.qtdPallets) || 0,
         observacao: formData.observacao?.trim(),
         notasIds: Array.isArray(selectedNotas) ? selectedNotas : []
