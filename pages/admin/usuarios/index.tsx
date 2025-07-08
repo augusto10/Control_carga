@@ -450,6 +450,30 @@ function GerenciarUsuariosContent() {
                       </Typography>
                     </Box>
                   </MenuItem>
+                  <MenuItem value="SEPARADOR">
+                    <Box>
+                      <Box fontWeight="medium">Separador</Box>
+                      <Typography variant="caption" color="text.secondary" fontSize="0.75rem">
+                        Acesso à área de Separação
+                      </Typography>
+                    </Box>
+                  </MenuItem>
+                  <MenuItem value="CONFERENTE">
+                    <Box>
+                      <Box fontWeight="medium">Conferente</Box>
+                      <Typography variant="caption" color="text.secondary" fontSize="0.75rem">
+                        Acesso à área de Conferência
+                      </Typography>
+                    </Box>
+                  </MenuItem>
+                  <MenuItem value="AUDITOR">
+                    <Box>
+                      <Box fontWeight="medium">Auditor</Box>
+                      <Typography variant="caption" color="text.secondary" fontSize="0.75rem">
+                        Acesso à área de Auditoria
+                      </Typography>
+                    </Box>
+                  </MenuItem>
                 </Select>
               </FormControl>
               <TextField

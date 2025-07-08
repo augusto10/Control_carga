@@ -181,15 +181,16 @@ const ConsultarNotas = () => {
         <TableContainer>
           <Table size="small">
             <TableHead>
-              <TableRow>
-                <TableCell>Número da Nota</TableCell>
-                <TableCell>Código</TableCell>
-                <TableCell align="right">Volumes</TableCell>
-                <TableCell>Data de Criação</TableCell>
-                <TableCell>Status</TableCell>
-                <TableCell>Controle</TableCell>
-              </TableRow>
-            </TableHead>
+  <TableRow>
+    <TableCell>Número da Nota</TableCell>
+    <TableCell>Código</TableCell>
+    <TableCell align="right">Volumes</TableCell>
+    <TableCell>Data de Criação</TableCell>
+    <TableCell>Status</TableCell>
+    <TableCell>Controle</TableCell>
+    <TableCell>Ações</TableCell>
+  </TableRow>
+</TableHead>
             <TableBody>
               {carregando ? (
                 <TableRow>
@@ -208,26 +209,13 @@ const ConsultarNotas = () => {
                   <TableRow key={nota.id} hover>
                     <TableCell>{nota.numeroNota}</TableCell>
                     <TableCell>{nota.codigo}</TableCell>
-                    <TableCell align="right">
-                      {nota.volumes || '1'}
-                    </TableCell>
-                    <TableCell>
-                    {formatISO9075(new Date(nota.dataCriacao))}
-                    </TableCell>
+                    <TableCell align="right">{nota.volumes || '1'}</TableCell>
+                    <TableCell>{formatISO9075(new Date(nota.dataCriacao))}</TableCell>
                     <TableCell>
                       {nota.controleId ? (
-                        <Chip 
-                          label="Vinculada" 
-                          color="success" 
-                          size="small" 
-                        />
+                        <Chip label="Vinculada" color="success" size="small" />
                       ) : (
-                        <Chip 
-                          label="Disponível" 
-                          color="warning" 
-                          size="small" 
-                          variant="outlined"
-                        />
+                        <Chip label="Disponível" color="warning" size="small" variant="outlined" />
                       )}
                     </TableCell>
                     <TableCell>
@@ -253,7 +241,17 @@ const ConsultarNotas = () => {
                         </Tooltip>
                       ) : '-'}
                     </TableCell>
+                    <TableCell>
+                      {!nota.controleId && (
+                        <Tooltip title="Excluir Nota">
+                          <IconButton color="error" onClick={() => handleExcluirNota(nota.id)}>
+                            <span className="material-icons">delete</span>
+                          </IconButton>
+                        </Tooltip>
+                      )}
+                    </TableCell>
                   </TableRow>
+                ))
                 ))
               )}
             </TableBody>
