@@ -387,8 +387,10 @@ const handler = async (req: LoginRequest, res: NextApiResponse) => {
           (origin): origin is string => typeof origin === 'string' && origin.startsWith('http')
         ) || 'https://controle-logistica.vercel.app';
         
-        // Usar a origem permitida se for uma string, caso contrário, usar a origem de fallback
-        const originToUse = allowedOrigin || fallbackOrigin;
+        // Garantir que estamos usando uma string (não uma expressão regular)
+        const originToUse = typeof allowedOrigin === 'string' ? allowedOrigin : fallbackOrigin;
+        
+        // Criar URL apenas com uma string válida
         const domainUrl = new URL(originToUse);
         const domainParts = domainUrl.hostname.split('.');
         
