@@ -1,5 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
+import { Transportadora } from '@prisma/client';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   switch (req.method) {
@@ -24,7 +25,7 @@ async function listar(req: NextApiRequest, res: NextApiResponse) {
       ...m,
       transportadora: {
         id: m.transportadoraId,
-        descricao: m.transportadoraId === 'ACCERT' ? 'ACERT Transportes' : 'Expresso Goiás',
+        descricao: m.transportadoraId === 'ACERT' ? 'ACERT Transportes' : 'Expresso Goiás',
       },
     }));
 
@@ -41,7 +42,7 @@ async function criar(req: NextApiRequest, res: NextApiResponse) {
     telefone?: string;
     cpf?: string;
     cnh?: string;
-    transportadoraId?: string;
+    transportadoraId?: Transportadora;
   };
 
   if (!nome?.trim()) return res.status(400).json({ error: 'Nome é obrigatório' });

@@ -25,7 +25,13 @@ import {
 import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon } from '@mui/icons-material';
 import { api } from '@/services/api';
 import AdminRoute from '@/components/admin/AdminRoute';
-import { Transportadora } from '@prisma/client';
+// Tipo retornado pela API de transportadoras
+interface TransportadoraApi {
+  id: string;
+  nome: string;
+  descricao: string;
+}
+
 
 interface Motorista {
   id: string;
@@ -34,12 +40,12 @@ interface Motorista {
   cpf: string;
   cnh: string;
   transportadoraId: string;
-  transportadora?: Transportadora;
+  transportadora?: TransportadoraApi;
 }
 
 function MotoristasContent() {
   const [motoristas, setMotoristas] = useState<Motorista[]>([]);
-  const [transportadoras, setTransportadoras] = useState<Transportadora[]>([]);
+  const [transportadoras, setTransportadoras] = useState<TransportadoraApi[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [openDialog, setOpenDialog] = useState(false);
@@ -55,7 +61,7 @@ function MotoristasContent() {
       setLoading(true);
       const [motRes, transRes] = await Promise.all([
         api.get<Motorista[]>('/api/motoristas'),
-        api.get<Transportadora[]>('/api/transportadoras')
+        api.get<TransportadoraApi[]>('/api/transportadoras')
       ]);
       setMotoristas(motRes.data);
       setTransportadoras(transRes.data);

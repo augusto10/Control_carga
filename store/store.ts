@@ -33,7 +33,7 @@ export type ControleCarga = {
   motorista: string;
   cpfMotorista?: string;  // Tornando opcional
   responsavel: string;
-  transportadora: 'ACCERT' | 'EXPRESSO_GOIAS';
+  transportadora: 'ACERT' | 'EXPRESSO_GOIAS';
   numeroManifesto?: string;
   qtdPallets: number;
   observacao?: string;
@@ -225,7 +225,7 @@ export const useStore = create<StoreState>((set) => ({
       
       console.log('[criarControle] Transportadora recebida:', controle.transportadora);
       
-      if (!['ACCERT', 'EXPRESSO_GOIAS'].includes(controle.transportadora)) {
+      if (!['ACERT', 'EXPRESSO_GOIAS'].includes(controle.transportadora)) {
         console.error('[criarControle] Transportadora inválida:', controle.transportadora);
         throw new Error('Transportadora inválida. Valor recebido: ' + controle.transportadora);
       }

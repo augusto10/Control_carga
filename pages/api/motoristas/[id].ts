@@ -1,5 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
+import { Transportadora } from '@prisma/client';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { id } = req.query as { id: string };
@@ -28,7 +29,7 @@ async function obter(id: string, res: NextApiResponse) {
       ...motoristaDb,
       transportadora: {
         id: motoristaDb.transportadoraId,
-        descricao: motoristaDb.transportadoraId === 'ACCERT' ? 'ACERT Transportes' : 'Expresso Goiás',
+        descricao: motoristaDb.transportadoraId === 'ACERT' ? 'ACERT Transportes' : 'Expresso Goiás',
       },
     };
     if (!motorista) return res.status(404).json({ error: 'Motorista não encontrado' });
@@ -45,13 +46,13 @@ async function atualizar(id: string, req: NextApiRequest, res: NextApiResponse) 
     telefone?: string;
     cpf?: string;
     cnh?: string;
-    transportadoraId?: string;
+    transportadoraId?: Transportadora;
   };
 
   try {
     const motorista = await prisma.motorista.update({
       where: { id },
-      data: { nome, telefone, cpf, cnh, transportadoraId },
+      data: { nome, telefone, cpf, cnh, transportadoraId: transportadoraId as Transportadora },
     });
     return res.status(200).json(motorista);
   } catch (error) {
