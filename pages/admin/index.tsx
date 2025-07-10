@@ -6,7 +6,6 @@ import {
   Box, 
   Card, 
   CardContent, 
-  CardHeader, 
   Avatar, 
   IconButton, 
   List, 
@@ -14,15 +13,14 @@ import {
   ListItemAvatar, 
   ListItemText,
   Divider,
-  LinearProgress,
-  useTheme
+  LinearProgress
 } from '@mui/material';
 import { 
   People as PeopleIcon, 
   Assignment as AssignmentIcon, 
   CheckCircle as CheckCircleIcon, 
   Pending as PendingIcon,
-  Warning as WarningIcon,
+
   Refresh as RefreshIcon
 } from '@mui/icons-material';
 import AdminLayout from '../../components/admin/AdminLayout';
@@ -46,7 +44,7 @@ interface DashboardStats {
 function AdminDashboardContent() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
-  const theme = useTheme();
+
 
   const loadStats = async () => {
     try {

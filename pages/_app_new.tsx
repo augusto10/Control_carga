@@ -1,4 +1,4 @@
-import { ThemeProvider, CssBaseline, Box, CircularProgress } from '@mui/material';
+import { ThemeProvider, CssBaseline } from '@mui/material';
 import { professionalTheme } from '../styles/theme';
 import { SnackbarProvider } from 'notistack';
 import { AppProps } from 'next/app';
@@ -14,7 +14,6 @@ const publicRoutes = ['/login', '/esqueci-senha', '/cadastro'];
 
 function MyApp({ Component, pageProps }: AppProps) {
   const [mounted, setMounted] = useState(false);
-  const [loading, setLoading] = useState(false); // Inicialmente false, pode ser alterado conforme necessário
   const router = useRouter();
   const isPublicRoute = publicRoutes.includes(router.pathname);
 
@@ -40,25 +39,6 @@ function MyApp({ Component, pageProps }: AppProps) {
     );
   };
 
-  // Componente de carregamento global
-  const GlobalLoader = () => (
-    <Box
-      sx={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        width: '100%',
-        height: '100%',
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: 'rgba(255, 255, 255, 0.8)',
-        zIndex: 9999,
-      }}
-    >
-      <CircularProgress size={60} />
-    </Box>
-  );
 
   return (
     <ThemeProvider theme={professionalTheme}>
@@ -70,8 +50,6 @@ function MyApp({ Component, pageProps }: AppProps) {
       >
         <AuthProvider>
           <ConfiguracaoProvider>
-            {/* Mostrar o loader global quando estiver carregando configurações */}
-            {loading && <GlobalLoader />}
             {getLayout(<Component {...pageProps} />)}
           </ConfiguracaoProvider>
         </AuthProvider>

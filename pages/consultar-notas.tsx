@@ -97,6 +97,18 @@ const ConsultarNotas = () => {
     pagina * linhasPorPagina + linhasPorPagina
   );
 
+  const handleExcluirNota = async (id: string) => {
+    try {
+      // TODO: Implementar lógica de exclusão de nota
+      console.log('Excluindo nota:', id);
+      // Exemplo de implementação:
+      // await api.delete(`/api/notas/${id}`);
+      // await carregarNotas();
+    } catch (error) {
+      console.error('Erro ao excluir nota:', error);
+    }
+  };
+
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
       <Box sx={{ mb: 4 }}>
@@ -251,7 +263,6 @@ const ConsultarNotas = () => {
                       )}
                     </TableCell>
                   </TableRow>
-                ))
                 ))
               )}
             </TableBody>
