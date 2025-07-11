@@ -271,8 +271,25 @@ export function AuthProvider({ children }: AuthProviderProps) {
       });
       
       // Redireciona com base no tipo de usuário
-      const redirectPath = userResponse.data.user.tipo === USER_TYPES.ADMIN ? '/admin' : '/dashboard';
-      console.log(`[AuthContext] Redirecionando para: ${redirectPath}`);
+      const loggedInUser = userResponse.data.user;
+      let redirectPath = '/'; // Rota padrão
+
+      switch (loggedInUser.tipo) {
+        case 'ADMIN':
+          redirectPath = '/admin/dashboard';
+          break;
+        case 'SEPARADOR':
+        case 'CONFERENTE':
+        case 'AUDITOR':
+        case 'GERENTE':
+          redirectPath = '/';
+          break;
+        default:
+          redirectPath = '/acesso-negado';
+          break;
+      }
+
+      console.log(`[AuthContext] Redirecionando usuário do tipo ${loggedInUser.tipo} para ${redirectPath}`);
       await router.push(redirectPath);
       
     } catch (error: any) {

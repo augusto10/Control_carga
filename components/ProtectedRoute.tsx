@@ -8,7 +8,7 @@ import { USER_TYPES } from '../types/auth-types';
 // Lista de rotas públicas que não requerem autenticação
 const PUBLIC_ROUTES = ['/login', '/esqueci-senha', '/cadastro'];
 
-type TipoUsuario = typeof USER_TYPES.ADMIN | typeof USER_TYPES.GERENTE | typeof USER_TYPES.USUARIO;
+type TipoUsuario = typeof USER_TYPES.ADMIN | typeof USER_TYPES.GERENTE | typeof USER_TYPES.USUARIO | typeof USER_TYPES.SEPARADOR | typeof USER_TYPES.AUDITOR | typeof USER_TYPES.CONFERENTE;
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -18,7 +18,7 @@ interface ProtectedRouteProps {
 
 export default function ProtectedRoute({ 
   children, 
-  allowedRoles = [USER_TYPES.ADMIN, USER_TYPES.GERENTE, USER_TYPES.USUARIO],
+  allowedRoles = [USER_TYPES.ADMIN, USER_TYPES.GERENTE, USER_TYPES.USUARIO, USER_TYPES.SEPARADOR, USER_TYPES.AUDITOR, USER_TYPES.CONFERENTE],
   redirectTo = '/login' 
 }: ProtectedRouteProps) {
   const { user, isAuthenticated, isLoading } = useAuth();

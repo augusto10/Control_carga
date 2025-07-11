@@ -207,12 +207,17 @@ const menuItems = [
     icon: <ListAltIcon />,
     subItems: [
       {
+        text: 'Cadastrar Separação',
+        icon: <PlaylistAddIcon />,
+        path: '/separacao-conferencia/separadores'
+      },
+      {
         text: 'Separadores',
         icon: <PersonIcon />,
         path: '/separacao-conferencia/separadores'
       },
       {
-        text: 'Conferentes',
+        text: 'Confirmar Separação',
         icon: <PersonIcon />,
         path: '/separacao-conferencia/conferentes'
       },
@@ -352,57 +357,37 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
           </ButtonComponent>
           <Collapse in={isSubmenuOpen} timeout="auto" unmountOnExit>
             <List component="div" disablePadding>
-              {item.text === 'Separação e Conferência'
-              ? item.subItems
-                  .filter((subItem: any) => {
-                    if (!user) return false;
-                    switch (user.tipo) {
-                      case 'SEPARADOR':
-                        return subItem.text === 'Separadores';
-                      case 'CONFERENTE':
-                        return subItem.text === 'Conferentes';
-                      case 'AUDITOR':
-                        return subItem.text === 'Auditores';
-                      case 'GERENTE':
-                        return subItem.text === 'Gerentes';
-                      default:
-                        return false;
-                    }
-                  })
-                  .map((subItem: any) => (
-                    <Link href={subItem.path} key={subItem.path} passHref>
-                      <SubMenuItemButton 
-                        className={isActive(subItem.path, true) ? 'active' : ''}
-                      >
-                        <ListItemIcon sx={{ minWidth: 0, mr: 2, justifyContent: 'center' }}>
-                          {subItem.icon}
-                        </ListItemIcon>
-                        <ListItemText 
-                          primary={subItem.text} 
-                          primaryTypographyProps={{
-                            fontSize: '0.9rem',
-                            color: isActive(subItem.path, true) ? 'primary.main' : 'text.secondary',
-                          }}
-                          sx={{ opacity: open ? 1 : 0 }} 
-                        />
-                      </SubMenuItemButton>
-                    </Link>
-                  ))
-              : item.subItems.map((subItem: any) => (
+              {item.subItems
+                .filter((subItem: any) => {
+                  if (!user) return true; // Mostra tudo se não houver usuário (ou pode ser false)
+                  if (item.text !== 'Separação e Conferência') return true; // Não filtra outros menus
+
+                  // Lógica de filtro para 'Separação e Conferência'
+                  const userRole = user.tipo;
+                  if (userRole === 'ADMIN' || userRole === 'GERENTE') return true;
+
+                  const path = subItem.path.toLowerCase();
+                  if (userRole === 'SEPARADOR' && path.includes('separadores')) return true;
+                  if (userRole === 'CONFERENTE' && path.includes('conferentes')) return true;
+                  if (userRole === 'AUDITOR' && path.includes('auditores')) return true;
+
+                  return false;
+                })
+                .map((subItem: any) => (
                   <Link href={subItem.path} key={subItem.path} passHref>
-                    <SubMenuItemButton 
+                    <SubMenuItemButton
                       className={isActive(subItem.path, true) ? 'active' : ''}
                     >
                       <ListItemIcon sx={{ minWidth: 0, mr: 2, justifyContent: 'center' }}>
                         {subItem.icon}
                       </ListItemIcon>
-                      <ListItemText 
-                        primary={subItem.text} 
+                      <ListItemText
+                        primary={subItem.text}
                         primaryTypographyProps={{
                           fontSize: '0.9rem',
                           color: isActive(subItem.path, true) ? 'primary.main' : 'text.secondary',
                         }}
-                        sx={{ opacity: open ? 1 : 0 }} 
+                        sx={{ opacity: open ? 1 : 0 }}
                       />
                     </SubMenuItemButton>
                   </Link>

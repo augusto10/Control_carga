@@ -33,19 +33,19 @@ export default function Navbar() {
 
             {isAuthenticated && (
               <>
-                <Link href="/adicionar-notas" passHref>
+                <Link href="/separacao-conferencia/separadores" passHref>
                   <Button color="inherit" sx={{ fontWeight: 600 }}>
-                    {isMobile ? '➕' : 'Adicionar Notas'}
+                    {isMobile ? '➕' : 'Separar Pedido'}
                   </Button>
                 </Link>
-                <Link href="/criar-controle" passHref>
+                <Link href="/separacao-conferencia/conferentes" passHref>
                   <Button color="inherit" sx={{ fontWeight: 600 }}>
-                    {isMobile ? '📝' : 'Criar Controle'}
+                    {isMobile ? '📋' : 'Conferir Pedido'}
                   </Button>
                 </Link>
-                <Link href="/listar-controles" passHref>
+                <Link href="/relatorios/conferencias" passHref>
                   <Button color="inherit" sx={{ fontWeight: 600 }}>
-                    {isMobile ? '📋' : 'Listar Controles'}
+                    {isMobile ? '📊' : 'Relatórios'}
                   </Button>
                 </Link>
                 

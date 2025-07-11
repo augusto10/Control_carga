@@ -33,6 +33,7 @@ import {
 import { 
   Edit as EditIcon, 
   CheckCircle as CheckCircleIcon,
+  Delete as DeleteIcon,
   Pending as PendingIcon,
   Refresh as RefreshIcon
 } from '@mui/icons-material';
@@ -163,6 +164,39 @@ function GerenciarControlesContent() {
     }
   };
 
+  const handleExcluirControle = async (id: string) => {
+    if (!window.confirm('Tem certeza que deseja excluir este controle? Esta ação não pode ser desfeita.')) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await api.delete(`/api/controles/${id}`);
+      await carregarControles();
+      setSnackbar({
+        open: true,
+        message: 'Controle excluído com sucesso!',
+        severity: 'success'
+      });
+    } catch (error: unknown) {
+      console.error('Erro ao excluir controle:', error);
+      const errorMessage = error && typeof error === 'object' && 'response' in error &&
+                         error.response && typeof error.response === 'object' &&
+                         'data' in error.response &&
+                         error.response.data && typeof error.response.data === 'object' &&
+                         'message' in error.response.data ?
+                         String(error.response.data.message) : 'Erro ao excluir controle';
+
+      setSnackbar({
+        open: true,
+        message: errorMessage,
+        severity: 'error' as const
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleFinalizarControle = async (id: string) => {
     if (!window.confirm('Tem certeza que deseja finalizar este controle?')) {
       return;
@@ -255,6 +289,7 @@ function GerenciarControlesContent() {
         <Button 
           variant="contained" 
           color="primary" 
+          size="small"
           startIcon={<RefreshIcon />}
           onClick={carregarControles}
           disabled={loading}
@@ -318,6 +353,13 @@ function GerenciarControlesContent() {
                       size="small"
                     >
                       <EditIcon fontSize="small" />
+                    </IconButton>
+                    <IconButton 
+                      onClick={() => handleExcluirControle(controle.id)}
+                      color="error"
+                      size="small"
+                    >
+                      <DeleteIcon fontSize="small" />
                     </IconButton>
                     {controle.status !== 'FINALIZADO' && (
                       <IconButton 

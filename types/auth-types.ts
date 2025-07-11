@@ -45,7 +45,10 @@ export interface ProtectedRouteProps {
 export const USER_TYPES = {
   ADMIN: 'ADMIN' as TipoUsuario,
   GERENTE: 'GERENTE' as TipoUsuario,
-  USUARIO: 'USUARIO' as TipoUsuario
+  USUARIO: 'USUARIO' as TipoUsuario,
+  SEPARADOR: 'SEPARADOR' as TipoUsuario,
+  AUDITOR: 'AUDITOR' as TipoUsuario,
+  CONFERENTE: 'CONFERENTE' as TipoUsuario
 } as const;
 
 export type UserTypes = typeof USER_TYPES[keyof typeof USER_TYPES];

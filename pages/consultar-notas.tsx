@@ -18,8 +18,9 @@ import {
   IconButton,
   Tooltip
 } from '@mui/material';
-import { Search, FilterList, Refresh } from '@mui/icons-material';
+import { Search, FilterList, Refresh, Delete as DeleteIcon } from '@mui/icons-material';
 import { useStore } from '../store/store';
+import { useSnackbar } from 'notistack';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import formatISO9075 from 'date-fns/formatISO9075';
@@ -41,7 +42,8 @@ const ConsultarNotas = () => {
   const [linhasPorPagina, setLinhasPorPagina] = useState(10);
   const [carregando, setCarregando] = useState(true);
   
-  const { notas, fetchNotas } = useStore();
+  const { enqueueSnackbar } = useSnackbar();
+  const { notas, fetchNotas, deleteNota } = useStore();
 
   useEffect(() => {
     carregarNotas();
@@ -98,14 +100,45 @@ const ConsultarNotas = () => {
   );
 
   const handleExcluirNota = async (id: string) => {
+    console.log(`[handleExcluirNota] Iniciando exclusão da nota ${id}`);
+    
+    if (!confirm('Tem certeza que deseja excluir esta nota? Esta ação não pode ser desfeita.')) {
+      console.log('[handleExcluirNota] Usuário cancelou a exclusão');
+      return;
+    }
+
     try {
-      // TODO: Implementar lógica de exclusão de nota
-      console.log('Excluindo nota:', id);
-      // Exemplo de implementação:
-      // await api.delete(`/api/notas/${id}`);
-      // await carregarNotas();
+      console.log(`[handleExcluirNota] Chamando deleteNota para a nota ${id}`);
+      await deleteNota(id);
+      console.log(`[handleExcluirNota] Nota ${id} excluída com sucesso`);
+      
+      enqueueSnackbar('Nota excluída com sucesso!', { 
+        variant: 'success',
+        autoHideDuration: 3000 
+      });
+      
+      console.log(`[handleExcluirNota] Recarregando lista de notas...`);
+      await carregarNotas();
+      console.log(`[handleExcluirNota] Lista de notas recarregada`);
+      
     } catch (error) {
-      console.error('Erro ao excluir nota:', error);
+      console.error('[handleExcluirNota] Erro ao excluir nota:', error);
+      
+      let errorMessage = 'Erro ao excluir nota. Tente novamente.';
+      
+      if (error instanceof Error) {
+        console.error('[handleExcluirNota] Mensagem de erro:', error.message);
+        errorMessage = error.message;
+      }
+      
+      enqueueSnackbar(errorMessage, { 
+        variant: 'error',
+        autoHideDuration: 5000,
+        anchorOrigin: {
+          vertical: 'top',
+          horizontal: 'center',
+        }
+      });
     }
   };
 
@@ -253,14 +286,26 @@ const ConsultarNotas = () => {
                         </Tooltip>
                       ) : '-'}
                     </TableCell>
-                    <TableCell>
-                      {!nota.controleId && (
-                        <Tooltip title="Excluir Nota">
-                          <IconButton color="error" onClick={() => handleExcluirNota(nota.id)}>
-                            <span className="material-icons">delete</span>
-                          </IconButton>
-                        </Tooltip>
-                      )}
+                    <TableCell align="right">
+                      <Tooltip title="Excluir nota">
+                        <IconButton 
+                          size="small" 
+                          color="error" 
+                          onClick={(e) => {
+                            console.log('[UI] Botão de exclusão clicado para nota:', nota.id);
+                            console.log('[UI] Evento de clique:', e);
+                            console.log('[UI] Nota está vinculada?', !!nota.controleId);
+                            if (!nota.controleId) {
+                              handleExcluirNota(nota.id);
+                            } else {
+                              console.log('[UI] Botão de exclusão desabilitado - Nota vinculada');
+                            }
+                          }}
+                          disabled={!!nota.controleId} // Desabilita se a nota estiver vinculada a um controle
+                        >
+                          <DeleteIcon />
+                        </IconButton>
+                      </Tooltip>
                     </TableCell>
                   </TableRow>
                 ))

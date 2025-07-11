@@ -23,6 +23,36 @@ model ControleCarga {
   finalizado      Boolean        @default(false)
   cpfMotorista    String         @default("PENDENTE")
   notas           NotaFiscal[]
+  pedidos         Pedido[]
+
+  // --- Campos da Separação ---
+  separadorId             String?
+  separador               Usuario?       @relation("Separacao", fields: [separadorId], references: [id])
+
+  // --- Campos da Conferência ---
+  conferenciaRealizada    Boolean        @default(false)
+  dataConferencia         DateTime?
+  conferenteId            String?
+  conferente              Usuario?       @relation("Conferencia", fields: [conferenteId], references: [id])
+  pedido100               Boolean?
+  inconsistencia          Boolean?
+  motivosInconsistencia   String[]
+
+  // --- Campos da Auditoria ---
+  auditoriaRealizada      Boolean        @default(false)
+  dataAuditoria           DateTime?
+  auditorId               String?
+  auditor                 Usuario?       @relation("Auditoria", fields: [auditorId], references: [id])
+  auditoriaComErro        Boolean?
+  observacaoAuditoria     String?
+}
+
+model Pedido {
+  id          String         @id @default(uuid())
+  numeroPedido String
+  dataCriacao DateTime       @default(now())
+  controleId  String?
+  controle    ControleCarga? @relation(fields: [controleId], references: [id])
 }
 
 model NotaFiscal {
@@ -48,6 +78,11 @@ model Usuario {
   ultimoAcesso     DateTime?
   notas            NotaFiscal[]
   auditoriasAcesso AuditoriaAcesso[]
+
+  // Relações para ControleCarga
+  controlesSeparados  ControleCarga[] @relation("Separacao")
+  controlesConferidos ControleCarga[] @relation("Conferencia")
+  controlesAuditados  ControleCarga[] @relation("Auditoria")
 }
 
 model AuditoriaAcesso {
@@ -73,12 +108,11 @@ model ConfiguracaoSistema {
   tipo            String   @default("string")
   opcoes          String?
   editavel        Boolean  @default(true)
-  dataCriacao     DateTime @default(now())
+  dataCriacao          DateTime @default(now())
   dataAtualizacao DateTime @updatedAt
 
   @@index([chave])
 }
-
 
 model Motorista {
   id             String         @id @default(uuid())

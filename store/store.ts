@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { useSnackbar } from 'notistack';
+import { api } from '../services/api';
 
 export type ControleResumido = {
   id: string;
@@ -55,6 +56,7 @@ interface StoreState {
   vincularNotas: (controleId: string, notasIds: string[]) => Promise<void>;
   finalizarControle: (controleId: string) => Promise<void>;
   atualizarControle: (controleId: string, dados: Partial<Omit<ControleCarga, 'id' | 'dataCriacao' | 'notas'>>) => Promise<ControleCarga | null>;
+  deleteNota: (notaId: string) => Promise<boolean>;
 }
 
 export const useStore = create<StoreState>((set) => ({
@@ -65,19 +67,43 @@ export const useStore = create<StoreState>((set) => ({
   loading: false,
 
   fetchNotas: async (start?: string, end?: string) => {
+    console.log('[fetchNotas] Iniciando busca de notas');
+    console.log('[fetchNotas] Parâmetros:', { start, end });
+    
     const params = new URLSearchParams();
     if (start) params.append('start', start);
     if (end) params.append('end', end);
-    const response = await fetch(`/api/notas${params.toString() ? '?' + params.toString() : ''}`, {
-      headers: {
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0'
-      },
-      credentials: 'include' // Inclui cookies na requisição
-    });
-    const notas = await response.json();
-    set({ notas });
+    
+    const url = `/api/notas${params.toString() ? '?' + params.toString() : ''}`;
+    console.log('[fetchNotas] URL da requisição:', url);
+    
+    try {
+      const response = await fetch(url, {
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+          'Accept': 'application/json'
+        },
+        credentials: 'include' // Inclui cookies na requisição
+      });
+      
+      console.log('[fetchNotas] Resposta recebida, status:', response.status);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[fetchNotas] Erro na resposta:', errorText);
+        throw new Error('Erro ao carregar notas');
+      }
+      
+      const notas = await response.json();
+      console.log(`[fetchNotas] ${notas.length} notas carregadas`);
+      set({ notas });
+      
+    } catch (error) {
+      console.error('[fetchNotas] Erro ao buscar notas:', error);
+      throw error;
+    }
   },
 
   fetchControles: async () => {
@@ -412,6 +438,77 @@ export const useStore = create<StoreState>((set) => ({
     } catch (error) {
       console.error('Erro ao atualizar controle:', error);
       return null;
+    }
+  },
+
+  deleteNota: async (notaId: string): Promise<boolean> => {
+    console.log(`[deleteNota] Iniciando exclusão da nota ${notaId}`);
+    
+    try {
+      // Usando a instância do Axios configurada
+      console.log(`[deleteNota] Iniciando requisição DELETE para /api/notas/${notaId}`);
+      
+      const response = await api.delete(`/api/notas/${notaId}`, {
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      });
+      
+      console.log(`[deleteNota] Resposta recebida:`, {
+        status: response.status,
+        data: response.data
+      });
+      
+      // Remove a nota do estado local
+      console.log(`[deleteNota] Removendo nota ${notaId} do estado local`);
+      set((state) => ({
+        notas: state.notas.filter((nota) => {
+          const shouldKeep = nota.id !== notaId;
+          if (!shouldKeep) {
+            console.log(`[deleteNota] Nota ${notaId} removida do estado`);
+          }
+          return shouldKeep;
+        })
+      }));
+
+      console.log(`[deleteNota] Nota ${notaId} excluída com sucesso`);
+      return true;
+      
+    } catch (error: any) {
+      console.error('[deleteNota] Erro ao excluir nota:', error);
+      
+      let errorMessage = 'Erro ao excluir nota. Tente novamente.';
+      
+      if (error.response) {
+        // A requisição foi feita e o servidor respondeu com um status fora do intervalo 2xx
+        console.error('[deleteNota] Erro na resposta:', {
+          status: error.response.status,
+          data: error.response.data,
+          headers: error.response.headers
+        });
+        
+        if (error.response.data && error.response.data.error) {
+          errorMessage = error.response.data.error;
+        } else if (error.response.status === 401) {
+          errorMessage = 'Sessão expirada. Por favor, faça login novamente.';
+        } else if (error.response.status === 403) {
+          errorMessage = 'Você não tem permissão para excluir esta nota.';
+        } else if (error.response.status === 404) {
+          errorMessage = 'Nota não encontrada.';
+        }
+      } else if (error.request) {
+        // A requisição foi feita mas não houve resposta
+        console.error('[deleteNota] Sem resposta do servidor:', error.request);
+        errorMessage = 'Não foi possível conectar ao servidor. Verifique sua conexão de internet.';
+      } else {
+        // Algo aconteceu ao configurar a requisição
+        console.error('[deleteNota] Erro ao configurar a requisição:', error.message);
+        errorMessage = `Erro ao processar a requisição: ${error.message}`;
+      }
+      
+      throw new Error(errorMessage);
     }
   },
 }));

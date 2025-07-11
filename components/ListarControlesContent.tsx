@@ -11,6 +11,7 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  IconButton,
   Button,
   Chip,
   CircularProgress,
@@ -30,6 +31,8 @@ import { useSnackbar } from 'notistack';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
+import DeleteIcon from '@mui/icons-material/Delete';
+import { api } from '../services/api';
 
 
 
@@ -238,6 +241,24 @@ const ListarControlesContent: React.FC = () => {
     }
   };
 
+  const handleExcluirControle = async (id: string) => {
+    if (!window.confirm('Tem certeza que deseja excluir este controle? Esta ação não pode ser desfeita.')) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await api.delete(`/api/controles/${id}`);
+      await fetchControles();
+      enqueueSnackbar('Controle excluído com sucesso!', { variant: 'success' });
+    } catch (error: unknown) {
+      console.error('Erro ao excluir controle:', error);
+      enqueueSnackbar('Erro ao excluir controle', { variant: 'error' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
@@ -293,11 +314,12 @@ const ListarControlesContent: React.FC = () => {
                     />
                   </TableCell>
                   <TableCell align="right">
-                    <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+                    <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end' }}>
                       <Button 
                         variant="outlined" 
                         size="small"
                         onClick={() => router.push(`/controle/${controle.id}`)}
+                        sx={{ minWidth: '60px', fontSize: '0.7rem', padding: '2px 8px' }}
                       >
                         Ver
                       </Button>
@@ -305,129 +327,142 @@ const ListarControlesContent: React.FC = () => {
                         variant="outlined" 
                         size="small"
                         onClick={() => gerarPdf(controle as unknown as Controle, idx + 1)}
+                        sx={{ minWidth: '60px', fontSize: '0.7rem', padding: '2px 8px' }}
                       >
                         PDF
                       </Button>
                       {canEdit(controle) && (
-                        <Button
-                          variant="outlined"
-                          size="small"
-                          onClick={() => handleOpenEdit(controle)}
-                        >
-                          Editar
-                        </Button>
+                        <>
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            onClick={() => handleOpenEdit(controle)}
+                            sx={{ minWidth: '60px', fontSize: '0.7rem', padding: '2px 8px' }}
+                          >
+                            Editar
+                          </Button>
+                          <IconButton 
+                            onClick={() => handleExcluirControle(controle.id)} 
+                            color="error" 
+                            size="small"
+                            sx={{ padding: '4px' }}
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </>
                       )}
-                      {!controle.finalizado && (
-                        <Button 
-                          variant="contained" 
-                          color="primary" 
-                          size="small"
-                          onClick={() => handleFinalizarControle(controle.id)}
-                        >
-                          Finalizar
-                        </Button>
-                      )}
-                    </Box>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </Paper>
-          {editing && (
-        <Dialog open onClose={handleCloseEdit} maxWidth="sm" fullWidth>
-          <DialogTitle>Editar Controle</DialogTitle>
-          <DialogContent dividers>
-            <TextField
-              margin="normal"
-              fullWidth
-              label="Motorista"
-              value={editData.motorista ?? ''}
-              onChange={e => setEditData({ ...editData, motorista: e.target.value })}
-            />
-            <TextField
-              margin="normal"
-              fullWidth
-              label="Responsável"
-              value={editData.responsavel ?? ''}
-              onChange={e => setEditData({ ...editData, responsavel: e.target.value })}
-            />
-            <TextField
-              margin="normal"
-              fullWidth
-              label="CPF Motorista"
-              value={editData.cpfMotorista ?? ''}
-              onChange={e => setEditData({ ...editData, cpfMotorista: e.target.value })}
-            />
-            <FormControl fullWidth margin="normal">
-              <InputLabel id="transportadora-label">Transportadora</InputLabel>
-              <Select
-                labelId="transportadora-label"
-                value={editData.transportadora ?? 'ACERT'}
-                label="Transportadora"
-                onChange={e => setEditData({ ...editData, transportadora: e.target.value as any })}
-              >
-                <MenuItem value="ACERT">ACERT</MenuItem>
-                <MenuItem value="EXPRESSO_GOIAS">EXPRESSO GOIÁS</MenuItem>
-              </Select>
-            </FormControl>
-            <TextField
-              margin="normal"
-              type="number"
-              fullWidth
-              label="Quantidade de Pallets"
-              value={editData.qtdPallets ?? 0}
-              onChange={e => setEditData({ ...editData, qtdPallets: Number(e.target.value) })}
-            />
-            <TextField
-              margin="normal"
-              fullWidth
-              multiline
-              minRows={3}
-              label="Observação"
-              value={editData.observacao ?? ''}
-              onChange={e => setEditData({ ...editData, observacao: e.target.value })}
-            />
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={handleCloseEdit}>Cancelar</Button>
-            <Button variant="contained" onClick={handleSaveEdit}>Salvar</Button>
-          </DialogActions>
-        </Dialog>
-      )}
-          {/* Dialog de visualização do PDF */}
-      {pdfUrl && (
-        <Dialog open={pdfOpen} onClose={() => setPdfOpen(false)} fullWidth maxWidth="md">
-          <DialogTitle>Pré-visualização do PDF</DialogTitle>
-          <DialogContent dividers sx={{ height: 600 }}>
-            <iframe src={pdfUrl} width="100%" height="100%" style={{ border: 'none' }} />
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setPdfOpen(false)}>Fechar</Button>
+                    {!controle.finalizado && (
+                      <Button 
+                        variant="contained" 
+                        color="primary" 
+                        size="small"
+                        onClick={() => handleFinalizarControle(controle.id)}
+                        sx={{ minWidth: '80px', fontSize: '0.7rem', padding: '2px 8px' }}
+                      >
+                        Finalizar
+                      </Button>
+                    )}
+                  </Box>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
+    </Paper>
+    {editing && (
+      <Dialog open onClose={handleCloseEdit} maxWidth="sm" fullWidth>
+        <DialogTitle>Editar Controle</DialogTitle>
+        <DialogContent dividers>
+          <TextField
+            margin="normal"
+            fullWidth
+            label="Motorista"
+            value={editData.motorista ?? ''}
+            onChange={e => setEditData({ ...editData, motorista: e.target.value })}
+          />
+          <TextField
+            margin="normal"
+            fullWidth
+            label="Responsável"
+            value={editData.responsavel ?? ''}
+            onChange={e => setEditData({ ...editData, responsavel: e.target.value })}
+          />
+          <TextField
+            margin="normal"
+            fullWidth
+            label="CPF Motorista"
+            value={editData.cpfMotorista ?? ''}
+            onChange={e => setEditData({ ...editData, cpfMotorista: e.target.value })}
+          />
+          <FormControl fullWidth margin="normal">
+            <InputLabel id="transportadora-label">Transportadora</InputLabel>
+            <Select
+              labelId="transportadora-label"
+              value={editData.transportadora ?? 'ACERT'}
+              label="Transportadora"
+              onChange={e => setEditData({ ...editData, transportadora: e.target.value as any })}
+            >
+              <MenuItem value="ACERT">ACERT</MenuItem>
+              <MenuItem value="EXPRESSO_GOIAS">EXPRESSO GOIÁS</MenuItem>
+            </Select>
+          </FormControl>
+          <TextField
+            margin="normal"
+            type="number"
+            fullWidth
+            label="Quantidade de Pallets"
+            value={editData.qtdPallets ?? 0}
+            onChange={e => setEditData({ ...editData, qtdPallets: Number(e.target.value) })}
+          />
+          <TextField
+            margin="normal"
+            fullWidth
+            multiline
+            minRows={3}
+            label="Observação"
+            value={editData.observacao ?? ''}
+            onChange={e => setEditData({ ...editData, observacao: e.target.value })}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseEdit}>Cancelar</Button>
+          <Button variant="contained" onClick={handleSaveEdit}>Salvar</Button>
+        </DialogActions>
+      </Dialog>
+    )}
+    {/* Dialog de visualização do PDF */}
+    {pdfUrl && (
+      <Dialog open={pdfOpen} onClose={() => setPdfOpen(false)} fullWidth maxWidth="md">
+        <DialogTitle>Pré-visualização do PDF</DialogTitle>
+        <DialogContent dividers sx={{ height: 600 }}>
+          <iframe src={pdfUrl} width="100%" height="100%" style={{ border: 'none' }} />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPdfOpen(false)}>Fechar</Button>
+          <Button
+            onClick={() => {
+              const a = document.createElement('a');
+              a.href = pdfUrl;
+              a.download = 'romaneio.pdf';
+              a.click();
+            }}
+          >
+            Baixar
+          </Button>
+          {navigator.share && (
             <Button
               onClick={() => {
-                const a = document.createElement('a');
-                a.href = pdfUrl;
-                a.download = 'romaneio.pdf';
-                a.click();
+                navigator.share({ title: 'Romaneio', url: pdfUrl });
               }}
             >
-              Baixar
+              Compartilhar
             </Button>
-            {navigator.share && (
-              <Button
-                onClick={() => {
-                  navigator.share({ title: 'Romaneio', url: pdfUrl });
-                }}
-              >
-                Compartilhar
-              </Button>
-            )}
-          </DialogActions>
-        </Dialog>
-      )}
-    </Container>
+          )}
+        </DialogActions>
+      </Dialog>
+    )}
+  </Container>
   );
 };
 
