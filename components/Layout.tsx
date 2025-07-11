@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../contexts/AuthContext';
 import { styled, useTheme, Theme, CSSObject } from '@mui/material/styles';
@@ -30,6 +30,7 @@ import {
   Receipt as ReceiptIcon,
   PlaylistAdd as PlaylistAddIcon,
   ListAlt as ListAltIcon,
+  AssignmentTurnedIn as AssignmentTurnedInIcon,
   ChevronLeft as ChevronLeftIcon,
   ChevronRight as ChevronRightIcon,
   Home as HomeIcon,
@@ -175,20 +176,19 @@ const menuItems = [
     subItems: [
       { 
         text: 'Adicionar Notas', 
-        icon: <PlaylistAddIcon fontSize="small" />, 
+        icon: <PlaylistAddIcon />, 
         path: '/adicionar-notas' 
       },
       { 
         text: 'Consultar Notas', 
-        icon: <SearchIcon fontSize="small" />, 
-        path: '/consultar-notas' 
-      },
-
+        icon: <SearchIcon />, 
+        path: '/listar-notas' 
+      }
     ]
   },
-  { 
-    text: 'Controles', 
-    icon: <TruckIcon />,
+  {
+    text: 'Controles',
+    icon: <ListAltIcon />,
     subItems: [
       { 
         text: 'Criar Controle', 
@@ -201,6 +201,37 @@ const menuItems = [
         path: '/listar-controles' 
       },
     ]
+  },
+  {
+    text: 'Separação e Conferência',
+    icon: <ListAltIcon />,
+    subItems: [
+      {
+        text: 'Separadores',
+        icon: <PersonIcon />,
+        path: '/separacao-conferencia/separadores'
+      },
+      {
+        text: 'Conferentes',
+        icon: <PersonIcon />,
+        path: '/separacao-conferencia/conferentes'
+      },
+      {
+        text: 'Auditores',
+        icon: <PersonIcon />,
+        path: '/separacao-conferencia/auditores'
+      },
+      {
+        text: 'Gerentes',
+        icon: <AdminIcon />,
+        path: '/separacao-conferencia/gerentes'
+      }
+    ]
+  },
+  {
+    text: 'Checklist Empilhadeiras',
+    icon: <AssignmentTurnedInIcon />,
+    path: '/checklist-empilhadeiras',
   },
   { 
     text: 'Relatórios', 
@@ -315,34 +346,70 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
 
     if (hasSubItems) {
       return (
-        <div key={item.text}>
+        <React.Fragment key={item.text}>
           <ButtonComponent {...buttonProps}>
             {content}
           </ButtonComponent>
           <Collapse in={isSubmenuOpen} timeout="auto" unmountOnExit>
             <List component="div" disablePadding>
-              {item.subItems.map((subItem: any) => (
-                <Link href={subItem.path} key={subItem.path} passHref>
-                  <SubMenuItemButton 
-                    className={isActive(subItem.path, true) ? 'active' : ''}
-                  >
-                    <ListItemIcon sx={{ minWidth: 0, mr: 2, justifyContent: 'center' }}>
-                      {subItem.icon}
-                    </ListItemIcon>
-                    <ListItemText 
-                      primary={subItem.text} 
-                      primaryTypographyProps={{
-                        fontSize: '0.9rem',
-                        color: isActive(subItem.path, true) ? 'primary.main' : 'text.secondary',
-                      }}
-                      sx={{ opacity: open ? 1 : 0 }} 
-                    />
-                  </SubMenuItemButton>
-                </Link>
-              ))}
+              {item.text === 'Separação e Conferência'
+              ? item.subItems
+                  .filter((subItem: any) => {
+                    if (!user) return false;
+                    switch (user.tipo) {
+                      case 'SEPARADOR':
+                        return subItem.text === 'Separadores';
+                      case 'CONFERENTE':
+                        return subItem.text === 'Conferentes';
+                      case 'AUDITOR':
+                        return subItem.text === 'Auditores';
+                      case 'GERENTE':
+                        return subItem.text === 'Gerentes';
+                      default:
+                        return false;
+                    }
+                  })
+                  .map((subItem: any) => (
+                    <Link href={subItem.path} key={subItem.path} passHref>
+                      <SubMenuItemButton 
+                        className={isActive(subItem.path, true) ? 'active' : ''}
+                      >
+                        <ListItemIcon sx={{ minWidth: 0, mr: 2, justifyContent: 'center' }}>
+                          {subItem.icon}
+                        </ListItemIcon>
+                        <ListItemText 
+                          primary={subItem.text} 
+                          primaryTypographyProps={{
+                            fontSize: '0.9rem',
+                            color: isActive(subItem.path, true) ? 'primary.main' : 'text.secondary',
+                          }}
+                          sx={{ opacity: open ? 1 : 0 }} 
+                        />
+                      </SubMenuItemButton>
+                    </Link>
+                  ))
+              : item.subItems.map((subItem: any) => (
+                  <Link href={subItem.path} key={subItem.path} passHref>
+                    <SubMenuItemButton 
+                      className={isActive(subItem.path, true) ? 'active' : ''}
+                    >
+                      <ListItemIcon sx={{ minWidth: 0, mr: 2, justifyContent: 'center' }}>
+                        {subItem.icon}
+                      </ListItemIcon>
+                      <ListItemText 
+                        primary={subItem.text} 
+                        primaryTypographyProps={{
+                          fontSize: '0.9rem',
+                          color: isActive(subItem.path, true) ? 'primary.main' : 'text.secondary',
+                        }}
+                        sx={{ opacity: open ? 1 : 0 }} 
+                      />
+                    </SubMenuItemButton>
+                  </Link>
+                ))}
             </List>
           </Collapse>
-        </div>
+        </React.Fragment>
       );
     }
 
@@ -357,7 +424,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh' }}>
-      <AppBar position="fixed" open={open} elevation={0}>
+      <AppBar position="fixed" open={open} elevation={0} sx={{ bgcolor: '#ff9800', color: '#fff' }}>
         {/* Adicionado elevation={0} para remover a sombra padrão do AppBar */}
         <Toolbar>
           <IconButton
