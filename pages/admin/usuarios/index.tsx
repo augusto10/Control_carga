@@ -50,8 +50,9 @@ interface Usuario {
 }
 
 function GerenciarUsuariosContent() {
-  const { user, isAuthenticated, logout } = useAuth();
-  const router = useRouter();
+  const { user } = useAuth();
+  // Removidas variáveis não utilizadas: isAuthenticated, logout, router
+  // Elas foram mantidas no comentário para referência futura, caso sejam necessárias
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -447,6 +448,30 @@ function GerenciarUsuariosContent() {
                       <Box fontWeight="medium">Usuário</Box>
                       <Typography variant="caption" color="text.secondary" fontSize="0.75rem">
                         Acesso básico ao sistema
+                      </Typography>
+                    </Box>
+                  </MenuItem>
+                  <MenuItem value="SEPARADOR">
+                    <Box>
+                      <Box fontWeight="medium">Separador</Box>
+                      <Typography variant="caption" color="text.secondary" fontSize="0.75rem">
+                        Acesso à área de Separação
+                      </Typography>
+                    </Box>
+                  </MenuItem>
+                  <MenuItem value="CONFERENTE">
+                    <Box>
+                      <Box fontWeight="medium">Conferente</Box>
+                      <Typography variant="caption" color="text.secondary" fontSize="0.75rem">
+                        Acesso à área de Conferência
+                      </Typography>
+                    </Box>
+                  </MenuItem>
+                  <MenuItem value="AUDITOR">
+                    <Box>
+                      <Box fontWeight="medium">Auditor</Box>
+                      <Typography variant="caption" color="text.secondary" fontSize="0.75rem">
+                        Acesso à área de Auditoria
                       </Typography>
                     </Box>
                   </MenuItem>

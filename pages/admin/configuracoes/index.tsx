@@ -19,7 +19,7 @@ import {
   Switch
 } from '@mui/material';
 import { Save as SaveIcon } from '@mui/icons-material';
-import { useAuth } from '../../../contexts/AuthContext';
+// useAuth removido pois não está sendo utilizado
 import AdminRoute from '../../../components/admin/AdminRoute';
 import { api } from '@/services/api';
 
@@ -33,7 +33,7 @@ interface ConfiguracoesSistema {
 }
 
 function ConfiguracoesContent() {
-  const { user } = useAuth();
+  // user removido pois não está sendo utilizado
   const [configuracoes, setConfiguracoes] = useState<ConfiguracoesSistema[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -85,13 +85,18 @@ function ConfiguracoesContent() {
     handleInputChange(id, String(checked));
   };
 
+  interface ConfiguracaoAtualizada {
+    id: string;
+    valor: string;
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     try {
       setSaving(true);
       
-      const configuracoesAtualizadas = configuracoes.map(({ id, valor }) => ({
+      const configuracoesAtualizadas: ConfiguracaoAtualizada[] = configuracoes.map(({ id, valor }) => ({
         id,
         valor
       }));

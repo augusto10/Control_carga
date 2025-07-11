@@ -1,4 +1,4 @@
-import { ThemeProvider, CssBaseline, Box, CircularProgress } from '@mui/material';
+import { ThemeProvider, CssBaseline } from '@mui/material';
 import { professionalTheme } from '../styles/theme';
 import { SnackbarProvider } from 'notistack';
 import { AppProps } from 'next/app';

@@ -1,6 +1,5 @@
 import { useState, useEffect, useContext } from 'react';
 import { useRouter } from 'next/router';
-import { ApiError, ApiResponse } from '../../types/api';
 import { api } from '../../services/api';
 import { 
   Container, 
@@ -43,6 +42,7 @@ function PerfilUsuarioContent() {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   const { user, updateUser } = auth;
+  // router mantido para uso futuro
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -52,20 +52,30 @@ function PerfilUsuarioContent() {
     id: string;
     nome: string;
     email: string;
-    tipo: string;
-    dataCriacao: string;
-    dataAtualizacao: string;
-  }
   const [success, setSuccess] = useState<string | null>(null);
   const [formData, setFormData] = useState<PerfilFormData>({
-    nome: '',
-    email: '',
+    nome: user?.nome || '',
+    email: user?.email || '',
     senhaAtual: '',
     novaSenha: '',
     confirmarSenha: ''
   });
 
-  // Carregar dados do usuário
+  // Interface para o tipo de erro da API
+  interface ApiErrorResponse {
+    response?: {
+      data?: {
+        message?: string;
+      };
+    };
+    message?: string;
+  }
+  
+  // Garantir que setSuccess está definido
+  const setSuccessMessage = (message: string | null) => {
+    setSuccess(message);
+  };
+
   useEffect(() => {
     if (user) {
       setFormData(prev => ({
@@ -106,7 +116,6 @@ function PerfilUsuarioContent() {
       return false;
     }
 
-    // Se estiver alterando a senha, validar os campos de senha
     if (formData.novaSenha || formData.confirmarSenha) {
       if (!formData.senhaAtual) {
         setError('A senha atual é obrigatória para alterar a senha');
@@ -141,23 +150,18 @@ function PerfilUsuarioContent() {
         email: formData.email.trim()
       };
       
-      // Se houver nova senha, adicionar ao objeto de atualização
       if (formData.novaSenha) {
         dataToUpdate.senhaAtual = formData.senhaAtual;
         dataToUpdate.novaSenha = formData.novaSenha;
       }
       
-      // Chamar a API para atualizar o perfil
       const response = await api.put('/api/auth/perfil', dataToUpdate);
       
-      // Atualizar o usuário no contexto de autenticação
       updateUser(response.data);
       
-      // Mostrar mensagem de sucesso
-      setSuccess('Perfil atualizado com sucesso!');
+      setSuccessMessage('Perfil atualizado com sucesso!');
       setEditing(false);
       
-      // Limpar os campos de senha
       setFormData(prev => ({
         ...prev,
         senhaAtual: '',
@@ -165,11 +169,11 @@ function PerfilUsuarioContent() {
         confirmarSenha: ''
       }));
       
-      // Fechar a mensagem de sucesso após 5 segundos
-      setTimeout(() => setSuccess(null), 5000);
-    } catch (err: any) {
-      console.error('Erro ao atualizar perfil:', err);
-      setError(err.message || 'Erro ao atualizar perfil. Tente novamente.');
+      setTimeout(() => setSuccessMessage(null), 5000);
+    } catch (error) {
+      console.error('Erro ao atualizar perfil:', error);
+      const errorMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Erro ao atualizar perfil. Tente novamente.';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -350,10 +354,10 @@ function PerfilUsuarioContent() {
       <Snackbar
         open={!!success}
         autoHideDuration={6000}
-        onClose={() => setSuccess(null)}
+        onClose={() => setSuccessMessage(null)}
         anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
       >
-        <Alert onClose={() => setSuccess(null)} severity="success" sx={{ width: '100%' }}>
+        <Alert onClose={() => setSuccessMessage(null)} severity="success" sx={{ width: '100%' }}>
           {success}
         </Alert>
       </Snackbar>

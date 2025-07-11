@@ -22,7 +22,16 @@ export default function ErrorPage({ statusCode }: { statusCode: number }) {
   );
 }
 
-ErrorPage.getInitialProps = ({ res, err }: any) => {
+interface ErrorProps {
+  res: {
+    statusCode?: number;
+  };
+  err: {
+    statusCode?: number;
+  };
+}
+
+ErrorPage.getInitialProps = ({ res, err }: ErrorProps) => {
   const statusCode = res ? res.statusCode : err ? err.statusCode : 404;
   return { statusCode };
 };

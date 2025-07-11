@@ -1,5 +1,4 @@
-import React, { useEffect } from 'react';
-import { useRouter } from 'next/router';
+import React from 'react';
 import { Box, CircularProgress } from '@mui/material';
 import dynamic from 'next/dynamic';
 import { useAuth } from '../contexts/AuthContext';
@@ -20,8 +19,7 @@ const AdicionarNotasContent = dynamic(
 );
 
 const AdicionarNotasPage = () => {
-  const router = useRouter();
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isLoading } = useAuth();
 
   // Se estiver carregando, mostra um loader
   if (isLoading) {

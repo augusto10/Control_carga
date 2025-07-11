@@ -19,14 +19,13 @@ import {
   Grid,
   Card,
   CardContent,
-  CardHeader,
-  IconButton
+  CardHeader
 } from '@mui/material';
 import { Save as SaveIcon, Refresh as RefreshIcon } from '@mui/icons-material';
+import { api } from '../../services/api';
+import { ApiResponse } from '../../types/api';
 import AdminLayout from '../../components/admin/AdminLayout';
 import AdminRoute from '../../components/admin/AdminRoute';
-import { api } from '../../services/api';
-import { ApiError, ApiResponse } from '../../types/api';
 
 interface Configuracoes {
   id: string;

@@ -1,14 +1,15 @@
-import { Container, Typography, Box, Card, CardContent, CardActionArea, Grid, CircularProgress } from '@mui/material';
+import { Container, Typography, Box, Card, CardContent, Grid, CircularProgress } from '@mui/material';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
+import { useEffect, useState } from 'react';
 import {
   Add as AddIcon,
   NoteAdd as NoteAddIcon,
   Search as SearchIcon,
-  ListAlt as ListAltIcon
 } from '@mui/icons-material';
+import ListAltIcon from '@mui/icons-material/ListAlt';
+import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
 import { useAuth } from '../contexts/AuthContext';
-import { useRouter } from 'next/router';
-import { useEffect, useState } from 'react';
 
 type MenuCard = {
   title: string;
@@ -48,6 +49,20 @@ function HomeContent() {
       href: '/listar-controles',
       color: '#9c27b0',
     },
+    {
+      title: 'Separação e Conferência',
+      description: 'Acesse funções de separação, conferência, auditoria e gerência',
+      icon: <ListAltIcon sx={{ fontSize: 40 }} />,
+      href: '/separacao-conferencia',
+      color: '#00796b',
+    },
+    {
+      title: 'Checklist Empilhadeiras',
+      description: 'Checklist rápido e obrigatório para operadores',
+      icon: <AssignmentTurnedInIcon sx={{ fontSize: 40 }} />,
+      href: '/checklist-empilhadeiras',
+      color: '#fbc02d',
+    }
   ];
 
   return (
@@ -61,41 +76,54 @@ function HomeContent() {
         </Typography>
       </Box>
 
-      <Grid container spacing={3}>
+      <Grid container spacing={3} alignItems="stretch" justifyContent="center" sx={{ mt: 2 }}>
         {menuCards.map((card) => (
-          <Grid item xs={12} sm={6} key={card.title}>
-            <Link href={card.href} passHref style={{ textDecoration: 'none' }}>
-              <Card 
+          <Grid item xs={12} sm={6} key={card.title} sx={{ display: 'flex' }}>
+            <Link href={card.href} passHref style={{ textDecoration: 'none', width: '100%', height: '100%' }}>
+              <Card
                 sx={{
+                  width: '100%',
+                  minHeight: { xs: 120, sm: 140, md: 160 },
+                  maxWidth: 380,
                   height: '100%',
                   display: 'flex',
-                  flexDirection: 'column',
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  borderRadius: 3,
+                  boxShadow: '0 4px 16px rgba(0,0,0,0.10)',
+                  background: '#ff9800',
+                  p: { xs: 1.5, sm: 2 },
+                  gap: 2,
                   transition: 'transform 0.2s, box-shadow 0.2s',
                   '&:hover': {
-                    transform: 'translateY(-4px)',
-                    boxShadow: 6,
+                    transform: 'scale(1.03)',
+                    boxShadow: '0 10px 28px rgba(0,0,0,0.17)',
                   },
                 }}
               >
-                <CardActionArea sx={{ p: 3, height: '100%' }}>
-                  <Box 
-                    sx={{ 
-                      display: 'flex', 
-                      flexDirection: 'column', 
-                      alignItems: 'center',
-                      textAlign: 'center',
-                      color: card.color
-                    }}
-                  >
+                <Box sx={{
+                  minWidth: 48,
+                  minHeight: 48,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRadius: '50%',
+                  background: 'rgba(255,255,255,0.09)',
+                  mr: { xs: 1.5, sm: 2 },
+                  boxShadow: '0 1px 4px rgba(0,0,0,0.07)',
+                }}>
+                  <Box sx={{ color: '#fff', fontSize: 28, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     {card.icon}
-                    <Typography variant="h6" component="div" sx={{ mt: 2, color: 'text.primary' }}>
-                      {card.title}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                      {card.description}
-                    </Typography>
                   </Box>
-                </CardActionArea>
+                </Box>
+                <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                  <Typography variant="h6" sx={{ fontWeight: 700, color: '#fff', mb: 0.5, textAlign: 'left', fontSize: { xs: 15, sm: 17 } }}>
+                    {card.title}
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.92)', textAlign: 'left', fontSize: { xs: 12, sm: 13 } }}>
+                    {card.description}
+                  </Typography>
+                </Box>
               </Card>
             </Link>
           </Grid>
