@@ -31,7 +31,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
     case 'POST': {
       try {
-        const { motorista, responsavel, cpfMotorista = 'PENDENTE', transportadora, qtdPallets, observacao, numeroManifesto, notasIds } = req.body;
+        const { 
+          motorista, 
+          responsavel, 
+          cpfMotorista = 'PENDENTE', 
+          transportadora, 
+          qtdPallets, 
+          observacao, 
+          numeroManifesto, 
+          notasIds,
+          assinaturaMotorista,
+          assinaturaResponsavel,
+          dataAssinaturaMotorista,
+          dataAssinaturaResponsavel
+        } = req.body;
 
         // Validar campos obrigatórios
         const camposObrigatorios = [];
@@ -87,6 +100,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             qtdPallets: qtdPallets ? Number(qtdPallets) : 0,
             observacao: observacao ? observacao.trim() : null,
             finalizado: false,
+            // Campos de assinatura
+            ...(assinaturaMotorista && { assinaturaMotorista }),
+            ...(assinaturaResponsavel && { assinaturaResponsavel }),
+            ...(dataAssinaturaMotorista && { dataAssinaturaMotorista: new Date(dataAssinaturaMotorista) }),
+            ...(dataAssinaturaResponsavel && { dataAssinaturaResponsavel: new Date(dataAssinaturaResponsavel) }),
             // Vincula as notas diretamente na criação
             ...(notasIds && notasIds.length > 0 && {
               notas: {

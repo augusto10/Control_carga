@@ -8,7 +8,7 @@ export default async function handler(
   if (req.method === 'GET') {
     try {
       const { conferidas } = req.query;
-      let where: any = {};
+      const where: any = {};
 
       if (conferidas === 'true') {
         where.controle = {

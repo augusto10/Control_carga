@@ -8,7 +8,7 @@ export default async function handler(
   if (req.method === 'GET') {
     try {
       const { start, end, conferidas } = req.query;
-      let where = {} as any;
+      const where = {} as any;
       if (start || end) {
         where.dataCriacao = {};
         if (start) {

@@ -32,14 +32,18 @@ export type ControleCarga = {
   id: string;
   dataCriacao: Date;
   motorista: string;
-  cpfMotorista?: string;  // Tornando opcional
+  cpfMotorista: string;
   responsavel: string;
   transportadora: 'ACERT' | 'EXPRESSO_GOIAS';
-  numeroManifesto?: string;
+  numeroManifesto: string | null;
   qtdPallets: number;
-  observacao?: string;
+  observacao: string | null;
   finalizado: boolean;
   notas: NotaFiscal[];
+  assinaturaMotorista?: string | null;
+  assinaturaResponsavel?: string | null;
+  dataAssinaturaMotorista?: Date | null;
+  dataAssinaturaResponsavel?: Date | null;
 };
 
 interface StoreState {

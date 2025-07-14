@@ -57,6 +57,17 @@ interface LoginRequest extends NextApiRequest {
   };
 }
 
+interface Usuario {
+  id: string;
+  email: string;
+  senha: string;
+  nome: string;
+  tipo: string;
+  ativo: boolean;
+  dataCriacao: Date;
+  ultimoAcesso: Date;
+}
+
 // Middleware para habilitar CORS
 const allowCors = (fn: any) => async (req: NextApiRequest, res: NextApiResponse) => {
   // Obter origem da requisição
@@ -167,7 +178,7 @@ const handler = async (req: LoginRequest, res: NextApiResponse) => {
     console.log('6. Buscando usuário no banco de dados:', email);
     const usuario = await prisma.usuario.findUnique({
       where: { email: email.toLowerCase() },
-    });
+    }) as Usuario | null;
 
     if (!usuario) {
       console.log('7. Erro: Usuário não encontrado');
@@ -216,13 +227,13 @@ const handler = async (req: LoginRequest, res: NextApiResponse) => {
     // Gerar token JWT
     console.log('11. Gerando token JWT');
     const tokenPayload = {
-      id: usuario.id,
+      id: usuario.id.toString(),
       email: usuario.email,
       nome: usuario.nome,
       tipo: usuario.tipo,
     };
     
-    const token = sign(tokenPayload, JWT_SECRET, { expiresIn: '7d' });
+    const token = sign(tokenPayload, JWT_SECRET, { expiresIn: '7d' }) as string;
     console.log('11.1. Token gerado com sucesso');
 
     // Configurar cookie

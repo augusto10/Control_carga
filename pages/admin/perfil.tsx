@@ -52,6 +52,7 @@ function PerfilUsuarioContent() {
     id: string;
     nome: string;
     email: string;
+  }
   const [success, setSuccess] = useState<string | null>(null);
   const [formData, setFormData] = useState<PerfilFormData>({
     nome: user?.nome || '',

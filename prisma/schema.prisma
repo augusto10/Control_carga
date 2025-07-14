@@ -1,13 +1,13 @@
 generator client {
-  provider = "prisma-client-js"
+  provider   = "prisma-client-js"
   engineType = "binary"
 }
 
 datasource db {
-  provider     = "postgresql"
-  url          = env("DATABASE_URL")
-  directUrl    = env("DATABASE_URL")  // Conexão direta para o banco
-  relationMode = "prisma"
+  provider          = "postgresql"
+  url               = env("DATABASE_URL")
+  directUrl         = env("DATABASE_URL") // Conexão direta para o banco
+  relationMode      = "prisma"
   shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
 }
 
@@ -25,34 +25,41 @@ model ControleCarga {
   notas           NotaFiscal[]
   pedidos         Pedido[]
 
+  // Campos de assinatura digital
+  assinaturaMotorista       String?   @db.Text
+  assinaturaResponsavel     String?   @db.Text
+  dataAssinaturaMotorista   DateTime?
+  dataAssinaturaResponsavel DateTime?
+
   // --- Campos da Separação ---
-  separadorId             String?
-  separador               Usuario?       @relation("Separacao", fields: [separadorId], references: [id])
+  separadorId String?
+  separador   Usuario? @relation("Separacao", fields: [separadorId], references: [id])
 
   // --- Campos da Conferência ---
-  conferenciaRealizada    Boolean        @default(false)
-  dataConferencia         DateTime?
-  conferenteId            String?
-  conferente              Usuario?       @relation("Conferencia", fields: [conferenteId], references: [id])
-  pedido100               Boolean?
-  inconsistencia          Boolean?
-  motivosInconsistencia   String[]
+  conferenciaRealizada  Boolean   @default(false)
+  dataConferencia       DateTime?
+  conferenteId          String?
+  conferente            Usuario?  @relation("Conferencia", fields: [conferenteId], references: [id])
+  pedido100             Boolean?
+  inconsistencia        Boolean?
+  motivosInconsistencia String[]
 
   // --- Campos da Auditoria ---
-  auditoriaRealizada      Boolean        @default(false)
-  dataAuditoria           DateTime?
-  auditorId               String?
-  auditor                 Usuario?       @relation("Auditoria", fields: [auditorId], references: [id])
-  auditoriaComErro        Boolean?
-  observacaoAuditoria     String?
+  auditoriaRealizada  Boolean   @default(false)
+  dataAuditoria       DateTime?
+  auditorId           String?
+  auditor             Usuario?  @relation("Auditoria", fields: [auditorId], references: [id])
+  auditoriaComErro    Boolean?
+  observacaoAuditoria String?
 }
 
 model Pedido {
-  id          String         @id @default(uuid())
+  id           String           @id @default(uuid())
   numeroPedido String
-  dataCriacao DateTime       @default(now())
-  controleId  String?
-  controle    ControleCarga? @relation(fields: [controleId], references: [id])
+  dataCriacao  DateTime         @default(now())
+  controleId   String?
+  controle     ControleCarga?   @relation(fields: [controleId], references: [id])
+  conferido    PedidoConferido?
 }
 
 model NotaFiscal {
@@ -68,16 +75,17 @@ model NotaFiscal {
 }
 
 model Usuario {
-  id               String            @id @default(uuid())
-  nome             String
-  email            String            @unique
-  senha            String
-  tipo             TipoUsuario       @default(USUARIO)
-  ativo            Boolean           @default(true)
-  dataCriacao      DateTime          @default(now())
-  ultimoAcesso     DateTime?
-  notas            NotaFiscal[]
-  auditoriasAcesso AuditoriaAcesso[]
+  id                String            @id @default(uuid())
+  nome              String
+  email             String            @unique
+  senha             String
+  tipo              TipoUsuario       @default(USUARIO)
+  ativo             Boolean           @default(true)
+  dataCriacao       DateTime          @default(now())
+  ultimoAcesso      DateTime?
+  notas             NotaFiscal[]
+  auditoriasAcesso  AuditoriaAcesso[]
+  pedidosConferidos PedidoConferido[] @relation("PedidosConferidos")
 
   // Relações para ControleCarga
   controlesSeparados  ControleCarga[] @relation("Separacao")
@@ -108,28 +116,39 @@ model ConfiguracaoSistema {
   tipo            String   @default("string")
   opcoes          String?
   editavel        Boolean  @default(true)
-  dataCriacao          DateTime @default(now())
+  dataCriacao     DateTime @default(now())
   dataAtualizacao DateTime @updatedAt
 
   @@index([chave])
 }
 
 model Motorista {
-  id             String         @id @default(uuid())
-  dataCriacao    DateTime       @default(now())
-  nome           String
-  telefone       String
-  cpf            String         @unique
-  cnh            String
+  id               String         @id @default(uuid())
+  dataCriacao      DateTime       @default(now())
+  nome             String
+  telefone         String
+  cpf              String         @unique
+  cnh              String
   transportadoraId Transportadora
 }
-
-
 
 enum Transportadora {
   ACERT // valor legado (em desuso)
   ACCERT
   EXPRESSO_GOIAS
+}
+
+model PedidoConferido {
+  id                    String   @id @default(uuid())
+  dataCriacao           DateTime @default(now())
+  pedido                Pedido   @relation(fields: [pedidoId], references: [id])
+  pedidoId              String   @unique
+  conferente            Usuario  @relation("PedidosConferidos", fields: [conferenteId], references: [id])
+  conferenteId          String
+  pedido100             Boolean
+  inconsistencia        Boolean
+  motivosInconsistencia String[]
+  observacoes           String?
 }
 
 enum TipoUsuario {

@@ -18,7 +18,8 @@ import {
   ListItem,
   ListItemText,
   Checkbox,
-  CircularProgress
+  CircularProgress,
+  Autocomplete
 } from '@mui/material';
 import { useRouter } from 'next/router';
 import { useSnackbar } from 'notistack';
@@ -26,6 +27,20 @@ import { Transportadora, NotaFiscal } from '@prisma/client';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useAuth } from '../contexts/AuthContext';
+import { api } from '@/services/api';
+
+interface Motorista {
+  id: string;
+  nome: string;
+  cpf: string;
+  telefone: string;
+  cnh: string;
+  transportadoraId: string;
+  transportadora?: {
+    id: string;
+    descricao: string;
+  };
+}
 
 // Função para validar CPF
 function validarCPF(cpf: string): boolean {
@@ -79,28 +94,56 @@ const CriarControleContent: React.FC = () => {
     transportadoras: boolean;
     notas: boolean;
     submit: boolean;
+    motoristas: boolean;
   }>({
     transportadoras: false,
     notas: false,
-    submit: false
+    submit: false,
+    motoristas: false
   });
   
+  const [motoristas, setMotoristas] = useState<Motorista[]>([]);
+  
   // Opções fixas de transportadoras
+  // Usamos 'ACERT' como ID para compatibilidade com o backend, mas exibimos 'ACCERT' na interface
   const transportadorasFixas = [
-    { id: 'ACERT', nome: 'ACERT', descricao: 'ACERT' },
+    { id: 'ACERT', nome: 'ACCERT', descricao: 'ACCERT' },
     { id: 'EXPRESSO_GOIAS', nome: 'EXPRESSO_GOIAS', descricao: 'EXPRESSO GOIÁS' }
   ];
 
   // Encontra a transportadora padrão (ACERT)
   const transportadoraPadrao = transportadorasFixas.find(t => t.id === 'ACERT');
+  
+  // Função para obter o objeto da transportadora pelo ID
+  const getTransportadoraById = (id: string) => {
+    const encontrada = transportadorasFixas.find(t => t.id === id);
+    if (!encontrada) {
+      console.warn(`Transportadora com ID ${id} não encontrada, usando padrão`);
+      return transportadoraPadrao;
+    }
+    return encontrada;
+  };
 
-  const [formData, setFormData] = useState({
+  type Transportadora = 'ACERT' | 'EXPRESSO_GOIAS';
+  
+  interface FormData {
+    motorista: string;
+    cpfMotorista: string;
+    telefoneMotorista: string;
+    transportadora: Transportadora;
+    responsavel: string;
+    observacao?: string; // Torna opcional para ser compatível com string | undefined
+    qtdPallets: number;
+  }
+
+  const [formData, setFormData] = useState<FormData>({
     motorista: 'PENDENTE',
     cpfMotorista: '',
-    transportadora: transportadoraPadrao?.id || 'ACERT',
+    telefoneMotorista: '',
+    transportadora: 'ACERT',
     responsavel: 'PENDENTE',
     observacao: '',
-    qtdPallets: 0,
+    qtdPallets: 1,
   });
   
   useEffect(() => {
@@ -127,20 +170,27 @@ const CriarControleContent: React.FC = () => {
   useEffect(() => {
     const carregarDados = async () => {
       try {
-        setIsLoading(prev => ({ ...prev, transportadoras: true, notas: true }));
+        setIsLoading(prev => ({ ...prev, transportadoras: true, notas: true, motoristas: true }));
         
-        // Buscar notas da API
-        await fetchNotas();
+        // Carrega transportadoras e notas em paralelo
+        await Promise.all([
+          fetchTransportadoras(),
+          fetchNotas()
+        ]);
+        
+        // Carrega motoristas
+        const response = await api.get<Motorista[]>('/api/motoristas');
+        setMotoristas(response.data);
       } catch (error) {
         console.error('Erro ao carregar dados:', error);
-        enqueueSnackbar('Erro ao carregar notas fiscais', { variant: 'error' });
+        enqueueSnackbar('Erro ao carregar os dados. Tente novamente.', { variant: 'error' });
       } finally {
-        setIsLoading(prev => ({ ...prev, transportadoras: false, notas: false }));
+        setIsLoading(prev => ({ ...prev, transportadoras: false, notas: false, motoristas: false }));
       }
     };
-    
+
     carregarDados();
-  }, [fetchNotas, enqueueSnackbar]);
+  }, [fetchTransportadoras, fetchNotas, enqueueSnackbar]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | { name?: string; value: unknown }> | SelectChangeEvent<string>) => {
     const { name, value } = e.target as { name: string; value: string };
@@ -208,12 +258,16 @@ const CriarControleContent: React.FC = () => {
       setIsLoading(prev => ({ ...prev, submit: true }));
       
       // Garante que todos os campos obrigatórios tenham valores válidos
-      const dadosControle: CriarControleDTO = {
+      const dadosControle = {
         motorista: (formData.motorista || 'PENDENTE').trim(),
+        cpfMotorista: formData.cpfMotorista ? formData.cpfMotorista.replace(/[^\d]/g, '') : 'PENDENTE',
         responsavel: (formData.responsavel || 'PENDENTE').trim(),
-        transportadora: formData.transportadora as 'ACERT' | 'EXPRESSO_GOIAS',
+        transportadora: (formData.transportadora === 'ACERT' || formData.transportadora === 'EXPRESSO_GOIAS') 
+          ? formData.transportadora 
+          : 'ACERT',
         qtdPallets: Number(formData.qtdPallets) || 0,
-        observacao: formData.observacao?.trim(),
+        observacao: formData.observacao?.trim() || undefined,
+        finalizado: false, // Adiciona o campo finalizado
         notasIds: Array.isArray(selectedNotas) ? selectedNotas : []
       };
       
@@ -226,7 +280,8 @@ const CriarControleContent: React.FC = () => {
       console.log('[CriarControle] Dados do controle a serem enviados:', dadosControle);
       
       // Chama a função para criar o controle
-      const controleCriado = await criarControle(dadosControle);
+      // Usa type assertion para garantir a compatibilidade de tipos
+      const controleCriado = await criarControle(dadosControle as any);
       
       console.log('[CriarControle] Controle criado com sucesso:', controleCriado);
       
@@ -305,18 +360,64 @@ const CriarControleContent: React.FC = () => {
               margin="normal"
               required
             />
-            
-            <TextField
-              fullWidth
-              label="Motorista"
-              name="motorista"
-              value={formData.motorista}
-              onChange={handleChange}
-              error={!!errors.motorista}
-              helperText={errors.motorista}
-              margin="normal"
-              required
-            />
+                        <FormControl fullWidth margin="normal" error={!!errors.motorista}>
+              <Autocomplete
+                options={motoristas}
+                getOptionLabel={(option) => typeof option === 'string' ? option : `${option.nome} (${option.cpf})`}
+                value={motoristas.find(m => m.nome === formData.motorista) || null}
+                onChange={(_, newValue) => {
+                  if (typeof newValue === 'string') {
+                    setFormData(prev => ({
+                      ...prev,
+                      motorista: newValue,
+                      cpfMotorista: '',
+                      telefoneMotorista: ''
+                    }));
+                  } else if (newValue) {
+                    // Atualiza todos os campos do motorista, incluindo a transportadora
+                    const transportadoraSelecionada = getTransportadoraById(newValue.transportadoraId);
+                    setFormData(prev => ({
+                      ...prev,
+                      motorista: newValue.nome,
+                      cpfMotorista: newValue.cpf,
+                      telefoneMotorista: newValue.telefone || '',
+                      transportadora: (transportadoraSelecionada?.id === 'ACERT' || transportadoraSelecionada?.id === 'EXPRESSO_GOIAS' 
+                        ? transportadoraSelecionada.id 
+                        : 'ACERT') as Transportadora
+                    }));
+                  } else {
+                    setFormData(prev => ({
+                      ...prev,
+                      motorista: '',
+                      cpfMotorista: '',
+                      telefoneMotorista: ''
+                    }));
+                  }
+                }}
+                freeSolo
+                renderOption={(props, option) => (
+                  <li {...props}>
+                    <div>
+                      <div><strong>{option.nome}</strong></div>
+                      <div>CPF: {option.cpf}</div>
+                      <div>Telefone: {option.telefone || 'Não informado'}</div>
+                      <div>Transportadora: {option.transportadora?.descricao || 'Não informada'}</div>
+                    </div>
+                  </li>
+                )}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Motorista"
+                    name="motorista"
+                    required
+                    error={!!errors.motorista}
+                    helperText={errors.motorista}
+                  />
+                )}
+                loading={isLoading.motoristas}
+              />
+            </FormControl>
             
             <TextField
               fullWidth
@@ -330,7 +431,19 @@ const CriarControleContent: React.FC = () => {
               required
             />
             
-            <FormControl fullWidth error={!!errors.transportadora}>
+            <TextField
+              fullWidth
+              label="Telefone do Motorista"
+              name="telefoneMotorista"
+              value={formData.telefoneMotorista}
+              onChange={handleChange}
+              margin="normal"
+              placeholder="(00) 00000-0000"
+              inputProps={{
+                maxLength: 15
+              }}
+            />
+            <FormControl fullWidth error={!!errors.transportadora} margin="normal">
               <InputLabel id="transportadora-label">Transportadora</InputLabel>
               <Select
                 labelId="transportadora-label"
