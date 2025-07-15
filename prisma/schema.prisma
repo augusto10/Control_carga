@@ -5,8 +5,8 @@ generator client {
 
 datasource db {
   provider     = "postgresql"
-  url          = env("DATABASE_URL")
-  directUrl    = env("DIRECT_URL")   // Conexão direta para o banco (postgres://)
+  url          = env("POSTGRES_PRISMA_URL")
+  directUrl    = env("POSTGRES_URL_NON_POOLING")   // Conexão direta para o banco (postgres://)
   relationMode = "prisma"
   shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
 }
