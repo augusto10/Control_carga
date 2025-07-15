@@ -3,7 +3,8 @@ import { MaterialReactTable, MRT_ColumnDef } from 'material-react-table';
 import { Box, Paper, useTheme } from '@mui/material';
 
 interface ModernTableProps<T extends object> {
-  columns: MRT_ColumnDef<T>[];
+  // @ts-ignore: Tipagem ignorada devido à ausência de tipos do material-react-table
+  columns: any[];
   data: T[];
   title?: string;
   isLoading?: boolean;

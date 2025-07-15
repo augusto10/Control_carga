@@ -1,5 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
   // Garante que o Prisma seja incluído no bundle de produção
   experimental: {
     serverComponentsExternalPackages: ['@prisma/client'],

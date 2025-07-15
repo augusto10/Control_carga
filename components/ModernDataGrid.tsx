@@ -1,7 +1,15 @@
-import { DataGrid, ptBR } from '@mui/x-data-grid';
+import { DataGrid } from '@mui/x-data-grid';
+
 import { useTheme } from '@mui/material/styles';
 
-const ModernDataGrid = ({ rows, columns, ...props }) => {
+import { GridColDef, DataGridProps } from '@mui/x-data-grid';
+
+interface ModernDataGridProps extends Omit<DataGridProps, 'rows' | 'columns'> {
+  rows: any[];
+  columns: GridColDef[];
+}
+
+const ModernDataGrid = ({ rows, columns, ...props }: ModernDataGridProps) => {
   const theme = useTheme();
   
   return (
@@ -9,10 +17,11 @@ const ModernDataGrid = ({ rows, columns, ...props }) => {
       rows={rows}
       columns={columns}
       autoHeight
-      pageSize={5}
-      rowsPerPageOptions={[5]}
-      disableSelectionOnClick
-      localeText={ptBR.components.MuiDataGrid.defaultProps.localeText}
+      pageSizeOptions={[5]}
+      initialState={{
+        pagination: { paginationModel: { pageSize: 5, page: 0 } }
+      }}
+      disableRowSelectionOnClick
       sx={{
         '& .MuiDataGrid-columnHeaders': {
           backgroundColor: theme.palette.primary.main,

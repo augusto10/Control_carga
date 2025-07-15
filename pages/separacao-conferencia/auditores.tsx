@@ -1,9 +1,7 @@
-import { Typography, Box } from '@mui/material';
-
+import { Typography, Box, CircularProgress } from '@mui/material';
 import { useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../../contexts/AuthContext';
-import { Box, Typography, CircularProgress } from '@mui/material';
 
 export default function PaginaAuditores() {
   const { user, isLoading } = useAuth();

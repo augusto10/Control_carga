@@ -1,7 +1,12 @@
-import LoadingButton from '@mui/lab/LoadingButton';
+import { ReactNode } from 'react';
+import LoadingButton, { LoadingButtonProps } from '@mui/lab/LoadingButton';
 import { motion } from 'framer-motion';
 
-const ModernButton = ({ children, ...props }) => {
+interface ModernButtonProps extends LoadingButtonProps {
+  children: ReactNode;
+}
+
+const ModernButton = ({ children, ...props }: ModernButtonProps) => {
   return (
     <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.98 }}>
       <LoadingButton

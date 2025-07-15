@@ -91,6 +91,11 @@ const ConsultarNotas = () => {
     });
   };
 
+  const handleExcluirNota = (id: string) => {
+  // TODO: implementar lógica real de exclusão
+  alert(`Excluir nota com id: ${id}`);
+};
+
   const notasFiltradas = filtrarNotas();
   const notasPaginadas = notasFiltradas.slice(
     pagina * linhasPorPagina,
@@ -251,7 +256,6 @@ const ConsultarNotas = () => {
                       )}
                     </TableCell>
                   </TableRow>
-                ))
                 ))
               )}
             </TableBody>
