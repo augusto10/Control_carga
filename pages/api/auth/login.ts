@@ -112,7 +112,13 @@ const allowCors = (fn: any) => async (req: NextApiRequest, res: NextApiResponse)
 const handler = async (req: LoginRequest, res: NextApiResponse) => {
   // Log para depuração
   console.log('=== INÍCIO DO HANDLER DE LOGIN ===');
-  console.log('Database URL:', process.env.DATABASE_URL ? '***CONFIGURADO***' : 'NÃO CONFIGURADO');
+  const dbUrl = process.env.DATABASE_URL || 'NÃO DEFINIDO';
+  const directUrl = process.env.DIRECT_URL || 'NÃO DEFINIDO';
+
+  console.log('--- DEBUG DE VARIÁVEIS DE AMBIENTE ---');
+  console.log(`DATABASE_URL (início): ${dbUrl.substring(0, 20)}...`);
+  console.log(`DIRECT_URL (início): ${directUrl.substring(0, 20)}...`);
+  console.log('------------------------------------');
   console.log('NODE_ENV:', process.env.NODE_ENV || 'development');
   console.log('=== INÍCIO DO HANDLER DE LOGIN ===');
   try {
