@@ -14,7 +14,9 @@ const MIN_PASSWORD_LENGTH = 8;
 type AllowedOrigin = string | RegExp;
 
 // Lista de origens permitidas
+// ATENÇÃO: localhost só deve ser usado em desenvolvimento local!
 const ALLOWED_ORIGINS: AllowedOrigin[] = [
+  // Só use localhost em desenvolvimento!
   'http://localhost:3000',
   'http://localhost:3001',
   'http://127.0.0.1:3000',
