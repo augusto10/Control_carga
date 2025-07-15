@@ -10,15 +10,33 @@ const COOKIE_NAME = 'auth_token';
 const MAX_EMAIL_LENGTH = 254;
 const MIN_PASSWORD_LENGTH = 8;
 
+// Tipos para origens permitidas
+type AllowedOrigin = string | RegExp;
+
 // Lista de origens permitidas
-const ALLOWED_ORIGINS = [
+// ATENÇÃO: localhost só deve ser usado em desenvolvimento local!
+const ALLOWED_ORIGINS: AllowedOrigin[] = [
+  // Só use localhost em desenvolvimento!
   'http://localhost:3000',
   'http://localhost:3001',
   'http://127.0.0.1:3000',
   'http://127.0.0.1:3001',
   'https://seu-dominio.com',
-  'https://www.seu-dominio.com'
+  'https://www.seu-dominio.com',
+  'https://controle-logistica.vercel.app',
+  /^https:\/\/controle-logistica-.*-augusto10s-projects\.vercel\.app$/,
+  /^https:\/\/.*\.vercel\.app$/ // Permite qualquer subdomínio do Vercel para ambiente de desenvolvimento
 ];
+
+// Função para verificar se uma origem é permitida
+function isOriginAllowed(origin: string): boolean {
+  return ALLOWED_ORIGINS.some(allowed => {
+    if (typeof allowed === 'string') {
+      return allowed === origin;
+    }
+    return allowed.test(origin);
+  });
+}
 
 // Configurações de CORS padrão
 const DEFAULT_CORS_HEADERS = {
@@ -48,8 +66,9 @@ const allowCors = (fn: any) => async (req: NextApiRequest, res: NextApiResponse)
   const requestMethod = req.headers['access-control-request-method'];
   const requestHeaders = req.headers['access-control-request-headers'];
   
-  // Verificar se a origem é permitida
-  const allowedOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  // Verificar se a origem está na lista de permitidas
+  const originIsAllowed = isOriginAllowed(origin);
+  const allowedOrigin = originIsAllowed ? origin : (typeof ALLOWED_ORIGINS[0] === 'string' ? ALLOWED_ORIGINS[0] : '');
   
   // Aplicar headers CORS padrão
   Object.entries(DEFAULT_CORS_HEADERS).forEach(([key, value]) => {
@@ -93,7 +112,13 @@ const allowCors = (fn: any) => async (req: NextApiRequest, res: NextApiResponse)
 const handler = async (req: LoginRequest, res: NextApiResponse) => {
   // Log para depuração
   console.log('=== INÍCIO DO HANDLER DE LOGIN ===');
-  console.log('Database URL:', process.env.DATABASE_URL ? '***CONFIGURADO***' : 'NÃO CONFIGURADO');
+  const dbUrl = process.env.DATABASE_URL || 'NÃO DEFINIDO';
+  const directUrl = process.env.DIRECT_URL || 'NÃO DEFINIDO';
+
+  console.log('--- DEBUG DE VARIÁVEIS DE AMBIENTE ---');
+  console.log(`DATABASE_URL (início): ${dbUrl.substring(0, 20)}...`);
+  console.log(`DIRECT_URL (início): ${directUrl.substring(0, 20)}...`);
+  console.log('------------------------------------');
   console.log('NODE_ENV:', process.env.NODE_ENV || 'development');
   console.log('=== INÍCIO DO HANDLER DE LOGIN ===');
   try {
@@ -365,7 +390,16 @@ const handler = async (req: LoginRequest, res: NextApiResponse) => {
     if (isProduction) {
       // Em produção, extrair o domínio da origem permitida
       try {
-        const domainUrl = new URL(allowedOrigin);
+        // Encontrar a primeira origem permitida que é uma string
+        const fallbackOrigin = ALLOWED_ORIGINS.find(
+          (origin): origin is string => typeof origin === 'string' && origin.startsWith('http')
+        ) || 'https://controle-logistica.vercel.app';
+        
+        // Garantir que estamos usando uma string (não uma expressão regular)
+        const originToUse = typeof allowedOrigin === 'string' ? allowedOrigin : fallbackOrigin;
+        
+        // Criar URL apenas com uma string válida
+        const domainUrl = new URL(originToUse);
         const domainParts = domainUrl.hostname.split('.');
         
         // Se tiver subdomínios (ex: app.exemplo.com), pega apenas os dois últimos níveis (.exemplo.com)

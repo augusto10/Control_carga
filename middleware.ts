@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 // Lista de origens permitidas
+// ATENÇÃO: localhost só deve ser usado em desenvolvimento local!
 const ALLOWED_ORIGINS = process.env.NODE_ENV === 'production'
   ? [
       'https://seu-dominio.com',
@@ -15,6 +16,7 @@ const ALLOWED_ORIGINS = process.env.NODE_ENV === 'production'
       'https://*.vercel.app'
     ]
   : [
+      // Só use localhost em desenvolvimento!
       'http://localhost:3000',
       'http://localhost:3001',
       'http://127.0.0.1:3000',

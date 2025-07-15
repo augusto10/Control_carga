@@ -210,10 +210,11 @@ const CriarControleContent: React.FC = () => {
       // Garante que todos os campos obrigatórios tenham valores válidos
       const dadosControle: CriarControleDTO = {
         motorista: (formData.motorista || 'PENDENTE').trim(),
+        cpfMotorista: (formData.cpfMotorista || '').trim(),
         responsavel: (formData.responsavel || 'PENDENTE').trim(),
         transportadora: formData.transportadora as 'ACERT' | 'EXPRESSO_GOIAS',
         qtdPallets: Number(formData.qtdPallets) || 0,
-        observacao: formData.observacao?.trim(),
+        observacao: formData.observacao?.trim() || undefined,
         notasIds: Array.isArray(selectedNotas) ? selectedNotas : []
       };
       
