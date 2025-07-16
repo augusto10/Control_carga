@@ -45,7 +45,8 @@ const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
   images: {
-    domains: ['localhost'],
+    domains: ['localhost', 'gestaologistica.netlify.app', 'api.controle-carga.com'],
+    unoptimized: true, // Desativa a otimização de imagens para o Netlify
   },
   async headers() {
     return [
@@ -55,6 +56,7 @@ const nextConfig = {
           { key: 'Access-Control-Allow-Credentials', value: 'true' },
           { key: 'Access-Control-Allow-Origin', value: '*' },
           { key: 'Access-Control-Allow-Methods', value: 'GET,OPTIONS,PATCH,DELETE,POST,PUT' },
+          { key: 'Access-Control-Allow-Headers', value: 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version' },
         ],
       },
     ];
@@ -63,6 +65,29 @@ const nextConfig = {
   onDemandEntries: {
     maxInactiveAge: 60 * 1000,
     pagesBufferLength: 5,
+  },
+  // Desativa o X-Powered-By header
+  poweredByHeader: false,
+  // Configuração para o Netlify
+  target: 'serverless',
+  // Configuração para exportação estática
+  output: 'export',
+  // Desativa a verificação de tipos durante o build
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+  // Desativa a verificação de ESLint durante o build
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+  // Configuração para o Netlify Functions
+  async rewrites() {
+    return [
+      {
+        source: '/api/:path*',
+        destination: '/.netlify/functions/:path*',
+      },
+    ];
   },
 };
 

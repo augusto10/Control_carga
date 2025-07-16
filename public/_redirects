@@ -1,0 +1,5 @@
+# Redireciona todas as requisições de API para as funções do Netlify
+/api/*  /.netlify/functions/:splat  200
+
+# Redireciona todas as outras requisições para o Next.js
+/*  /index.html  200
