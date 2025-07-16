@@ -1,5 +1,5 @@
 [build]
-  command = "npm run netlify-build"
+  command = "npm run build"
   publish = ".next"
   functions = "netlify/functions"
 
@@ -7,39 +7,41 @@
   NODE_VERSION = "20.x"
   NPM_FLAGS = "--legacy-peer-deps"
   NEXT_TELEMETRY_DISABLED = "1"
+  # Desativa o plugin Next.js para rotas de API
   NETLIFY_NEXT_PLUGIN_SKIP = "true"
 
-[[plugins]]
-  package = "@netlify/plugin-nextjs"
-
-# Configuração para o Next.js
+# Configuração das funções
 [functions]
   node_bundler = "esbuild"
   external_node_modules = ["@prisma/client", "@prisma/adapter-pg"]
+  included_files = ["prisma/**/*.prisma"]
+  directory = "netlify/functions"
 
 # Redirecionamentos
+# IMPORTANTE: Esta regra deve vir antes de outras regras de redirecionamento
 [[redirects]]
   from = "/api/*"
-  to = "/.netlify/functions/:splat"
+  to = "/.netlify/functions/api/:splat"
   status = 200
   force = true
 
-# Configuração para o Next.js
+# Garante que as rotas da aplicação sejam tratadas pelo Next.js
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
-  force = true
 
-# Configuração de headers para API
+# Headers para as funções de API
 [[headers]]
-  for = "/api/*"
+  for = "/.netlify/functions/api/*"
   [headers.values]
     Access-Control-Allow-Origin = "*"
     Access-Control-Allow-Methods = "GET, POST, PUT, DELETE, OPTIONS"
-    Access-Control-Allow-Headers = "X-Requested-With, Content-Type, Authorization"
+    Access-Control-Allow-Headers = "X-Requested-With, Content-Type, Authorization, Accept"
+    Access-Control-Allow-Credentials = "true"
+    Access-Control-Max-Age = "600"
 
-# Configuração de headers para assets
+# Headers para o site
 [[headers]]
   for = "/*"
   [headers.values]
@@ -47,3 +49,8 @@
     X-Content-Type-Options = "nosniff"
     X-XSS-Protection = "1; mode=block"
     Referrer-Policy = "strict-origin-when-cross-origin"
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+# Desativando o plugin Next.js para evitar conflitos com as rotas de API
+# [[plugins]]
+#   package = "@netlify/plugin-nextjs"

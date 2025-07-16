@@ -1,28 +1,42 @@
 generator client {
-  provider = "prisma-client-js"
+  provider   = "prisma-client-js"
   engineType = "binary"
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  // uncomment next line if you use Prisma <5.10
-  // directUrl = env("DATABASE_URL_UNPOOLED")
+  provider     = "postgresql"
+  url          = env("DATABASE_URL")
   relationMode = "prisma"
 }
 
 model ControleCarga {
-  id              String         @id @default(uuid())
-  dataCriacao     DateTime       @default(now())
-  motorista       String
-  responsavel     String
-  transportadora  Transportadora @default(ACCERT)
-  numeroManifesto String?
-  qtdPallets      Int            @default(0)
-  observacao      String?
-  finalizado      Boolean        @default(false)
-  cpfMotorista    String         @default("PENDENTE")
-  notas           NotaFiscal[]
+  id                        String         @id @default(uuid())
+  dataCriacao               DateTime       @default(now())
+  motorista                 String
+  responsavel               String
+  transportadora            Transportadora @default(ACCERT)
+  numeroManifesto           String?
+  qtdPallets                Int            @default(0)
+  observacao                String?
+  finalizado                Boolean        @default(false)
+  cpfMotorista              String         @default("PENDENTE")
+  auditorId                 String?
+  auditoriaComErro          Boolean?
+  auditoriaRealizada        Boolean        @default(false)
+  conferenciaRealizada      Boolean        @default(false)
+  conferenteId              String?
+  dataAuditoria             DateTime?
+  dataConferencia           DateTime?
+  inconsistencia            Boolean?
+  motivosInconsistencia     String[]
+  observacaoAuditoria       String?
+  pedido100                 Boolean?
+  separadorId               String?
+  assinaturaMotorista       String?
+  assinaturaResponsavel     String?
+  dataAssinaturaMotorista   DateTime?
+  dataAssinaturaResponsavel DateTime?
+  notas                     NotaFiscal[]
 }
 
 model NotaFiscal {
@@ -79,23 +93,39 @@ model ConfiguracaoSistema {
   @@index([chave])
 }
 
-
 model Motorista {
-  id             String         @id @default(uuid())
-  dataCriacao    DateTime       @default(now())
-  nome           String
-  telefone       String
-  cpf            String         @unique
-  cnh            String
+  id               String         @id @default(uuid())
+  dataCriacao      DateTime       @default(now())
+  nome             String
+  telefone         String
+  cpf              String         @unique
+  cnh              String
   transportadoraId Transportadora
 }
 
+model Pedido {
+  id           String   @id
+  numeroPedido String
+  dataCriacao  DateTime @default(now())
+  controleId   String?
+  conferidoId  String?
+}
 
+model PedidoConferido {
+  id                    String   @id
+  dataCriacao           DateTime @default(now())
+  pedidoId              String   @unique
+  conferenteId          String
+  pedido100             Boolean
+  inconsistencia        Boolean
+  motivosInconsistencia String[]
+  observacoes           String?
+}
 
 enum Transportadora {
-  ACERT // valor legado (em desuso)
-  ACCERT
+  ACERT
   EXPRESSO_GOIAS
+  ACCERT
 }
 
 enum TipoUsuario {

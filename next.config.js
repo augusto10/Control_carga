@@ -68,8 +68,8 @@ const nextConfig = {
   },
   // Desativa o X-Powered-By header
   poweredByHeader: false,
-  // Configuração para exportação estática
-  output: 'export',
+  // Configuração para o Netlify Functions
+  // Removendo output: 'export' para permitir API routes
   // Desativa a verificação de tipos durante o build
   typescript: {
     ignoreBuildErrors: true,
@@ -77,15 +77,6 @@ const nextConfig = {
   // Desativa a verificação de ESLint durante o build
   eslint: {
     ignoreDuringBuilds: true,
-  },
-  // Configuração para o Netlify Functions
-  async rewrites() {
-    return [
-      {
-        source: '/api/:path*',
-        destination: '/.netlify/functions/:path*',
-      },
-    ];
   },
 };
 
