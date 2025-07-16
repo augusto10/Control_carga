@@ -1,11 +1,22 @@
 [build]
   command = "npm run build"
   publish = ".next"
+  functions = ".netlify/functions"
 
 [build.environment]
-  NEXT_PUBLIC_API_URL = "https://api.controle-carga.com"
+  NODE_VERSION = "20.x"
+  NPM_FLAGS = "--legacy-peer-deps"
+  NEXT_TELEMETRY_DISABLED = "1"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
 
 [[redirects]]
   from = "/api/*"
-  to = "/api/:splat"
+  to = "/.netlify/functions/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
   status = 200

@@ -4,6 +4,32 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { serialize } from 'cookie';
 import prisma from '../../../lib/prisma';
 
+// Função auxiliar para log detalhado
+function logDebug(message: string, data?: any) {
+  const timestamp = new Date().toISOString();
+  const logData = data ? `\n${JSON.stringify(data, null, 2)}` : '';
+  console.log(`[${timestamp}] ${message}${logData}`);
+}
+
+// Função para log de erros
+function logError(message: string, error: any) {
+  const timestamp = new Date().toISOString();
+  const errorData = error ? `\nErro: ${error.message || 'Sem mensagem de erro'}\nStack: ${error.stack || 'Sem stack trace'}` : '';
+  console.error(`[${timestamp}] ERRO: ${message}${errorData}`);
+}
+
+// Log de inicialização
+logDebug('Iniciando rota de login', {
+  nodeEnv: process.env.NODE_ENV,
+  // Não logar valores sensíveis, apenas nomes das variáveis
+  envVars: Object.keys(process.env).filter(key => 
+    key.includes('DATABASE') || 
+    key.includes('NEXT_PUBLIC') ||
+    key.includes('JWT') ||
+    key.includes('NODE_ENV')
+  )
+});
+
 // Constantes de configuração
 const JWT_SECRET = process.env.JWT_SECRET || 'seu_segredo_secreto';
 const COOKIE_NAME = 'auth_token';
@@ -110,6 +136,16 @@ const allowCors = (fn: any) => async (req: NextApiRequest, res: NextApiResponse)
 };
 
 const handler = async (req: LoginRequest, res: NextApiResponse) => {
+  const requestId = Math.random().toString(36).substring(2, 8);
+  
+  // Log de início da requisição
+  logDebug(`[${requestId}] Iniciando processamento da requisição`, {
+    method: req.method,
+    url: req.url,
+    headers: Object.keys(req.headers),
+    body: req.body ? { ...req.body, senha: '***' } : 'Nenhum corpo na requisição'
+  });
+  
   try {
     console.log('1. Recebida requisição de login');
     console.log('   - Método:', req.method);
@@ -232,14 +268,42 @@ const handler = async (req: LoginRequest, res: NextApiResponse) => {
     console.log("Login attempt for email:", email); // Log the email
 
     // Buscar usuário no banco de dados
-    console.log('5. Buscando usuário no banco de dados');
-    console.log('   - Email:', email);
+    logDebug(`[${requestId}] 5. Buscando usuário no banco de dados`, { email });
     
     let usuario;
     try {
-      console.log('5.1. Iniciando busca no banco de dados...');
+      logDebug(`[${requestId}] 5.1. Iniciando busca no banco de dados...`);
+      
+      // Log da configuração do Prisma
+      logDebug(`[${requestId}] Configuração do Prisma:`, {
+        datasourceUrl: process.env.DATABASE_URL ? 'DATABASE_URL está definida' : 'DATABASE_URL NÃO está definida',
+        // Não logar a URL completa do banco de dados por segurança
+        databaseType: process.env.DATABASE_URL?.split(':')[0] || 'Desconhecido',
+        prismaClientInitialized: !!prisma
+      });
+      
+      // Testar conexão com o banco de dados
+      try {
+        await prisma.$queryRaw`SELECT 1 as test`;
+        logDebug(`[${requestId}] 5.2. Conexão com o banco de dados bem-sucedida`);
+      } catch (dbTestError) {
+        logError(`[${requestId}] 5.2. Erro ao conectar ao banco de dados:`, dbTestError);
+        throw new Error('Falha na conexão com o banco de dados');
+      }
+      
+      // Buscar usuário
       usuario = await prisma.usuario.findUnique({
-        where: { email }
+        where: { email },
+        select: {
+          id: true,
+          nome: true,
+          email: true,
+          senha: true,
+          tipo: true,
+          ativo: true,
+          dataCriacao: true,
+          ultimoAcesso: true
+        }
       });
       
       console.log('5.2. Busca no banco concluída');
@@ -251,13 +315,24 @@ const handler = async (req: LoginRequest, res: NextApiResponse) => {
         console.log('   - Usuário ativo:', usuario.ativo);
       }
     } catch (dbError) {
-      console.error('5.3. Erro ao buscar usuário no banco de dados:');
-      console.error(dbError);
+      logError(`[${requestId}] 5.3. Erro ao buscar usuário no banco de dados:`, dbError);
+      
+      // Log adicional para erros de conexão
+      if (dbError instanceof Error) {
+        if (dbError.message.includes('P1001') || dbError.message.includes('connect')) {
+          logError(`[${requestId}] 5.4. Erro de conexão com o banco de dados detectado`, {
+            databaseUrl: process.env.DATABASE_URL ? '***' : 'Não definida',
+            nodeEnv: process.env.NODE_ENV
+          });
+        }
+      }
+      
       return res.status(500).json({
         success: false,
         message: 'Erro ao buscar usuário no banco de dados',
         code: 'DATABASE_ERROR',
-        error: process.env.NODE_ENV === 'development' ? (dbError as Error).message : undefined
+        error: process.env.NODE_ENV === 'development' ? (dbError as Error).message : undefined,
+        requestId
       });
     }
     
@@ -484,25 +559,40 @@ const handler = async (req: LoginRequest, res: NextApiResponse) => {
     return res.status(200).json(responseData);
       
   } catch (error: unknown) {
-    console.error('=== ERRO NÃO TRATADO NO HANDLER ===');
+    logError(`[${requestId}] === ERRO NÃO TRATADO NO HANDLER ===`, error);
     
-    // Tratamento seguro do erro desconhecido
-    if (error instanceof Error) {
-      console.error('Tipo do erro:', error.constructor.name);
-      console.error('Mensagem de erro:', error.message);
-      console.error('Stack trace:', error.stack || 'Sem stack trace');
-    } else {
-      console.error('Erro desconhecido:', error);
-    }
+    // Log detalhado do ambiente
+    logDebug(`[${requestId}] Ambiente no momento do erro:`, {
+      nodeEnv: process.env.NODE_ENV,
+      prismaClientInitialized: !!prisma?.$connect,
+      databaseUrlDefined: !!process.env.DATABASE_URL,
+      // Não logar valores sensíveis
+      envVars: Object.keys(process.env).filter(key => 
+        key.includes('DATABASE') || 
+        key.includes('NEXT_PUBLIC') ||
+        key.includes('JWT') ||
+        key.includes('NODE_ENV')
+      )
+    });
     
     const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+    const errorCode = error instanceof Error && 'code' in error ? error.code : 'UNKNOWN_ERROR';
     
-    return res.status(500).json({
+    // Resposta de erro detalhada
+    const response = {
       success: false,
       message: 'Erro interno do servidor',
-      code: 'INTERNAL_SERVER_ERROR',
-      error: process.env.NODE_ENV === 'development' ? errorMessage : undefined
-    });
+      code: errorCode,
+      requestId,
+      timestamp: new Date().toISOString(),
+      error: process.env.NODE_ENV === 'development' ? errorMessage : undefined,
+      // Adicionar stack trace apenas em desenvolvimento
+      ...(process.env.NODE_ENV === 'development' && error instanceof Error ? { stack: error.stack } : {})
+    };
+    
+    logDebug(`[${requestId}] Enviando resposta de erro:`, response);
+    
+    return res.status(500).json(response);
   } finally {
     console.log('=== FIM DO HANDLER DE LOGIN ===\n');
   }
