@@ -68,8 +68,6 @@ const nextConfig = {
   },
   // Desativa o X-Powered-By header
   poweredByHeader: false,
-  // Configuração para o Netlify
-  target: 'serverless',
   // Configuração para exportação estática
   output: 'export',
   // Desativa a verificação de tipos durante o build

@@ -11,7 +11,8 @@
     "prisma:init": "node scripts/prisma/init-prisma.js",
     "lint": "next lint",
     "seed": "ts-node --project tsconfig.seed.json prisma/seed.ts",
-    "create-admin": "ts-node --compiler-options '{\"module\":\"CommonJS\"}' scripts/create-admin.ts"
+    "create-admin": "ts-node --compiler-options '{\"module\":\"CommonJS\"}' scripts/create-admin.ts",
+    "netlify-build": "npm install && npm run build"
   },
   "engines": {
     "node": "20.x"
