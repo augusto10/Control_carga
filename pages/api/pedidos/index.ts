@@ -11,12 +11,12 @@ export default async function handler(
       const where: any = {};
 
       if (conferidas === 'true') {
-        where.controle = {
+        where.conferido = {
           conferenciaRealizada: true
         };
       } else {
         // Por padrão, lista apenas os não conferidos
-        where.controle = {
+        where.conferido = {
           conferenciaRealizada: false
         };
       }
@@ -24,9 +24,11 @@ export default async function handler(
       const pedidos = await prisma.pedido.findMany({
         where,
         include: {
-          controle: {
+          controle: true,
+          conferido: {
             include: {
               separador: true,
+              conferente: true,
               auditor: true,
             },
           },
@@ -59,8 +61,6 @@ export default async function handler(
             numeroManifesto: `M-PED-${Date.now()}`,
             motorista: 'A Definir',
             responsavel: 'A Definir',
-            separadorId: separadorId,
-            auditorId: auditorId,
           },
         });
 
@@ -68,6 +68,15 @@ export default async function handler(
           data: {
             numeroPedido,
             controleId: novoControle.id,
+          },
+        });
+
+        // Criar PedidoConferido com separadorId e auditorId
+        await tx.pedidoConferido.create({
+          data: {
+            pedidoId: novoPedido.id,
+            separadorId: separadorId,
+            auditorId: auditorId,
           },
         });
 

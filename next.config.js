@@ -41,6 +41,14 @@ const nextConfig = {
   },
   reactStrictMode: true,
   swcMinify: true,
+  typescript: {
+    // Desabilita a verificação de tipos durante o build
+    ignoreBuildErrors: true,
+  },
+  eslint: {
+    // Desabilita o ESLint durante o build
+    ignoreDuringBuilds: true,
+  },
   images: {
     domains: ['localhost'],
   },

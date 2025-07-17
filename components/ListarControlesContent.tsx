@@ -1,17 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useStore } from '../store/store';
 import type { ControleCarga as PrismaControleCarga, NotaFiscal } from '@prisma/client';
+import type { Prisma } from '@prisma/client';
 
 // Extensão local da interface ControleCarga para incluir campos adicionais
 interface ControleComNotas extends PrismaControleCarga {
   notas: NotaFiscal[];
-  cpfMotorista?: string | null;
-  pedido100?: boolean | null;
-  inconsistencia?: boolean | null;
-  motivosInconsistencia?: string | null;
-  auditorId?: string | null;
   auditor?: any | null;
-  dataAuditoria?: Date | null;
 }
 
 import { 
@@ -60,7 +55,7 @@ import AddIcon from '@mui/icons-material/Add';
 
 import AssinaturaDigital from './AssinaturaDigital';
 
-interface Controle extends Omit<LocalControleCarga, 'notas' | 'numeroManifesto' | 'assinaturaMotorista' | 'assinaturaResponsavel' | 'dataAssinaturaMotorista' | 'dataAssinaturaResponsavel'> {
+interface Controle extends Omit<PrismaControleCarga, 'notas' | 'numeroManifesto' | 'assinaturaMotorista' | 'assinaturaResponsavel' | 'dataAssinaturaMotorista' | 'dataAssinaturaResponsavel'> {
   numeroManifesto: string | null;
   assinaturaMotorista: string | null;
   assinaturaResponsavel: string | null;
@@ -180,22 +175,16 @@ const ListarControlesContent: React.FC = () => {
     return controlesStore.map(controle => ({
       ...controle,
       dataCriacao: new Date(controle.dataCriacao),
-      dataConferencia: controle.dataConferencia ? new Date(controle.dataConferencia) : null,
       dataAssinaturaMotorista: controle.dataAssinaturaMotorista ? new Date(controle.dataAssinaturaMotorista) : null,
       dataAssinaturaResponsavel: controle.dataAssinaturaResponsavel ? new Date(controle.dataAssinaturaResponsavel) : null,
-      notas: controle.notas || [],
-      cpfMotorista: controle.cpfMotorista || null,
-      pedido100: controle.pedido100 || null,
-      inconsistencia: controle.inconsistencia || null,
-      motivosInconsistencia: controle.motivosInconsistencia || null,
-      auditorId: controle.auditorId || null,
-      auditor: controle.auditor || null,
-      dataAuditoria: controle.dataAuditoria ? new Date(controle.dataAuditoria) : null
+      notas: (controle as any).notas || [],
+      auditor: (controle as any).auditor || null,
+      dataAuditoria: (controle as any).dataAuditoria ? new Date((controle as any).dataAuditoria) : null
     }));
   }, []);
 
   useEffect(() => {
-    setControles(converterControles(controlesStore));
+    setControles(converterControles(controlesStore as any));
   }, [controlesStore, converterControles]);
   const [editing, setEditing] = React.useState<ControleComNotas | null>(null);
   const [editData, setEditData] = React.useState<Partial<Omit<PrismaControleCarga, 'id' | 'dataCriacao' | 'notas'>>>({});
@@ -213,7 +202,7 @@ const ListarControlesContent: React.FC = () => {
         setLoading(true);
         await fetchControles();
         // Atualiza a lista de controles após o fetch
-        setControles(converterControles(controlesStore));
+        setControles(converterControles(controlesStore as any));
       } catch (error) {
         console.error('Erro ao carregar controles:', error);
         enqueueSnackbar('Erro ao carregar controles', { variant: 'error' });
@@ -242,8 +231,6 @@ const ListarControlesContent: React.FC = () => {
         assinaturaResponsavel: 'assinaturaResponsavel' in controle ? controle.assinaturaResponsavel || null : null,
         dataAssinaturaMotorista: 'dataAssinaturaMotorista' in controle ? controle.dataAssinaturaMotorista || null : null,
         dataAssinaturaResponsavel: 'dataAssinaturaResponsavel' in controle ? controle.dataAssinaturaResponsavel || null : null,
-        auditoriaId: controle.auditoriaId || null,
-        observacaoAuditoria: controle.observacaoAuditoria || null,
         notas: 'notas' in controle ? (controle.notas || []) : []
       };
       const existingBytes = await fetch('/templates/modelo-romaneio.pdf').then(res => res.arrayBuffer());
@@ -479,7 +466,10 @@ const ListarControlesContent: React.FC = () => {
       if (editData.motorista !== undefined) dadosAtualizacao.motorista = editData.motorista as string;
       if (editData.responsavel !== undefined) dadosAtualizacao.responsavel = editData.responsavel as string;
       if (editData.cpfMotorista !== undefined) dadosAtualizacao.cpfMotorista = editData.cpfMotorista as string;
-      if (editData.transportadora !== undefined) dadosAtualizacao.transportadora = editData.transportadora as 'ACERT' | 'EXPRESSO_GOIAS';
+      if (editData.transportadora !== undefined) {
+        const transportadoraValida = editData.transportadora === 'EXPRESSO_GOIAS' ? 'EXPRESSO_GOIAS' : 'ACERT';
+        dadosAtualizacao.transportadora = transportadoraValida;
+      }
       if (editData.qtdPallets !== undefined) dadosAtualizacao.qtdPallets = Number(editData.qtdPallets) || 0;
       if (editData.observacao !== undefined) dadosAtualizacao.observacao = editData.observacao as string | null;
       
@@ -488,7 +478,7 @@ const ListarControlesContent: React.FC = () => {
         dadosAtualizacao.numeroManifesto = editData.numeroManifesto || undefined;
       }
       
-      await atualizarControle(editing.id, dadosAtualizacao);
+      await atualizarControle(editing.id, dadosAtualizacao as any);
       enqueueSnackbar('Controle atualizado com sucesso', { variant: 'success' });
       handleCloseEdit();
     } catch (error) {

@@ -179,7 +179,7 @@ function PaginaConferenciaPedidos() {
     if (!pedidoSelecionado || !user) return;
     
     try {
-      const response = await api.post('/api/pedidos/confirmar-conferencia', {
+      const response = await api.post('/api/conferencias', {
         pedidoId: pedidoSelecionado.id,
         pedido100,
         inconsistencia,

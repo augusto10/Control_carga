@@ -1,8 +1,10 @@
--- AlterEnum
-ALTER TYPE "Transportadora" ADD VALUE 'ACCERT';
+-- (AlterEnum removido - já existe valor ACCERT no enum)
+--
 
--- AlterTable
-ALTER TABLE "ControleCarga" ALTER COLUMN "transportadora" SET DEFAULT 'ACCERT';
+
+-- AlterTable (removido ajuste de default, permanece demais alterações)
+--
+
 
 -- CreateTable
 CREATE TABLE "Motorista" (

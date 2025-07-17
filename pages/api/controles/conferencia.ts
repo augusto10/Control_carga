@@ -17,29 +17,40 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 
   try {
-    // 1. Encontrar o pedido para obter o controleId
-    const pedido = await prisma.pedido.findUnique({
-      where: { id: pedidoId },
+    // 1. Verificar se já existe um PedidoConferido para este pedido
+    let pedidoConferido = await prisma.pedidoConferido.findUnique({
+      where: { pedidoId: pedidoId },
     });
 
-    if (!pedido || !pedido.controleId) {
-      return res.status(404).json({ error: 'Pedido não encontrado ou não associado a um controle' });
+    if (pedidoConferido) {
+      // 2. Atualizar o PedidoConferido existente
+      pedidoConferido = await prisma.pedidoConferido.update({
+        where: { id: pedidoConferido.id },
+        data: {
+          conferenciaRealizada: true,
+          dataConferencia: new Date(),
+          conferenteId: conferenteId,
+          pedido100: pedido100 === 'sim',
+          inconsistencia: inconsistencia === 'sim',
+          motivosInconsistencia: inconsistencia === 'sim' ? motivosInconsistencia : [],
+        },
+      });
+    } else {
+      // 3. Criar novo PedidoConferido
+      pedidoConferido = await prisma.pedidoConferido.create({
+        data: {
+          pedidoId: pedidoId,
+          conferenciaRealizada: true,
+          dataConferencia: new Date(),
+          conferenteId: conferenteId,
+          pedido100: pedido100 === 'sim',
+          inconsistencia: inconsistencia === 'sim',
+          motivosInconsistencia: inconsistencia === 'sim' ? motivosInconsistencia : [],
+        },
+      });
     }
 
-    // 2. Atualizar o ControleCarga associado
-    const updatedControle = await prisma.controleCarga.update({
-      where: { id: pedido.controleId },
-      data: {
-        conferenciaRealizada: true,
-        dataConferencia: new Date(),
-        conferenteId: conferenteId, // Usando o ID do usuário autenticado
-        pedido100: pedido100 === 'sim', // Corrigido para comparar com 'sim'
-        inconsistencia: inconsistencia === 'sim', // Corrigido para comparar com 'sim'
-        motivosInconsistencia: inconsistencia === 'sim' ? motivosInconsistencia : [], // Salva motivos apenas se houver inconsistência
-      },
-    });
-
-    res.status(200).json(updatedControle);
+    res.status(200).json(pedidoConferido);
   } catch (error) {
     console.error('Erro ao salvar a conferência:', error);
     res.status(500).json({ error: 'Erro interno do servidor' });

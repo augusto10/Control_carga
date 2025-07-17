@@ -25,32 +25,13 @@ model ControleCarga {
   notas           NotaFiscal[]
   pedidos         Pedido[]
 
+
+
   // Campos de assinatura digital
   assinaturaMotorista       String?   @db.Text
   assinaturaResponsavel     String?   @db.Text
   dataAssinaturaMotorista   DateTime?
   dataAssinaturaResponsavel DateTime?
-
-  // --- Campos da Separação ---
-  separadorId String?
-  separador   Usuario? @relation("Separacao", fields: [separadorId], references: [id])
-
-  // --- Campos da Conferência ---
-  conferenciaRealizada  Boolean   @default(false)
-  dataConferencia       DateTime?
-  conferenteId          String?
-  conferente            Usuario?  @relation("Conferencia", fields: [conferenteId], references: [id])
-  pedido100             Boolean?
-  inconsistencia        Boolean?
-  motivosInconsistencia String[]
-
-  // --- Campos da Auditoria ---
-  auditoriaRealizada  Boolean   @default(false)
-  dataAuditoria       DateTime?
-  auditorId           String?
-  auditor             Usuario?  @relation("Auditoria", fields: [auditorId], references: [id])
-  auditoriaComErro    Boolean?
-  observacaoAuditoria String?
 }
 
 model Pedido {
@@ -85,12 +66,11 @@ model Usuario {
   ultimoAcesso      DateTime?
   notas             NotaFiscal[]
   auditoriasAcesso  AuditoriaAcesso[]
-  pedidosConferidos PedidoConferido[] @relation("PedidosConferidos")
 
-  // Relações para ControleCarga
-  controlesSeparados  ControleCarga[] @relation("Separacao")
-  controlesConferidos ControleCarga[] @relation("Conferencia")
-  controlesAuditados  ControleCarga[] @relation("Auditoria")
+  // Relações para PedidoConferido
+  pedidosSeparados  PedidoConferido[] @relation("Separacao")
+  pedidosConferidos PedidoConferido[] @relation("Conferencia")
+  pedidosAuditados  PedidoConferido[] @relation("Auditoria")
 }
 
 model AuditoriaAcesso {
@@ -143,11 +123,28 @@ model PedidoConferido {
   dataCriacao           DateTime @default(now())
   pedido                Pedido   @relation(fields: [pedidoId], references: [id])
   pedidoId              String   @unique
-  conferente            Usuario  @relation("PedidosConferidos", fields: [conferenteId], references: [id])
-  conferenteId          String
-  pedido100             Boolean
-  inconsistencia        Boolean
+  
+  // --- Campos da Separação ---
+  separadorId String?
+  separador   Usuario? @relation("Separacao", fields: [separadorId], references: [id])
+
+  // --- Campos da Conferência ---
+  conferenciaRealizada  Boolean   @default(false)
+  dataConferencia       DateTime?
+  conferenteId          String?
+  conferente            Usuario?  @relation("Conferencia", fields: [conferenteId], references: [id])
+  pedido100             Boolean?
+  inconsistencia        Boolean?
   motivosInconsistencia String[]
+
+  // --- Campos da Auditoria ---
+  auditoriaRealizada  Boolean   @default(false)
+  dataAuditoria       DateTime?
+  auditorId           String?
+  auditor             Usuario?  @relation("Auditoria", fields: [auditorId], references: [id])
+  auditoriaComErro    Boolean?
+  observacaoAuditoria String?
+  
   observacoes           String?
 }
 

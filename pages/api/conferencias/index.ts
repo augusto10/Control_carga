@@ -36,10 +36,12 @@ export default async function handler(
 
     if (req.method === 'GET') {
       return listarConferencias(req, res);
+    } else if (req.method === 'POST') {
+      return criarConferencia(req, res);
     } else if (req.method === 'PUT') {
       return atualizarConferencia(req, res);
     } else {
-      res.setHeader('Allow', ['GET', 'PUT']);
+      res.setHeader('Allow', ['GET', 'POST', 'PUT']);
       return res.status(405).end(`Method ${req.method} Not Allowed`);
     }
   } catch (error) {
@@ -134,6 +136,90 @@ async function listarConferencias(req: NextApiRequest, res: NextApiResponse) {
       error: 'Erro ao listar as conferências',
       details: error instanceof Error ? error.message : 'Erro desconhecido'
     });
+  }
+}
+
+async function criarConferencia(req: NextApiRequest, res: NextApiResponse) {
+  try {
+    const token = await getToken({ req, secret });
+    if (!token?.sub) {
+      return res.status(401).json({ error: 'Não autorizado' });
+    }
+
+    const {
+      pedidoId,
+      pedido100,
+      inconsistencia,
+      motivosInconsistencia = [],
+      observacoes,
+    } = req.body as {
+      pedidoId?: string;
+      pedido100?: 'sim' | 'nao' | boolean;
+      inconsistencia?: 'sim' | 'nao' | boolean;
+      motivosInconsistencia?: string[];
+      observacoes?: string;
+    };
+
+    if (!pedidoId) {
+      return res.status(400).json({ error: 'ID do Pedido é obrigatório' });
+    }
+
+    const pedido = await prisma.pedido.findUnique({
+      where: { id: pedidoId },
+      include: { controle: true },
+    });
+
+    if (!pedido) {
+      return res.status(404).json({ error: 'Pedido não encontrado' });
+    }
+
+    const conferenciaExistente = await prisma.pedidoConferido.findUnique({
+      where: { pedidoId },
+    });
+    if (conferenciaExistente) {
+      return res.status(400).json({ error: 'Este pedido já foi conferido' });
+    }
+
+    const conferencia = await prisma.pedidoConferido.create({
+      data: {
+        pedidoId,
+        conferenteId: token.sub,
+        pedido100: pedido100 === 'sim' || pedido100 === true,
+        inconsistencia: inconsistencia === 'sim' || inconsistencia === true,
+        motivosInconsistencia:
+          inconsistencia === 'sim' || inconsistencia === true ? motivosInconsistencia : [],
+        observacoes: observacoes || null,
+      },
+      include: {
+        conferente: { select: { id: true, nome: true, email: true } },
+      },
+    });
+
+    await prisma.pedido.update({
+      where: { id: pedidoId },
+      data: {
+        conferido: { connect: { id: conferencia.id } },
+      },
+    });
+
+    if (pedido.controleId) {
+      await prisma.controleCarga.update({
+        where: { id: pedido.controleId },
+        data: {
+          
+          dataConferencia: new Date(),
+          conferenteId: token.sub,
+          pedido100: conferencia.pedido100,
+          inconsistencia: conferencia.inconsistencia,
+          motivosInconsistencia: conferencia.motivosInconsistencia,
+        },
+      });
+    }
+
+    return res.status(201).json({ success: true, data: conferencia, message: 'Conferência registrada com sucesso!' });
+  } catch (error) {
+    console.error('Erro ao criar conferência:', error);
+    return res.status(500).json({ error: 'Erro ao criar conferência', details: error instanceof Error ? error.message : 'Erro desconhecido' });
   }
 }
 
