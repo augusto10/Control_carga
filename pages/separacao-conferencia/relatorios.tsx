@@ -1,6 +1,6 @@
 import { Container, Typography, Card, CardContent, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Button } from '@mui/material';
 import { useEffect, useState } from 'react';
-import { useAuth } from '@/hooks/useAuth';
+import useAuth from '../../hooks/useAuth';
 
 interface NotaFiscal {
   id: string;
