@@ -26,7 +26,8 @@ import {
   IconButton,
   TablePagination,
   FormControlLabel,
-  Switch
+  Switch,
+  SelectChangeEvent
 } from '@mui/material';
 import { Edit as EditIcon, Save as SaveIcon, Cancel as CancelIcon } from '@mui/icons-material';
 import { format } from 'date-fns';
