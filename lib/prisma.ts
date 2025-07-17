@@ -3,6 +3,7 @@ import { PrismaClient } from '@prisma/client';
 // Adiciona o PrismaClient ao objeto global em desenvolvimento para evitar
 // esgotar o limite de conexões do banco de dados.
 // Saiba mais: https://pris.ly/d/help/next-js-best-practices
+// Atualizado para PostgreSQL padrão - sem relationMode
 
 const prismaClientSingleton = () => {
   return new PrismaClient();
