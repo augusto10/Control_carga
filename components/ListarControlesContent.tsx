@@ -1058,7 +1058,7 @@ const ListarControlesContent: React.FC = () => {
                               variant="contained"
                               color="primary"
                               size="small"
-                              onClick={() => handleFinalizarControle(controle.id)}
+                              onClick={() => handleFinalizarControle(controle)}
                               disabled={loadingButtons[controle.id]}
                               sx={{
                                 ...buttonStyles,
