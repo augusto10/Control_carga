@@ -26,6 +26,7 @@
     "@mui/material": "^5.15.15",
     "@mui/styles": "^5.15.15",
     "@prisma/client": "^6.12.0",
+    "@prisma/extension-accelerate": "^2.0.2",
     "@supabase/supabase-js": "^2.52.0",
     "@types/js-cookie": "^3.0.6",
     "@types/react-redux": "^7.1.34",
@@ -34,6 +35,7 @@
     "@zxing/library": "^0.21.3",
     "axios": "^1.10.0",
     "bcryptjs": "^3.0.2",
+    "bufferutil": "^4.0.9",
     "cookie": "^1.0.2",
     "cookies-next": "^3.0.0",
     "date-fns": "2.30.0",
@@ -52,6 +54,7 @@
     "react-number-format": "^5.4.4",
     "react-redux": "^9.2.0",
     "react-signature-canvas": "^1.0.7",
+    "utf-8-validate": "^6.0.5",
     "zod": "^4.0.5",
     "zustand": "^4.4.7"
   },

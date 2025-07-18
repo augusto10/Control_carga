@@ -1,26 +1,42 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '@prisma/client/edge';
+import { withAccelerate } from '@prisma/extension-accelerate';
 
-// Adiciona o PrismaClient ao objeto global em desenvolvimento para evitar
-// esgotar o limite de conexões do banco de dados.
-// Saiba mais: https://pris.ly/d/help/next-js-best-practices
-// Atualizado para PostgreSQL padrão - sem relationMode
+// Configuração otimizada para trabalhar apenas com Prisma Accelerate
+// Não requer conexão direta com o banco de dados
 
 const prismaClientSingleton = () => {
-  // Log para depuração
+  // Log de inicialização
   console.log('=== PRISMA CLIENT INITIALIZATION ===');
   console.log('NODE_ENV:', process.env.NODE_ENV || 'development');
-  console.log('DATABASE_URL:', process.env.DATABASE_URL ? '***CONFIGURADO***' : 'NÃO CONFIGURADO');
+  console.log('Using Prisma Accelerate:', !!process.env.DATABASE_URL?.includes('accelerate.prisma-data.net'));
   
-  // Log detalhado apenas em desenvolvimento
-  if (process.env.NODE_ENV !== 'production') {
-    console.log('Database URL:', process.env.DATABASE_URL || 'Não definido');
-  }
-  
-  console.log('=== FIM DA INICIALIZAÇÃO DO PRISMA ===');
-  
-  return new PrismaClient({
-    log: ['query', 'info', 'warn', 'error']
+  // Configuração otimizada para o Prisma Accelerate
+  const prisma = new PrismaClient({
+    datasourceUrl: process.env.DATABASE_URL,
+    log: process.env.NODE_ENV === 'development' 
+      ? ['query', 'error', 'warn'] 
+      : ['error', 'warn'],
+  }).$extends(
+    withAccelerate({
+      // Configurações adicionais do Accelerate, se necessário
+    })
+  );
+
+  // Adiciona um manipulador de erros personalizado
+  prisma.$extends({
+    query: {
+      async $allOperations({ operation, model, args, query }) {
+        try {
+          return await query(args);
+        } catch (error) {
+          console.error(`Prisma Error in ${model}.${operation}:`, error);
+          throw error;
+        }
+      }
+    }
   });
+  
+  return prisma;
 };
 
 declare global {
@@ -29,15 +45,11 @@ declare global {
 }
 
 // Inicializa o Prisma Client
-let prisma: ReturnType<typeof prismaClientSingleton>;
+const prisma = globalThis.prisma ?? prismaClientSingleton();
 
-if (process.env.NODE_ENV === 'production') {
-  prisma = prismaClientSingleton();
-} else {
-  if (!global.prisma) {
-    global.prisma = prismaClientSingleton();
-  }
-  prisma = global.prisma;
+// Apenas em desenvolvimento, adiciona ao global para hot-reload
+if (process.env.NODE_ENV !== 'production') {
+  globalThis.prisma = prisma;
 }
 
 export default prisma;

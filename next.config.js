@@ -1,53 +1,58 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Garante que o Prisma seja incluído no bundle de produção
+  // Configuração para o Prisma Accelerate
   experimental: {
-    serverComponentsExternalPackages: ['@prisma/client'],
+    serverComponentsExternalPackages: ['@prisma/client', '@prisma/extension-accelerate'],
+    serverActions: true,
   },
+  
+  // Configuração para Edge Functions
+  runtime: 'edge',
+  
   // Otimizações de build
-  webpack: (config, { isServer }) => {
-    // Garante que o Prisma seja incluído no bundle do lado do servidor
+  webpack: (config, { isServer, dev }) => {
+    // Configuração para o Prisma no lado do servidor
     if (isServer) {
-      config.externals = config.externals || [];
+      config.externals = [...(config.externals || []), 
+        { '@prisma/client': '@prisma/client' },
+        { '@prisma/extension-accelerate': '@prisma/extension-accelerate' }
+      ];
       
-      // Adiciona o Prisma ao bundle
-      if (Array.isArray(config.externals)) {
-        config.externals.push('@prisma/client');
-      } else if (typeof config.externals === 'object' && config.externals !== null) {
-        config.externals['@prisma/client'] = '@prisma/client';
-      }
-      
-      // Garante que o Prisma seja incluído no bundle
+      // Adiciona regras para arquivos .prisma
       config.module.rules.push({
         test: /\.prisma$/,
         loader: 'null-loader',
       });
     }
     
-    // Adiciona fallbacks para módulos do Node.js
+    // Configuração para módulos do Node.js
     config.resolve.fallback = {
       ...config.resolve.fallback,
       fs: false,
       net: false,
       tls: false,
+      dns: false,
       child_process: false,
-      dns: 'empty',
-      net: 'empty',
-      tls: 'empty',
-      fs: 'empty',
+      // Adiciona suporte para Buffer
+      bufferutil: require.resolve('bufferutil'),
+      'utf-8-validate': require.resolve('utf-8-validate'),
     };
     
     return config;
   },
+  
+  // Configurações de build
   reactStrictMode: true,
   swcMinify: true,
+  
+  // Configurações de TypeScript
   typescript: {
-    // Desabilita a verificação de tipos durante o build
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false, // Habilita a verificação de tipos
   },
+  
+  // Configurações do ESLint
   eslint: {
-    // Desabilita o ESLint durante o build
-    ignoreDuringBuilds: true,
+    ignoreDuringBuilds: false, // Habilita o ESLint durante o build
   },
   images: {
     domains: ['localhost'],
