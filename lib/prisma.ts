@@ -6,7 +6,21 @@ import { PrismaClient } from '@prisma/client';
 // Atualizado para PostgreSQL padrão - sem relationMode
 
 const prismaClientSingleton = () => {
-  return new PrismaClient();
+  // Log para depuração
+  console.log('=== PRISMA CLIENT INITIALIZATION ===');
+  console.log('NODE_ENV:', process.env.NODE_ENV || 'development');
+  console.log('DATABASE_URL:', process.env.DATABASE_URL ? '***CONFIGURADO***' : 'NÃO CONFIGURADO');
+  
+  // Log detalhado apenas em desenvolvimento
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('Database URL:', process.env.DATABASE_URL || 'Não definido');
+  }
+  
+  console.log('=== FIM DA INICIALIZAÇÃO DO PRISMA ===');
+  
+  return new PrismaClient({
+    log: ['query', 'info', 'warn', 'error']
+  });
 };
 
 declare global {
@@ -14,10 +28,16 @@ declare global {
   var prisma: undefined | ReturnType<typeof prismaClientSingleton>;
 }
 
-const prisma = globalThis.prisma ?? prismaClientSingleton();
+// Inicializa o Prisma Client
+let prisma: ReturnType<typeof prismaClientSingleton>;
+
+if (process.env.NODE_ENV === 'production') {
+  prisma = prismaClientSingleton();
+} else {
+  if (!global.prisma) {
+    global.prisma = prismaClientSingleton();
+  }
+  prisma = global.prisma;
+}
 
 export default prisma;
-
-if (process.env.NODE_ENV !== 'production') {
-  globalThis.prisma = prisma;
-}
