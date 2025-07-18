@@ -12,7 +12,8 @@
   "build": {
     "env": {
       "PRISMA_GENERATE_DATAPROXY": "false",
-      "PRISMA_SKIP_POSTINSTALL_GENERATE": "false"
+      "PRISMA_SKIP_POSTINSTALL_GENERATE": "false",
+      "PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING": "1"
     }
   },
   "buildCommand": "npm install && npx prisma generate && npm run build",
