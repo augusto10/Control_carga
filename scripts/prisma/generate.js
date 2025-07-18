@@ -22,7 +22,9 @@ const prismaClientExists = fs.existsSync(prismaClientDir);
 // Sempre gere o Prisma Client para evitar versões desatualizadas (ex.: Data Proxy vs Engine local)
 console.log('🚀 Gerando Prisma Client...');
 try {
-  execSync('npx prisma generate', { stdio: 'inherit' });
+  // Definir variável de ambiente para ignorar checksums ausentes
+  process.env.PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING = '1';
+  execSync('npx prisma generate', { stdio: 'inherit', env: { ...process.env, PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING: '1' } });
   console.log('✅ Prisma Client gerado com sucesso!');
 } catch (error) {
   console.error('❌ Erro ao gerar o Prisma Client:', error);
