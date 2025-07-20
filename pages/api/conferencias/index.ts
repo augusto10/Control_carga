@@ -202,19 +202,8 @@ async function criarConferencia(req: NextApiRequest, res: NextApiResponse) {
       },
     });
 
-    if (pedido.controleId) {
-      await prisma.controleCarga.update({
-        where: { id: pedido.controleId },
-        data: {
-          
-          dataConferencia: new Date(),
-          conferenteId: token.sub,
-          pedido100: conferencia.pedido100,
-          inconsistencia: conferencia.inconsistencia,
-          motivosInconsistencia: conferencia.motivosInconsistencia,
-        },
-      });
-    }
+    // Nota: Os campos de conferência são armazenados no modelo PedidoConferido,
+    // não no ControleCarga. O ControleCarga não possui esses campos no schema.
 
     return res.status(201).json({ success: true, data: conferencia, message: 'Conferência registrada com sucesso!' });
   } catch (error) {
@@ -298,18 +287,16 @@ async function atualizarConferencia(req: NextApiRequest, res: NextApiResponse) {
       },
     });
 
-    // Atualizar também o controle de carga associado
-    await prisma.controleCarga.update({
-      where: { id: conferenciaAtualizada.pedido.controleId },
-      data: {
-        pedido100: Boolean(pedido100),
-        inconsistencia: Boolean(inconsistencia),
-        motivosInconsistencia: Array.isArray(motivosInconsistencia) 
-          ? motivosInconsistencia 
-          : [],
-        observacao: observacoes || null,
-      },
-    });
+    // Nota: Os campos de conferência são armazenados no modelo PedidoConferido,
+    // não no ControleCarga. Apenas a observação pode ser atualizada no ControleCarga.
+    if (observacoes && conferenciaAtualizada.pedido.controleId) {
+      await prisma.controleCarga.update({
+        where: { id: conferenciaAtualizada.pedido.controleId },
+        data: {
+          observacao: observacoes,
+        },
+      });
+    }
 
     // Retornar os dados no formato esperado pelo frontend
     return res.status(200).json({

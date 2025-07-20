@@ -38,8 +38,7 @@ export default async function handler(
       include: {
         controle: {
           select: {
-            finalizado: true,
-            responsavelId: true
+            finalizado: true
           }
         }
       }
@@ -61,9 +60,8 @@ export default async function handler(
     });
 
     const isAdmin = usuario?.tipo === 'ADMIN';
-    const isResponsavel = nota.controle?.responsavelId === decoded.id;
-
-    if (!isAdmin && !isResponsavel) {
+    // Como não temos campo responsavelId no modelo, apenas admins podem excluir notas
+    if (!isAdmin) {
       return res.status(403).json({ error: 'Sem permissão para excluir esta nota' });
     }
 

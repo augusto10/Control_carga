@@ -1025,7 +1025,7 @@ const ListarControlesContent: React.FC = () => {
                           <Tooltip title="Excluir">
                             <span>
                               <IconButton 
-                                onClick={() => handleExcluirControle(controle.id)} 
+                                onClick={() => handleExcluirControle(controle)} 
                                 color="error" 
                                 size="small"
                                 disabled={loadingButtons[`delete_${controle.id}`]}

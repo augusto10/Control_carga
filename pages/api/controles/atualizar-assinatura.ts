@@ -7,9 +7,7 @@ import { z } from 'zod';
 // Esquema de validação para o corpo da requisição
 const assinaturaSchema = z.object({
   controleId: z.string().min(1, 'ID do controle é obrigatório'),
-  tipo: z.enum(['motorista', 'responsavel'], {
-    errorMap: () => ({ message: 'Tipo de assinatura deve ser "motorista" ou "responsavel"' })
-  }),
+  tipo: z.enum(['motorista', 'responsavel']),
   assinatura: z.string()
     .min(100, 'Assinatura inválida')
     .refine(data => data.startsWith('data:image/'), {
@@ -49,7 +47,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const validation = assinaturaSchema.safeParse(req.body);
     
     if (!validation.success) {
-      const errorMessage = validation.error.errors.map(err => err.message).join('; ');
+      const errorMessage = validation.error.issues.map((err: any) => err.message).join('; ');
       return res.status(400).json({ 
         error: 'Dados inválidos',
         details: errorMessage
@@ -65,16 +63,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    // Verifica se o controle existe e se o usuário tem permissão para acessá-lo
+    // Verifica se o controle existe
     const controleExistente = await prisma.controleCarga.findUnique({
       where: { 
-        id: controleId,
-        // Se o usuário não for admin, verifica se ele é o criador do controle
-        ...(decodedToken.role !== 'admin' ? { usuarioId: decodedToken.userId } : {})
+        id: controleId
       },
       select: { 
-        finalizado: true,
-        usuarioId: true
+        finalizado: true
       }
     });
 
@@ -98,46 +93,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           where: { id: controleId },
           data: dadosAtualizacao,
           include: {
-            notas: true,
-            usuario: {
-              select: {
-                id: true,
-                nome: true,
-                email: true
-              }
-            }
-          }
-        }),
-        // Registra a ação no log de atividades
-        prisma.logAtividade.create({
-          data: {
-            acao: `Assinatura do ${tipo} adicionada`,
-            tabela: 'ControleCarga',
-            registroId: controleId,
-            usuarioId: decodedToken.userId || 'sistema',
-            dadosAntigos: {},
-            dadosNovos: {
-              tipoAssinatura: tipo,
-              dataAssinatura: new Date()
-            }
+            notas: true
           }
         })
       ]);
 
-      // Remove dados sensíveis antes de retornar
-      const { usuario, ...controleSemDadosSensiveis } = controleAtualizado;
-      
       return res.status(200).json({ 
         success: true,
         message: 'Assinatura salva com sucesso',
-        controle: {
-          ...controleSemDadosSensiveis,
-          usuario: {
-            id: usuario?.id,
-            nome: usuario?.nome
-            // Não incluir email ou outros dados sensíveis
-          }
-        }
+        controle: controleAtualizado
       });
     } catch (dbError) {
       console.error('Erro ao atualizar o banco de dados:', dbError);

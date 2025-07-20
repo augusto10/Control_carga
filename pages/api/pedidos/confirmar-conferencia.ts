@@ -68,16 +68,12 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     });
 
     // Se o pedido estiver vinculado a um controle, marcar como conferido
-    if (pedido.controle) {
+    if (pedido.controle && pedido.controleId && typeof pedido.controleId === 'string') {
       await prisma.controleCarga.update({
         where: { id: pedido.controleId },
         data: {
-          conferenciaRealizada: true,
-          dataConferencia: new Date(),
-          conferenteId,
-          pedido100: pedido100 === 'sim',
-          inconsistencia: inconsistencia === 'sim',
-          motivosInconsistencia: inconsistencia === 'sim' ? motivosInconsistencia : []
+          // Atualizar apenas campos que existem no modelo ControleCarga
+          observacao: `Conferência realizada em ${new Date().toISOString()}`
         }
       });
     }
@@ -93,7 +89,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     res.status(500).json({ 
       success: false,
       error: 'Erro ao registrar conferência',
-      details: error.message 
+      details: error instanceof Error ? error.message : 'Erro desconhecido'
     });
   }
 }

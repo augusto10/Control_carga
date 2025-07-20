@@ -68,7 +68,7 @@ export default function RelatoriosPage() {
                       {nota.controle?.auditoriaRealizada ? (nota.controle?.auditoriaComErro ? 'Com Erro' : 'OK') : 'Pendente'}
                     </TableCell>
                     <TableCell align="right">
-                      {user?.tipo === 'AUDITOR' && !nota.controle?.auditoriaRealizada && (
+                      {(user as any)?.tipo === 'AUDITOR' && !nota.controle?.auditoriaRealizada && (
                         <Button variant="contained" size="small" onClick={() => handleAuditar(nota.id)}>
                           Auditar
                         </Button>

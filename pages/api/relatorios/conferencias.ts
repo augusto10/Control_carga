@@ -9,21 +9,25 @@ const handler = async (req: AuthenticatedRequest, res: NextApiResponse) => {
   }
 
   try {
-    const conferencias = await prisma.controleCarga.findMany({
-      where: {
-        conferenciaRealizada: true,
-      },
+    // Buscar conferências via PedidoConferido, que é onde os dados são realmente salvos
+    const conferencias = await prisma.pedidoConferido.findMany({
       include: {
-        pedidos: true, // Correção: a relação é 'pedidos' (plural)
-        separador: {
-          select: { nome: true },
-        },
-        auditor: {
-          select: { nome: true },
+        pedido: {
+          include: {
+            controle: {
+              include: {
+                notas: true
+              }
+            }
+          }
         },
         conferente: {
-          select: { nome: true },
-        },
+          select: {
+            id: true,
+            nome: true,
+            email: true
+          }
+        }
       },
       orderBy: {
         dataConferencia: 'desc',

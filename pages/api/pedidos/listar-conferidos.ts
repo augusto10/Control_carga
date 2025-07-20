@@ -43,8 +43,7 @@ export default async function handler(
       include: {
         controle: {
           include: {
-            separador: true,
-            auditor: true
+            notas: true
           }
         },
         conferido: {
@@ -69,7 +68,7 @@ export default async function handler(
     console.error('Erro ao listar pedidos conferidos:', error);
     res.status(500).json({ 
       error: 'Erro ao listar pedidos conferidos',
-      details: error.message 
+      details: error instanceof Error ? error.message : 'Erro desconhecido'
     });
   }
 }

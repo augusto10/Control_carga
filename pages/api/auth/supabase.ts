@@ -27,7 +27,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(401).json({
       user: null,
       session: null,
-      error: error.message
+      error: error instanceof Error ? error.message : 'Erro desconhecido na autenticação'
     })
   }
 }

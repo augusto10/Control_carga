@@ -1,12 +1,19 @@
-import LoadingButton from '@mui/lab/LoadingButton';
+import { Button, CircularProgress, ButtonProps } from '@mui/material';
 import { motion } from 'framer-motion';
+import React from 'react';
 
-const ModernButton = ({ children, ...props }) => {
+interface ModernButtonProps extends Omit<ButtonProps, 'loading'> {
+  children: React.ReactNode;
+  loading?: boolean;
+}
+
+const ModernButton: React.FC<ModernButtonProps> = ({ children, loading, ...props }) => {
   return (
     <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.98 }}>
-      <LoadingButton
+      <Button
         variant="contained"
         size="large"
+        disabled={loading}
         sx={{
           borderRadius: 3,
           fontWeight: 600,
@@ -14,8 +21,11 @@ const ModernButton = ({ children, ...props }) => {
         }}
         {...props}
       >
+        {loading ? (
+          <CircularProgress size={20} color="inherit" sx={{ mr: 1 }} />
+        ) : null}
         {children}
-      </LoadingButton>
+      </Button>
     </motion.div>
   );
 };
