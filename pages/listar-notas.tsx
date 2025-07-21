@@ -98,7 +98,8 @@ async function handleExcluirNota(id: string) {
   if (!confirm('Tem certeza que deseja excluir esta nota? Esta ação não pode ser desfeita.')) return;
   try {
     // Importando deleteNota dinamicamente do store para garantir contexto
-    const { deleteNota, fetchNotas } = require('../store/store').useStore.getState();
+    const { useStore } = await import('../store/store');
+    const { deleteNota, fetchNotas } = useStore.getState();
     await deleteNota(id);
     enqueueSnackbar('Nota excluída com sucesso!', { variant: 'success', autoHideDuration: 3000 });
     await fetchNotas();
