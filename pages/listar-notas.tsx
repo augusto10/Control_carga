@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Button, Container, Typography, Box, CircularProgress, Chip, TextField, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, IconButton, Tooltip, Paper } from '@mui/material';
 import { DeleteRounded } from '@mui/icons-material';
 import { useStore } from '../store/store';
+import { enqueueSnackbar } from 'notistack';
 import { format } from 'date-fns';
 
 const ListarNotas = () => {
@@ -92,8 +93,20 @@ const ListarNotas = () => {
   );
 };
 
-function handleExcluirNota(id: string) {
-  alert(`Excluir nota ${id} (implementar ação real)`);
+// Função de exclusão real integrada ao backend
+async function handleExcluirNota(id: string) {
+  if (!confirm('Tem certeza que deseja excluir esta nota? Esta ação não pode ser desfeita.')) return;
+  try {
+    // Importando deleteNota dinamicamente do store para garantir contexto
+    const { deleteNota, fetchNotas } = require('../store/store').useStore.getState();
+    await deleteNota(id);
+    enqueueSnackbar('Nota excluída com sucesso!', { variant: 'success', autoHideDuration: 3000 });
+    await fetchNotas();
+  } catch (error) {
+    let errorMessage = 'Erro ao excluir nota. Tente novamente.';
+    if (error instanceof Error) errorMessage = error.message;
+    enqueueSnackbar(errorMessage, { variant: 'error', autoHideDuration: 5000 });
+  }
 }
 
 export default ListarNotas;

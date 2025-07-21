@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useStore } from '../store/store';
 import type { ControleCarga as PrismaControleCarga, NotaFiscal } from '@prisma/client';
 import type { Prisma } from '@prisma/client';
@@ -76,7 +76,9 @@ interface AssinaturaState {
   tipo: 'motorista' | 'responsavel';
 }
 
+
 const ListarControlesContent: React.FC = () => {
+  const assinaturaRef = useRef<any>(null);
   const { user } = useAuth();
   const { controles: controlesStore, fetchControles, finalizarControle, atualizarControle } = useStore();
   const [controles, setControles] = useState<ControleComNotas[]>([]);
@@ -201,8 +203,6 @@ const ListarControlesContent: React.FC = () => {
       try {
         setLoading(true);
         await fetchControles();
-        // Atualiza a lista de controles após o fetch
-        setControles(converterControles(controlesStore as any));
       } catch (error) {
         console.error('Erro ao carregar controles:', error);
         enqueueSnackbar('Erro ao carregar controles', { variant: 'error' });
@@ -212,7 +212,12 @@ const ListarControlesContent: React.FC = () => {
     };
 
     carregarDados();
-  }, [fetchControles, enqueueSnackbar, converterControles, controlesStore]);
+  }, []); // Executar apenas uma vez ao montar o componente
+
+  // Atualiza a lista local quando controlesStore muda
+  useEffect(() => {
+    setControles(converterControles(controlesStore as any));
+  }, [controlesStore, converterControles]);
 
   const gerarPdf = async (controle: ControleComNotas) => {
     try {
@@ -342,35 +347,24 @@ const ListarControlesContent: React.FC = () => {
       const assinaturaY = yPos - 10;
       
       // Assinatura do Motorista
+      page.drawText('Motorista:', { x: 100, y: assinaturaY - 10, size: fontSize, font });
+      page.drawText(controleCompleto.motorista, { x: 100, y: assinaturaY - 25, size: fontSize, font });
+      
       if (controleCompleto.assinaturaMotorista) {
-        try {
-          // Adiciona a imagem da assinatura do motorista
-          const signatureImage = await fetch(controleCompleto.assinaturaMotorista).then(res => res.arrayBuffer());
-          const signature = await doc.embedPng(signatureImage);
-          const signatureDims = signature.scale(0.5); // Reduz o tamanho da assinatura
-          
-          page.drawImage(signature, {
-            x: 100,
-            y: assinaturaY - 50,
-            width: signatureDims.width,
-            height: signatureDims.height,
-          });
-        } catch (error) {
-          console.error('Erro ao carregar assinatura do motorista:', error);
-          page.drawText('Assinatura do Motorista (não disponível)', { 
-            x: 100, 
-            y: assinaturaY - 20, 
-            size: fontSize - 2, 
-            font, 
-            color: rgb(0.7, 0.7, 0.7) 
-          });
-        }
+        // Exibe "ASSINADO DIGITALMENTE" como carimbo
+        page.drawText('ASSINADO DIGITALMENTE', { 
+          x: 100, 
+          y: assinaturaY - 40, 
+          size: fontSize - 1, 
+          font, 
+          color: rgb(0, 0.5, 0) // Verde para indicar assinado
+        });
       } else {
-        page.drawText('Assinatura do Motorista:', { x: 100, y: assinaturaY - 20, size: fontSize - 1, font });
+        page.drawText('Assinatura:', { x: 100, y: assinaturaY - 40, size: fontSize - 1, font });
         // Linha para assinatura
         page.drawLine({
-          start: { x: 100, y: assinaturaY - 30 },
-          end: { x: 300, y: assinaturaY - 30 },
+          start: { x: 100, y: assinaturaY - 50 },
+          end: { x: 300, y: assinaturaY - 50 },
           thickness: 1,
           color: rgb(0, 0, 0),
         });
@@ -383,35 +377,24 @@ const ListarControlesContent: React.FC = () => {
       page.drawText(`Data: ${dataMotorista}`, { x: 100, y: assinaturaY - 45, size: fontSize - 2, font });
 
       // Assinatura do Responsável
+      page.drawText('Responsável:', { x: 350, y: assinaturaY - 10, size: fontSize, font });
+      page.drawText(controleCompleto.responsavel, { x: 350, y: assinaturaY - 25, size: fontSize, font });
+      
       if (controleCompleto.assinaturaResponsavel) {
-        try {
-          // Adiciona a imagem da assinatura do responsável
-          const signatureImage = await fetch(controleCompleto.assinaturaResponsavel).then(res => res.arrayBuffer());
-          const signature = await doc.embedPng(signatureImage);
-          const signatureDims = signature.scale(0.5); // Reduz o tamanho da assinatura
-          
-          page.drawImage(signature, {
-            x: 350,
-            y: assinaturaY - 50,
-            width: signatureDims.width,
-            height: signatureDims.height,
-          });
-        } catch (error) {
-          console.error('Erro ao carregar assinatura do responsável:', error);
-          page.drawText('Assinatura do Responsável (não disponível)', { 
-            x: 350, 
-            y: assinaturaY - 20, 
-            size: fontSize - 2, 
-            font, 
-            color: rgb(0.7, 0.7, 0.7) 
-          });
-        }
+        // Exibe "ASSINADO DIGITALMENTE" como carimbo
+        page.drawText('ASSINADO DIGITALMENTE', { 
+          x: 350, 
+          y: assinaturaY - 40, 
+          size: fontSize - 1, 
+          font, 
+          color: rgb(0, 0.5, 0) // Verde para indicar assinado
+        });
       } else {
-        page.drawText('Assinatura do Responsável:', { x: 350, y: assinaturaY - 20, size: fontSize - 1, font });
+        page.drawText('Assinatura:', { x: 350, y: assinaturaY - 40, size: fontSize - 1, font });
         // Linha para assinatura
         page.drawLine({
-          start: { x: 350, y: assinaturaY - 30 },
-          end: { x: 550, y: assinaturaY - 30 },
+          start: { x: 350, y: assinaturaY - 50 },
+          end: { x: 550, y: assinaturaY - 50 },
           thickness: 1,
           color: rgb(0, 0, 0),
         });
@@ -437,6 +420,45 @@ const ListarControlesContent: React.FC = () => {
   const canEdit = (c: ControleComNotas): boolean => {
     if (!c.finalizado) return true;
     return user?.tipo === 'GERENTE' || user?.tipo === 'ADMIN';
+  };
+
+  const handleExcluirControle = async (controle: ControleComNotas) => {
+    if (!confirm(`Tem certeza que deseja excluir o controle ${controle.numeroManifesto || controle.id.substring(0, 8)}? Esta ação não pode ser desfeita.`)) {
+      return;
+    }
+
+    const deleteKey = `delete_${controle.id}`;
+    setLoadingButtons(prev => ({ ...prev, [deleteKey]: true }));
+
+    try {
+      const response = await api.delete(`/api/controles/${controle.id}`);
+      
+      if (response.status === 200) {
+        enqueueSnackbar('Controle excluído com sucesso!', { 
+          variant: 'success',
+          autoHideDuration: 3000 
+        });
+        
+        // Recarregar a lista de controles
+        await fetchControles();
+        setControles(converterControles(controlesStore as any));
+      }
+    } catch (error: any) {
+      console.error('Erro ao excluir controle:', error);
+      
+      let errorMessage = 'Erro ao excluir controle. Tente novamente.';
+      
+      if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      }
+      
+      enqueueSnackbar(errorMessage, { 
+        variant: 'error',
+        autoHideDuration: 5000 
+      });
+    } finally {
+      setLoadingButtons(prev => ({ ...prev, [deleteKey]: false }));
+    }
   };
 
   const handleOpenEdit = useCallback((c: ControleComNotas) => {
@@ -518,9 +540,17 @@ const ListarControlesContent: React.FC = () => {
    * @returns true se a assinatura foi salva com sucesso, false caso contrário
    */
   const handleSalvarAssinatura = useCallback(async (assinatura: string): Promise<boolean> => {
+    console.log('[handleSalvarAssinatura] Iniciando salvamento da assinatura');
+    console.log('[handleSalvarAssinatura] Parâmetros:', {
+      controleId: assinaturaAberta.controleId,
+      tipo: assinaturaAberta.tipo,
+      assinaturaLength: assinatura?.length || 0
+    });
+    
     try {
       // Validação dos parâmetros
       if (!assinaturaAberta.controleId || !assinaturaAberta.tipo) {
+        console.error('[handleSalvarAssinatura] Erro: ID do controle ou tipo não especificado');
         throw new Error('ID do controle ou tipo de assinatura não especificado');
       }
       
@@ -656,32 +686,7 @@ const ListarControlesContent: React.FC = () => {
     }
   }, [finalizarControle, enqueueSnackbar, setLoadingButtons]);
 
-  const handleExcluirControle = useCallback(async (controle: ControleComNotas) => {
-    if (!controle) return;
-    if (!window.confirm('Tem certeza que deseja excluir este controle? Esta ação não pode ser desfeita.')) {
-      return;
-    }
 
-    try {
-      setLoadingButtons(prev => ({ ...prev, [`delete_${controle.id}`]: true }));
-      await api.delete(`/api/controles/${controle.id}`);
-      await fetchControles();
-      enqueueSnackbar('Controle excluído com sucesso!', { 
-        variant: 'success',
-        autoHideDuration: 3000,
-        anchorOrigin: { vertical: 'top', horizontal: 'center' },
-      });
-    } catch (error) {
-      console.error('Erro ao excluir controle:', error);
-      enqueueSnackbar('Erro ao excluir controle. Tente novamente.', { 
-        variant: 'error',
-        autoHideDuration: 5000,
-        anchorOrigin: { vertical: 'top', horizontal: 'center' },
-      });
-    } finally {
-      setLoadingButtons(prev => ({ ...prev, [`delete_${controle.id}`]: false }));
-    }
-  }, [api, enqueueSnackbar, fetchControles, setLoadingButtons]);
 
   if (loading) {
     return (
@@ -976,8 +981,9 @@ const ListarControlesContent: React.FC = () => {
                   <TableCell>
                     <Chip 
                       label={controle.finalizado ? 'Finalizado' : 'Em andamento'} 
-                      color={controle.finalizado ? 'success' : 'default'}
+                      color={controle.finalizado ? 'success' : 'warning'}
                       size="small"
+                      sx={controle.finalizado ? { backgroundColor: '#4caf50', color: 'white' } : {}}
                     />
                   </TableCell>
                   <TableCell align="right">
@@ -985,10 +991,15 @@ const ListarControlesContent: React.FC = () => {
                       <Tooltip title="Ver detalhes">
                         <IconButton 
                           onClick={() => router.push(`/controle/${controle.id}`)}
-                          color="primary"
+                          color={!controle.finalizado ? "success" : "primary"}
                           size="small"
                           disabled={loadingButtons[controle.id]}
-                          sx={buttonStyles}
+                          sx={{
+                            ...buttonStyles,
+                            '&:hover': {
+                              backgroundColor: !controle.finalizado ? 'rgba(46, 125, 50, 0.08)' : 'rgba(25, 118, 210, 0.08)'
+                            }
+                          }}
                         >
                           <VisibilityIcon fontSize="small" />
                         </IconButton>
@@ -1223,15 +1234,20 @@ const ListarControlesContent: React.FC = () => {
         </Dialog>
       )}
 
-      {/* Diálogo de Assinatura */}
-      <Dialog 
-        open={assinaturaAberta.aberto} 
-        onClose={handleFecharAssinatura}
-        maxWidth="sm"
-        fullWidth
-        aria-labelledby="assinatura-dialog-title"
-        aria-describedby="assinatura-dialog-description"
-      >
+      {/* Diálogo de Assinatura - Só renderiza se tiver controleId válido */}
+      {assinaturaAberta.aberto && assinaturaAberta.controleId && (
+        <Dialog 
+          open={true}
+          onClose={handleFecharAssinatura}
+          maxWidth="md"
+          fullWidth
+          PaperProps={{
+            sx: {
+              borderRadius: 2,
+              boxShadow: '0 8px 32px rgba(0,0,0,0.12)'
+            }
+          }}
+        >
         <DialogTitle sx={{ 
           display: 'flex', 
           alignItems: 'center', 
@@ -1283,38 +1299,35 @@ const ListarControlesContent: React.FC = () => {
               p: 2,
               bgcolor: 'background.paper'
             }}>
-              <AssinaturaDigital
-                ref={(ref) => {
-                  if (ref && assinaturaAberta.aberto) {
-                    // Limpa a assinatura quando o diálogo é aberto
-                    ref.clear();
-                  }
-                }}
-                onSave={async (signatureData) => {
-                  try {
-                    await handleSalvarAssinatura(signatureData);
-                    // Recarrega os controles para garantir que tudo está sincronizado
-                    await fetchControles();
-                    handleFecharAssinatura();
-                  } catch (error) {
-                    // O erro já foi tratado em handleSalvarAssinatura
-                    console.error('Erro ao processar assinatura:', error);
-                  }
-                }}
-                label={assinaturaAberta.tipo === 'motorista' 
-                  ? 'Sua Assinatura' 
-                  : 'Sua Assinatura'}
-                value={(() => {
-                  if (!assinaturaAberta.controleId) return '';
-                  const controle = controles.find(c => c.id === assinaturaAberta.controleId);
-                  if (!controle) return '';
-                  return assinaturaAberta.tipo === 'motorista' 
-                    ? controle.assinaturaMotorista || '' 
-                    : controle.assinaturaResponsavel || '';
-                })()}
-                showSaveButton={true}
-                disabled={salvandoAssinatura}
-              />
+              {(() => {
+                if (!assinaturaAberta.controleId) {
+                  console.error('[Modal Assinatura] controleId não informado');
+                  return <Typography color="error">Erro: Controle não selecionado.</Typography>;
+                }
+                const controle = controles.find(c => c.id === assinaturaAberta.controleId);
+                if (!controle) {
+                  console.error('[Modal Assinatura] Controle não encontrado:', assinaturaAberta.controleId);
+                  return <Typography color="error">Erro: Controle não encontrado.</Typography>;
+                }
+                return (
+                  <AssinaturaDigital
+                    ref={assinaturaRef}
+                    onSave={async (signatureData) => {
+                      try {
+                        await handleSalvarAssinatura(signatureData);
+                        await fetchControles();
+                        handleFecharAssinatura();
+                      } catch (error) {
+                        console.error('Erro ao processar assinatura:', error);
+                      }
+                    }}
+                    label={assinaturaAberta.tipo === 'motorista' ? 'Sua Assinatura' : 'Sua Assinatura'}
+                    value={assinaturaAberta.tipo === 'motorista' ? controle.assinaturaMotorista || '' : controle.assinaturaResponsavel || ''}
+                    showSaveButton={true}
+                    disabled={salvandoAssinatura}
+                  />
+                );
+              })()}
             </Box>
             
             <Box sx={{ 
@@ -1344,15 +1357,49 @@ const ListarControlesContent: React.FC = () => {
           </Button>
           <Box sx={{ flex: 1 }} />
           <Button 
-            onClick={() => {
-              // Simula o clique no botão de salvar dentro do componente AssinaturaDigital
-              const signatureComponent = document.querySelector('.signature-canvas')?.parentElement?.parentElement;
-              const saveButton = signatureComponent?.querySelector('button[type="button"]:not([color="error"])') as HTMLButtonElement;
-              if (saveButton && !saveButton.disabled) {
-                saveButton.click();
-              } else {
-                enqueueSnackbar('Por favor, faça uma assinatura antes de salvar', {
-                  variant: 'warning',
+            onClick={async () => {
+              try {
+                if (assinaturaRef.current) {
+                  // Tenta obter a assinatura usando múltiplas estratégias
+                  let signature = null;
+                  
+                  // Estratégia 1: Usar getSignature se disponível
+                  if (typeof assinaturaRef.current.getSignature === 'function') {
+                    signature = assinaturaRef.current.getSignature();
+                  }
+                  
+                  // Estratégia 2: Verificar se não está vazio usando isEmpty
+                  if (!signature && typeof assinaturaRef.current.isEmpty === 'function') {
+                    if (!assinaturaRef.current.isEmpty()) {
+                      // Se não está vazio, tenta obter via toDataURL
+                      if (typeof assinaturaRef.current.toDataURL === 'function') {
+                        signature = assinaturaRef.current.toDataURL('image/png');
+                      }
+                    }
+                  }
+                  
+                  if (signature && signature.length > 1000) {
+                    await handleSalvarAssinatura(signature);
+                    await fetchControles();
+                    handleFecharAssinatura();
+                  } else {
+                    enqueueSnackbar('Por favor, faça uma assinatura antes de salvar', {
+                      variant: 'warning',
+                      autoHideDuration: 3000,
+                      anchorOrigin: { vertical: 'top', horizontal: 'center' },
+                    });
+                  }
+                } else {
+                  enqueueSnackbar('Erro: Componente de assinatura não está pronto', {
+                    variant: 'error',
+                    autoHideDuration: 3000,
+                    anchorOrigin: { vertical: 'top', horizontal: 'center' },
+                  });
+                }
+              } catch (error) {
+                console.error('Erro ao processar assinatura:', error);
+                enqueueSnackbar('Erro ao processar assinatura. Tente novamente.', {
+                  variant: 'error',
                   autoHideDuration: 3000,
                   anchorOrigin: { vertical: 'top', horizontal: 'center' },
                 });
@@ -1367,40 +1414,9 @@ const ListarControlesContent: React.FC = () => {
             {salvandoAssinatura ? 'Salvando...' : 'Salvar'}
           </Button>
         </DialogActions>
-      </Dialog>
+        </Dialog>
+      )}
 
-      {/* Botão flutuante para adicionar novo controle */}
-      <Tooltip title="Novo Controle">
-        <Button
-          variant="contained"
-          color="primary"
-          onClick={() => router.push('/controle/novo')}
-          sx={{
-            position: 'fixed',
-            bottom: '32px',
-            right: '32px',
-            width: '60px',
-            height: '60px',
-            borderRadius: '50%',
-            minWidth: 'auto',
-            boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
-            '&:hover': {
-              transform: 'scale(1.1)',
-              boxShadow: '0 6px 24px rgba(0,0,0,0.25)'
-            },
-            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-            zIndex: 1000,
-            '@media (max-width: 600px)': {
-              bottom: '20px',
-              right: '20px',
-              width: '56px',
-              height: '56px'
-            }
-          }}
-        >
-          <AddIcon sx={{ fontSize: '2rem' }} />
-        </Button>
-      </Tooltip>
     </Container>
   );
 };

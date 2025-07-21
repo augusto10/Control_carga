@@ -258,7 +258,7 @@ const ConsultarNotas = () => {
                     <TableCell>{formatISO9075(new Date(nota.dataCriacao))}</TableCell>
                     <TableCell>
                       {nota.controleId ? (
-                        <Chip label="Vinculada" color="success" size="small" />
+                        <Chip label="Em Carga" color="success" size="small" sx={{ backgroundColor: '#4caf50', color: 'white' }} />
                       ) : (
                         <Chip label="Disponível" color="warning" size="small" variant="outlined" />
                       )}
@@ -287,21 +287,18 @@ const ConsultarNotas = () => {
                       ) : '-'}
                     </TableCell>
                     <TableCell align="right">
-                      <Tooltip title="Excluir nota">
+                      <Tooltip title={nota.controleId ? "Não é possível excluir nota vinculada" : "Excluir nota"}>
                         <IconButton 
                           size="small" 
                           color="error" 
                           onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
                             console.log('[UI] Botão de exclusão clicado para nota:', nota.id);
-                            console.log('[UI] Evento de clique:', e);
                             console.log('[UI] Nota está vinculada?', !!nota.controleId);
-                            if (!nota.controleId) {
-                              handleExcluirNota(nota.id);
-                            } else {
-                              console.log('[UI] Botão de exclusão desabilitado - Nota vinculada');
-                            }
+                            handleExcluirNota(nota.id);
                           }}
-                          disabled={!!nota.controleId} // Desabilita se a nota estiver vinculada a um controle
+                          disabled={!!nota.controleId}
                         >
                           <DeleteIcon />
                         </IconButton>

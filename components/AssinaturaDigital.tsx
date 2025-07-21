@@ -18,8 +18,11 @@ import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 
 // Importação dinâmica para evitar problemas de SSR
 const SignatureCanvas = dynamic(
-  () => import('react-signature-canvas'),
-  { ssr: false, loading: () => <div>Carregando...</div> }
+  () => import('react-signature-canvas').then(mod => ({ default: mod.default })),
+  { 
+    ssr: false, 
+    loading: () => <div>Carregando canvas...</div>
+  }
 );
 
 // Estilos globais para o canvas de assinatura
@@ -145,10 +148,12 @@ const AssinaturaDigital = forwardRef<AssinaturaDigitalHandles, AssinaturaDigital
     const [dimensions, setDimensions] = useState({ width: 300, height: 200 });
     const [isReady, setIsReady] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
+    const sigCanvas = useRef<any>(null);
     const [isSaving, setIsSaving] = useState(false);
     
     // Efeito para inicialização segura do canvas
     useEffect(() => {
+      console.log('[AssinaturaDigital] useEffect inicialização chamado');
       const updateDimensions = () => {
         if (containerRef.current) {
           const { width, height } = containerRef.current.getBoundingClientRect();
@@ -163,6 +168,10 @@ const AssinaturaDigital = forwardRef<AssinaturaDigitalHandles, AssinaturaDigital
       updateDimensions();
       window.addEventListener('resize', updateDimensions);
       
+      setTimeout(() => {
+        setIsReady(true);
+        console.log('[AssinaturaDigital] setIsReady(true) chamado');
+      }, 200);
       // Limpeza
       return () => {
         window.removeEventListener('resize', updateDimensions);
@@ -177,60 +186,123 @@ const AssinaturaDigital = forwardRef<AssinaturaDigitalHandles, AssinaturaDigital
     // Expõe métodos para o componente pai
     useImperativeHandle(ref, () => ({
       clear: () => {
-        setIsSigned(false);
-        setHasDrawn(false);
+        console.log('[AssinaturaDigital] clear: sigCanvas.current:', sigCanvas.current);
+        if (sigCanvas.current && typeof sigCanvas.current.clear === 'function') {
+          sigCanvas.current.clear();
+          setHasDrawn(false);
+          setIsSigned(false);
+        } else {
+          console.warn('[AssinaturaDigital] clear: sigCanvas.current.clear não é função', sigCanvas.current);
+          // Fallback: limpa manualmente os estados
+          setHasDrawn(false);
+          setIsSigned(false);
+        }
         return true;
       },
       isEmpty: () => {
+        if (sigCanvas.current && typeof sigCanvas.current.isEmpty === 'function') {
+          return sigCanvas.current.isEmpty();
+        }
+        // Fallback: considera vazio se não desenhou nem assinou
+        console.log('[AssinaturaDigital] isEmpty fallback - hasDrawn:', hasDrawn, 'isSigned:', isSigned);
         return !hasDrawn && !isSigned;
       },
       getSignature: () => {
-        return value || null;
+        if (sigCanvas.current && typeof sigCanvas.current.toDataURL === 'function') {
+          return sigCanvas.current.toDataURL();
+        }
+        // Se não conseguir obter do canvas, tenta usar o valor existente
+        if (value) {
+          console.log('[AssinaturaDigital] getSignature fallback - usando value:', !!value);
+          return value;
+        }
+        console.warn('[AssinaturaDigital] getSignature: não foi possível obter assinatura');
+        return null;
       }
     }));
 
     const handleClear = () => {
+      if (sigCanvas.current) {
+        sigCanvas.current.clear();
+      }
       setIsSigned(false);
       setHasDrawn(false);
     };
 
     const handleSave = async () => {
+  setIsSaving(true);
+  try {
+    // Verifica se há uma assinatura
+    if (!hasDrawn && !isSigned && !value) {
+      throw new Error('Por favor, faça uma assinatura antes de salvar.');
+    }
+    
+    // Captura a assinatura do canvas
+    let signatureData: string | null = null;
+    
+    // Estratégia 1: Tenta obter do ref do canvas
+    if (sigCanvas.current && hasDrawn) {
+      console.log('[AssinaturaDigital] Tentando obter assinatura do ref do canvas');
       try {
-        // Verifica se há uma assinatura
-        if (!hasDrawn && !isSigned) {
-          throw new Error('Por favor, faça uma assinatura antes de salvar.');
-        }
-        
-        setIsSaving(true);
-        
-        try {
-          // Para esta versão simplificada, vamos usar um placeholder
-          // Em uma implementação real, você precisaria capturar o canvas
-          const dataUrl = 'data:image/png;base64,placeholder';
-          
-          // Chama a função de callback para salvar
-          if (onSave) {
-            await onSave(dataUrl);
+        if (typeof sigCanvas.current.toDataURL === 'function') {
+          signatureData = sigCanvas.current.toDataURL('image/png');
+          console.log('[AssinaturaDigital] Assinatura obtida do ref do canvas');
+        } else if (sigCanvas.current.getCanvas && typeof sigCanvas.current.getCanvas === 'function') {
+          const canvas = sigCanvas.current.getCanvas();
+          if (canvas && typeof canvas.toDataURL === 'function') {
+            signatureData = canvas.toDataURL('image/png');
+            console.log('[AssinaturaDigital] Assinatura obtida via getCanvas()');
           }
-          
-          setIsSigned(true);
-          setHasDrawn(false);
-          
-        } catch (error) {
-          console.error('Erro ao processar a assinatura:', error);
-          throw error; // Propaga o erro para o bloco catch externo
         }
-      } catch (error: any) {
-        console.error('Erro ao salvar assinatura:', error);
-        // Re-lança o erro com uma mensagem mais amigável se necessário
-        if (error instanceof Error) {
-          throw new Error(`Não foi possível salvar a assinatura: ${error.message}`);
-        }
-        throw new Error('Ocorreu um erro inesperado ao salvar a assinatura.');
-      } finally {
-        setIsSaving(false);
+      } catch (refError) {
+        console.warn('[AssinaturaDigital] Erro ao obter assinatura do ref:', refError);
       }
-    };
+    }
+    
+    // Estratégia 2: Se não conseguiu do ref, tenta usar o valor existente
+    if (!signatureData && value) {
+      console.log('[AssinaturaDigital] Usando assinatura existente (value)');
+      signatureData = value;
+    }
+    
+    // Estratégia 3: Última tentativa - busca diretamente no DOM
+    if (!signatureData && hasDrawn) {
+      console.log('[AssinaturaDigital] Tentando obter assinatura do DOM');
+      try {
+        const canvasElement = document.querySelector('.signature-canvas') as HTMLCanvasElement;
+        if (canvasElement && typeof canvasElement.toDataURL === 'function') {
+          signatureData = canvasElement.toDataURL('image/png');
+          console.log('[AssinaturaDigital] Assinatura obtida do DOM');
+        }
+      } catch (domError) {
+        console.warn('[AssinaturaDigital] Erro ao obter assinatura do DOM:', domError);
+      }
+    }
+    
+    if (!signatureData) {
+      throw new Error('Não foi possível obter a assinatura. Tente desenhar novamente.');
+    }
+    
+    // Valida se a assinatura não está vazia (apenas fundo branco)
+    if (signatureData.length < 1000) {
+      throw new Error('A assinatura parece estar vazia. Por favor, desenhe sua assinatura.');
+    }
+    
+    console.log('[AssinaturaDigital] Chamando onSave com assinatura de tamanho:', signatureData.length);
+    await onSave(signatureData);
+    setIsSigned(true);
+    setHasDrawn(false);
+  } catch (error) {
+    console.error('[AssinaturaDigital] Erro ao salvar:', error);
+    // Re-lança o erro com uma mensagem mais amigável se necessário
+    if (error instanceof Error) {
+      throw new Error(`Não foi possível salvar a assinatura: ${error.message}`);
+    }
+    throw new Error('Ocorreu um erro inesperado ao salvar a assinatura');
+  } finally {
+    setIsSaving(false);
+  }
+};
 
     // Efeito para sincronizar o valor inicial
     useEffect(() => {
@@ -240,6 +312,7 @@ const AssinaturaDigital = forwardRef<AssinaturaDigitalHandles, AssinaturaDigital
     }, [value, hasDrawn]);
 
     if (!isReady) {
+      console.log('[AssinaturaDigital] Renderizando CircularProgress (loading)');
       return (
         <Box 
           sx={{ 
@@ -284,6 +357,25 @@ const AssinaturaDigital = forwardRef<AssinaturaDigitalHandles, AssinaturaDigital
             {isReady && (
               <>
                 <SignatureCanvas
+                  ref={(canvas: any) => {
+                    if (canvas) {
+                      sigCanvas.current = canvas;
+                      console.log('[AssinaturaDigital] SignatureCanvas ref atribuído:', canvas);
+                      console.log('[AssinaturaDigital] Tipo do canvas:', typeof canvas);
+                      console.log('[AssinaturaDigital] Métodos disponíveis:', canvas ? Object.getOwnPropertyNames(canvas) : 'nenhum');
+                      
+                      // Verifica se os métodos essenciais estão disponíveis
+                      if (canvas.toDataURL && canvas.clear && canvas.isEmpty) {
+                        console.log('[AssinaturaDigital] Todos os métodos essenciais estão disponíveis');
+                      } else {
+                        console.warn('[AssinaturaDigital] Alguns métodos essenciais não estão disponíveis:', {
+                          toDataURL: !!canvas.toDataURL,
+                          clear: !!canvas.clear,
+                          isEmpty: !!canvas.isEmpty
+                        });
+                      }
+                    }
+                  }}
                   penColor="black"
                   canvasProps={{
                     className: 'signature-canvas',

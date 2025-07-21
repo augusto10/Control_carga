@@ -2,20 +2,16 @@
 const nextConfig = {
   // Configuração para o Prisma Accelerate
   experimental: {
-    serverComponentsExternalPackages: ['@prisma/client', '@prisma/extension-accelerate'],
+    serverComponentsExternalPackages: ['@prisma/client'],
     serverActions: true,
   },
-  
-  // Configuração para Edge Functions
-  runtime: 'edge',
   
   // Otimizações de build
   webpack: (config, { isServer, dev }) => {
     // Configuração para o Prisma no lado do servidor
     if (isServer) {
       config.externals = [...(config.externals || []), 
-        { '@prisma/client': '@prisma/client' },
-        { '@prisma/extension-accelerate': '@prisma/extension-accelerate' }
+        { '@prisma/client': '@prisma/client' }
       ];
       
       // Adiciona regras para arquivos .prisma
@@ -32,10 +28,7 @@ const nextConfig = {
       net: false,
       tls: false,
       dns: false,
-      child_process: false,
-      // Adiciona suporte para Buffer
-      bufferutil: require.resolve('bufferutil'),
-      'utf-8-validate': require.resolve('utf-8-validate'),
+      child_process: false
     };
     
     return config;

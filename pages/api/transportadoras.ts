@@ -18,8 +18,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const transportadoras: Transportadora[] = [
       {
         id: 'ACERT',
-        nome: 'ACERT',
-        descricao: 'ACERT Transportes',
+        nome: 'ACCERT',
+        descricao: 'ACCERT Transportes',
       },
       {
         id: 'EXPRESSO_GOIAS',

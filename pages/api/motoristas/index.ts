@@ -25,7 +25,7 @@ async function listar(req: NextApiRequest, res: NextApiResponse) {
       ...m,
       transportadora: {
         id: m.transportadoraId,
-        descricao: m.transportadoraId === 'ACERT' ? 'ACERT Transportes' : 'Expresso Goiás',
+        descricao: m.transportadoraId === 'ACERT' ? 'ACCERT Transportes' : 'Expresso Goiás',
       },
     }));
 

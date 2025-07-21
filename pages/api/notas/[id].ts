@@ -53,15 +53,22 @@ export default async function handler(
       return res.status(400).json({ error: 'Não é possível excluir uma nota de um controle finalizado' });
     }
 
-    // Verificar se o usuário tem permissão (responsável pelo controle ou admin)
+    // Verificar se o usuário tem permissão
     const usuario = await prisma.usuario.findUnique({
       where: { id: decoded.id },
       select: { tipo: true }
     });
 
-    const isAdmin = usuario?.tipo === 'ADMIN';
-    // Como não temos campo responsavelId no modelo, apenas admins podem excluir notas
-    if (!isAdmin) {
+    if (!usuario) {
+      return res.status(403).json({ error: 'Usuário não encontrado' });
+    }
+
+    const isAdmin = usuario.tipo === 'ADMIN' || usuario.tipo === 'GERENTE';
+    const isUsuario = usuario.tipo === 'USUARIO';
+    
+    // Admins e gerentes podem excluir qualquer nota não finalizada
+    // Usuários podem excluir apenas notas não vinculadas
+    if (!isAdmin && (!isUsuario || nota.controleId)) {
       return res.status(403).json({ error: 'Sem permissão para excluir esta nota' });
     }
 

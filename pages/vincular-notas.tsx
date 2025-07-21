@@ -77,29 +77,6 @@ const VincularNotasPage = () => {
           fetchNotas(),
           fetchControles()
         ]);
-        
-        // Se estiver editando, carrega os dados do controle
-        if (controleId) {
-          const controle = controles.find(c => c.id === controleId);
-          if (controle) {
-            setControleEncontrado(true);
-            setMotorista(controle.motorista || '');
-            setCpfMotorista(controle.cpfMotorista || '');
-            setResponsavel(controle.responsavel || '');
-            setTransportadora(controle.transportadora || 'ACERT');
-            setNumeroManifesto(controle.numeroManifesto || '');
-            setQtdPallets(controle.qtdPallets || 0);
-            setObservacao(controle.observacao || '');
-            
-            // Marca as notas já vinculadas como selecionadas
-            const notasVinculadas = controle.notas
-              .filter((nota: NotaFiscal) => nota.controleId === controleId)
-              .map((nota: NotaFiscal) => nota.id);
-            setNotasSelecionadas(notasVinculadas);
-          } else {
-            setControleEncontrado(false);
-          }
-        }
       } catch (error) {
         console.error('Erro ao carregar dados:', error);
         enqueueSnackbar('Erro ao carregar dados. Tente novamente.', { 
@@ -112,7 +89,32 @@ const VincularNotasPage = () => {
     };
     
     loadData();
-  }, [controleId, fetchNotas, fetchControles, controles, enqueueSnackbar]);
+  }, []); // Executar apenas uma vez ao montar o componente
+
+  // Carrega os dados do controle quando controleId ou controles mudam
+  useEffect(() => {
+    if (controleId && controles.length > 0) {
+      const controle = controles.find(c => c.id === controleId);
+      if (controle) {
+        setControleEncontrado(true);
+        setMotorista(controle.motorista || '');
+        setCpfMotorista(controle.cpfMotorista || '');
+        setResponsavel(controle.responsavel || '');
+        setTransportadora(controle.transportadora || 'ACERT');
+        setNumeroManifesto(controle.numeroManifesto || '');
+        setQtdPallets(controle.qtdPallets || 0);
+        setObservacao(controle.observacao || '');
+        
+        // Marca as notas já vinculadas como selecionadas
+        const notasVinculadas = controle.notas
+          .filter((nota: NotaFiscal) => nota.controleId === controleId)
+          .map((nota: NotaFiscal) => nota.id);
+        setNotasSelecionadas(notasVinculadas);
+      } else {
+        setControleEncontrado(false);
+      }
+    }
+  }, [controleId, controles]);
 
   const handleToggleNota = (notaId: string) => {
     const currentIndex = notasSelecionadas.indexOf(notaId);
