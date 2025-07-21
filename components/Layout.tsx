@@ -82,9 +82,10 @@ const DrawerHeader = styled('div')(({ theme }) => ({
   justifyContent: 'space-between',
   padding: theme.spacing(0, 1.5),
   ...theme.mixins.toolbar,
-  borderBottom: `1px solid ${theme.palette.divider}`,
-  backgroundColor: theme.palette.primary.main,
-  color: theme.palette.primary.contrastText,
+  borderBottom: 'none',
+  background: 'linear-gradient(135deg, #ff6b35 0%, #ff8c42 100%)',
+  color: '#ffffff',
+  boxShadow: '0 2px 10px rgba(255, 107, 53, 0.2)',
 }));
 
 interface AppBarPropsExtended extends AppBarProps {
@@ -99,9 +100,10 @@ const AppBar = styled(MuiAppBar, {
     easing: theme.transitions.easing.sharp,
     duration: theme.transitions.duration.leavingScreen,
   }),
-  backgroundColor: theme.palette.primary.main,
-  color: theme.palette.primary.contrastText,
-  boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+  background: 'linear-gradient(135deg, #ff6b35 0%, #ff8c42 100%)',
+  color: '#ffffff',
+  boxShadow: '0 4px 20px rgba(255, 107, 53, 0.3)',
+  backdropFilter: 'blur(10px)',
   ...(open && {
     marginLeft: drawerWidth,
     width: `calc(100% - ${drawerWidth}px)`,
@@ -132,21 +134,27 @@ const StyledDrawer = styled(Drawer, {
 }));
 
 const MenuItemButton = styled(ListItemButton)(({ theme }) => ({
-  minHeight: 48,
-  borderRadius: theme.shape.borderRadius,
-  margin: theme.spacing(0.5, 1.5),
-  padding: theme.spacing(1, 2),
+  minHeight: 52,
+  borderRadius: 12,
+  margin: theme.spacing(0.3, 1.5),
+  padding: theme.spacing(1.2, 2),
+  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+  fontWeight: 500,
+  transition: 'all 0.3s ease',
   '&:hover': {
-    backgroundColor: alpha(theme.palette.primary.main, 0.1),
+    backgroundColor: alpha('#ff6b35', 0.1),
+    transform: 'translateX(4px)',
+    boxShadow: '0 4px 12px rgba(255, 107, 53, 0.15)',
   },
   '&.active': {
-    backgroundColor: alpha(theme.palette.primary.main, 0.15),
+    backgroundColor: alpha('#ff6b35', 0.15),
+    borderLeft: '4px solid #ff6b35',
     '& .MuiListItemIcon-root': {
       color: theme.palette.primary.main,
     },
     '& .MuiListItemText-primary': {
       fontWeight: 600,
-      color: theme.palette.primary.main,
+      color: '#1a1a1a',
     },
   },
 }));
@@ -527,7 +535,12 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
         }}
       >
         
-        <Box sx={{ overflow: 'auto', height: 'calc(100vh - 64px)', py: 1 }}>
+        <Box sx={{ 
+          overflow: 'auto', 
+          height: 'calc(100vh - 64px)', 
+          py: 2,
+          background: 'linear-gradient(180deg, #fafafa 0%, #f5f5f5 100%)'
+        }}>
           <List>
             {menuItems.map((item) => (
               <ListItem key={item.text} disablePadding sx={{ display: 'block' }}>
@@ -537,14 +550,44 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
           </List>
           
           {/* Espaço para informações do usuário no rodapé */}
-          <Box sx={{ p: 2, mt: 'auto', borderTop: `1px solid ${theme.palette.divider}`, opacity: open ? 1 : 0 }}>
+          <Box sx={{ 
+            p: 2, 
+            mt: 'auto', 
+            borderTop: '1px solid rgba(255, 107, 53, 0.2)', 
+            opacity: open ? 1 : 0,
+            background: 'linear-gradient(135deg, rgba(255, 107, 53, 0.05) 0%, rgba(255, 140, 66, 0.05) 100%)',
+            borderRadius: '12px 12px 0 0'
+          }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Avatar sx={{ width: 32, height: 32, bgcolor: 'primary.main' }}>
+              <Avatar sx={{ 
+                width: 36, 
+                height: 36, 
+                background: 'linear-gradient(135deg, #ff6b35 0%, #ff8c42 100%)',
+                fontWeight: 600,
+                fontSize: '1.1rem'
+              }}>
                 {user?.nome?.charAt(0).toUpperCase() || <PersonIcon fontSize="small" />}
               </Avatar>
               <Box>
-                <Typography variant="subtitle2" noWrap>{user?.nome || 'Usuário'}</Typography>
-                <Typography variant="caption" color="text.secondary" noWrap>
+                <Typography 
+                  variant="subtitle2" 
+                  noWrap
+                  sx={{
+                    fontWeight: 600,
+                    color: '#1a1a1a',
+                    fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif'
+                  }}
+                >
+                  {user?.nome || 'Usuário'}
+                </Typography>
+                <Typography 
+                  variant="caption" 
+                  noWrap
+                  sx={{
+                    color: '#ff6b35',
+                    fontWeight: 500
+                  }}
+                >
                   {user?.tipo || 'Nível de Acesso'}
                 </Typography>
               </Box>
@@ -560,8 +603,9 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
           p: 3, 
           width: '100%', 
           mt: '64px',
-          backgroundColor: theme.palette.background.default,
-          minHeight: 'calc(100vh - 64px)'
+          background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)',
+          minHeight: 'calc(100vh - 64px)',
+          fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif'
         }}
       >
         {children}

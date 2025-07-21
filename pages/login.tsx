@@ -101,24 +101,69 @@ export default function Login() {
   return (
     <>
       <Head>
-        <title>Login | Controle de Carga</title>
+        <title>Login | Gestão Logística Esplendor</title>
       </Head>
       
-      <Container component="main" maxWidth="xs">
-        <Box
-          sx={{
-            marginTop: 8,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-          }}
-        >
-          <Typography component="h1" variant="h4" sx={{ mb: 3, fontWeight: 'bold' }}>
-            Controle de Carga
+      <Box
+        sx={{
+          minHeight: '100vh',
+          backgroundImage: 'linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url("https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80")',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          py: 4
+        }}
+      >
+        <Container component="main" maxWidth="sm">
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+            }}
+          >
+          <Typography 
+            component="h1" 
+            variant="h3" 
+            sx={{ 
+              mb: 4, 
+              fontWeight: 900,
+              color: '#ffffff',
+              textAlign: 'center',
+              letterSpacing: '1px',
+              fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+              textShadow: '0 2px 8px rgba(0,0,0,0.5)',
+              fontSize: { xs: '1.8rem', sm: '2.5rem', md: '3rem' }
+            }}
+          >
+            GESTÃO LOGÍSTICA ESPLENDOR
           </Typography>
           
-          <Paper elevation={3} sx={{ p: 4, width: '100%' }}>
-            <Typography component="h2" variant="h5" align="center" sx={{ mb: 3 }}>
+          <Paper 
+            elevation={24} 
+            sx={{ 
+              p: 5, 
+              width: '100%', 
+              borderRadius: 3,
+              background: 'rgba(255, 255, 255, 0.95)',
+              backdropFilter: 'blur(10px)',
+              border: '1px solid rgba(255, 255, 255, 0.2)'
+            }}
+          >
+            <Typography 
+              component="h2" 
+              variant="h4" 
+              align="center" 
+              sx={{ 
+                mb: 4, 
+                fontWeight: 700,
+                color: '#1a1a1a',
+                fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif'
+              }}
+            >
               Acessar Conta
             </Typography>
             
@@ -174,7 +219,25 @@ export default function Login() {
                 type="submit"
                 fullWidth
                 variant="contained"
-                sx={{ mt: 3, mb: 2, py: 1.5 }}
+                sx={{ 
+                  mt: 3, 
+                  mb: 2, 
+                  py: 1.8,
+                  fontSize: '1.1rem',
+                  fontWeight: 600,
+                  borderRadius: 2,
+                  background: 'linear-gradient(45deg, #ff6b35 30%, #ff8c42 90%)',
+                  boxShadow: '0 4px 20px rgba(255, 107, 53, 0.3)',
+                  '&:hover': {
+                    background: 'linear-gradient(45deg, #e55a2b 30%, #e57a35 90%)',
+                    boxShadow: '0 6px 25px rgba(255, 107, 53, 0.4)',
+                    transform: 'translateY(-1px)'
+                  },
+                  '&:disabled': {
+                    background: '#cccccc'
+                  },
+                  transition: 'all 0.3s ease'
+                }}
                 disabled={isLoading}
               >
                 {isLoading ? (
@@ -185,20 +248,41 @@ export default function Login() {
               </Button>
               
               <Box sx={{ textAlign: 'center', mt: 2 }}>
-                <Link component={NextLink} href="/esqueci-senha" variant="body2">
-  Esqueceu sua senha?
-</Link>
+                <Link 
+                  component={NextLink} 
+                  href="/esqueci-senha" 
+                  variant="body2"
+                  sx={{
+                    color: '#ff6b35',
+                    fontWeight: 500,
+                    textDecoration: 'none',
+                    '&:hover': {
+                      color: '#e55a2b',
+                      textDecoration: 'underline'
+                    }
+                  }}
+                >
+                  Esqueceu sua senha?
+                </Link>
               </Box>
             </Box>
           </Paper>
           
           <Box sx={{ mt: 3, textAlign: 'center' }}>
-            <Typography variant="body2" color="text.secondary">
-              © {new Date().getFullYear()} Controle de Carga
+            <Typography 
+              variant="body2" 
+              sx={{
+                color: 'rgba(255, 255, 255, 0.8)',
+                fontWeight: 500,
+                textShadow: '0 1px 2px rgba(0,0,0,0.5)'
+              }}
+            >
+              © {new Date().getFullYear()} Gestão Logística Esplendor
             </Typography>
           </Box>
-        </Box>
-      </Container>
+          </Box>
+        </Container>
+      </Box>
     </>
   );
 }
