@@ -960,9 +960,13 @@ const ListarControlesContent: React.FC = () => {
                 backgroundColor: 'rgba(0,0,0,0.2)'
               }
             },
+            // Melhorias para mobile
             '@media (max-width: 900px)': {
               maxHeight: 'none',
-              overflowX: 'auto'
+              overflowX: 'auto',
+              '& .MuiTable-root': {
+                minWidth: '800px' // Força largura mínima para scroll horizontal
+              }
             }
           }}
         >
@@ -971,7 +975,12 @@ const ListarControlesContent: React.FC = () => {
             aria-label="tabela de controles"
             sx={{
               '& .MuiTableCell-root': {
-                borderBottom: '1px solid rgba(224, 224, 224, 0.5)'
+                borderBottom: '1px solid rgba(224, 224, 224, 0.5)',
+                // Melhorias para mobile
+                '@media (max-width: 900px)': {
+                  padding: '12px 8px', // Padding menor em mobile
+                  fontSize: '0.875rem'
+                }
               },
               '& .MuiTableRow-root:last-child .MuiTableCell-root': {
                 borderBottom: 'none'
@@ -1189,6 +1198,8 @@ const ListarControlesContent: React.FC = () => {
                           disabled={loadingButtons[controle.id]}
                           sx={{
                             ...buttonStyles,
+                            minHeight: '44px', // Melhor área de toque mobile
+                            minWidth: '44px',
                             '&:hover': {
                               backgroundColor: !controle.finalizado ? 'rgba(46, 125, 50, 0.08)' : 'rgba(25, 118, 210, 0.08)'
                             }

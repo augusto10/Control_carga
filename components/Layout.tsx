@@ -232,7 +232,12 @@ const menuItems = [
       },
       {
         text: 'Confirmar Separação',
-        icon: <PersonIcon />,
+        icon: <AssignmentTurnedInIcon />,
+        path: '/separacao-conferencia/confirmar-auditoria'
+      },
+      {
+        text: 'Relatório de Separação',
+        icon: <ReportIcon />,
         path: '/separacao-conferencia/conferentes'
       },
       {
@@ -251,6 +256,11 @@ const menuItems = [
     text: 'Checklist Empilhadeiras',
     icon: <AssignmentTurnedInIcon />,
     path: '/checklist-empilhadeiras',
+  },
+  {
+    text: 'Motoristas',
+    icon: <TruckIcon />,
+    path: '/admin/motoristas',
   },
   { 
     text: 'Relatórios', 
@@ -404,9 +414,11 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                   if (userRole === 'ADMIN' || userRole === 'GERENTE') return true;
 
                   const path = subItem.path.toLowerCase();
-                  if (userRole === 'SEPARADOR' && path.includes('separadores')) return true;
-                  if (userRole === 'CONFERENTE' && path.includes('conferentes')) return true;
-                  if (userRole === 'AUDITOR' && path.includes('auditores')) return true;
+                  const itemText = subItem.text.toLowerCase();
+                  
+                  if (userRole === 'SEPARADOR' && (path.includes('separadores') || itemText.includes('cadastrar separação'))) return true;
+                  if (userRole === 'CONFERENTE' && (path.includes('conferentes') || itemText.includes('confirmar separação') || itemText.includes('relatório de separação'))) return true;
+                  if (userRole === 'AUDITOR' && (path.includes('auditores') || itemText.includes('confirmar separação'))) return true;
 
                   return false;
                 })

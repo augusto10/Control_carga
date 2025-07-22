@@ -1,3 +1,8 @@
+// ===== RELATÓRIO DE SEPARAÇÃO - DOMÍNIO DE PEDIDOS =====
+// Esta página mostra relatório de PEDIDOS (separação/conferência)
+// NÃO confundir com Notas Fiscais - são entidades totalmente distintas
+// Todos os dados são lidos de PedidoConferido
+
 import {
   Box,
   Button,
@@ -91,6 +96,10 @@ interface Filtros {
 }
 
 function PaginaConferenciaPedidos() {
+  // ===== RELATÓRIO DE SEPARAÇÃO - DADOS DE PEDIDOCONFERIDO =====
+  // Esta função exibe relatório de pedidos com dados salvos em PedidoConferido
+  // NÃO tem relação com Notas Fiscais
+  
   const { user } = useAuth();
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [carregando, setCarregando] = useState(true);
@@ -110,7 +119,10 @@ function PaginaConferenciaPedidos() {
     status: 'todos'
   });
 
-  // Carregar pedidos
+  // ===== CARREGAR DADOS DE PEDIDOCONFERIDO =====
+  // Esta função carrega dados de separação/conferência salvos em PedidoConferido
+  // NÃO tem relação com Notas Fiscais
+  
   const carregarPedidos = async () => {
     try {
       setCarregando(true);
@@ -130,7 +142,8 @@ function PaginaConferenciaPedidos() {
         params.append('status', filtros.status);
       }
       
-      const response = await api.get(`/api/pedidos/listar-conferidos?${params.toString()}`);
+      // Buscar pedidos com dados de separação/conferência em PedidoConferido
+      const response = await api.get(`/api/pedidos?${params.toString()}`);
       setPedidos(response.data);
     } catch (error) {
       console.error('Erro ao carregar pedidos:', error);
@@ -243,122 +256,138 @@ function PaginaConferenciaPedidos() {
         </Alert>
       </Snackbar>
 
-      {/* Título e Filtros */}
-      <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Typography variant="h4" component="h1">
-          Controle de Conferência de Pedidos
-        </Typography>
-        <Box sx={{ display: 'flex', gap: 2 }}>
-          <TextField
-            label="Data Inicial"
-            type="date"
-            size="small"
-            InputLabelProps={{
-              shrink: true,
-            }}
-            onChange={(e) => setFiltros({...filtros, dataInicio: e.target.value ? new Date(e.target.value) : null})}
-          />
-          <TextField
-            label="Data Final"
-            type="date"
-            size="small"
-            InputLabelProps={{
-              shrink: true,
-            }}
-            onChange={(e) => setFiltros({...filtros, dataFim: e.target.value ? new Date(e.target.value) : null})}
-          />
-          <FormControl size="small" sx={{ minWidth: 200 }}>
-            <InputLabel>Status</InputLabel>
-            <Select
-              value={filtros.status}
-              label="Status"
-              onChange={(e) => setFiltros({...filtros, status: e.target.value as any})}
-            >
-              <MenuItem value="todos">Todos</MenuItem>
-              <MenuItem value="com-inconsistencia">Com Inconsistência</MenuItem>
-              <MenuItem value="sem-inconsistencia">Sem Inconsistência</MenuItem>
-            </Select>
-          </FormControl>
-        </Box>
-      </Box>
+      <Container maxWidth="lg">
+        <Card sx={{ mt: 4, p: 2, boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.37)', borderRadius: '10px' }}>
+          <CardContent>
+            <Typography variant="h5" component="h1" gutterBottom align="center" sx={{ fontWeight: 'bold' }}>
+              Relatório de Separação
+            </Typography>
+            
+            {/* Aviso sobre domínio de dados */}
+            <Alert severity="info" sx={{ mb: 3 }}>
+              <strong>Domínio de Pedidos:</strong> Este relatório mostra dados de separação e conferência de pedidos salvos em PedidoConferido. 
+              Não confundir com notas fiscais - são processos totalmente distintos.
+            </Alert>
 
-      {/* Tabela de Pedidos */}
-      <Paper sx={{ width: '100%', overflow: 'hidden', mb: 2 }}>
-        <TableContainer sx={{ maxHeight: 600 }}>
-          <Table stickyHeader>
-            <TableHead>
-              <TableRow>
-                <TableCell>Nº Pedido</TableCell>
-                <TableCell>Data</TableCell>
-                <TableCell>Motorista</TableCell>
-                <TableCell>Responsável</TableCell>
-                <TableCell>Transportadora</TableCell>
-                <TableCell>Status</TableCell>
-                <TableCell align="right">Ações</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {carregando ? (
-                <TableRow>
-                  <TableCell colSpan={7} align="center">
-                    <CircularProgress />
-                  </TableCell>
-                </TableRow>
-              ) : pedidosPaginados.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} align="center">
-                    Nenhum pedido encontrado
-                  </TableCell>
-                </TableRow>
-              ) : (
-                pedidosPaginados.map((pedido) => (
-                  <TableRow key={pedido.id} hover>
-                    <TableCell>{pedido.numeroPedido}</TableCell>
-                    <TableCell>
-                      {format(new Date(pedido.dataCriacao), 'dd/MM/yyyy HH:mm', { locale: ptBR })}
-                    </TableCell>
-                    <TableCell>{pedido.controle?.motorista || '-'}</TableCell>
-                    <TableCell>{pedido.controle?.responsavel || '-'}</TableCell>
-                    <TableCell>{pedido.controle?.transportadora || '-'}</TableCell>
-                    <TableCell>
-                      {pedido.conferido ? (
-                        <Chip 
-                          label={pedido.conferido.inconsistencia ? 'Com Inconsistência' : 'Conferido'}
-                          color={pedido.conferido.inconsistencia ? 'error' : 'success'}
-                          size="small"
-                        />
-                      ) : (
-                        <Chip label="Pendente" color="warning" size="small" />
-                      )}
-                    </TableCell>
-                    <TableCell align="right">
-                      <Button 
-                        variant="contained" 
-                        size="small"
-                        color={pedido.conferido ? 'info' : 'primary'}
-                        onClick={() => handleAbrirModal(pedido)}
-                      >
-                        {pedido.conferido ? 'Ver Detalhes' : 'Registrar Conferência'}
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
-        <TablePagination
-          rowsPerPageOptions={[5, 10, 25]}
-          component="div"
-          count={pedidos.length}
-          rowsPerPage={linhasPorPagina}
-          page={pagina}
-          onPageChange={handleMudarPagina}
-          onRowsPerPageChange={handleMudarLinhasPorPagina}
-          labelRowsPerPage="Linhas por página:"
-          labelDisplayedRows={({ from, to, count }) => `${from}-${to} de ${count}`}
-        />
-      </Paper>
+            {/* Título e Filtros */}
+            <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Typography variant="h4" component="h1">
+                Controle de Conferência de Pedidos
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 2 }}>
+                <TextField
+                  label="Data Inicial"
+                  type="date"
+                  size="small"
+                  InputLabelProps={{
+                    shrink: true,
+                  }}
+                  onChange={(e) => setFiltros({...filtros, dataInicio: e.target.value ? new Date(e.target.value) : null})}
+                />
+                <TextField
+                  label="Data Final"
+                  type="date"
+                  size="small"
+                  InputLabelProps={{
+                    shrink: true,
+                  }}
+                  onChange={(e) => setFiltros({...filtros, dataFim: e.target.value ? new Date(e.target.value) : null})}
+                />
+                <FormControl size="small" sx={{ minWidth: 200 }}>
+                  <InputLabel>Status</InputLabel>
+                  <Select
+                    value={filtros.status}
+                    label="Status"
+                    onChange={(e) => setFiltros({...filtros, status: e.target.value as any})}
+                  >
+                    <MenuItem value="todos">Todos</MenuItem>
+                    <MenuItem value="com-inconsistencia">Com Inconsistência</MenuItem>
+                    <MenuItem value="sem-inconsistencia">Sem Inconsistência</MenuItem>
+                  </Select>
+                </FormControl>
+              </Box>
+            </Box>
+
+            {/* Tabela de Pedidos */}
+            <Paper sx={{ width: '100%', overflow: 'hidden', mb: 2 }}>
+              <TableContainer sx={{ maxHeight: 600 }}>
+                <Table stickyHeader>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Nº Pedido</TableCell>
+                      <TableCell>Data</TableCell>
+                      <TableCell>Motorista</TableCell>
+                      <TableCell>Responsável</TableCell>
+                      <TableCell>Transportadora</TableCell>
+                      <TableCell>Status</TableCell>
+                      <TableCell align="right">Ações</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {carregando ? (
+                      <TableRow>
+                        <TableCell colSpan={7} align="center">
+                          <CircularProgress />
+                        </TableCell>
+                      </TableRow>
+                    ) : pedidosPaginados.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={7} align="center">
+                          Nenhum pedido encontrado
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      pedidosPaginados.map((pedido) => (
+                        <TableRow key={pedido.id} hover>
+                          <TableCell>{pedido.numeroPedido}</TableCell>
+                          <TableCell>
+                            {format(new Date(pedido.dataCriacao), 'dd/MM/yyyy HH:mm', { locale: ptBR })}
+                          </TableCell>
+                          <TableCell>{pedido.controle?.motorista || '-'}</TableCell>
+                          <TableCell>{pedido.controle?.responsavel || '-'}</TableCell>
+                          <TableCell>{pedido.controle?.transportadora || '-'}</TableCell>
+                          <TableCell>
+                            {pedido.conferido ? (
+                              <Chip 
+                                label={pedido.conferido.inconsistencia ? 'Com Inconsistência' : 'Conferido'}
+                                color={pedido.conferido.inconsistencia ? 'error' : 'success'}
+                                size="small"
+                              />
+                            ) : (
+                              <Chip label="Pendente" color="warning" size="small" />
+                            )}
+                          </TableCell>
+                          <TableCell align="right">
+                            <Button 
+                              variant="contained" 
+                              size="small"
+                              color={pedido.conferido ? 'info' : 'primary'}
+                              onClick={() => handleAbrirModal(pedido)}
+                            >
+                              {pedido.conferido ? 'Ver Detalhes' : 'Registrar Conferência'}
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+              <TablePagination
+                rowsPerPageOptions={[5, 10, 25]}
+                component="div"
+                count={pedidos.length}
+                rowsPerPage={linhasPorPagina}
+                page={pagina}
+                onPageChange={handleMudarPagina}
+                onRowsPerPageChange={handleMudarLinhasPorPagina}
+                labelRowsPerPage="Linhas por página:"
+                labelDisplayedRows={({ from, to, count }) => `${from}-${to} de ${count}`}
+              />
+            </Paper>
+          </CardContent>
+        </Card>
+      </Container>
 
       {/* Modal de Conferência */}
       <Dialog open={modalAberto} onClose={handleFecharModal} maxWidth="sm" fullWidth>

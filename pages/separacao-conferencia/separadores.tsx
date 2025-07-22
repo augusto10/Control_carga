@@ -1,3 +1,8 @@
+// ===== CADASTRAR SEPARAÇÃO - DOMÍNIO DE PEDIDOS =====
+// Esta página é específica para cadastro de PEDIDOS (separação/conferência)
+// NÃO confundir com Notas Fiscais - são entidades totalmente distintas
+// Todos os dados são salvos em PedidoConferido
+
 import { useState, useEffect } from 'react';
 import {
   Container,
@@ -12,7 +17,8 @@ import {
   Grid,
   Box,
   CircularProgress,
-  SelectChangeEvent
+  SelectChangeEvent,
+  Alert
 } from '@mui/material';
 import { useSnackbar } from 'notistack';
 import api from '../../services/api';
@@ -57,22 +63,29 @@ export default function CadastrarSeparacaoPage() {
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+    
+    // ===== SALVAR DADOS DE SEPARAÇÃO EM PEDIDOCONFERIDO =====
+    // Esta função salva dados de separação/conferência em PedidoConferido
+    // NÃO tem relação com Notas Fiscais
+    
     try {
       const response = await api.post('/api/pedidos', {
         numeroPedido: pedido,
         separadorId: separadorId,
-        auditorId: auditorId,
+        auditorId: auditorId || null, // Auditor pode ser opcional
+        conferenteId: conferenteId || null, // Conferente pode ser opcional
       });
 
       if (response.status === 200 || response.status === 201) {
-        enqueueSnackbar('Pedido salvo com sucesso!', { variant: 'success' });
+        enqueueSnackbar('Separação cadastrada com sucesso!', { variant: 'success' });
         handleCancel(); // Limpa o formulário
       } else {
-        throw new Error('Falha ao salvar o pedido');
+        throw new Error('Falha ao salvar a separação');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao salvar separação:', error);
-      enqueueSnackbar('Erro ao salvar o pedido. Tente novamente.', { variant: 'error' });
+      const errorMessage = error?.response?.data?.error || 'Erro ao salvar a separação. Tente novamente.';
+      enqueueSnackbar(errorMessage, { variant: 'error' });
     }
   };
 
@@ -98,6 +111,12 @@ export default function CadastrarSeparacaoPage() {
         <Typography variant="h5" component="h1" fontWeight="bold" gutterBottom>
           Cadastrar Separação
         </Typography>
+        
+        {/* Aviso sobre domínio de dados */}
+        <Alert severity="info" sx={{ mb: 3 }}>
+          <strong>Domínio de Pedidos:</strong> Esta funcionalidade é específica para separação e conferência de pedidos. 
+          Não confundir com notas fiscais - são processos totalmente distintos.
+        </Alert>
         <Box component="form" onSubmit={handleSubmit}>
           <Grid container spacing={3}>
             <Grid item xs={12}>
@@ -130,15 +149,18 @@ export default function CadastrarSeparacaoPage() {
               </FormControl>
             </Grid>
             <Grid item xs={12}>
-              <FormControl fullWidth required>
-                <InputLabel id="auditor-label">Auditor</InputLabel>
+              <FormControl fullWidth>
+                <InputLabel id="auditor-label">Auditor (Opcional)</InputLabel>
                 <Select
                   labelId="auditor-label"
                   id="auditor-select"
                   value={auditorId}
-                  label="Auditor"
+                  label="Auditor (Opcional)"
                   onChange={(e: SelectChangeEvent) => setAuditorId(e.target.value)}
                 >
+                  <MenuItem value="">
+                    <em>Selecionar depois</em>
+                  </MenuItem>
                   {auditores.map((user) => (
                     <MenuItem key={user.id} value={user.id}>
                       {user.nome}
@@ -148,15 +170,18 @@ export default function CadastrarSeparacaoPage() {
               </FormControl>
             </Grid>
             <Grid item xs={12}>
-              <FormControl fullWidth required>
-                <InputLabel id="conferente-label">Conferente</InputLabel>
+              <FormControl fullWidth>
+                <InputLabel id="conferente-label">Conferente (Opcional)</InputLabel>
                 <Select
                   labelId="conferente-label"
                   id="conferente-select"
                   value={conferenteId}
-                  label="Conferente"
+                  label="Conferente (Opcional)"
                   onChange={(e: SelectChangeEvent) => setConferenteId(e.target.value)}
                 >
+                  <MenuItem value="">
+                    <em>Selecionar depois</em>
+                  </MenuItem>
                   {conferentes.map((user) => (
                     <MenuItem key={user.id} value={user.id}>
                       {user.nome}

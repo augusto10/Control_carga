@@ -362,9 +362,11 @@ const AssinaturaDigital = forwardRef<AssinaturaDigitalHandles, AssinaturaDigital
                     className: 'signature-canvas',
                     style: {
                       width: '100%',
-                      height: '200px',
+                      height: isMobile ? '280px' : '200px', // Maior em mobile
                       backgroundColor: '#fff',
-                      touchAction: 'none'
+                      touchAction: 'none',
+                      border: '2px solid #e0e0e0',
+                      borderRadius: '8px'
                     }
                   }}
                   onBegin={() => {
