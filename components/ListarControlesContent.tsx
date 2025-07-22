@@ -34,7 +34,9 @@ import {
   Box, 
   Select,
   TextField,
-  Tooltip
+  Tooltip,
+  useMediaQuery,
+  useTheme
 } from '@mui/material';
 import { useSnackbar } from 'notistack';
 import { format } from 'date-fns';
@@ -54,6 +56,8 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import AddIcon from '@mui/icons-material/Add';
 
 import AssinaturaDigital from './AssinaturaDigital';
+import ResponsiveTable from './ResponsiveTable';
+import ResponsiveContainer from './ResponsiveContainer';
 
 interface Controle extends Omit<PrismaControleCarga, 'notas' | 'numeroManifesto' | 'assinaturaMotorista' | 'assinaturaResponsavel' | 'dataAssinaturaMotorista' | 'dataAssinaturaResponsavel'> {
   numeroManifesto: string | null;

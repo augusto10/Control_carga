@@ -18,7 +18,7 @@ import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 
 // Importação dinâmica para evitar problemas de SSR
 const SignatureCanvas = dynamic(
-  () => import('react-signature-canvas').then(mod => ({ default: mod.default })),
+  () => import('react-signature-canvas'),
   { 
     ssr: false, 
     loading: () => <div>Carregando canvas...</div>
@@ -357,38 +357,23 @@ const AssinaturaDigital = forwardRef<AssinaturaDigitalHandles, AssinaturaDigital
             {isReady && (
               <>
                 <SignatureCanvas
-                  ref={(canvas: any) => {
-                    if (canvas) {
-                      sigCanvas.current = canvas;
-                      console.log('[AssinaturaDigital] SignatureCanvas ref atribuído:', canvas);
-                      console.log('[AssinaturaDigital] Tipo do canvas:', typeof canvas);
-                      console.log('[AssinaturaDigital] Métodos disponíveis:', canvas ? Object.getOwnPropertyNames(canvas) : 'nenhum');
-                      
-                      // Verifica se os métodos essenciais estão disponíveis
-                      if (canvas.toDataURL && canvas.clear && canvas.isEmpty) {
-                        console.log('[AssinaturaDigital] Todos os métodos essenciais estão disponíveis');
-                      } else {
-                        console.warn('[AssinaturaDigital] Alguns métodos essenciais não estão disponíveis:', {
-                          toDataURL: !!canvas.toDataURL,
-                          clear: !!canvas.clear,
-                          isEmpty: !!canvas.isEmpty
-                        });
-                      }
-                    }
-                  }}
                   penColor="black"
                   canvasProps={{
                     className: 'signature-canvas',
                     style: {
                       width: '100%',
-                      height: '100%',
+                      height: '200px',
                       backgroundColor: '#fff',
                       touchAction: 'none'
                     }
                   }}
                   onBegin={() => {
+                    console.log('[AssinaturaDigital] Assinatura iniciada');
                     setHasDrawn(true);
                     setIsSigned(false);
+                  }}
+                  onEnd={() => {
+                    console.log('[AssinaturaDigital] Assinatura finalizada');
                   }}
                 />
                 {!hasDrawn && !isSigned && (

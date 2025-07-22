@@ -23,7 +23,8 @@ import {
   Avatar,
   Button,
   Menu,
-  MenuItem
+  MenuItem,
+  SwipeableDrawer
 } from '@mui/material';
 import {
   Menu as MenuIcon,
@@ -104,14 +105,16 @@ const AppBar = styled(MuiAppBar, {
   color: '#ffffff',
   boxShadow: '0 4px 20px rgba(255, 107, 53, 0.3)',
   backdropFilter: 'blur(10px)',
-  ...(open && {
-    marginLeft: drawerWidth,
-    width: `calc(100% - ${drawerWidth}px)`,
-    transition: theme.transitions.create(['width', 'margin'], {
-      easing: theme.transitions.easing.sharp,
-      duration: theme.transitions.duration.enteringScreen,
+  [theme.breakpoints.up('md')]: {
+    ...(open && {
+      marginLeft: drawerWidth,
+      width: `calc(100% - ${drawerWidth}px)`,
+      transition: theme.transitions.create(['width', 'margin'], {
+        easing: theme.transitions.easing.sharp,
+        duration: theme.transitions.duration.enteringScreen,
+      }),
     }),
-  }),
+  },
 }));
 
 const StyledDrawer = styled(Drawer, {
@@ -138,16 +141,19 @@ const MenuItemButton = styled(ListItemButton)(({ theme }) => ({
   borderRadius: 12,
   margin: theme.spacing(0.3, 1.5),
   padding: theme.spacing(1.2, 2),
-  fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-  fontWeight: 500,
-  transition: 'all 0.3s ease',
+  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+  [theme.breakpoints.down('md')]: {
+    minHeight: 56,
+    padding: theme.spacing(1.5, 2),
+    margin: theme.spacing(0.2, 1),
+  },
   '&:hover': {
-    backgroundColor: alpha('#ff6b35', 0.1),
+    backgroundColor: alpha(theme.palette.primary.main, 0.1),
     transform: 'translateX(4px)',
-    boxShadow: '0 4px 12px rgba(255, 107, 53, 0.15)',
+    boxShadow: '0 4px 12px rgba(255, 107, 53, 0.2)',
   },
   '&.active': {
-    backgroundColor: alpha('#ff6b35', 0.15),
+    backgroundColor: alpha(theme.palette.primary.main, 0.15),
     borderLeft: '4px solid #ff6b35',
     '& .MuiListItemIcon-root': {
       color: theme.palette.primary.main,
@@ -258,15 +264,26 @@ const menuItems = [
   },
 ];
 
-const Layout = ({ children }: { children: React.ReactNode }) => {
+const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const theme = useTheme();
-  const { user, logout } = useAuth();
   const router = useRouter();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-  const [open, setOpen] = useState(!isMobile);
-  const [openSubmenus, setOpenSubmenus] = useState<Record<string, boolean>>({});
+  const { user, logout } = useAuth();
+  const [open, setOpen] = useState(true);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [openSubmenus, setOpenSubmenus] = useState<Record<string, boolean>>({});
   const menuOpen = Boolean(anchorEl);
+  
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const isTablet = useMediaQuery(theme.breakpoints.down('lg'));
+  
+  useEffect(() => {
+    if (isMobile) {
+      setOpen(false);
+    } else {
+      setOpen(true);
+    }
+  }, [isMobile]);
 
   const handleMenuClick = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
@@ -300,7 +317,19 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
   }, [router.pathname]);
 
   const toggleDrawer = () => {
-    setOpen(!open);
+    if (isMobile) {
+      setMobileOpen(!mobileOpen);
+    } else {
+      setOpen(!open);
+    }
+  };
+
+  const handleDrawerClose = () => {
+    setMobileOpen(false);
+  };
+
+  const handleDrawerToggle = () => {
+    setMobileOpen(!mobileOpen);
   };
 
   const toggleSubmenu = (itemText: string) => {
@@ -521,80 +550,169 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
         </Toolbar>
       </AppBar>
       
-      <StyledDrawer 
-        variant="permanent" 
-        open={open}
-        sx={{
-          '& .MuiDrawer-paper': {
-            width: open ? drawerWidth : `calc(${theme.spacing(7)} + 1px)`,
-            transition: theme.transitions.create('width', {
-              easing: theme.transitions.easing.sharp,
-              duration: theme.transitions.duration.enteringScreen,
-            }),
-          },
-        }}
-      >
-        
-        <Box sx={{ 
-          overflow: 'auto', 
-          height: 'calc(100vh - 64px)', 
-          py: 2,
-          background: 'linear-gradient(180deg, #fafafa 0%, #f5f5f5 100%)'
-        }}>
-          <List>
-            {menuItems.map((item) => (
-              <ListItem key={item.text} disablePadding sx={{ display: 'block' }}>
-                {renderMenuItem(item)}
-              </ListItem>
-            ))}
-          </List>
-          
-          {/* Espaço para informações do usuário no rodapé */}
+      {/* Mobile Drawer */}
+      {isMobile ? (
+        <SwipeableDrawer
+          anchor="left"
+          open={mobileOpen}
+          onClose={handleDrawerClose}
+          onOpen={handleDrawerToggle}
+          ModalProps={{
+            keepMounted: true, // Better open performance on mobile.
+          }}
+          sx={{
+            '& .MuiDrawer-paper': {
+              width: drawerWidth,
+              background: 'linear-gradient(180deg, #fafafa 0%, #f5f5f5 100%)',
+              borderRight: 'none',
+              boxShadow: '4px 0 20px rgba(0,0,0,0.1)',
+            },
+          }}
+        >
+          <DrawerHeader>
+            <Typography variant="h6" sx={{ fontWeight: 600, color: '#ffffff' }}>
+              Controle de Carga
+            </Typography>
+            <IconButton onClick={handleDrawerClose} sx={{ color: '#ffffff' }}>
+              <ChevronLeftIcon />
+            </IconButton>
+          </DrawerHeader>
+          <Divider />
           <Box sx={{ 
-            p: 2, 
-            mt: 'auto', 
-            borderTop: '1px solid rgba(255, 107, 53, 0.2)', 
-            opacity: open ? 1 : 0,
-            background: 'linear-gradient(135deg, rgba(255, 107, 53, 0.05) 0%, rgba(255, 140, 66, 0.05) 100%)',
-            borderRadius: '12px 12px 0 0'
+            overflow: 'auto', 
+            height: 'calc(100vh - 64px)', 
+            py: 2,
           }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Avatar sx={{ 
-                width: 36, 
-                height: 36, 
-                background: 'linear-gradient(135deg, #ff6b35 0%, #ff8c42 100%)',
-                fontWeight: 600,
-                fontSize: '1.1rem'
-              }}>
-                {user?.nome?.charAt(0).toUpperCase() || <PersonIcon fontSize="small" />}
-              </Avatar>
-              <Box>
-                <Typography 
-                  variant="subtitle2" 
-                  noWrap
-                  sx={{
-                    fontWeight: 600,
-                    color: '#1a1a1a',
-                    fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif'
-                  }}
-                >
-                  {user?.nome || 'Usuário'}
-                </Typography>
-                <Typography 
-                  variant="caption" 
-                  noWrap
-                  sx={{
-                    color: '#ff6b35',
-                    fontWeight: 500
-                  }}
-                >
-                  {user?.tipo || 'Nível de Acesso'}
-                </Typography>
+            <List>
+              {menuItems.map((item) => (
+                <ListItem key={item.text} disablePadding sx={{ display: 'block' }}>
+                  {renderMenuItem(item)}
+                </ListItem>
+              ))}
+            </List>
+            
+            {/* Espaço para informações do usuário no rodapé */}
+            <Box sx={{ 
+              p: 2, 
+              mt: 'auto', 
+              borderTop: '1px solid rgba(255, 107, 53, 0.2)', 
+              background: 'linear-gradient(135deg, rgba(255, 107, 53, 0.05) 0%, rgba(255, 140, 66, 0.05) 100%)',
+              borderRadius: '12px 12px 0 0'
+            }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Avatar sx={{ 
+                  width: 36, 
+                  height: 36, 
+                  background: 'linear-gradient(135deg, #ff6b35 0%, #ff8c42 100%)',
+                  fontWeight: 600,
+                  fontSize: '1.1rem'
+                }}>
+                  {user?.nome?.charAt(0).toUpperCase() || <PersonIcon fontSize="small" />}
+                </Avatar>
+                <Box>
+                  <Typography 
+                    variant="subtitle2" 
+                    noWrap
+                    sx={{
+                      fontWeight: 600,
+                      color: '#1a1a1a',
+                      fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif'
+                    }}
+                  >
+                    {user?.nome || 'Usuário'}
+                  </Typography>
+                  <Typography 
+                    variant="caption" 
+                    noWrap
+                    sx={{
+                      color: '#ff6b35',
+                      fontWeight: 500
+                    }}
+                  >
+                    {user?.tipo || 'Nível de Acesso'}
+                  </Typography>
+                </Box>
               </Box>
             </Box>
           </Box>
-        </Box>
-      </StyledDrawer>
+        </SwipeableDrawer>
+      ) : (
+        /* Desktop Drawer */
+        <StyledDrawer 
+          variant="permanent" 
+          open={open}
+          sx={{
+            display: { xs: 'none', md: 'block' },
+            '& .MuiDrawer-paper': {
+              width: open ? drawerWidth : `calc(${theme.spacing(7)} + 1px)`,
+              transition: theme.transitions.create('width', {
+                easing: theme.transitions.easing.sharp,
+                duration: theme.transitions.duration.enteringScreen,
+              }),
+            },
+          }}
+        >
+          <Box sx={{ 
+            overflow: 'auto', 
+            height: 'calc(100vh - 64px)', 
+            py: 2,
+            background: 'linear-gradient(180deg, #fafafa 0%, #f5f5f5 100%)'
+          }}>
+            <List>
+              {menuItems.map((item) => (
+                <ListItem key={item.text} disablePadding sx={{ display: 'block' }}>
+                  {renderMenuItem(item)}
+                </ListItem>
+              ))}
+            </List>
+            
+            {/* Espaço para informações do usuário no rodapé */}
+            <Box sx={{ 
+              p: 2, 
+              mt: 'auto', 
+              borderTop: '1px solid rgba(255, 107, 53, 0.2)', 
+              opacity: open ? 1 : 0,
+              background: 'linear-gradient(135deg, rgba(255, 107, 53, 0.05) 0%, rgba(255, 140, 66, 0.05) 100%)',
+              borderRadius: '12px 12px 0 0'
+            }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Avatar sx={{ 
+                  width: 36, 
+                  height: 36, 
+                  background: 'linear-gradient(135deg, #ff6b35 0%, #ff8c42 100%)',
+                  fontWeight: 600,
+                  fontSize: '1.1rem'
+                }}>
+                  {user?.nome?.charAt(0).toUpperCase() || <PersonIcon fontSize="small" />}
+                </Avatar>
+                <Box>
+                  <Typography 
+                    variant="subtitle2" 
+                    noWrap
+                    sx={{
+                      fontWeight: 600,
+                      color: '#1a1a1a',
+                      fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif'
+                    }}
+                  >
+                    {user?.nome || 'Usuário'}
+                  </Typography>
+                  <Typography 
+                    variant="caption" 
+                    noWrap
+                    sx={{
+                      color: '#ff6b35',
+                      fontWeight: 500
+                    }}
+                  >
+                    {user?.tipo || 'Nível de Acesso'}
+                  </Typography>
+                </Box>
+              </Box>
+            </Box>
+          </Box>
+        </StyledDrawer>
+      )}
       
       <Box 
         component="main" 

@@ -1,6 +1,15 @@
 import { createTheme } from '@mui/material/styles';
 
 export const professionalTheme = createTheme({
+  breakpoints: {
+    values: {
+      xs: 0,
+      sm: 600,
+      md: 900,
+      lg: 1200,
+      xl: 1536,
+    },
+  },
   palette: {
     primary: {
       main: '#ff6b35',   // Laranja moderno
@@ -45,35 +54,35 @@ export const professionalTheme = createTheme({
     ].join(','),
     h1: {
       fontWeight: 900,
-      fontSize: '3rem',
+      fontSize: 'clamp(2rem, 5vw, 3rem)',
       letterSpacing: '0.5px',
       color: '#1a1a1a',
     },
     h2: {
       fontWeight: 700,
-      fontSize: '2.5rem',
+      fontSize: 'clamp(1.75rem, 4vw, 2.5rem)',
       letterSpacing: '0.3px',
       color: '#1a1a1a',
     },
     h3: {
       fontWeight: 600,
-      fontSize: '2rem',
+      fontSize: 'clamp(1.5rem, 3.5vw, 2rem)',
       letterSpacing: '0.2px',
       color: '#1a1a1a',
     },
     h4: {
       fontWeight: 600,
-      fontSize: '1.5rem',
+      fontSize: 'clamp(1.25rem, 3vw, 1.5rem)',
       color: '#1a1a1a',
     },
     h5: {
       fontWeight: 500,
-      fontSize: '1.25rem',
+      fontSize: 'clamp(1.1rem, 2.5vw, 1.25rem)',
       color: '#1a1a1a',
     },
     h6: {
       fontWeight: 500,
-      fontSize: '1rem',
+      fontSize: 'clamp(1rem, 2vw, 1rem)',
       color: '#1a1a1a',
     },
     body1: {
@@ -101,6 +110,12 @@ export const professionalTheme = createTheme({
           fontSize: '1rem',
           transition: 'all 0.3s ease',
           boxShadow: 'none',
+          minHeight: '44px', // Melhor área de toque para mobile
+          '@media (max-width: 900px)': {
+            padding: '14px 20px',
+            fontSize: '0.95rem',
+            minHeight: '48px',
+          },
           '&:hover': {
             transform: 'translateY(-2px)',
             boxShadow: '0 6px 20px rgba(0,0,0,0.15)',
@@ -133,9 +148,17 @@ export const professionalTheme = createTheme({
           backdropFilter: 'blur(10px)',
           border: '1px solid rgba(255, 255, 255, 0.2)',
           transition: 'all 0.3s ease',
+          '@media (max-width: 900px)': {
+            borderRadius: '12px',
+            margin: '8px',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.08)',
+          },
           '&:hover': {
             transform: 'translateY(-4px)',
             boxShadow: '0 12px 40px rgba(0,0,0,0.15)',
+            '@media (max-width: 900px)': {
+              transform: 'none', // Desabilita hover em mobile
+            },
           },
         },
       },
