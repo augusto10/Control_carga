@@ -220,6 +220,9 @@ const ListarControlesContent: React.FC = () => {
   }, [controlesStore, converterControles]);
 
   const gerarPdf = async (controle: ControleComNotas) => {
+    // Importar dependências necessárias
+    const { PDFDocument, rgb, StandardFonts } = await import('pdf-lib');
+    const fontBytes = await fetch('/fonts/helvetica.ttf').then(res => res.arrayBuffer());
     try {
       // Garante que as propriedades opcionais estejam definidas
       const controleCompleto: ControleComNotas = {
@@ -242,9 +245,11 @@ const ListarControlesContent: React.FC = () => {
       const doc = await PDFDocument.load(existingBytes);
       const page = doc.getPage(0);
       const { width, height } = page.getSize();
+      
+      // Usar fonte padrão do PDF
       const font = await doc.embedFont(StandardFonts.Helvetica);
-      const fontSize = 10; // Reduzindo o tamanho da fonte para 10
-      const lineHeight = 18; // Ajustando o espaçamento para a fonte menor
+      const fontSize = 10;
+      const lineHeight = 18;
       let yPos = height - 50;
 
       // Cabeçalho
@@ -346,58 +351,242 @@ const ListarControlesContent: React.FC = () => {
       // Linha divisória para assinaturas
       const assinaturaY = yPos - 10;
       
+      // Função para desenhar o carimbo de assinatura digital
+      const drawDigitalStamp = async (x: number, y: number, name: string, signature: string | null, signatureDate: Date | null) => {
+        // Desenha o nome
+        const nameY = y;
+        page.drawText(name, { x, y: nameY, size: fontSize, font });
+        
+        if (signature) {
+          try {
+            // Desenha a assinatura como imagem
+            const signatureImage = await doc.embedPng(signature);
+            const signatureAspectRatio = signatureImage.width / signatureImage.height;
+            const signatureWidth = 150;
+            const signatureHeight = signatureWidth / signatureAspectRatio;
+            
+            // Desenha a assinatura
+            page.drawImage(signatureImage, {
+              x: x,
+              y: nameY - 25 - signatureHeight,
+              width: signatureWidth,
+              height: signatureHeight,
+            });
+            
+            // Desenha o carimbo digital abaixo da assinatura com mais espaço
+            const stampX = x - 8;
+            const stampY = nameY - 50 - signatureHeight; // Aumentado o espaço acima do carimbo
+            const stampWidth = signatureWidth + 16;
+            const stampHeight = 45; // Aumentado para acomodar melhor o conteúdo
+            
+            // Fundo do carimbo com bordas arredondadas (simulado)
+            const cornerRadius = 4;
+            
+            // Retângulo principal com borda arredondada
+            page.drawRectangle({
+              x: stampX,
+              y: stampY - stampHeight,
+              width: stampWidth,
+              height: stampHeight,
+              borderWidth: 0.8,
+              borderColor: rgb(0, 0.6, 0),
+              borderOpacity: 0.6,
+              color: rgb(0.98, 1, 0.98), // Fundo mais branco
+              opacity: 0.9,
+              borderDashArray: [1, 1],
+            });
+            
+            // Linha decorativa superior
+            page.drawLine({
+              start: { x: stampX + 10, y: stampY - 5 },
+              end: { x: stampX + stampWidth - 10, y: stampY - 5 },
+              thickness: 1.5,
+              color: rgb(0, 0.5, 0),
+              opacity: 0.3,
+            });
+            
+            // Texto do carimbo com fonte em negrito
+            const boldFont = await doc.embedFont(StandardFonts.HelveticaBold);
+            page.drawText('ASSINATURA DIGITAL', {
+              x: stampX + (stampWidth / 2) - 45, // Centralizado
+              y: stampY - 22,
+              size: fontSize - 1,
+              font: boldFont,
+              color: rgb(0, 0.4, 0),
+              opacity: 0.9,
+            });
+            
+            // Linha decorativa abaixo do texto
+            page.drawLine({
+              start: { x: stampX + 15, y: stampY - 26 },
+              end: { x: stampX + stampWidth - 15, y: stampY - 26 },
+              thickness: 0.5,
+              color: rgb(0, 0.5, 0),
+              opacity: 0.3,
+            });
+            
+            // Data e hora da assinatura mais abaixo
+            if (signatureDate) {
+              const dateStr = new Date(signatureDate).toLocaleString('pt-BR', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false,
+                timeZone: 'America/Sao_Paulo'
+              });
+              
+              // Texto da data com fundo sutil
+              const dateText = `Assinado em: ${dateStr}`;
+              const dateTextWidth = font.widthOfTextAtSize(dateText, fontSize - 3);
+              
+              // Fundo sutil para a data
+              page.drawRectangle({
+                x: stampX + (stampWidth - dateTextWidth) / 2 - 3,
+                y: stampY - stampHeight + 6,
+                width: dateTextWidth + 6,
+                height: 14,
+                color: rgb(0.95, 1, 0.95),
+                borderWidth: 0.5,
+                borderColor: rgb(0.9, 0.9, 0.9),
+                opacity: 0.7,
+              });
+              
+              // Texto da data
+              page.drawText(dateText, {
+                x: stampX + (stampWidth - dateTextWidth) / 2,
+                y: stampY - stampHeight + 8,
+                size: fontSize - 3,
+                font,
+                color: rgb(0, 0.3, 0),
+              });
+            }
+            
+            // Retorna a posição Y para o próximo elemento
+            return stampY - stampHeight - 10;
+            
+          } catch (error) {
+            console.error('Erro ao processar assinatura digital:', error);
+            // Fallback para o modo texto se houver erro ao processar a imagem
+            const fallbackY = y - 25;
+            page.drawText('Assinatura Digital', { 
+              x, 
+              y: fallbackY, 
+              size: fontSize - 1, 
+              font, 
+              color: rgb(0, 0.5, 0) 
+            });
+            
+            // Adiciona a data mesmo no fallback
+            if (signatureDate) {
+              const dateStr = new Date(signatureDate).toLocaleString('pt-BR');
+              page.drawText(`Assinado em: ${dateStr}`, {
+                x,
+                y: fallbackY - 15,
+                size: fontSize - 2,
+                font,
+                color: rgb(0, 0.4, 0),
+              });
+              return fallbackY - 35;
+            }
+            
+            return fallbackY - 20;
+          }
+          
+        } else {
+          // Linha para assinatura não assinada
+          const lineY = y - 25;
+          page.drawLine({
+            start: { x, y: lineY },
+            end: { x: x + 200, y: lineY },
+            thickness: 1,
+            color: rgb(0.8, 0.8, 0.8),
+          });
+          
+          // Texto de orientação
+          page.drawText('(Assinatura não registrada)', {
+            x,
+            y: lineY - 15,
+            size: fontSize - 2,
+            font,
+            color: rgb(0.6, 0.6, 0.6),
+          });
+          
+          // Retorna a posição Y para o próximo elemento
+          return lineY - 30;
+        }
+      };
+      
       // Assinatura do Motorista
-      page.drawText('Motorista:', { x: 100, y: assinaturaY - 10, size: fontSize, font });
-      page.drawText(controleCompleto.motorista, { x: 100, y: assinaturaY - 25, size: fontSize, font });
-      
-      if (controleCompleto.assinaturaMotorista) {
-        // Exibe "ASSINADO DIGITALMENTE" como carimbo
-        page.drawText('ASSINADO DIGITALMENTE', { 
-          x: 100, 
-          y: assinaturaY - 40, 
-          size: fontSize - 1, 
-          font, 
-          color: rgb(0, 0.5, 0) // Verde para indicar assinado
-        });
-      } else {
-        page.drawText('Assinatura:', { x: 100, y: assinaturaY - 40, size: fontSize - 1, font });
-        // Linha para assinatura
-        page.drawLine({
-          start: { x: 100, y: assinaturaY - 50 },
-          end: { x: 300, y: assinaturaY - 50 },
-          thickness: 1,
-          color: rgb(0, 0, 0),
-        });
-      }
-      
-      // Data da assinatura do motorista
-      const dataMotorista = controleCompleto.dataAssinaturaMotorista 
-        ? new Date(controleCompleto.dataAssinaturaMotorista).toLocaleDateString('pt-BR')
-        : '__/__/____';
-      page.drawText(`Data: ${dataMotorista}`, { x: 100, y: assinaturaY - 45, size: fontSize - 2, font });
+      page.drawText('Motorista:', { x: 100, y: yPos - 10, size: fontSize, font, color: rgb(0.2, 0.2, 0.2) });
+      const motoristaY = await (async () => {
+        try {
+          return await drawDigitalStamp(
+            100, 
+            yPos - 35,
+            controleCompleto.motorista, 
+            controleCompleto.assinaturaMotorista,
+            controleCompleto.dataAssinaturaMotorista
+          );
+        } catch (error) {
+          console.error('Erro ao desenhar assinatura do motorista:', error);
+          return yPos - 50; // Retorna uma posição padrão em caso de erro
+        }
+      })();
 
       // Assinatura do Responsável
-      page.drawText('Responsável:', { x: 350, y: assinaturaY - 10, size: fontSize, font });
-      page.drawText(controleCompleto.responsavel, { x: 350, y: assinaturaY - 25, size: fontSize, font });
+      page.drawText('Responsável:', { x: 350, y: yPos - 10, size: fontSize, font, color: rgb(0.2, 0.2, 0.2) });
+      const responsavelY = await (async () => {
+        try {
+          return await drawDigitalStamp(
+            350, 
+            yPos - 35,
+            controleCompleto.responsavel, 
+            controleCompleto.assinaturaResponsavel,
+            controleCompleto.dataAssinaturaResponsavel
+          );
+        } catch (error) {
+          console.error('Erro ao desenhar assinatura do responsável:', error);
+          return yPos - 50; // Retorna uma posição padrão em caso de erro
+        }
+      })();
       
-      if (controleCompleto.assinaturaResponsavel) {
-        // Exibe "ASSINADO DIGITALMENTE" como carimbo
-        page.drawText('ASSINADO DIGITALMENTE', { 
-          x: 350, 
-          y: assinaturaY - 40, 
-          size: fontSize - 1, 
-          font, 
-          color: rgb(0, 0.5, 0) // Verde para indicar assinado
-        });
-      } else {
-        page.drawText('Assinatura:', { x: 350, y: assinaturaY - 40, size: fontSize - 1, font });
-        // Linha para assinatura
-        page.drawLine({
-          start: { x: 350, y: assinaturaY - 50 },
-          end: { x: 550, y: assinaturaY - 50 },
-          thickness: 1,
-          color: rgb(0, 0, 0),
-        });
+      // Rodapé com informações de assinatura digital
+      const footerY = Math.min(motoristaY, responsavelY) - 20;
+      if (controleCompleto.assinaturaMotorista || controleCompleto.assinaturaResponsavel) {
+        const assinaturaInfo = [];
+        
+        if (controleCompleto.assinaturaMotorista && controleCompleto.dataAssinaturaMotorista) {
+          const data = new Date(controleCompleto.dataAssinaturaMotorista).toLocaleString('pt-BR');
+          assinaturaInfo.push(`Assinado por ${controleCompleto.motorista} em ${data}`);
+        }
+        
+        if (controleCompleto.assinaturaResponsavel && controleCompleto.dataAssinaturaResponsavel) {
+          const data = new Date(controleCompleto.dataAssinaturaResponsavel).toLocaleString('pt-BR');
+          assinaturaInfo.push(`Aprovado por ${controleCompleto.responsavel} em ${data}`);
+        }
+        
+        if (assinaturaInfo.length > 0) {
+          page.drawText('DOCUMENTO ASSINADO DIGITALMENTE', {
+            x: 50,
+            y: footerY,
+            size: fontSize - 1,
+            font,
+            color: rgb(0, 0.6, 0),
+            opacity: 0.9
+          });
+          
+          assinaturaInfo.forEach((info, index) => {
+            page.drawText(`• ${info}`, {
+              x: 50,
+              y: footerY - (index + 1) * 15,
+              size: fontSize - 2,
+              font,
+              color: rgb(0.3, 0.3, 0.3),
+            });
+          });
+        }
       }
       
       // Data da assinatura do responsável
