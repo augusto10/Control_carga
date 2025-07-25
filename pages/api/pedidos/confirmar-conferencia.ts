@@ -2,6 +2,67 @@ import { NextApiResponse } from 'next';
 import prisma from '../../../lib/prisma';
 import { withAuth, AuthenticatedRequest } from '../../../lib/middleware/withAuth';
 
+// Função auxiliar para atualizar pontuação do usuário
+async function atualizarPontuacaoUsuario(
+  usuarioId: string, 
+  acao: 'PEDIDO_CORRETO' | 'PEDIDO_INCORRETO' | 'BONUS_ADMIN' | 'PENALIDADE_ADMIN',
+  pedidoId?: string,
+  descricao?: string
+) {
+  const PONTOS_CONFIG = {
+    PEDIDO_CORRETO: 10,
+    PEDIDO_INCORRETO: -5,
+    BONUS_ADMIN: 0,
+    PENALIDADE_ADMIN: 0
+  };
+
+  const pontosGanhos = PONTOS_CONFIG[acao];
+
+  // Buscar ou criar pontuação do usuário
+  let pontuacaoUsuario = await prisma.pontuacaoUsuario.findUnique({
+    where: { usuarioId }
+  });
+
+  if (!pontuacaoUsuario) {
+    pontuacaoUsuario = await prisma.pontuacaoUsuario.create({
+      data: {
+        usuarioId,
+        pontuacaoTotal: 0,
+        pedidosCorretos: 0,
+        pedidosIncorretos: 0
+      }
+    });
+  }
+
+  // Atualizar contadores
+  const novosDados: any = {
+    pontuacaoTotal: pontuacaoUsuario.pontuacaoTotal + pontosGanhos
+  };
+
+  if (acao === 'PEDIDO_CORRETO') {
+    novosDados.pedidosCorretos = pontuacaoUsuario.pedidosCorretos + 1;
+  } else if (acao === 'PEDIDO_INCORRETO') {
+    novosDados.pedidosIncorretos = pontuacaoUsuario.pedidosIncorretos + 1;
+  }
+
+  // Atualizar pontuação do usuário
+  await prisma.pontuacaoUsuario.update({
+    where: { usuarioId },
+    data: novosDados
+  });
+
+  // Registrar no histórico
+  await prisma.historicoPontuacao.create({
+    data: {
+      usuarioId,
+      pedidoId,
+      acao,
+      pontosGanhos,
+      descricao: descricao || `${acao.replace('_', ' ').toLowerCase()}`
+    }
+  });
+}
+
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', ['POST']);
@@ -51,11 +112,40 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           select: {
             id: true,
             nome: true,
-            email: true
+            email: true,
+            tipo: true
+          }
+        },
+        separador: {
+          select: {
+            id: true,
+            nome: true,
+            tipo: true
           }
         }
       }
     });
+
+    // Atualizar pontuação do conferente (gamificação)
+    try {
+      const pedidoCorreto = pedido100 === 'sim' && inconsistencia !== 'sim';
+      const acaoConferente = pedidoCorreto ? 'PEDIDO_CORRETO' : 'PEDIDO_INCORRETO';
+      
+      // Atualizar pontos do conferente
+      await atualizarPontuacaoUsuario(conferenteId, acaoConferente, pedidoId, `Conferência de pedido ${pedidoCorreto ? 'correto' : 'incorreto'}`);
+      
+      // Se há separador e o pedido foi conferido como incorreto, penalizar o separador
+      if (conferencia.separador && !pedidoCorreto) {
+        await atualizarPontuacaoUsuario(conferencia.separador.id, 'PEDIDO_INCORRETO', pedidoId, 'Pedido separado incorretamente (detectado na conferência)');
+      }
+      // Se há separador e o pedido foi conferido como correto, bonificar o separador
+      else if (conferencia.separador && pedidoCorreto) {
+        await atualizarPontuacaoUsuario(conferencia.separador.id, 'PEDIDO_CORRETO', pedidoId, 'Pedido separado corretamente');
+      }
+    } catch (gamificationError) {
+      console.error('Erro ao atualizar pontuação:', gamificationError);
+      // Não falhar a operação principal por erro na gamificação
+    }
 
     // Atualizar o pedido para vincular à conferência
     await prisma.pedido.update({

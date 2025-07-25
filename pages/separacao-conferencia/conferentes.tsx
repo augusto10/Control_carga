@@ -1,7 +1,28 @@
 // ===== RELATÓRIO DE SEPARAÇÃO - DOMÍNIO DE PEDIDOS =====
-// Esta página mostra relatório de PEDIDOS (separação/conferência)
-// NÃO confundir com Notas Fiscais - são entidades totalmente distintas
-// Todos os dados são lidos de PedidoConferido
+//
+// IMPORTANTE: Esta página mostra relatório de PEDIDOS (separação/conferência)
+// NÃO confundir com NOTAS FISCAIS - são processos logísticos completamente distintos
+//
+// DOMÍNIO DE PEDIDOS - EXPLICAÇÃO DETALHADA:
+//
+// Este arquivo trabalha com o domínio de PEDIDOS, que é um processo interno de separação
+// e conferência de itens no estoque/armazém. É diferente do controle de notas fiscais:
+//
+// PEDIDOS (Este sistema):
+// - Solicitações internas para separação de produtos
+// - Processo de picking/separação no armazém
+// - Conferência e auditoria dos itens separados
+// - Controle de separadores, conferentes e auditores
+// - Fluxo: Criação → Separação → Conferência → Auditoria → Finalização
+// - Dados salvos na tabela PedidoConferido
+//
+// NOTAS FISCAIS (Sistema diferente):
+// - Documentos fiscais obrigatórios para transporte
+// - Controle de carga para motoristas externos
+// - Assinaturas digitais de motoristas e responsáveis
+// - Dados salvos nas tabelas NotaFiscal e ControleManifesto
+//
+// ATENÇÃO: Não misturar os dois domínios - são tabelas, APIs e fluxos diferentes!
 
 import {
   Box,
@@ -41,6 +62,7 @@ import {
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import api from '@/services/api';
+import { validarPedido } from '@/services/gamificacaoService';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -71,6 +93,7 @@ interface PedidoConferido {
   motivosInconsistencia: string[];
   observacoes: string | null;
   conferente: Usuario;
+  statusValidacao: 'PENDENTE' | 'VALIDADO_CORRETO' | 'VALIDADO_INCORRETO';
 }
 
 interface Pedido {
@@ -113,6 +136,7 @@ function PaginaConferenciaPedidos() {
   const [inconsistencia, setInconsistencia] = useState('nao');
   const [motivos, setMotivos] = useState<string[]>([]);
   const [observacoes, setObservacoes] = useState('');
+  const [validando, setValidando] = useState<Record<string, boolean>>({});
   const [filtros, setFiltros] = useState<Filtros>({
     dataInicio: null,
     dataFim: null,
@@ -208,7 +232,26 @@ function PaginaConferenciaPedidos() {
       setErro('Erro ao salvar a conferência. Tente novamente.');
     }
   };
-  
+
+  const handleValidarPedido = async (pedidoConferidoId: string, status: 'VALIDADO_CORRETO' | 'VALIDADO_INCORRETO') => {
+    setValidando(prev => ({ ...prev, [pedidoConferidoId]: true }));
+    try {
+      const response = await validarPedido(pedidoConferidoId, status);
+      setSucesso(response.message);
+      // Atualiza o status do pedido na lista para refletir a mudança sem recarregar a página
+      setPedidos(pedidos.map(p => {
+        if (p.conferido?.id === pedidoConferidoId) {
+          return { ...p, conferido: { ...p.conferido, statusValidacao: status } };
+        }
+        return p;
+      }));
+    } catch (error: any) {
+      setErro(error.message || 'Erro ao validar pedido.');
+    } finally {
+      setValidando(prev => ({ ...prev, [pedidoConferidoId]: false }));
+    }
+  };
+
   // Manipuladores de paginação
   const handleMudarPagina = (event: unknown, novaPagina: number) => {
     setPagina(novaPagina);
@@ -310,16 +353,16 @@ function PaginaConferenciaPedidos() {
 
             {/* Tabela de Pedidos */}
             <Paper sx={{ width: '100%', overflow: 'hidden', mb: 2 }}>
-              <TableContainer sx={{ maxHeight: 600 }}>
-                <Table stickyHeader>
+              <TableContainer component={Paper} elevation={3}>
+                <Table>
                   <TableHead>
                     <TableRow>
                       <TableCell>Nº Pedido</TableCell>
                       <TableCell>Data</TableCell>
-                      <TableCell>Motorista</TableCell>
-                      <TableCell>Responsável</TableCell>
-                      <TableCell>Transportadora</TableCell>
-                      <TableCell>Status</TableCell>
+                      <TableCell>Separador</TableCell>
+                      <TableCell>Conferente</TableCell>
+                      <TableCell>Status Conferência</TableCell>
+                      <TableCell>Status Validação</TableCell>
                       <TableCell align="right">Ações</TableCell>
                     </TableRow>
                   </TableHead>
@@ -343,29 +386,61 @@ function PaginaConferenciaPedidos() {
                           <TableCell>
                             {format(new Date(pedido.dataCriacao), 'dd/MM/yyyy HH:mm', { locale: ptBR })}
                           </TableCell>
-                          <TableCell>{pedido.controle?.motorista || '-'}</TableCell>
-                          <TableCell>{pedido.controle?.responsavel || '-'}</TableCell>
-                          <TableCell>{pedido.controle?.transportadora || '-'}</TableCell>
+                          <TableCell>{pedido.controle?.separador?.nome || 'Não atribuído'}</TableCell>
+                          <TableCell>{pedido.conferido?.conferente?.nome || 'Não conferido'}</TableCell>
                           <TableCell>
                             {pedido.conferido ? (
-                              <Chip 
-                                label={pedido.conferido.inconsistencia ? 'Com Inconsistência' : 'Conferido'}
-                                color={pedido.conferido.inconsistencia ? 'error' : 'success'}
-                                size="small"
-                              />
+                              <Chip label="Conferido" color="success" size="small" />
                             ) : (
                               <Chip label="Pendente" color="warning" size="small" />
                             )}
                           </TableCell>
+                          <TableCell>
+                            {pedido.conferido ? (
+                              <Chip 
+                                label={pedido.conferido.statusValidacao.replace('VALIDADO_', '').replace('PENDENTE', 'Pendente')}
+                                color={
+                                  pedido.conferido.statusValidacao === 'VALIDADO_CORRETO' ? 'success' :
+                                  pedido.conferido.statusValidacao === 'VALIDADO_INCORRETO' ? 'error' : 'default'
+                                } 
+                                size="small"
+                              />
+                            ) : (
+                              'N/A'
+                            )}
+                          </TableCell>
                           <TableCell align="right">
-                            <Button 
-                              variant="contained" 
-                              size="small"
-                              color={pedido.conferido ? 'info' : 'primary'}
-                              onClick={() => handleAbrirModal(pedido)}
-                            >
-                              {pedido.conferido ? 'Ver Detalhes' : 'Registrar Conferência'}
-                            </Button>
+                            <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+                              <Button
+                                variant="contained"
+                                size="small"
+                                onClick={() => handleAbrirModal(pedido)}
+                              >
+                                {pedido.conferido ? 'Ver Detalhes' : 'Conferir'}
+                              </Button>
+                              {user?.tipo === 'GERENTE' && pedido.conferido && pedido.conferido.statusValidacao === 'PENDENTE' && (
+                                <>
+                                  <Button
+                                    variant="outlined"
+                                    size="small"
+                                    color="success"
+                                    onClick={() => handleValidarPedido(pedido.conferido!.id, 'VALIDADO_CORRETO')}
+                                    disabled={validando[pedido.conferido.id]}
+                                  >
+                                    Correto
+                                  </Button>
+                                  <Button
+                                    variant="outlined"
+                                    size="small"
+                                    color="error"
+                                    onClick={() => handleValidarPedido(pedido.conferido!.id, 'VALIDADO_INCORRETO')}
+                                    disabled={validando[pedido.conferido.id]}
+                                  >
+                                    Incorreto
+                                  </Button>
+                                </>
+                              )}
+                            </Box>
                           </TableCell>
                         </TableRow>
                       ))
@@ -486,7 +561,7 @@ function PaginaConferenciaPedidos() {
                 {pedidoSelecionado.conferido && (
                   <Grid item xs={12}>
                     <Typography variant="subtitle2" color="textSecondary">
-                      <strong>Conferente:</strong> {pedidoSelecionado.conferido.conferente.nome}
+                      <strong>Conferente:</strong> {pedidoSelecionado.conferido.conferente?.nome || 'Não atribuído'}
                       <br />
                       <strong>Data da Conferência:</strong>{' '}
                       {format(new Date(pedidoSelecionado.conferido.dataCriacao), 'dd/MM/yyyy HH:mm', { locale: ptBR })}

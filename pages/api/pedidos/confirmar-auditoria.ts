@@ -71,53 +71,104 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(404).json({ message: 'Pedido não encontrado' });
     }
 
-    if (!pedido.conferido) {
-      return res.status(400).json({ message: 'Este pedido ainda não foi separado/conferido' });
-    }
-
-    if (pedido.conferido.auditoriaRealizada) {
-      return res.status(400).json({ message: 'Este pedido já foi auditado' });
-    }
-
-    if (!pedido.conferido.separadorId) {
-      return res.status(400).json({ message: 'Este pedido ainda não foi separado' });
-    }
-
-    // Atualizar o PedidoConferido com os dados da auditoria
-    const pedidoConferidoAtualizado = await prisma.pedidoConferido.update({
-      where: { id: pedido.conferido.id },
-      data: {
+    // Criar ou atualizar o registro de conferência
+    const pedidoConferido = await prisma.pedidoConferido.upsert({
+      where: { pedidoId },
+      update: {
         auditorId: currentUser.id,
         auditoriaRealizada: true,
         auditoriaComErro: inconsistencia,
         dataAuditoria: new Date(),
-        observacaoAuditoria: observacoes || null,
-        // Atualizar também os campos específicos da auditoria
-        pedido100: pedido100,
-        inconsistencia: inconsistencia,
+        observacaoAuditoria: observacoes,
         motivosInconsistencia: inconsistencia ? [motivoInconsistencia] : []
       },
-      include: {
-        auditor: {
-          select: {
-            id: true,
-            nome: true,
-            email: true
+      create: {
+        pedidoId,
+        auditorId: currentUser.id,
+        auditoriaRealizada: true,
+        auditoriaComErro: inconsistencia,
+        dataAuditoria: new Date(),
+        observacaoAuditoria: observacoes,
+        motivosInconsistencia: inconsistencia ? [motivoInconsistencia] : []
+      }
+    });
+
+    // Integração automática com gamificação
+    try {
+      // Identificar o usuário responsável (separador ou conferente)
+      const pedidoCompleto = await prisma.pedido.findUnique({
+        where: { id: pedidoId },
+        include: {
+          controle: {
+            select: { motorista: true, responsavel: true }
+          }
+        }
+      });
+
+      if (pedidoCompleto?.controle) {
+        const responsavel = pedidoCompleto.controle.motorista || pedidoCompleto.controle.responsavel;
+        
+        if (responsavel && responsavel !== 'PENDENTE') {
+          const usuario = await prisma.usuario.findFirst({
+            where: { nome: responsavel }
+          });
+
+          if (usuario) {
+            // Registrar pontuação baseada no resultado da auditoria
+            const acao = inconsistencia ? 'PEDIDO_INCORRETO' : 'PEDIDO_CORRETO';
+            const pontos = inconsistencia ? -5 : 10;
+            
+            await prisma.historicoPontuacao.create({
+              data: {
+                usuarioId: usuario.id,
+                pedidoId,
+                acao,
+                pontosGanhos: pontos,
+                descricao: `Auditoria ${inconsistencia ? 'com erro' : 'correta'} do pedido ${pedidoId}`
+              }
+            });
+
+            // Atualizar pontuação total
+            const pontuacaoAtual = await prisma.pontuacaoUsuario.findUnique({
+              where: { usuarioId: usuario.id }
+            });
+
+            if (pontuacaoAtual) {
+              await prisma.pontuacaoUsuario.update({
+                where: { usuarioId: usuario.id },
+                data: {
+                  pontuacaoTotal: { increment: pontos },
+                  pedidosCorretos: !inconsistencia ? { increment: 1 } : { increment: 0 },
+                  pedidosIncorretos: inconsistencia ? { increment: 1 } : { increment: 0 }
+                }
+              });
+            } else {
+              await prisma.pontuacaoUsuario.create({
+                data: {
+                  usuarioId: usuario.id,
+                  pontuacaoTotal: pontos,
+                  pedidosCorretos: !inconsistencia ? 1 : 0,
+                  pedidosIncorretos: inconsistencia ? 1 : 0
+                }
+              });
+            }
           }
         }
       }
-    });
+    } catch (gamificacaoError) {
+      console.error('Erro ao registrar pontuação na gamificação:', gamificacaoError);
+      // Não falhar a requisição principal por erro na gamificação
+    }
 
     return res.status(200).json({
       message: 'Auditoria confirmada com sucesso',
       auditoria: {
-        id: pedidoConferidoAtualizado.id,
-        pedido100: pedidoConferidoAtualizado.pedido100,
-        inconsistencia: pedidoConferidoAtualizado.inconsistencia,
-        motivosInconsistencia: pedidoConferidoAtualizado.motivosInconsistencia,
-        observacoes: pedidoConferidoAtualizado.observacaoAuditoria,
-        dataAuditoria: pedidoConferidoAtualizado.dataAuditoria,
-        auditor: pedidoConferidoAtualizado.auditor
+        id: pedidoConferido.id,
+        pedido100: !inconsistencia,
+        inconsistencia,
+        motivosInconsistencia: pedidoConferido.motivosInconsistencia,
+        observacoes: pedidoConferido.observacaoAuditoria,
+        dataAuditoria: pedidoConferido.dataAuditoria
       }
     });
   } catch (error: any) {

@@ -69,6 +69,11 @@ model Usuario {
   pedidosSeparados  PedidoConferido[] @relation("Separacao")
   pedidosConferidos PedidoConferido[] @relation("Conferencia")
   pedidosAuditados  PedidoConferido[] @relation("Auditoria")
+  pedidosValidados  PedidoConferido[] @relation("Validacao")
+
+  // Relações para Gamificação
+  pontuacao         PontuacaoUsuario?
+  historicoPontos   HistoricoPontuacao[]
 }
 
 model AuditoriaAcesso {
@@ -144,6 +149,56 @@ model PedidoConferido {
   observacaoAuditoria String?
   
   observacoes           String?
+
+  // --- Campos da Validação do Gerente ---
+  statusValidacao   StatusValidacao @default(PENDENTE)
+  dataValidacao     DateTime?
+  validadorId       String?
+  validador         Usuario? @relation("Validacao", fields: [validadorId], references: [id])
+}
+
+// Tabela para armazenar pontuação dos usuários no sistema de gamificação
+model PontuacaoUsuario {
+  id                String   @id @default(uuid())
+  usuarioId         String   @unique
+  usuario           Usuario  @relation(fields: [usuarioId], references: [id])
+  pontuacaoTotal    Int      @default(0)
+  pedidosCorretos   Int      @default(0)
+  pedidosIncorretos Int      @default(0)
+  posicaoRanking    Int?
+  dataAtualizacao   DateTime @updatedAt
+  dataCriacao       DateTime @default(now())
+
+  @@index([pontuacaoTotal])
+  @@index([posicaoRanking])
+}
+
+// Tabela para histórico de pontuações
+model HistoricoPontuacao {
+  id            String   @id @default(uuid())
+  usuarioId     String
+  usuario       Usuario  @relation(fields: [usuarioId], references: [id])
+  pedidoId      String?
+  acao          AcaoPontuacao
+  pontosGanhos  Int      // Pode ser negativo para perda de pontos
+  descricao     String?
+  dataAcao      DateTime @default(now())
+
+  @@index([usuarioId])
+  @@index([dataAcao])
+}
+
+enum AcaoPontuacao {
+  PEDIDO_CORRETO
+  PEDIDO_INCORRETO
+  BONUS_ADMIN
+  PENALIDADE_ADMIN
+}
+
+enum StatusValidacao {
+  PENDENTE
+  VALIDADO_CORRETO
+  VALIDADO_INCORRETO
 }
 
 enum TipoUsuario {
@@ -156,3 +211,4 @@ enum TipoUsuario {
   CONFERENTE
   AUDITOR
 }
+

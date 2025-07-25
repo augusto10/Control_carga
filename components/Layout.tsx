@@ -43,7 +43,9 @@ import {
   LocalShipping as TruckIcon,
   Assessment as ReportIcon,
   Logout as LogoutIcon,
-  AdminPanelSettings as AdminIcon
+  AdminPanelSettings as AdminIcon,
+  EmojiEvents as TrophyIcon,
+  Leaderboard as LeaderboardIcon
 } from '@mui/icons-material';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -179,13 +181,19 @@ const SubMenuItemButton = styled(MenuItemButton)(({ theme }) => ({
 
 const menuItems = [
   { 
-    text: 'Início', 
+    text: 'Dashboard', 
     icon: <HomeIcon />, 
     path: '/',
     exact: true
   },
+  {
+    text: 'Painel Gerencial',
+    icon: <AdminIcon />,
+    path: '/painel-gerencial',
+    adminOnly: true
+  },
   { 
-    text: 'Notas', 
+    text: 'Gestão de Notas', 
     icon: <ReceiptIcon />,
     subItems: [
       { 
@@ -201,8 +209,8 @@ const menuItems = [
     ]
   },
   {
-    text: 'Controles',
-    icon: <ListAltIcon />,
+    text: 'Controle de Carga',
+    icon: <TruckIcon />,
     subItems: [
       { 
         text: 'Criar Controle', 
@@ -218,7 +226,7 @@ const menuItems = [
   },
   {
     text: 'Separação e Conferência',
-    icon: <ListAltIcon />,
+    icon: <AssignmentTurnedInIcon />,
     subItems: [
       {
         text: 'Cadastrar Separação',
@@ -253,22 +261,44 @@ const menuItems = [
     ]
   },
   {
-    text: 'Checklist Empilhadeiras',
-    icon: <AssignmentTurnedInIcon />,
-    path: '/checklist-empilhadeiras',
+    text: 'Gamificação',
+    icon: <TrophyIcon />,
+    subItems: [
+      {
+        text: 'Ranking',
+        icon: <LeaderboardIcon />,
+        path: '/gamificacao/ranking'
+      },
+      {
+        text: 'Meu Histórico',
+        icon: <AssignmentTurnedInIcon />,
+        path: '/gamificacao/historico'
+      }
+    ]
   },
   {
-    text: 'Motoristas',
-    icon: <TruckIcon />,
-    path: '/admin/motoristas',
+    text: 'Operações',
+    icon: <ListAltIcon />,
+    subItems: [
+      {
+        text: 'Checklist Empilhadeiras',
+        icon: <AssignmentTurnedInIcon />,
+        path: '/checklist-empilhadeiras'
+      },
+      {
+        text: 'Motoristas',
+        icon: <TruckIcon />,
+        path: '/admin/motoristas'
+      }
+    ]
   },
   { 
-    text: 'Relatórios', 
+    text: 'Relatórios e Análises', 
     icon: <ReportIcon />,
     path: '/relatorios'
   },
   { 
-    text: 'Perfil', 
+    text: 'Meu Perfil', 
     icon: <PersonIcon />,
     path: '/perfil'
   },
@@ -596,11 +626,19 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             py: 2,
           }}>
             <List>
-              {menuItems.map((item) => (
-                <ListItem key={item.text} disablePadding sx={{ display: 'block' }}>
-                  {renderMenuItem(item)}
-                </ListItem>
-              ))}
+              {menuItems
+                .filter((item) => {
+                  // Filtrar itens administrativos se o usuário não for ADMIN ou GERENTE
+                  if (item.adminOnly && user?.tipo !== 'ADMIN' && user?.tipo !== 'GERENTE') {
+                    return false;
+                  }
+                  return true;
+                })
+                .map((item) => (
+                  <ListItem key={item.text} disablePadding sx={{ display: 'block' }}>
+                    {renderMenuItem(item)}
+                  </ListItem>
+                ))}
             </List>
             
             {/* Espaço para informações do usuário no rodapé */}
@@ -671,11 +709,19 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             background: 'linear-gradient(180deg, #fafafa 0%, #f5f5f5 100%)'
           }}>
             <List>
-              {menuItems.map((item) => (
-                <ListItem key={item.text} disablePadding sx={{ display: 'block' }}>
-                  {renderMenuItem(item)}
-                </ListItem>
-              ))}
+              {menuItems
+                .filter((item) => {
+                  // Filtrar itens administrativos se o usuário não for ADMIN ou GERENTE
+                  if (item.adminOnly && user?.tipo !== 'ADMIN' && user?.tipo !== 'GERENTE') {
+                    return false;
+                  }
+                  return true;
+                })
+                .map((item) => (
+                  <ListItem key={item.text} disablePadding sx={{ display: 'block' }}>
+                    {renderMenuItem(item)}
+                  </ListItem>
+                ))}
             </List>
             
             {/* Espaço para informações do usuário no rodapé */}

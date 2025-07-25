@@ -32,11 +32,21 @@ const globalStyles = `
     width: 100% !important;
     height: 100% !important;
     background-color: #fff;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
   }
   
   @media (max-width: 600px) {
     .signature-canvas {
-      height: 150px !important;
+      height: 200px !important;
+      min-height: 200px !important;
+    }
+  }
+  
+  @media (max-width: 480px) {
+    .signature-canvas {
+      height: 250px !important;
+      min-height: 250px !important;
     }
   }
 `;
@@ -186,18 +196,53 @@ const AssinaturaDigital = forwardRef<AssinaturaDigitalHandles, AssinaturaDigital
     // Expõe métodos para o componente pai
     useImperativeHandle(ref, () => ({
       clear: () => {
-        console.log('[AssinaturaDigital] clear: sigCanvas.current:', sigCanvas.current);
-        if (sigCanvas.current && typeof sigCanvas.current.clear === 'function') {
-          sigCanvas.current.clear();
+        console.log('[AssinaturaDigital] Tentando limpar assinatura via useImperativeHandle');
+        try {
+          // Estratégia 1: Tentar usar o ref diretamente
+          if (sigCanvas.current && typeof sigCanvas.current.clear === 'function') {
+            console.log('[AssinaturaDigital] Limpando via ref do SignatureCanvas');
+            sigCanvas.current.clear();
+            setHasDrawn(false);
+            setIsSigned(false);
+            console.log('[AssinaturaDigital] Assinatura limpa com sucesso via ref');
+            return;
+          }
+          
+          // Estratégia 2: Buscar todos os canvas e limpar
+          const canvasElements = document.querySelectorAll('canvas');
+          console.log('[AssinaturaDigital] Encontrados', canvasElements.length, 'canvas elements');
+          
+          canvasElements.forEach((canvas, index) => {
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              console.log(`[AssinaturaDigital] Limpando canvas ${index} via useImperativeHandle`);
+              ctx.clearRect(0, 0, canvas.width, canvas.height);
+              // Preenche com fundo branco
+              ctx.fillStyle = '#ffffff';
+              ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
+          });
+          
+          // Estratégia 3: Resetar estados
           setHasDrawn(false);
           setIsSigned(false);
-        } else {
-          console.warn('[AssinaturaDigital] clear: sigCanvas.current.clear não é função', sigCanvas.current);
-          // Fallback: limpa manualmente os estados
-          setHasDrawn(false);
-          setIsSigned(false);
+          console.log('[AssinaturaDigital] Estados resetados via useImperativeHandle');
+          
+          // Estratégia 4: Tentar buscar o canvas específico no DOM
+          const canvasElement = document.querySelector('.signature-canvas canvas') as HTMLCanvasElement;
+          if (canvasElement) {
+            const ctx = canvasElement.getContext('2d');
+            if (ctx) {
+              console.log('[AssinaturaDigital] Limpando via querySelector específico');
+              ctx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+              ctx.fillStyle = '#ffffff';
+              ctx.fillRect(0, 0, canvasElement.width, canvasElement.height);
+            }
+          }
+          
+        } catch (error) {
+          console.error('[AssinaturaDigital] Erro ao limpar assinatura:', error);
         }
-        return true;
       },
       isEmpty: () => {
         if (sigCanvas.current && typeof sigCanvas.current.isEmpty === 'function') {
@@ -222,87 +267,130 @@ const AssinaturaDigital = forwardRef<AssinaturaDigitalHandles, AssinaturaDigital
     }));
 
     const handleClear = () => {
-      if (sigCanvas.current) {
-        sigCanvas.current.clear();
+      console.log('[AssinaturaDigital] handleClear chamado');
+      try {
+        // Estratégia 1: Usar o ref do SignatureCanvas
+        if (sigCanvas.current && typeof sigCanvas.current.clear === 'function') {
+          console.log('[AssinaturaDigital] Limpando via ref do canvas');
+          sigCanvas.current.clear();
+          setHasDrawn(false);
+          setIsSigned(false);
+          console.log('[AssinaturaDigital] Canvas limpo com sucesso via ref');
+          return;
+        }
+        
+        // Estratégia 2: Buscar canvas no DOM e limpar manualmente
+        const canvasElements = document.querySelectorAll('canvas');
+        console.log('[AssinaturaDigital] Encontrados', canvasElements.length, 'canvas elements');
+        
+        canvasElements.forEach((canvas, index) => {
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            console.log(`[AssinaturaDigital] Limpando canvas ${index}`);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            // Preenche com fundo branco
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+          }
+        });
+        
+        // Estratégia 3: Forçar re-render do componente
+        setHasDrawn(false);
+        setIsSigned(false);
+        
+        console.log('[AssinaturaDigital] Estados resetados - hasDrawn: false, isSigned: false');
+        
+        // Estratégia 4: Tentar via querySelector específico
+        const signatureCanvas = document.querySelector('.signature-canvas canvas') as HTMLCanvasElement;
+        if (signatureCanvas) {
+          const ctx = signatureCanvas.getContext('2d');
+          if (ctx) {
+            console.log('[AssinaturaDigital] Limpando via querySelector específico');
+            ctx.clearRect(0, 0, signatureCanvas.width, signatureCanvas.height);
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, signatureCanvas.width, signatureCanvas.height);
+          }
+        }
+        
+      } catch (error) {
+        console.error('[AssinaturaDigital] Erro ao limpar assinatura:', error);
       }
-      setIsSigned(false);
-      setHasDrawn(false);
     };
 
     const handleSave = async () => {
-  setIsSaving(true);
-  try {
-    // Verifica se há uma assinatura
-    if (!hasDrawn && !isSigned && !value) {
-      throw new Error('Por favor, faça uma assinatura antes de salvar.');
-    }
-    
-    // Captura a assinatura do canvas
-    let signatureData: string | null = null;
-    
-    // Estratégia 1: Tenta obter do ref do canvas
-    if (sigCanvas.current && hasDrawn) {
-      console.log('[AssinaturaDigital] Tentando obter assinatura do ref do canvas');
+      setIsSaving(true);
       try {
-        if (typeof sigCanvas.current.toDataURL === 'function') {
-          signatureData = sigCanvas.current.toDataURL('image/png');
-          console.log('[AssinaturaDigital] Assinatura obtida do ref do canvas');
-        } else if (sigCanvas.current.getCanvas && typeof sigCanvas.current.getCanvas === 'function') {
-          const canvas = sigCanvas.current.getCanvas();
-          if (canvas && typeof canvas.toDataURL === 'function') {
-            signatureData = canvas.toDataURL('image/png');
-            console.log('[AssinaturaDigital] Assinatura obtida via getCanvas()');
+        // Verifica se há uma assinatura
+        if (!hasDrawn && !isSigned && !value) {
+          throw new Error('Por favor, faça uma assinatura antes de salvar.');
+        }
+        
+        // Captura a assinatura do canvas
+        let signatureData: string | null = null;
+        
+        // Estratégia 1: Tenta obter do ref do canvas
+        if (sigCanvas.current && hasDrawn) {
+          console.log('[AssinaturaDigital] Tentando obter assinatura do ref do canvas');
+          try {
+            if (typeof sigCanvas.current.toDataURL === 'function') {
+              signatureData = sigCanvas.current.toDataURL('image/png');
+              console.log('[AssinaturaDigital] Assinatura obtida do ref do canvas');
+            } else if (sigCanvas.current.getCanvas && typeof sigCanvas.current.getCanvas === 'function') {
+              const canvas = sigCanvas.current.getCanvas();
+              if (canvas && typeof canvas.toDataURL === 'function') {
+                signatureData = canvas.toDataURL('image/png');
+                console.log('[AssinaturaDigital] Assinatura obtida via getCanvas()');
+              }
+            }
+          } catch (refError) {
+            console.warn('[AssinaturaDigital] Erro ao obter assinatura do ref:', refError);
           }
         }
-      } catch (refError) {
-        console.warn('[AssinaturaDigital] Erro ao obter assinatura do ref:', refError);
-      }
-    }
-    
-    // Estratégia 2: Se não conseguiu do ref, tenta usar o valor existente
-    if (!signatureData && value) {
-      console.log('[AssinaturaDigital] Usando assinatura existente (value)');
-      signatureData = value;
-    }
-    
-    // Estratégia 3: Última tentativa - busca diretamente no DOM
-    if (!signatureData && hasDrawn) {
-      console.log('[AssinaturaDigital] Tentando obter assinatura do DOM');
-      try {
-        const canvasElement = document.querySelector('.signature-canvas') as HTMLCanvasElement;
-        if (canvasElement && typeof canvasElement.toDataURL === 'function') {
-          signatureData = canvasElement.toDataURL('image/png');
-          console.log('[AssinaturaDigital] Assinatura obtida do DOM');
+        
+        // Estratégia 2: Se não conseguiu do ref, tenta usar o valor existente
+        if (!signatureData && value) {
+          console.log('[AssinaturaDigital] Usando assinatura existente (value)');
+          signatureData = value;
         }
-      } catch (domError) {
-        console.warn('[AssinaturaDigital] Erro ao obter assinatura do DOM:', domError);
+        
+        // Estratégia 3: Última tentativa - busca diretamente no DOM
+        if (!signatureData && hasDrawn) {
+          console.log('[AssinaturaDigital] Tentando obter assinatura do DOM');
+          try {
+            const canvasElement = document.querySelector('.signature-canvas canvas') as HTMLCanvasElement;
+            if (canvasElement && typeof canvasElement.toDataURL === 'function') {
+              signatureData = canvasElement.toDataURL('image/png');
+              console.log('[AssinaturaDigital] Assinatura obtida do DOM');
+            }
+          } catch (domError) {
+            console.warn('[AssinaturaDigital] Erro ao obter assinatura do DOM:', domError);
+          }
+        }
+        
+        if (!signatureData) {
+          throw new Error('Não foi possível obter a assinatura. Tente desenhar novamente.');
+        }
+        
+        // Valida se a assinatura não está vazia (apenas fundo branco)
+        if (signatureData.length < 1000) {
+          throw new Error('A assinatura parece estar vazia. Por favor, desenhe sua assinatura.');
+        }
+        
+        console.log('[AssinaturaDigital] Chamando onSave com assinatura de tamanho:', signatureData.length);
+        await onSave(signatureData);
+        setIsSigned(true);
+        setHasDrawn(false);
+      } catch (error) {
+        console.error('[AssinaturaDigital] Erro ao salvar:', error);
+        // Re-lança o erro com uma mensagem mais amigável se necessário
+        if (error instanceof Error) {
+          throw new Error(`Não foi possível salvar a assinatura: ${error.message}`);
+        }
+        throw new Error('Ocorreu um erro inesperado ao salvar a assinatura');
+      } finally {
+        setIsSaving(false);
       }
-    }
-    
-    if (!signatureData) {
-      throw new Error('Não foi possível obter a assinatura. Tente desenhar novamente.');
-    }
-    
-    // Valida se a assinatura não está vazia (apenas fundo branco)
-    if (signatureData.length < 1000) {
-      throw new Error('A assinatura parece estar vazia. Por favor, desenhe sua assinatura.');
-    }
-    
-    console.log('[AssinaturaDigital] Chamando onSave com assinatura de tamanho:', signatureData.length);
-    await onSave(signatureData);
-    setIsSigned(true);
-    setHasDrawn(false);
-  } catch (error) {
-    console.error('[AssinaturaDigital] Erro ao salvar:', error);
-    // Re-lança o erro com uma mensagem mais amigável se necessário
-    if (error instanceof Error) {
-      throw new Error(`Não foi possível salvar a assinatura: ${error.message}`);
-    }
-    throw new Error('Ocorreu um erro inesperado ao salvar a assinatura');
-  } finally {
-    setIsSaving(false);
-  }
-};
+    };
 
     // Efeito para sincronizar o valor inicial
     useEffect(() => {
@@ -357,26 +445,30 @@ const AssinaturaDigital = forwardRef<AssinaturaDigitalHandles, AssinaturaDigital
             {isReady && (
               <>
                 <SignatureCanvas
-                  penColor="black"
+                  ref={sigCanvas}
                   canvasProps={{
+                    width: dimensions.width,
+                    height: dimensions.height,
                     className: 'signature-canvas',
                     style: {
-                      width: '100%',
-                      height: isMobile ? '280px' : '200px', // Maior em mobile
+                      border: '2px solid #e0e0e0',
+                      borderRadius: '8px',
                       backgroundColor: '#fff',
                       touchAction: 'none',
-                      border: '2px solid #e0e0e0',
-                      borderRadius: '8px'
+                      width: '100%',
+                      height: '100%',
+                      minHeight: isMobile ? '250px' : '200px'
                     }
                   }}
                   onBegin={() => {
-                    console.log('[AssinaturaDigital] Assinatura iniciada');
+                    console.log('[AssinaturaDigital] Início da assinatura');
                     setHasDrawn(true);
-                    setIsSigned(false);
+                    setIsSigned(true);
                   }}
                   onEnd={() => {
-                    console.log('[AssinaturaDigital] Assinatura finalizada');
+                    console.log('[AssinaturaDigital] Fim da assinatura');
                   }}
+                  clearOnResize={false}
                 />
                 {!hasDrawn && !isSigned && (
                   <Box
@@ -436,18 +528,23 @@ const AssinaturaDigital = forwardRef<AssinaturaDigitalHandles, AssinaturaDigital
                 fullWidth={isMobile}
                 startIcon={<DeleteIcon />}
                 onClick={handleClear}
-                disabled={disabled || (!hasDrawn && !isSigned)}
+                disabled={disabled}
                 sx={{
-                  minWidth: 120,
-                  '&.Mui-disabled': {
-                    borderColor: 'transparent',
-                    color: 'text.disabled'
+                  minWidth: isMobile ? 56 : 48,
+                  height: isMobile ? 56 : 48,
+                  borderRadius: '12px',
+                  bgcolor: 'error.main',
+                  color: 'white',
+                  fontSize: isMobile ? '1.1rem' : '1rem',
+                  '&:hover': {
+                    bgcolor: 'error.dark',
+                    transform: 'scale(1.05)',
+                  },
+                  '&:disabled': {
+                    bgcolor: 'grey.300',
+                    color: 'grey.500',
                   },
                   transition: 'all 0.2s ease-in-out',
-                  '&:hover': {
-                    backgroundColor: 'rgba(211, 47, 47, 0.04)',
-                    borderColor: '#d32f2f'
-                  }
                 }}
               >
                 Limpar

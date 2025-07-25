@@ -21,6 +21,7 @@ import {
   DialogContent,
   DialogTitle,
   FormControl,
+  Grid,
   IconButton,
   InputLabel,
   MenuItem,
@@ -80,6 +81,11 @@ interface AssinaturaState {
   tipo: 'motorista' | 'responsavel';
 }
 
+interface DetalhesState {
+  aberto: boolean;
+  controle: ControleComNotas | null;
+}
+
 
 const ListarControlesContent: React.FC = () => {
   const assinaturaRef = useRef<any>(null);
@@ -88,6 +94,10 @@ const ListarControlesContent: React.FC = () => {
   const [controles, setControles] = useState<ControleComNotas[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [loadingButtons, setLoadingButtons] = useState<Record<string, boolean>>({});
+  const [detalhesModal, setDetalhesModal] = useState<DetalhesState>({
+    aberto: false,
+    controle: null
+  });
   
   // Estilos consistentes para os botões
   const buttonStyles = {
@@ -703,13 +713,35 @@ const ListarControlesContent: React.FC = () => {
   }, [editing, editData, atualizarControle, enqueueSnackbar, handleCloseEdit]);
 
   const handleAbrirAssinatura = useCallback((controle: ControleComNotas, tipo: 'motorista' | 'responsavel') => {
-    setLoadingButtons(prev => ({ ...prev, [`sign_${tipo}_${controle.id}`]: true }));
+    console.log('[Modal Assinatura] Abrindo modal para controle:', controle.id, 'tipo:', tipo);
+    
+    if (!controle.id) {
+      console.error('[Modal Assinatura] controleId não informado');
+      enqueueSnackbar('Erro: ID do controle não encontrado', { variant: 'error' });
+      return;
+    }
+    
     setAssinaturaAberta({
       aberto: true,
       controleId: controle.id,
       tipo
     });
-  }, [setLoadingButtons, setAssinaturaAberta]);
+  }, []);
+
+  const handleAbrirDetalhes = useCallback((controle: ControleComNotas) => {
+    console.log('[Modal Detalhes] Abrindo modal para controle:', controle.id);
+    setDetalhesModal({
+      aberto: true,
+      controle
+    });
+  }, []);
+
+  const handleFecharDetalhes = useCallback(() => {
+    setDetalhesModal({
+      aberto: false,
+      controle: null
+    });
+  }, []);
 
   const handleFecharAssinatura = useCallback(() => {
     if (assinaturaAberta.controleId && assinaturaAberta.tipo) {
@@ -1190,9 +1222,9 @@ const ListarControlesContent: React.FC = () => {
                   </TableCell>
                   <TableCell align="right">
                     <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end' }}>
-                      <Tooltip title="Ver detalhes">
+                      <Tooltip title="Ver detalhes completos">
                         <IconButton 
-                          onClick={() => router.push(`/controle/${controle.id}`)}
+                          onClick={() => handleAbrirDetalhes(controle)}
                           color={!controle.finalizado ? "success" : "primary"}
                           size="small"
                           disabled={loadingButtons[controle.id]}
@@ -1201,8 +1233,10 @@ const ListarControlesContent: React.FC = () => {
                             minHeight: '44px', // Melhor área de toque mobile
                             minWidth: '44px',
                             '&:hover': {
-                              backgroundColor: !controle.finalizado ? 'rgba(46, 125, 50, 0.08)' : 'rgba(25, 118, 210, 0.08)'
-                            }
+                              backgroundColor: !controle.finalizado ? 'rgba(46, 125, 50, 0.08)' : 'rgba(25, 118, 210, 0.08)',
+                              transform: 'scale(1.05)'
+                            },
+                            transition: 'all 0.2s ease-in-out'
                           }}
                         >
                           <VisibilityIcon fontSize="small" />
@@ -1618,6 +1652,272 @@ const ListarControlesContent: React.FC = () => {
             {salvandoAssinatura ? 'Salvando...' : 'Salvar'}
           </Button>
         </DialogActions>
+        </Dialog>
+      )}
+
+      {/* Modal de Visualização Detalhada */}
+      {detalhesModal.aberto && detalhesModal.controle && (
+        <Dialog 
+          open={detalhesModal.aberto} 
+          onClose={handleFecharDetalhes}
+          maxWidth="lg" 
+          fullWidth
+          PaperProps={{
+            sx: {
+              borderRadius: '12px',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.1)',
+              maxHeight: '90vh'
+            }
+          }}
+        >
+          <DialogTitle sx={{
+            background: 'linear-gradient(135deg, #2196f3 0%, #21cbf3 100%)',
+            color: 'white',
+            fontWeight: 600,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 2
+          }}>
+            <VisibilityIcon />
+            Detalhes Completos do Controle - {detalhesModal.controle.numeroManifesto || 'N/A'}
+          </DialogTitle>
+          <DialogContent sx={{ p: 0 }}>
+            <Box sx={{ p: 3 }}>
+              {/* Informações Básicas */}
+              <Typography variant="h6" gutterBottom sx={{ 
+                color: 'primary.main', 
+                fontWeight: 600,
+                borderBottom: '2px solid',
+                borderColor: 'primary.main',
+                pb: 1,
+                mb: 2
+              }}>
+                Informações Básicas
+              </Typography>
+              
+              <Grid container spacing={3} sx={{ mb: 3 }}>
+                <Grid item xs={12} sm={6} md={4}>
+                  <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
+                    <Typography variant="subtitle2" color="text.secondary">Número do Manifesto</Typography>
+                    <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                      {detalhesModal.controle.numeroManifesto || 'N/A'}
+                    </Typography>
+                  </Paper>
+                </Grid>
+                <Grid item xs={12} sm={6} md={4}>
+                  <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
+                    <Typography variant="subtitle2" color="text.secondary">Data de Criação</Typography>
+                    <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                      {format(new Date(detalhesModal.controle.dataCriacao), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                    </Typography>
+                  </Paper>
+                </Grid>
+                <Grid item xs={12} sm={6} md={4}>
+                  <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
+                    <Typography variant="subtitle2" color="text.secondary">Status</Typography>
+                    <Chip 
+                      label={detalhesModal.controle.finalizado ? 'Finalizado' : 'Em andamento'} 
+                      color={detalhesModal.controle.finalizado ? 'success' : 'warning'}
+                      sx={{ mt: 0.5, fontWeight: 600 }}
+                    />
+                  </Paper>
+                </Grid>
+                <Grid item xs={12} sm={6} md={4}>
+                  <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
+                    <Typography variant="subtitle2" color="text.secondary">Transportadora</Typography>
+                    <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                      {detalhesModal.controle.transportadora}
+                    </Typography>
+                  </Paper>
+                </Grid>
+                <Grid item xs={12} sm={6} md={4}>
+                  <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
+                    <Typography variant="subtitle2" color="text.secondary">Quantidade de Pallets</Typography>
+                    <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                      {detalhesModal.controle.qtdPallets || 0}
+                    </Typography>
+                  </Paper>
+                </Grid>
+                <Grid item xs={12} sm={6} md={4}>
+                  <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
+                    <Typography variant="subtitle2" color="text.secondary">Total de Notas</Typography>
+                    <Typography variant="h6" sx={{ fontWeight: 600, color: 'primary.main' }}>
+                      {detalhesModal.controle.notas?.length || 0}
+                    </Typography>
+                  </Paper>
+                </Grid>
+              </Grid>
+
+              {/* Informações de Pessoas */}
+              <Typography variant="h6" gutterBottom sx={{ 
+                color: 'primary.main', 
+                fontWeight: 600,
+                borderBottom: '2px solid',
+                borderColor: 'primary.main',
+                pb: 1,
+                mb: 2
+              }}>
+                Responsáveis
+              </Typography>
+              
+              <Grid container spacing={3} sx={{ mb: 3 }}>
+                <Grid item xs={12} md={6}>
+                  <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
+                    <Typography variant="subtitle2" color="text.secondary">Motorista</Typography>
+                    <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                      {detalhesModal.controle.motorista || 'PENDENTE'}
+                    </Typography>
+                    {detalhesModal.controle.cpfMotorista && (
+                      <Typography variant="body2" color="text.secondary">
+                        CPF: {detalhesModal.controle.cpfMotorista}
+                      </Typography>
+                    )}
+                    {detalhesModal.controle.assinaturaMotorista && (
+                      <Chip 
+                        label="Assinado Digitalmente" 
+                        color="success" 
+                        size="small" 
+                        sx={{ mt: 1 }}
+                        icon={<CheckCircleOutlineIcon />}
+                      />
+                    )}
+                    {detalhesModal.controle.dataAssinaturaMotorista && (
+                      <Typography variant="caption" display="block" sx={{ mt: 1 }}>
+                        Assinado em: {format(new Date(detalhesModal.controle.dataAssinaturaMotorista), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                      </Typography>
+                    )}
+                  </Paper>
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
+                    <Typography variant="subtitle2" color="text.secondary">Responsável</Typography>
+                    <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                      {detalhesModal.controle.responsavel || 'PENDENTE'}
+                    </Typography>
+                    {detalhesModal.controle.assinaturaResponsavel && (
+                      <Chip 
+                        label="Assinado Digitalmente" 
+                        color="success" 
+                        size="small" 
+                        sx={{ mt: 1 }}
+                        icon={<CheckCircleOutlineIcon />}
+                      />
+                    )}
+                    {detalhesModal.controle.dataAssinaturaResponsavel && (
+                      <Typography variant="caption" display="block" sx={{ mt: 1 }}>
+                        Assinado em: {format(new Date(detalhesModal.controle.dataAssinaturaResponsavel), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                      </Typography>
+                    )}
+                  </Paper>
+                </Grid>
+              </Grid>
+
+              {/* Observações */}
+              {detalhesModal.controle.observacao && (
+                <>
+                  <Typography variant="h6" gutterBottom sx={{ 
+                    color: 'primary.main', 
+                    fontWeight: 600,
+                    borderBottom: '2px solid',
+                    borderColor: 'primary.main',
+                    pb: 1,
+                    mb: 2
+                  }}>
+                    Observações
+                  </Typography>
+                  <Paper sx={{ p: 2, bgcolor: 'grey.50', mb: 3 }}>
+                    <Typography variant="body1">
+                      {detalhesModal.controle.observacao}
+                    </Typography>
+                  </Paper>
+                </>
+              )}
+
+              {/* Notas Fiscais */}
+              <Typography variant="h6" gutterBottom sx={{ 
+                color: 'primary.main', 
+                fontWeight: 600,
+                borderBottom: '2px solid',
+                borderColor: 'primary.main',
+                pb: 1,
+                mb: 2
+              }}>
+                Notas Fiscais ({detalhesModal.controle.notas?.length || 0})
+              </Typography>
+              
+              {detalhesModal.controle.notas && detalhesModal.controle.notas.length > 0 ? (
+                <TableContainer component={Paper} sx={{ mb: 2 }}>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell sx={{ fontWeight: 600 }}>Número da Nota</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>Código</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>Volumes</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>Data de Criação</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {detalhesModal.controle.notas.map((nota) => (
+                        <TableRow key={nota.id} hover>
+                          <TableCell sx={{ fontWeight: 500 }}>{nota.numeroNota}</TableCell>
+                          <TableCell>
+                            <Typography variant="body2" sx={{ 
+                              fontFamily: 'monospace',
+                              fontSize: '0.8rem',
+                              wordBreak: 'break-all'
+                            }}>
+                              {nota.codigo}
+                            </Typography>
+                          </TableCell>
+                          <TableCell>{nota.volumes}</TableCell>
+                          <TableCell>
+                            {nota.dataCriacao ? 
+                              format(new Date(nota.dataCriacao), "dd/MM/yyyy HH:mm", { locale: ptBR }) : 
+                              'N/A'
+                            }
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              ) : (
+                <Paper sx={{ p: 3, textAlign: 'center', bgcolor: 'grey.50' }}>
+                  <Typography variant="body1" color="text.secondary">
+                    Nenhuma nota fiscal vinculada a este controle.
+                  </Typography>
+                </Paper>
+              )}
+            </Box>
+          </DialogContent>
+          <DialogActions sx={{ p: 2, gap: 1, borderTop: '1px solid', borderColor: 'divider' }}>
+            <Button 
+              onClick={handleFecharDetalhes}
+              sx={{
+                borderRadius: '8px',
+                textTransform: 'none',
+                fontWeight: 500
+              }}
+            >
+              Fechar
+            </Button>
+            <Button 
+              variant="contained" 
+              onClick={() => gerarPdf(detalhesModal.controle)}
+              startIcon={<PictureAsPdfIcon />}
+              sx={{
+                borderRadius: '8px',
+                textTransform: 'none',
+                fontWeight: 500,
+                background: 'linear-gradient(135deg, #ff6b35 0%, #ff8c42 100%)',
+                '&:hover': {
+                  background: 'linear-gradient(135deg, #e55a2b 0%, #e57a35 100%)',
+                }
+              }}
+            >
+              Gerar PDF
+            </Button>
+          </DialogActions>
         </Dialog>
       )}
 

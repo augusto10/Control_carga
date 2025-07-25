@@ -41,17 +41,24 @@ export default async function handler(
 
   if (req.method === 'GET') {
     try {
-      const { conferidas } = req.query;
+      const { dataInicio, dataFim, status } = req.query;
       const where: any = {};
 
-      if (conferidas === 'true') {
+      if (dataInicio && typeof dataInicio === 'string') {
+        where.dataCriacao = { ...where.dataCriacao, gte: new Date(dataInicio) };
+      }
+
+      if (dataFim && typeof dataFim === 'string') {
+        where.dataCriacao = { ...where.dataCriacao, lte: new Date(dataFim) };
+      }
+
+      if (status === 'com-inconsistencia') {
         where.conferido = {
-          conferenciaRealizada: true
+          inconsistencia: true,
         };
-      } else {
-        // Por padrão, lista apenas os não conferidos
+      } else if (status === 'sem-inconsistencia') {
         where.conferido = {
-          conferenciaRealizada: false
+          inconsistencia: false,
         };
       }
 

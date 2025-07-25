@@ -1,6 +1,26 @@
 // ===== CADASTRAR SEPARAÇÃO - DOMÍNIO DE PEDIDOS =====
-// Esta página é específica para cadastro de PEDIDOS (separação/conferência)
-// NÃO confundir com Notas Fiscais - são entidades totalmente distintas
+// 
+// IMPORTANTE: Esta página é específica para cadastro de PEDIDOS (separação/conferência)
+// NÃO confundir com NOTAS FISCAIS - são processos logísticos completamente distintos
+//
+// DOMÍNIO DE PEDIDOS vs NOTAS FISCAIS:
+// 
+// 1. PEDIDOS (Este arquivo):
+//    - Solicitações internas de produtos para separação no estoque
+//    - Processo de picking/separação de itens do armazém
+//    - Conferência e auditoria dos itens separados
+//    - Fluxo: Criação → Separação → Conferência → Auditoria → Finalização
+//    - Usado por separadores e conferentes internos
+//    - Pode ou não gerar notas fiscais posteriormente
+//
+// 2. NOTAS FISCAIS (Controle de Carga):
+//    - Documentos fiscais obrigatórios que acompanham mercadorias
+//    - Usadas para controle de transporte e entrega externa
+//    - Vinculadas a controles de carga para motoristas
+//    - Fluxo: Criação → Vinculação ao Controle → Transporte → Assinatura → Finalização
+//    - Usado por motoristas e responsáveis externos
+//
+// ATENÇÃO: Não misturar os dois domínios - são tabelas, APIs e fluxos diferentes!
 // Todos os dados são salvos em PedidoConferido
 
 import { useState, useEffect } from 'react';
