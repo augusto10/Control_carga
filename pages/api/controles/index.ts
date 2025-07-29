@@ -4,7 +4,7 @@ import { gerarProximoNumeroManifesto } from '../../../lib/gerarNumeroManifesto';
 
 const prisma = new PrismaClient();
 
-type Transportadora = 'ACERT' | 'EXPRESSO_GOIAS'; // Removido ACCERT que não é mais usado
+type Transportadora = 'ACERT' | 'EXPRESSO_GOIAS' | 'TERCEIRIZADA'; // Removido ACCERT que não é mais usado
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   switch (req.method) {
@@ -82,7 +82,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
 
         // Garantir que a transportadora tenha um valor válido
-        const transportadoraValida = (transportadora === 'ACERT' || transportadora === 'EXPRESSO_GOIAS') 
+        const transportadoraValida = (transportadora === 'ACERT' || transportadora === 'EXPRESSO_GOIAS' || transportadora === 'TERCEIRIZADA') 
           ? transportadora 
           : 'ACERT';
           

@@ -29,7 +29,11 @@ async function obter(id: string, res: NextApiResponse) {
       ...motoristaDb,
       transportadora: {
         id: motoristaDb.transportadoraId,
-        descricao: motoristaDb.transportadoraId === 'ACERT' ? 'ACCERT Transportes' : 'Expresso Goiás',
+        descricao: motoristaDb.transportadoraId === 'ACERT' 
+          ? 'ACCERT Transportes' 
+          : motoristaDb.transportadoraId === 'TERCEIRIZADA' 
+            ? 'Terceirizada' 
+            : 'Expresso Goiás',
       },
     };
     if (!motorista) return res.status(404).json({ error: 'Motorista não encontrado' });

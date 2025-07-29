@@ -94,7 +94,7 @@ export default async function handler(
     // NÃO tem relação com Notas Fiscais
     
     try {
-      const { numeroPedido, separadorId, auditorId, conferenteId } = req.body;
+      const { numeroPedido, separadorId, auditorId } = req.body;
 
       if (!numeroPedido || !separadorId) {
         return res.status(400).json({ error: 'Número do Pedido e Separador são obrigatórios.' });
@@ -125,7 +125,6 @@ export default async function handler(
             pedidoId: novoPedido.id,
             separadorId: separadorId,
             auditorId: auditorId || null, // Auditor pode ser definido depois
-            conferenteId: conferenteId || null, // Conferente pode ser definido depois
             // Campos de controle de fluxo
             conferenciaRealizada: false,
             auditoriaRealizada: false,
@@ -140,13 +139,6 @@ export default async function handler(
               }
             },
             auditor: {
-              select: {
-                id: true,
-                nome: true,
-                email: true
-              }
-            },
-            conferente: {
               select: {
                 id: true,
                 nome: true,

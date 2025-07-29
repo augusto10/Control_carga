@@ -108,7 +108,8 @@ const CriarControleContent: React.FC = () => {
   // Usamos 'ACERT' como ID para compatibilidade com o backend, mas exibimos 'ACCERT' na interface
   const transportadorasFixas = [
     { id: 'ACERT', nome: 'ACCERT', descricao: 'ACCERT' },
-    { id: 'EXPRESSO_GOIAS', nome: 'EXPRESSO_GOIAS', descricao: 'EXPRESSO GOIÁS' }
+    { id: 'EXPRESSO_GOIAS', nome: 'EXPRESSO_GOIAS', descricao: 'EXPRESSO GOIÁS' },
+    { id: 'TERCEIRIZADA', nome: 'TERCEIRIZADA', descricao: 'TERCEIRIZADA' }
   ];
 
   // Encontra a transportadora padrão (ACERT)
@@ -124,7 +125,7 @@ const CriarControleContent: React.FC = () => {
     return encontrada;
   };
 
-  type Transportadora = 'ACERT' | 'EXPRESSO_GOIAS';
+  type Transportadora = 'ACERT' | 'EXPRESSO_GOIAS' | 'TERCEIRIZADA';
   
   interface FormData {
     motorista: string;
@@ -262,7 +263,7 @@ const CriarControleContent: React.FC = () => {
         motorista: (formData.motorista || 'PENDENTE').trim(),
         cpfMotorista: formData.cpfMotorista ? formData.cpfMotorista.replace(/[^\d]/g, '') : 'PENDENTE',
         responsavel: (formData.responsavel || 'PENDENTE').trim(),
-        transportadora: (formData.transportadora === 'ACERT' || formData.transportadora === 'EXPRESSO_GOIAS') 
+        transportadora: (formData.transportadora === 'ACERT' || formData.transportadora === 'EXPRESSO_GOIAS' || formData.transportadora === 'TERCEIRIZADA') 
           ? formData.transportadora 
           : 'ACERT',
         qtdPallets: Number(formData.qtdPallets) || 0,

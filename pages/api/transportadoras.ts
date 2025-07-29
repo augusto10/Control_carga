@@ -26,6 +26,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         nome: 'EXPRESSO_GOIAS',
         descricao: 'Expresso Goiás',
       },
+      {
+        id: 'TERCEIRIZADA',
+        nome: 'TERCEIRIZADA',
+        descricao: 'Terceirizada',
+      },
     ];
 
     return res.status(200).json(transportadoras);

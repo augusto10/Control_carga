@@ -65,7 +65,7 @@ async function buscarMaiorNumeroManifesto(): Promise<number> {
   }
 }
 
-export async function gerarProximoNumeroManifesto(transportadora: 'ACERT' | 'EXPRESSO_GOIAS'): Promise<string> {
+export async function gerarProximoNumeroManifesto(transportadora: 'ACERT' | 'EXPRESSO_GOIAS' | 'TERCEIRIZADA'): Promise<string> {
   console.log(`[gerarProximoNumeroManifesto] Iniciando para ${transportadora}`);
   
   try {

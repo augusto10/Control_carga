@@ -24,7 +24,7 @@ import {
 } from '@mui/material';
 import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon } from '@mui/icons-material';
 import { api } from '@/services/api';
-import AdminRoute from '@/components/admin/AdminRoute';
+import ProtectedRoute from '@/components/ProtectedRoute';
 // Tipo retornado pela API de transportadoras
 interface TransportadoraApi {
   id: string;
@@ -183,9 +183,9 @@ function MotoristasContent() {
 }
 
 const MotoristasPage = () => (
-  <AdminRoute>
+  <ProtectedRoute>
     <MotoristasContent />
-  </AdminRoute>
+  </ProtectedRoute>
 );
 
 export default MotoristasPage;

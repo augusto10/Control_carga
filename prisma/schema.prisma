@@ -119,6 +119,7 @@ enum Transportadora {
   ACERT // valor legado (em desuso)
   ACCERT
   EXPRESSO_GOIAS
+  TERCEIRIZADA
 }
 
 model PedidoConferido {

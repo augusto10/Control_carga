@@ -28,24 +28,27 @@ import {
 } from '@mui/material';
 import {
   Menu as MenuIcon,
-  Receipt as ReceiptIcon,
-  PlaylistAdd as PlaylistAddIcon,
-  ListAlt as ListAltIcon,
-  AssignmentTurnedIn as AssignmentTurnedInIcon,
+  SpaceDashboardOutlined as DashboardIcon,
+  AnalyticsOutlined as AnalyticsIcon,
+  FactCheckOutlined as FactCheckIcon,
+  GroupsOutlined as GroupsIcon,
+  Inventory2Outlined as InventoryIcon,
+  LocalShippingOutlined as TruckIcon,
+  SummarizeOutlined as ReportIcon,
+  LogoutOutlined as LogoutIcon,
+  AdminPanelSettingsOutlined as AdminIcon,
+  EmojiEventsOutlined as TrophyIcon,
+  LeaderboardOutlined as LeaderboardIcon,
+  PersonOutline as PersonIcon,
   ChevronLeft as ChevronLeftIcon,
   ChevronRight as ChevronRightIcon,
-  Home as HomeIcon,
-  Search as SearchIcon,
-  Link as LinkIcon,
   ExpandLess,
   ExpandMore,
-  Person as PersonIcon,
-  LocalShipping as TruckIcon,
-  Assessment as ReportIcon,
-  Logout as LogoutIcon,
-  AdminPanelSettings as AdminIcon,
-  EmojiEvents as TrophyIcon,
-  Leaderboard as LeaderboardIcon
+  ReceiptLongOutlined as ReceiptIcon,
+  PlaylistAddOutlined as PlaylistAddIcon,
+  ListAltOutlined as ListAltIcon,
+  AssignmentTurnedInOutlined as AssignmentTurnedInIcon,
+  SearchOutlined as SearchIcon
 } from '@mui/icons-material';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -86,7 +89,7 @@ const DrawerHeader = styled('div')(({ theme }) => ({
   padding: theme.spacing(0, 1.5),
   ...theme.mixins.toolbar,
   borderBottom: 'none',
-  background: 'linear-gradient(135deg, #ff6b35 0%, #ff8c42 100%)',
+  background: 'linear-gradient(135deg, #ff6b35 0%, #ff8c42 80%, #ffb347 100%)',
   color: '#ffffff',
   boxShadow: '0 2px 10px rgba(255, 107, 53, 0.2)',
 }));
@@ -134,31 +137,34 @@ const StyledDrawer = styled(Drawer, {
       duration: theme.transitions.duration.enteringScreen,
     }),
     borderRight: 'none',
+    background: 'linear-gradient(135deg, #ff6b35 0%, #ff8c42 80%, #ffb347 100%)',
+    boxShadow: '0 8px 32px rgba(255, 107, 53, 0.10)',
+    backdropFilter: 'blur(8px)',
     ...(open ? openedMixin(theme) : closedMixin(theme)),
   },
 }));
 
 const MenuItemButton = styled(ListItemButton)(({ theme }) => ({
-  minHeight: 52,
-  borderRadius: 12,
-  margin: theme.spacing(0.3, 1.5),
-  padding: theme.spacing(1.2, 2),
-  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-  [theme.breakpoints.down('md')]: {
-    minHeight: 56,
-    padding: theme.spacing(1.5, 2),
-    margin: theme.spacing(0.2, 1),
+  minHeight: 48,
+  borderRadius: '14px',
+  margin: theme.spacing(0.7, 1.5),
+  paddingLeft: theme.spacing(2.5),
+  paddingRight: theme.spacing(2),
+  transition: 'background 0.18s, box-shadow 0.18s',
+  backdropFilter: 'blur(2px)',
+  '&.active': {
+    background: 'rgba(255, 255, 255, 0.22)',
+    boxShadow: '0 2px 12px rgba(255, 107, 53, 0.13)',
+    border: '1.5px solid #ff8c42',
+    '& .MuiListItemIcon-root': {
+      color: '#ff6b35',
+    },
   },
   '&:hover': {
-    backgroundColor: alpha(theme.palette.primary.main, 0.1),
-    transform: 'translateX(4px)',
-    boxShadow: '0 4px 12px rgba(255, 107, 53, 0.2)',
-  },
-  '&.active': {
-    backgroundColor: alpha(theme.palette.primary.main, 0.15),
-    borderLeft: '4px solid #ff6b35',
+    background: 'rgba(255, 255, 255, 0.18)',
+    boxShadow: '0 2px 8px rgba(255, 140, 66, 0.10)',
     '& .MuiListItemIcon-root': {
-      color: theme.palette.primary.main,
+      color: '#ff8c42',
     },
     '& .MuiListItemText-primary': {
       fontWeight: 600,
@@ -182,13 +188,13 @@ const SubMenuItemButton = styled(MenuItemButton)(({ theme }) => ({
 const menuItems = [
   { 
     text: 'Dashboard', 
-    icon: <HomeIcon />, 
+    icon: <DashboardIcon />, 
     path: '/',
     exact: true
   },
   {
     text: 'Painel Gerencial',
-    icon: <AdminIcon />,
+    icon: <AnalyticsIcon />,
     path: '/painel-gerencial',
     adminOnly: true
   },
@@ -226,7 +232,7 @@ const menuItems = [
   },
   {
     text: 'Separação e Conferência',
-    icon: <AssignmentTurnedInIcon />,
+    icon: <FactCheckIcon />,
     subItems: [
       {
         text: 'Cadastrar Separação',
@@ -278,7 +284,7 @@ const menuItems = [
   },
   {
     text: 'Operações',
-    icon: <ListAltIcon />,
+    icon: <InventoryIcon />,
     subItems: [
       {
         text: 'Checklist Empilhadeiras',

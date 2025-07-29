@@ -54,11 +54,9 @@ export default function CadastrarSeparacaoPage() {
 
   const [separadorId, setSeparadorId] = useState('');
   const [auditorId, setAuditorId] = useState('');
-  const [conferenteId, setConferenteId] = useState('');
 
   const [separadores, setSeparadores] = useState<Usuario[]>([]);
   const [auditores, setAuditores] = useState<Usuario[]>([]);
-  const [conferentes, setConferentes] = useState<Usuario[]>([]);
   
   const [loading, setLoading] = useState(true);
   const { enqueueSnackbar } = useSnackbar();
@@ -70,7 +68,6 @@ export default function CadastrarSeparacaoPage() {
         const { data } = await api.get<Usuario[]>('/api/usuarios-por-funcao');
         setSeparadores(data.filter(u => u.tipo === 'SEPARADOR'));
         setAuditores(data.filter(u => u.tipo === 'AUDITOR'));
-        setConferentes(data.filter(u => u.tipo === 'CONFERENTE'));
       } catch (error) {
         console.error('Erro ao buscar usuários:', error);
         enqueueSnackbar('Falha ao carregar dados de usuários.', { variant: 'error' });
@@ -93,7 +90,6 @@ export default function CadastrarSeparacaoPage() {
         numeroPedido: pedido,
         separadorId: separadorId,
         auditorId: auditorId || null, // Auditor pode ser opcional
-        conferenteId: conferenteId || null, // Conferente pode ser opcional
       });
 
       if (response.status === 200 || response.status === 201) {
@@ -114,7 +110,6 @@ export default function CadastrarSeparacaoPage() {
 
     setSeparadorId('');
     setAuditorId('');
-    setConferenteId('');
   };
 
   if (loading) {
@@ -182,27 +177,6 @@ export default function CadastrarSeparacaoPage() {
                     <em>Selecionar depois</em>
                   </MenuItem>
                   {auditores.map((user) => (
-                    <MenuItem key={user.id} value={user.id}>
-                      {user.nome}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={12}>
-              <FormControl fullWidth>
-                <InputLabel id="conferente-label">Conferente (Opcional)</InputLabel>
-                <Select
-                  labelId="conferente-label"
-                  id="conferente-select"
-                  value={conferenteId}
-                  label="Conferente (Opcional)"
-                  onChange={(e: SelectChangeEvent) => setConferenteId(e.target.value)}
-                >
-                  <MenuItem value="">
-                    <em>Selecionar depois</em>
-                  </MenuItem>
-                  {conferentes.map((user) => (
                     <MenuItem key={user.id} value={user.id}>
                       {user.nome}
                     </MenuItem>

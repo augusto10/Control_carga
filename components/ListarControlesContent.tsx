@@ -99,6 +99,24 @@ const ListarControlesContent: React.FC = () => {
     controle: null
   });
   
+  // Opções fixas de transportadoras
+  // Usamos 'ACERT' como ID para compatibilidade com o backend, mas exibimos 'ACCERT' na interface
+  const transportadorasFixas = [
+    { id: 'ACERT', nome: 'ACCERT', descricao: 'ACCERT Transportes' },
+    { id: 'EXPRESSO_GOIAS', nome: 'EXPRESSO_GOIAS', descricao: 'Expresso Goiás' },
+    { id: 'TERCEIRIZADA', nome: 'TERCEIRIZADA', descricao: 'Terceirizada' }
+  ];
+
+  // Função para obter o objeto da transportadora pelo ID
+  const getTransportadoraById = (id: string) => {
+    const encontrada = transportadorasFixas.find(t => t.id === id);
+    if (!encontrada) {
+      console.warn(`Transportadora com ID ${id} não encontrada`);
+      return transportadorasFixas[0]; // Retorna ACCERT como padrão
+    }
+    return encontrada;
+  };
+  
   // Estilos consistentes para os botões
   const buttonStyles = {
     minWidth: '32px',
@@ -274,7 +292,8 @@ const ListarControlesContent: React.FC = () => {
       yPos -= lineHeight * 6; // Aumentado de 3 para 6 linhas (3 linhas a mais)
       
       // Linha 1
-      page.drawText(`Transportadora: ${controleCompleto.transportadora}`, { x: 50, y: yPos, size: fontSize, font });
+      const transportadoraExibida = getTransportadoraById(controleCompleto.transportadora || 'ACERT');
+      page.drawText(`Transportadora: ${transportadoraExibida.descricao}`, { x: 50, y: yPos, size: fontSize, font });
       page.drawText(`Usuário: ${controleCompleto.responsavel}`, { x: 250, y: yPos, size: fontSize, font });
       
       // Linha 2
@@ -509,26 +528,64 @@ const ListarControlesContent: React.FC = () => {
           }
           
         } else {
-          // Linha para assinatura não assinada
-          const lineY = y - 25;
-          page.drawLine({
-            start: { x, y: lineY },
-            end: { x: x + 200, y: lineY },
-            thickness: 1,
-            color: rgb(0.8, 0.8, 0.8),
+          // Gera carimbo automático quando não há assinatura
+          const stampY = y - 25;
+          const stampWidth = 200;
+          const stampHeight = 60;
+          
+          // Fundo do carimbo com bordas arredondadas (simulado)
+          page.drawRectangle({
+            x: x,
+            y: stampY - stampHeight,
+            width: stampWidth,
+            height: stampHeight,
+            borderWidth: 1,
+            borderColor: rgb(0, 0.6, 0),
+            borderOpacity: 0.8,
+            color: rgb(0.98, 1, 0.98),
+            opacity: 0.9,
+            borderDashArray: [2, 2],
           });
           
-          // Texto de orientação
-          page.drawText('(Assinatura não registrada)', {
-            x,
-            y: lineY - 15,
+          // Texto do carimbo
+          const boldFont = await doc.embedFont(StandardFonts.HelveticaBold);
+          page.drawText('CARIMBO AUTOMÁTICO', {
+            x: x + (stampWidth / 2) - 65,
+            y: stampY - 20,
+            size: fontSize,
+            font: boldFont,
+            color: rgb(0, 0.4, 0),
+            opacity: 0.9,
+          });
+          
+          // Texto com nome e data
+          const currentDate = new Date().toLocaleString('pt-BR', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            timeZone: 'America/Sao_Paulo'
+          });
+          
+          page.drawText(`Assinado por: ${name}`, {
+            x: x + 10,
+            y: stampY - 40,
             size: fontSize - 2,
             font,
-            color: rgb(0.6, 0.6, 0.6),
+            color: rgb(0, 0.3, 0),
+          });
+          
+          page.drawText(`Data: ${currentDate}`, {
+            x: x + 10,
+            y: stampY - 55,
+            size: fontSize - 2,
+            font,
+            color: rgb(0, 0.3, 0),
           });
           
           // Retorna a posição Y para o próximo elemento
-          return lineY - 30;
+          return stampY - stampHeight - 10;
         }
       };
       
@@ -692,7 +749,7 @@ const ListarControlesContent: React.FC = () => {
       if (editData.responsavel !== undefined) dadosAtualizacao.responsavel = editData.responsavel as string;
       if (editData.cpfMotorista !== undefined) dadosAtualizacao.cpfMotorista = editData.cpfMotorista as string;
       if (editData.transportadora !== undefined) {
-        const transportadoraValida = editData.transportadora === 'EXPRESSO_GOIAS' ? 'EXPRESSO_GOIAS' : 'ACERT';
+        const transportadoraValida = (editData.transportadora === 'ACERT' || editData.transportadora === 'EXPRESSO_GOIAS' || editData.transportadora === 'TERCEIRIZADA') ? editData.transportadora : 'ACERT';
         dadosAtualizacao.transportadora = transportadoraValida;
       }
       if (editData.qtdPallets !== undefined) dadosAtualizacao.qtdPallets = Number(editData.qtdPallets) || 0;
@@ -1411,8 +1468,9 @@ const ListarControlesContent: React.FC = () => {
                 label="Transportadora"
                 onChange={e => setEditData({ ...editData, transportadora: e.target.value as any })}
               >
-                <MenuItem value="ACERT">ACERT</MenuItem>
+                <MenuItem value="ACERT">ACCERT</MenuItem>
                 <MenuItem value="EXPRESSO_GOIAS">EXPRESSO GOIÁS</MenuItem>
+                <MenuItem value="TERCEIRIZADA">TERCEIRIZADA</MenuItem>
               </Select>
             </FormControl>
             <TextField
