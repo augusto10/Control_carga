@@ -64,13 +64,13 @@ interface HistoricoPontuacao {
   dataAcao: string;
 }
 
-export default function GamificacaoPage() {
+function GamificacaoPage() {
   const { user } = useAuth();
   const [ranking, setRanking] = useState<RankingUsuario[]>([]);
   const [historico, setHistorico] = useState<HistoricoPontuacao[]>([]);
   const [loading, setLoading] = useState(true);
   const [registrarDialog, setRegistrarDialog] = useState(false);
-  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' | 'warning' | 'info' });
   const [formData, setFormData] = useState({
     usuarioId: '',
     pedidoId: '',
@@ -190,7 +190,7 @@ export default function GamificacaoPage() {
                         <TableCell>
                           <Chip
                             label={`#${usuario.posicaoRanking || index + 1}`}
-                            color={index === 0 ? 'gold' : index === 1 ? 'silver' : index === 2 ? 'bronze' : 'default'}
+                            color={index === 0 ? 'warning' : index === 1 ? 'secondary' : index === 2 ? 'primary' : 'default'}
                             variant="outlined"
                           />
                         </TableCell>

@@ -1903,7 +1903,7 @@ const ListarControlesContent: React.FC = () => {
             </Button>
             <Button 
               variant="contained" 
-              onClick={() => gerarPdf(detalhesModal.controle)}
+              onClick={() => detalhesModal.controle && gerarPdf(detalhesModal.controle)}
               startIcon={<PictureAsPdfIcon />}
               sx={{
                 borderRadius: '8px',

@@ -1,5 +1,5 @@
-import { PrismaClient, AcaoPontuacao } from '@prisma/client';
-import type { Prisma } from '@prisma/client';
+import { PrismaClient, AcaoPontuacao } from '@prisma/client/edge';
+import type { Prisma } from '@prisma/client/edge';
 
 interface RegistrarPontuacaoParams {
   usuarioId: string;
@@ -16,7 +16,7 @@ interface RegistrarPontuacaoParams {
  * @param params - Os parâmetros para registrar a pontuação.
  */
 export async function registrarPontuacao(
-  tx: Prisma.TransactionClient,
+  tx: any,
   params: RegistrarPontuacaoParams
 ) {
   const { usuarioId, pontos, acao, pedidoId, descricao } = params;
