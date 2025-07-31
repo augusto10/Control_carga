@@ -61,16 +61,18 @@ export function getTokenFromCookies(req: NextApiRequest): string | null {
  * @param secret Segredo para verificação
  * @returns Payload decodificado ou null se inválido
  */
-export function verifyToken(token: string, secret: string): any | null {
+export async function verifyToken(token: string, secret: string): Promise<any | null> {
   try {
     // Import dinâmico para evitar problemas no lado do cliente
-    const { verify } = require('jsonwebtoken');
+    if (typeof window !== 'undefined') return null;
     
-    const decoded = verify(token, secret);
+    const jwt = await import('jsonwebtoken');
+    
+    const decoded = jwt.verify(token, secret);
     
     // Verificar se o payload tem os campos necessários
-    if (decoded && decoded.id) {
-      return decoded;
+    if (decoded && typeof decoded === 'object' && 'id' in decoded) {
+      return decoded as any;
     }
     
     console.log('[Auth] Token decodificado não tem ID de usuário');

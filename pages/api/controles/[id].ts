@@ -32,7 +32,7 @@ export default async function handler(
 
     // Verificar o token JWT usando função utilitária
     console.log('[Auth] Verificando token com função utilitária');
-    const decoded = verifyToken(token, JWT_SECRET);
+    const decoded = await verifyToken(token, JWT_SECRET);
     console.log('[Auth] Token decodificado:', decoded ? '***SUCCESS***' : '***FAILED***');
     
     if (!decoded || !decoded.id) {
