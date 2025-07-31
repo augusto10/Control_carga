@@ -46,8 +46,6 @@ const allowCors = (fn: any) => async (req: NextApiRequest, res: NextApiResponse)
   // Handle preflight
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
-    
-    return res.status(204).end();
   }
 
   // Chamar o handler principal
@@ -173,3 +171,5 @@ async function remover(id: string, req: NextApiRequest, res: NextApiResponse) {
     return res.status(500).json({ error: 'Erro interno do servidor' });
   }
 }
+
+export default allowCors(handler);
