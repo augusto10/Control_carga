@@ -172,7 +172,7 @@ function MotoristasContent() {
           <DialogTitle>Confirmar Exclusão</DialogTitle>
           <DialogContent>
             <DialogContentText>
-              Tem certeza que deseja excluir o motorista "{deleteDialog.motorista?.nome}"?
+              Tem certeza que deseja excluir o motorista &quot;{deleteDialog.motorista?.nome}&quot;?
               Esta ação não pode ser desfeita.
             </DialogContentText>
           </DialogContent>
