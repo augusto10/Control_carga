@@ -452,13 +452,8 @@ export const useStore = create<StoreState>((set) => ({
       // Usando a instância do Axios configurada
       console.log(`[deleteNota] Iniciando requisição DELETE para /api/notas/${notaId}`);
       
-      const response = await api.delete(`/api/notas/${notaId}`, {
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0'
-        }
-      });
+      // Usar POST ao invés de DELETE para contornar erro 405
+      const response = await api.post('/api/notas/delete', { id: notaId });
       
       console.log(`[deleteNota] Resposta recebida:`, {
         status: response.status,

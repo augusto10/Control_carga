@@ -66,5 +66,9 @@ export const deleteMotorista = async (id: string) => {
   return api.post('/api/motoristas/delete', { id });
 };
 
+export const deleteNota = async (id: string) => {
+  return api.post('/api/notas/delete', { id });
+};
+
 export { api };
 export default api;
