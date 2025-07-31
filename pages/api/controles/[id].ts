@@ -12,25 +12,30 @@ const ALLOWED_ORIGINS = [
   /^https:\/\/.*\.vercel\.app$/
 ];
 
-// Middleware CORS simplificado
+// Middleware CORS simplificado para garantir DELETE funcione
 const allowCors = (fn: any) => async (req: NextApiRequest, res: NextApiResponse) => {
   const origin = req.headers.origin || '';
   
-  // Sempre permitir origens conhecidas
-  const isAllowed = ALLOWED_ORIGINS.some(allowed => 
-    typeof allowed === 'string' ? allowed === origin : allowed.test(origin)
-  );
-  
-  if (isAllowed) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
+  // Permitir todas as origens em desenvolvimento
+  if (process.env.NODE_ENV !== 'production') {
+    res.setHeader('Access-Control-Allow-Origin', origin || '*');
+  } else {
+    // Em produção, permitir origens específicas
+    const isAllowed = ALLOWED_ORIGINS.some(allowed => 
+      typeof allowed === 'string' ? allowed === origin : allowed.test(origin)
+    );
+    if (isAllowed) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+    }
   }
   
   res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, PUT, DELETE, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, PUT, DELETE, POST, OPTIONS, PATCH');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept');
   
-  // Handle preflight
+  // Handle preflight - sempre responder 200 para OPTIONS
   if (req.method === 'OPTIONS') {
+    res.setHeader('Access-Control-Max-Age', '86400');
     return res.status(200).end();
   }
 

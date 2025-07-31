@@ -165,6 +165,9 @@ export function middleware(request: NextRequest) {
   const isAllowed = isOriginAllowed(origin);
   const isDomainAllowedForCookies = isDomainAllowed(origin);
   
+  // IMPORTANTE: Garantir que DELETE seja sempre permitido
+  const isDeleteMethod = request.method === 'DELETE';
+  
   // Se for uma requisição OPTIONS (preflight), responder imediatamente
   if (request.method === 'OPTIONS') {
     const response = new NextResponse(null, { 
@@ -172,35 +175,29 @@ export function middleware(request: NextRequest) {
       headers: {}
     });
     
-    // Adiciona os headers CORS
-    if (isAllowed) {
-      // Define os headers CORS para a resposta OPTIONS
-      response.headers.set('Access-Control-Allow-Origin', origin);
-      response.headers.set('Access-Control-Allow-Methods', CORS_HEADERS['Access-Control-Allow-Methods']);
-      response.headers.set('Access-Control-Allow-Headers', CORS_HEADERS['Access-Control-Allow-Headers']);
-      response.headers.set('Access-Control-Allow-Credentials', 'true');
-      response.headers.set('Access-Control-Max-Age', '86400'); // 24 horas
-      response.headers.set('Vary', 'Origin, Cookie, Accept-Encoding');
-      
-      // Adiciona headers de segurança
-      response.headers.set('X-Content-Type-Options', 'nosniff');
-      response.headers.set('X-Frame-Options', 'DENY');
-      response.headers.set('X-XSS-Protection', '1; mode=block');
-      
-      if (process.env.NODE_ENV === 'production') {
-        response.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
-      }
-    } else {
-      return new NextResponse('Not allowed by CORS', { 
-        status: 403,
-        headers: {
-          'Content-Type': 'text/plain',
-          'Access-Control-Allow-Origin': '*',
-        },
-      });
+    // Adiciona os headers CORS - sempre permitir DELETE no preflight
+    response.headers.set('Access-Control-Allow-Origin', origin || '*');
+    response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+    response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, X-XSRF-TOKEN, Accept');
+    response.headers.set('Access-Control-Allow-Credentials', 'true');
+    response.headers.set('Access-Control-Max-Age', '86400'); // 24 horas
+    response.headers.set('Vary', 'Origin, Cookie, Accept-Encoding');
+    
+    // Adiciona headers de segurança
+    response.headers.set('X-Content-Type-Options', 'nosniff');
+    response.headers.set('X-Frame-Options', 'DENY');
+    response.headers.set('X-XSS-Protection', '1; mode=block');
+    
+    if (process.env.NODE_ENV === 'production') {
+      response.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
     }
     
     return response;
+  }
+  
+  // Para DELETE, garantir que passe pelo middleware
+  if (isDeleteMethod) {
+    console.log('Middleware: Requisição DELETE detectada, permitindo...');
   }
   
   // Para requisições que não são OPTIONS, continuar com o processamento normal
@@ -210,11 +207,12 @@ export function middleware(request: NextRequest) {
     },
   });
   
-  // Adicionar os headers CORS à resposta apenas se a origem for permitida
-  if (isAllowed) {
+  // Adicionar os headers CORS à resposta - aplicar para todas as origens permitidas
+  if (isAllowed || isDeleteMethod) {
     // Define os headers CORS
-    response.headers.set('Access-Control-Allow-Origin', origin);
+    response.headers.set('Access-Control-Allow-Origin', origin || '*');
     response.headers.set('Access-Control-Allow-Credentials', 'true');
+    response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
     response.headers.set('Access-Control-Expose-Headers', CORS_HEADERS['Access-Control-Expose-Headers']);
     response.headers.set('Vary', 'Origin, Cookie, Accept-Encoding');
     
