@@ -56,5 +56,14 @@ const createApi = (): AxiosInstance => {
 // Cria e exporta a instância da API
 const api = createApi();
 
+// Funções auxiliares para exclusão usando POST (workaround para erro 405)
+export const deleteControle = async (id: string) => {
+  return api.post('/api/controles/delete', { id });
+};
+
+export const deleteMotorista = async (id: string) => {
+  return api.post('/api/motoristas/delete', { id });
+};
+
 export { api };
 export default api;

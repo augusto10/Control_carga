@@ -691,7 +691,8 @@ const ListarControlesContent: React.FC = () => {
     setLoadingButtons(prev => ({ ...prev, [deleteKey]: true }));
 
     try {
-      const response = await api.delete(`/api/controles/${controle.id}`);
+      // Usar POST ao invés de DELETE para contornar erro 405
+      const response = await api.post('/api/controles/delete', { id: controle.id });
       
       if (response.status === 200) {
         enqueueSnackbar('Controle excluído com sucesso!', { 
