@@ -16,6 +16,7 @@ const createApi = (): AxiosInstance => {
     headers: {
       'Content-Type': 'application/json',
     },
+    withCredentials: true, // Importante: enviar cookies automaticamente
   });
 
   // Adiciona o token JWT às requisições

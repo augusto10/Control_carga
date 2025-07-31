@@ -110,7 +110,7 @@ function MotoristasContent() {
   const handleDelete = async(id:string)=>{
     if(!confirm('Excluir motorista?')) return;
     try{
-      await api.delete(`/api/motoristas/${id}`);
+      await api.post('/api/motoristas/delete', { id });
       await carregar();
     }catch(err){
       console.error(err);

@@ -171,7 +171,7 @@ function GerenciarControlesContent() {
 
     try {
       setLoading(true);
-      await api.delete(`/api/controles/${id}`);
+      await api.post('/api/controles/delete', { id });
       await carregarControles();
       setSnackbar({
         open: true,
