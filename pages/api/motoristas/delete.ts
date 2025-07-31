@@ -32,18 +32,7 @@ const allowCors = (fn: any) => async (req: NextApiRequest, res: NextApiResponse)
 };
 
 // Função para extrair token dos cookies
-const getTokenFromCookies = (req: NextApiRequest): string | null => {
-  const cookieHeader = req.headers.cookie;
-  if (!cookieHeader) return null;
-
-  const cookies = cookieHeader.split(';').reduce((acc, cookie) => {
-    const [name, value] = cookie.trim().split('=');
-    acc[name] = value;
-    return acc;
-  }, {} as Record<string, string>);
-
-  return cookies.jwt || null;
-};
+import { getTokenFromCookies, verifyToken } from '../../../lib/auth';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
