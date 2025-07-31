@@ -42,7 +42,7 @@ const allowCors = (fn: any) => async (req: NextApiRequest, res: NextApiResponse)
   }
 };
 
-export default allowCors(async function handler(
+async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -52,9 +52,15 @@ export default allowCors(async function handler(
     console.log('Query params:', req.query);
     console.log('User agent:', req.headers['user-agent']);
     
+    // Permitir OPTIONS para preflight
+    if (req.method === 'OPTIONS') {
+      res.setHeader('Allow', ['DELETE', 'OPTIONS']);
+      return res.status(200).end();
+    }
     // Verificar se o método é DELETE
     if (req.method !== 'DELETE') {
       console.log('Método não permitido:', req.method);
+      res.setHeader('Allow', ['DELETE', 'OPTIONS']);
       return res.status(405).json({ error: 'Método não permitido' });
     }
 
@@ -163,4 +169,6 @@ export default allowCors(async function handler(
       stack: process.env.NODE_ENV === 'development' ? error instanceof Error ? error.stack : undefined : undefined
     });
   }
-});
+}
+
+export default allowCors(handler);

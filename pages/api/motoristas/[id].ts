@@ -63,7 +63,7 @@ const allowCors = (fn: any) => async (req: NextApiRequest, res: NextApiResponse)
   }
 };
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { id } = req.query as { id: string };
   if (!id) return res.status(400).json({ error: 'ID é obrigatório' });
 
