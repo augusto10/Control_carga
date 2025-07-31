@@ -136,7 +136,14 @@ function GerenciarUsuariosContent() {
       setLoading(true);
       
       if (isEditing) {
-        await api.put(`/api/admin/usuarios/${currentUsuario.id}`, currentUsuario);
+        // Usar POST ao invés de PUT para contornar erro 405
+        await api.post('/api/admin/usuarios/edit', {
+          id: currentUsuario.id,
+          nome: currentUsuario.nome,
+          tipo: currentUsuario.tipo,
+          senha: currentUsuario.senha,
+          ativo: currentUsuario.ativo
+        });
         setSnackbar({ open: true, message: 'Usuário atualizado com sucesso!', severity: 'success' });
       } else {
         await api.post('/api/admin/usuarios', currentUsuario);
@@ -186,7 +193,8 @@ function GerenciarUsuariosContent() {
       onConfirm: async () => {
         try {
           setLoading(true);
-          await api.patch(`/api/admin/usuarios/${id}/status`, { ativo: !ativo });
+          // Usar POST ao invés de PATCH para contornar erro 405
+        await api.post('/api/admin/usuarios/toggle-status', { id, ativo: !ativo });
           await carregarUsuarios();
           setSnackbar({ 
             open: true, 
