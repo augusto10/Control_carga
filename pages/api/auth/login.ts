@@ -239,15 +239,30 @@ const handler = async (req: LoginRequest, res: NextApiResponse) => {
     // Configurar cookie
     console.log('12. Configurando o cookie de autenticação');
     
-    // Lógica de cookie simplificada para robustez em dev e prod
+    // Detectar domínio da origem para configuração de cookie
+    const requestOrigin = req.headers.origin || '';
+    let domain = undefined;
+    
+    // Configuração específica para produção
+    if (process.env.NODE_ENV === 'production') {
+      // Para Vercel e domínios customizados
+      if (requestOrigin.includes('vercel.app')) {
+        // Deixar o navegador gerenciar automaticamente para subdomínios Vercel
+        domain = undefined;
+      } else if (requestOrigin.includes('gestao-logistica')) {
+        // Para domínio customizado
+        domain = '.vercel.app'; // Permite cookies em subdomínios
+      }
+    }
+    
+    // Configuração de cookie otimizada para produção
     const cookieOptions: any = {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax', // 'lax' oferece um bom equilíbrio entre segurança e usabilidade
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // 'none' para produção com HTTPS
       maxAge: 60 * 60 * 24 * 7, // 7 dias de validade
       path: '/',
-      // O domínio não é definido explicitamente, permitindo que o navegador
-      // o gerencie. Isso evita problemas comuns em localhost e funciona bem em produção.
+      domain: domain,
     };
 
     // Criar o cookie com as opções simplificadas

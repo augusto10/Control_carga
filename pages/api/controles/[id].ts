@@ -14,6 +14,13 @@ export default async function handler(
     console.log('Query params:', req.query);
     console.log('User agent:', req.headers['user-agent']);
     
+    // Se for uma requisição OPTIONS (preflight), retornar imediatamente
+    if (req.method === 'OPTIONS') {
+      // Adicionar headers específicos para preflight - garantir DELETE
+      res.setHeader('Access-Control-Allow-Methods', 'GET, PUT, DELETE, POST, OPTIONS');
+      return res.status(200).json({ message: 'OPTIONS request' });
+    }
+
     // Verificar se o método é DELETE
     if (req.method !== 'DELETE') {
       console.log('Método não permitido:', req.method);

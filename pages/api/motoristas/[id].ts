@@ -64,9 +64,10 @@ const allowCors = (fn: any) => async (req: NextApiRequest, res: NextApiResponse)
   
   // Se for uma requisição OPTIONS (preflight), retornar imediatamente
   if (req.method === 'OPTIONS') {
-    // Adicionar headers específicos para preflight
+    // Adicionar headers específicos para preflight - garantir DELETE
+    res.setHeader('Access-Control-Allow-Methods', 'GET, PUT, DELETE, POST, OPTIONS');
     if (requestMethod) {
-      res.setHeader('Access-Control-Allow-Methods', requestMethod);
+      res.setHeader('Access-Control-Allow-Methods', 'GET, PUT, DELETE, POST, OPTIONS');
     }
     
     if (requestHeaders) {
