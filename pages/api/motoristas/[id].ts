@@ -24,55 +24,28 @@ const DEFAULT_CORS_HEADERS = {
   'Access-Control-Allow-Methods': 'GET, PUT, DELETE, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With, X-XSRF-TOKEN',
   'Access-Control-Allow-Credentials': 'true',
-  'Access-Control-Expose-Headers': 'Set-Cookie, XSRF-TOKEN',
-  'Access-Control-Max-Age': '86400', // 24 hours
-  'Vary': 'Origin, Cookie, Accept-Encoding',
 };
 
-// Função para verificar se uma origem é permitida
-function isOriginAllowed(origin: string): boolean {
-  return ALLOWED_ORIGINS.some(allowed => {
-    if (typeof allowed === 'string') {
-      return allowed === origin;
-    }
-    return allowed.test(origin);
-  });
-}
-
-// Middleware para habilitar CORS
+// Middleware CORS simplificado
 const allowCors = (fn: any) => async (req: NextApiRequest, res: NextApiResponse) => {
-  // Obter origem da requisição
   const origin = req.headers.origin || '';
-  const requestMethod = req.headers['access-control-request-method'];
-  const requestHeaders = req.headers['access-control-request-headers'];
-  
-  // Verificar se a origem está na lista de permitidas
-  const originIsAllowed = isOriginAllowed(origin);
-  const allowedOrigin = originIsAllowed ? origin : (typeof ALLOWED_ORIGINS[0] === 'string' ? ALLOWED_ORIGINS[0] : '');
-  
-  // Aplicar headers CORS padrão
-  Object.entries(DEFAULT_CORS_HEADERS).forEach(([key, value]) => {
-    if (key.toLowerCase() === 'access-control-allow-origin') {
-      res.setHeader(key, allowedOrigin);
-    } else {
-      res.setHeader(key, value);
-    }
-  });
-  
-  // Configurar headers específicos para a origem permitida
-  res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
-  
-  // Se for uma requisição OPTIONS (preflight), retornar imediatamente
+
+  // Sempre permitir origens conhecidas
+  const isAllowed = ALLOWED_ORIGINS.some(allowed =>
+    typeof allowed === 'string' ? allowed === origin : allowed.test(origin)
+  );
+
+  if (isAllowed) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
+
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, PUT, DELETE, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+
+  // Handle preflight
   if (req.method === 'OPTIONS') {
-    // Adicionar headers específicos para preflight - garantir DELETE
-    res.setHeader('Access-Control-Allow-Methods', 'GET, PUT, DELETE, POST, OPTIONS');
-    if (requestMethod) {
-      res.setHeader('Access-Control-Allow-Methods', 'GET, PUT, DELETE, POST, OPTIONS');
-    }
-    
-    if (requestHeaders) {
-      res.setHeader('Access-Control-Allow-Headers', requestHeaders);
-    }
+    return res.status(200).end();
     
     return res.status(204).end();
   }

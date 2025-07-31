@@ -1,7 +1,7 @@
 import { compare } from 'bcryptjs';
 import { sign } from 'jsonwebtoken';
 import { NextApiRequest, NextApiResponse } from 'next';
-import { serialize } from 'cookie';
+import { serialize, SerializeOptions } from 'cookie';
 import prisma from '../../../lib/prisma';
 
 // Constantes de configuração
@@ -239,30 +239,14 @@ const handler = async (req: LoginRequest, res: NextApiResponse) => {
     // Configurar cookie
     console.log('12. Configurando o cookie de autenticação');
     
-    // Detectar domínio da origem para configuração de cookie
-    const requestOrigin = req.headers.origin || '';
-    let domain = undefined;
-    
-    // Configuração específica para produção
-    if (process.env.NODE_ENV === 'production') {
-      // Para Vercel e domínios customizados
-      if (requestOrigin.includes('vercel.app')) {
-        // Deixar o navegador gerenciar automaticamente para subdomínios Vercel
-        domain = undefined;
-      } else if (requestOrigin.includes('gestao-logistica')) {
-        // Para domínio customizado
-        domain = '.vercel.app'; // Permite cookies em subdomínios
-      }
-    }
-    
-    // Configuração de cookie otimizada para produção
-    const cookieOptions: any = {
+    // Configuração simplificada do cookie para garantir compatibilidade cross-origin
+    const cookieOptions: SerializeOptions = {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // 'none' para produção com HTTPS
-      maxAge: 60 * 60 * 24 * 7, // 7 dias de validade
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      maxAge: 60 * 60 * 24 * 7, // 7 dias
       path: '/',
-      domain: domain,
+      // Não definir domínio - deixar o navegador gerenciar automaticamente
     };
 
     // Criar o cookie com as opções simplificadas

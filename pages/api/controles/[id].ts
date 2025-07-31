@@ -4,7 +4,45 @@ import { getTokenFromCookies, verifyToken } from '../../../lib/auth';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'seu_segredo_secreto';
 
-export default async function handler(
+const ALLOWED_ORIGINS = [
+  'http://localhost:3000',
+  'http://localhost:3001',
+  'https://controle-logistica.vercel.app',
+  /^https:\/\/controle-logistica-.*\.vercel\.app$/,
+  /^https:\/\/.*\.vercel\.app$/
+];
+
+// Middleware CORS simplificado
+const allowCors = (fn: any) => async (req: NextApiRequest, res: NextApiResponse) => {
+  const origin = req.headers.origin || '';
+  
+  // Sempre permitir origens conhecidas
+  const isAllowed = ALLOWED_ORIGINS.some(allowed => 
+    typeof allowed === 'string' ? allowed === origin : allowed.test(origin)
+  );
+  
+  if (isAllowed) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
+  
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, PUT, DELETE, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+  
+  // Handle preflight
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
+  try {
+    return await fn(req, res);
+  } catch (error) {
+    console.error('Erro no handler:', error);
+    return res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+};
+
+export default allowCors(async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -14,13 +52,6 @@ export default async function handler(
     console.log('Query params:', req.query);
     console.log('User agent:', req.headers['user-agent']);
     
-    // Se for uma requisição OPTIONS (preflight), retornar imediatamente
-    if (req.method === 'OPTIONS') {
-      // Adicionar headers específicos para preflight - garantir DELETE
-      res.setHeader('Access-Control-Allow-Methods', 'GET, PUT, DELETE, POST, OPTIONS');
-      return res.status(200).json({ message: 'OPTIONS request' });
-    }
-
     // Verificar se o método é DELETE
     if (req.method !== 'DELETE') {
       console.log('Método não permitido:', req.method);
@@ -132,4 +163,4 @@ export default async function handler(
       stack: process.env.NODE_ENV === 'development' ? error instanceof Error ? error.stack : undefined : undefined
     });
   }
-}
+});
