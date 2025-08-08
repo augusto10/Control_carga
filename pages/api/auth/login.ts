@@ -178,6 +178,16 @@ const handler = async (req: LoginRequest, res: NextApiResponse) => {
     console.log('6. Buscando usuário no banco de dados:', email);
     const usuario = await prisma.usuario.findUnique({
       where: { email: email.toLowerCase() },
+      select: {
+        id: true,
+        email: true,
+        senha: true,
+        nome: true,
+        tipo: true,
+        ativo: true,
+        dataCriacao: true,
+        ultimoAcesso: true,
+      },
     }) as Usuario | null;
 
     if (!usuario) {
