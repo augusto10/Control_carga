@@ -29,6 +29,11 @@ const handler = async (req: AuthenticatedRequest, res: NextApiResponse) => {
     const controlesRaw = await prisma.controleCarga.findMany({
       where,
       orderBy: { dataCriacao: 'desc' },
+      select: {
+        motorista: true,
+        cpfMotorista: true,
+        // Não selecionar campos novos ausentes no banco (qtdPalletsLevados, qtdPalletsDevolvidos, placaVeiculo)
+      },
     });
 
     type ControleLite = {

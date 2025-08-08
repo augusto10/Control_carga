@@ -12,7 +12,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       try {
         const controles = await prisma.controleCarga.findMany({
           orderBy: { dataCriacao: 'desc' },
-          include: {
+          select: {
+            id: true,
+            motorista: true,
+            cpfMotorista: true,
+            responsavel: true,
+            transportadora: true,
+            numeroManifesto: true,
+            // Campo antigo ainda existente
+            qtdPallets: true,
+            observacao: true,
+            finalizado: true,
+            dataCriacao: true,
+            // Não selecionar campos novos ausentes no banco (qtdPalletsLevados, qtdPalletsDevolvidos, placaVeiculo)
             notas: true,
           },
         });
