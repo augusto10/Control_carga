@@ -148,10 +148,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         });
       }
 
-      // Atualizar último acesso
+      // Atualizar último acesso (limitando campos retornados para evitar colunas inexistentes)
       await prisma.usuario.update({
         where: { id: user.id },
-        data: { ultimoAcesso: new Date() }
+        data: { ultimoAcesso: new Date() },
+        select: {
+          id: true,
+        }
       });
 
       return res.status(200).json({ 
