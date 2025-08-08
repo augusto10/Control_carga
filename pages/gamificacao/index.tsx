@@ -197,15 +197,13 @@ function GamificacaoPage() {
                         <TableCell>
                           <Box sx={{ display: 'flex', alignItems: 'center' }}>
                             <Avatar sx={{ mr: 2, bgcolor: 'primary.main' }}>
-                              {usuario.usuario.nome.charAt(0).toUpperCase()}
+                              {(usuario.usuario?.nome?.charAt(0)?.toUpperCase() ?? '?')}
                             </Avatar>
                             <Box>
                               <Typography variant="body1" fontWeight="bold">
-                                {usuario.usuario.nome}
+                                {usuario.usuario?.nome ?? '-'}
                               </Typography>
-                              <Typography variant="body2" color="text.secondary">
-                                {usuario.usuario.email}
-                              </Typography>
+                              {/* Email removido pois não existe no tipo retornado pelo serviço */}
                             </Box>
                           </Box>
                         </TableCell>

@@ -254,7 +254,6 @@ const ListarControlesContent: React.FC = () => {
   const gerarPdf = async (controle: ControleComNotas) => {
     // Importar dependências necessárias
     const { PDFDocument, rgb, StandardFonts } = await import('pdf-lib');
-    const fontBytes = await fetch('/fonts/helvetica.ttf').then(res => res.arrayBuffer());
     try {
       // Garante que as propriedades opcionais estejam definidas
       const controleCompleto: ControleComNotas = {
@@ -265,6 +264,10 @@ const ListarControlesContent: React.FC = () => {
         cpfMotorista: 'cpfMotorista' in controle ? controle.cpfMotorista || '' : '',
         transportadora: controle.transportadora || 'ACERT',
         qtdPallets: 'qtdPallets' in controle ? controle.qtdPallets || 0 : 0,
+        // Novos campos opcionais
+        ...(('qtdPalletsLevados' in controle) ? { qtdPalletsLevados: (controle as any).qtdPalletsLevados || 0 } : {}),
+        ...(('qtdPalletsDevolvidos' in controle) ? { qtdPalletsDevolvidos: (controle as any).qtdPalletsDevolvidos || 0 } : {}),
+        ...(('placaVeiculo' in controle) ? { placaVeiculo: (controle as any).placaVeiculo || '' } : {}),
         observacao: 'observacao' in controle ? controle.observacao || '' : '',
         finalizado: 'finalizado' in controle ? !!controle.finalizado : false,
         assinaturaMotorista: 'assinaturaMotorista' in controle ? controle.assinaturaMotorista || null : null,
@@ -275,14 +278,49 @@ const ListarControlesContent: React.FC = () => {
       };
       const existingBytes = await fetch('/templates/modelo-romaneio.pdf').then(res => res.arrayBuffer());
       const doc = await PDFDocument.load(existingBytes);
-      const page = doc.getPage(0);
-      const { width, height } = page.getSize();
+      let page = doc.getPage(0);
+      let { width, height } = page.getSize();
       
       // Usar fonte padrão do PDF
       const font = await doc.embedFont(StandardFonts.Helvetica);
-      const fontSize = 10;
-      const lineHeight = 18;
-      let yPos = height - 50;
+      const fontSize = 9; // fonte menor para caber mais linhas
+      const lineHeight = 14; // reduzir altura da linha
+      const topMargin = 50;
+      const bottomMargin = 60; // espaço para rodapés/assinaturas
+      const minSpaceForSignatures = 180; // espaço otimizado para duas assinaturas
+      let yPos = height - topMargin;
+
+      // Helpers de paginação (duas colunas)
+      const leftBaseX = 40;
+      const rightBaseX = 300; // distância horizontal para segunda coluna
+
+      const drawTableHeaderForColumn = (baseX: number, headerY: number) => {
+        const col1 = baseX;       // Qtd
+        const col2 = baseX + 30;  // Nota Fiscal
+        const col3 = baseX + 100; // Data
+        const col4 = baseX + 200; // Volumes
+        page.drawText('Qtd', { x: col1, y: headerY, size: fontSize, font, color: rgb(0, 0, 0) });
+        page.drawText('Nota Fiscal', { x: col2, y: headerY, size: fontSize, font, color: rgb(0, 0, 0) });
+        page.drawText('Data', { x: col3, y: headerY, size: fontSize, font, color: rgb(0, 0, 0) });
+        page.drawText('Volumes', { x: col4, y: headerY, size: fontSize, font, color: rgb(0, 0, 0) });
+        // linha sob o cabeçalho desta coluna
+        page.drawLine({
+          start: { x: baseX, y: headerY - 5 },
+          end: { x: baseX + 240, y: headerY - 5 },
+          thickness: 1,
+          color: rgb(0, 0, 0),
+        });
+        return { col1, col2, col3, col4, nextY: headerY - 24 };
+      };
+
+      const addNewPage = () => {
+        const newPage = doc.addPage([width, height]);
+        page = newPage;
+        // Atualiza dimensões caso o template tenha tamanhos diferentes
+        const size = page.getSize();
+        width = size.width; height = size.height;
+        yPos = height - topMargin;
+      };
 
       // Cabeçalho
       const dataAtual = new Date().toLocaleDateString('pt-BR');
@@ -298,7 +336,8 @@ const ListarControlesContent: React.FC = () => {
       
       // Linha 2
       yPos -= lineHeight * 1.5;
-      page.drawText(`Placa Veículo: -`, { x: 50, y: yPos, size: fontSize, font });
+      page.drawText(`Placa Veículo: ${(controle as any).placaVeiculo || (controleCompleto as any).placaVeiculo || '-'}`,
+        { x: 50, y: yPos, size: fontSize, font });
       page.drawText(`Nome Motorista: ${controleCompleto.motorista}`, { x: 250, y: yPos, size: fontSize, font });
       
       // Linha 3
@@ -306,57 +345,97 @@ const ListarControlesContent: React.FC = () => {
       page.drawText(`CPF Motorista: ${controleCompleto.cpfMotorista}`, { x: 50, y: yPos, size: fontSize, font });
       page.drawText(`Horário: ${horaAtual}`, { x: 250, y: yPos, size: fontSize, font });
       
-      // Linha 4
+      // Linha 4 - Pallets (novos campos)
       yPos -= lineHeight * 1.5;
-      page.drawText(`Quantidade de Pallets: ${controleCompleto.qtdPallets}`, { x: 50, y: yPos, size: fontSize, font });
+      page.drawText(`Pallets Levados: ${(controle as any).qtdPalletsLevados ?? (controleCompleto as any).qtdPalletsLevados ?? 0}`,
+        { x: 50, y: yPos, size: fontSize, font });
+      page.drawText(`Pallets Devolvidos: ${(controle as any).qtdPalletsDevolvidos ?? (controleCompleto as any).qtdPalletsDevolvidos ?? 0}`,
+        { x: 250, y: yPos, size: fontSize, font });
+
+      // Linha 5 - Diferença e Data
+      yPos -= lineHeight * 1.5;
+      const _lev = Number((controle as any).qtdPalletsLevados ?? (controleCompleto as any).qtdPalletsLevados ?? 0);
+      const _dev = Number((controle as any).qtdPalletsDevolvidos ?? (controleCompleto as any).qtdPalletsDevolvidos ?? 0);
+      const _diff = _lev - _dev;
+      page.drawText(`Diferença: ${_diff}`,{ x: 50, y: yPos, size: fontSize, font });
       page.drawText(`Data: ${dataAtual}`, { x: 250, y: yPos, size: fontSize, font });
+
+      // Observações (se houver)
+      if (controleCompleto.observacao && String(controleCompleto.observacao).trim().length > 0) {
+        yPos -= lineHeight * 1.5;
+        page.drawText('Observações:', { x: 50, y: yPos, size: fontSize, font });
+        yPos -= lineHeight;
+        const obsText = String(controleCompleto.observacao);
+        const wrap = (text: string, max = 95) => text.match(new RegExp(`.{1,${max}}`, 'g')) || [];
+        wrap(obsText).forEach((ln) => {
+          page.drawText(ln, { x: 50, y: yPos, size: fontSize, font });
+          yPos -= lineHeight * 1.1;
+        });
+      }
       
-      // Tabela de Notas
+      // Tabela de Notas (duas colunas)
       yPos -= lineHeight * 2; // Espaço antes da tabela
-      
-      // Cabeçalho da Tabela
-      const headerY = yPos;
-      const col1 = 50;   // Qtd
-      const col2 = 80;   // Nota Fiscal
-      const col3 = 150;  // Data
-      const col4 = 250;  // Volumes
-      
-      // Desenha linhas do cabeçalho
-      page.drawText('Qtd', { x: col1, y: headerY, size: fontSize, font, color: rgb(0, 0, 0) });
-      page.drawText('Nota Fiscal', { x: col2, y: headerY, size: fontSize, font, color: rgb(0, 0, 0) });
-      page.drawText('Data', { x: col3, y: headerY, size: fontSize, font, color: rgb(0, 0, 0) });
-      page.drawText('Volumes', { x: col4, y: headerY, size: fontSize, font, color: rgb(0, 0, 0) });
-      
-      // Linha divisória
-      yPos -= 5;
-      page.drawLine({
-        start: { x: 50, y: yPos },
-        end: { x: width - 50, y: yPos },
-        thickness: 1,
-        color: rgb(0, 0, 0),
-      });
-      
-      // Dados das notas
-      yPos -= 25;
+      // Cabeçalho para ambas as colunas na mesma linha
+      const leftHeader = drawTableHeaderForColumn(leftBaseX, yPos);
+      const rightHeader = drawTableHeaderForColumn(rightBaseX, yPos);
+      let yLeft = leftHeader.nextY;
+      let yRight = rightHeader.nextY;
+      let rowsLeft = 0;
+      let rowsRight = 0;
+      const maxRowsPerColumn = 15; // objetivo: 15 por lado
+
+      const drawNota = (idx: number, nota: any, cols: {col1:number,col2:number,col3:number,col4:number}, y: number) => {
+        const volumes = parseInt(nota.volumes) || 1;
+        const dataNota = nota.dataCriacao ? new Date(nota.dataCriacao).toLocaleDateString('pt-BR') : '-';
+        page.drawText((idx + 1).toString(), { x: cols.col1, y, size: fontSize, font });
+        page.drawText(nota.numeroNota || '-', { x: cols.col2, y, size: fontSize, font });
+        page.drawText(dataNota, { x: cols.col3, y, size: fontSize, font });
+        page.drawText(String(volumes), { x: cols.col4, y, size: fontSize, font });
+      };
+
       let totalVolumes = 0;
-      
       controleCompleto.notas.forEach((nota, index) => {
-        if (yPos < 100) {
-          // Se estiver chegando no final da página, cria uma nova página
-          page.drawText('Continua na próxima página...', { x: 50, y: 50, size: fontSize - 2, font, color: rgb(0.5, 0.5, 0.5) });
-          yPos = height - 50; // Volta para o topo da nova página
-        }
-        
         const volumes = parseInt(nota.volumes) || 1;
         totalVolumes += volumes;
-        const dataNota = nota.dataCriacao ? new Date(nota.dataCriacao).toLocaleDateString('pt-BR') : '-';
-        
-        page.drawText((index + 1).toString(), { x: col1, y: yPos, size: fontSize, font });
-        page.drawText(nota.numeroNota || '-', { x: col2, y: yPos, size: fontSize, font });
-        page.drawText(dataNota, { x: col3, y: yPos, size: fontSize, font });
-        page.drawText(volumes.toString(), { x: col4, y: yPos, size: fontSize, font });
-        
-        yPos -= lineHeight;
+
+        // Verifica se precisamos de nova página (sem espaço para mais linhas + assinaturas)
+        const noSpaceLeft = (rowsLeft >= maxRowsPerColumn) || (yLeft < bottomMargin + minSpaceForSignatures + lineHeight);
+        const noSpaceRight = (rowsRight >= maxRowsPerColumn) || (yRight < bottomMargin + minSpaceForSignatures + lineHeight);
+        if (noSpaceLeft && noSpaceRight) {
+          page.drawText('Continua na próxima página...', { x: 50, y: 40, size: fontSize - 2, font, color: rgb(0.5, 0.5, 0.5) });
+          addNewPage();
+          // redesenha cabeçalhos em nova página
+          const newLeft = drawTableHeaderForColumn(leftBaseX, yPos);
+          const newRight = drawTableHeaderForColumn(rightBaseX, yPos);
+          yLeft = newLeft.nextY;
+          yRight = newRight.nextY;
+          rowsLeft = 0;
+          rowsRight = 0;
+        }
+
+        // Preenche coluna esquerda até 15 linhas, senão a direita
+        if (!noSpaceLeft && rowsLeft < maxRowsPerColumn) {
+          drawNota(index, nota, leftHeader, yLeft);
+          yLeft -= lineHeight;
+          rowsLeft += 1;
+        } else if (!noSpaceRight && rowsRight < maxRowsPerColumn) {
+          drawNota(index, nota, rightHeader, yRight);
+          yRight -= lineHeight;
+          rowsRight += 1;
+        } else {
+          // caso limite atingido em ambas após checks, força nova página e desenha na esquerda
+          page.drawText('Continua na próxima página...', { x: 50, y: 40, size: fontSize - 2, font, color: rgb(0.5, 0.5, 0.5) });
+          addNewPage();
+          const newLeft = drawTableHeaderForColumn(leftBaseX, yPos);
+          const newRight = drawTableHeaderForColumn(rightBaseX, yPos);
+          yLeft = newLeft.nextY;
+          yRight = newRight.nextY;
+          rowsLeft = 0;
+          rowsRight = 0;
+          drawNota(index, nota, newLeft, yLeft);
+          yLeft -= lineHeight;
+          rowsLeft += 1;
+        }
       });
       
       // Totalizadores
@@ -368,10 +447,19 @@ const ListarControlesContent: React.FC = () => {
         color: rgb(0, 0, 0),
       });
       
+      // posiciona totalizadores considerando a menor Y das duas colunas
+      yPos = Math.min(yLeft, yRight) - 8;
+      page.drawLine({
+        start: { x: 50, y: yPos },
+        end: { x: width - 50, y: yPos },
+        thickness: 1,
+        color: rgb(0, 0, 0),
+      });
       yPos -= lineHeight;
-      page.drawText('TOTAL:', { x: col2, y: yPos, size: fontSize, font, color: rgb(0, 0, 0) });
-      page.drawText(controleCompleto.notas.length.toString(), { x: col1, y: yPos, size: fontSize, font, color: rgb(0, 0, 0) });
-      page.drawText(totalVolumes.toString(), { x: col4, y: yPos, size: fontSize, font, color: rgb(0, 0, 0) });
+      // Totais alinhados na coluna esquerda
+      page.drawText('TOTAL:', { x: leftBaseX + 80, y: yPos, size: fontSize, font, color: rgb(0, 0, 0) });
+      page.drawText(controleCompleto.notas.length.toString(), { x: leftBaseX, y: yPos, size: fontSize, font, color: rgb(0, 0, 0) });
+      page.drawText(totalVolumes.toString(), { x: leftBaseX + 200, y: yPos, size: fontSize, font, color: rgb(0, 0, 0) });
       
       // Rodapé
       yPos -= lineHeight * 2;
@@ -379,6 +467,10 @@ const ListarControlesContent: React.FC = () => {
       page.drawText(`Total de Volumes: ${totalVolumes}`, { x: 250, y: yPos, size: fontSize - 1, font });
 
       // Seção de Assinaturas
+      // Garante espaço suficiente; se não houver, cria nova página para as assinaturas
+      if (yPos < bottomMargin + minSpaceForSignatures) {
+        addNewPage();
+      }
       yPos -= lineHeight * 2;
       
       // Linha divisória para assinaturas

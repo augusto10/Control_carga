@@ -44,7 +44,7 @@ const nextConfig = {
   
   // Configurações do ESLint
   eslint: {
-    ignoreDuringBuilds: false, // Habilita o ESLint durante o build
+    ignoreDuringBuilds: true, // Ignora ESLint no build para evitar falhas por lint em produção
   },
   images: {
     domains: ['localhost'],

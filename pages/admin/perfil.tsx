@@ -15,10 +15,12 @@ import {
   Snackbar,
   CircularProgress
 } from '@mui/material';
-import { Edit as EditIcon, Save as SaveIcon, Cancel as CancelIcon } from '@mui/icons-material';
+import { Edit as EditIcon, Save as SaveIcon, Cancel as CancelIcon, PhotoCamera as PhotoCameraIcon } from '@mui/icons-material';
 import { AuthContext } from '../../contexts/AuthContext';
 import AdminLayout from '../../components/admin/AdminLayout';
 import AdminRoute from '../../components/admin/AdminRoute';
+import RankingComponent from '../../components/RankingComponent';
+import { obterMinhaPontuacao, PontuacaoResponse } from '../../services/gamificacaoService';
 
 interface PerfilFormData {
   nome: string;
@@ -46,7 +48,10 @@ function PerfilUsuarioContent() {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pontuacao, setPontuacao] = useState<PontuacaoResponse | null>(null);
+  const [carregandoPontuacao, setCarregandoPontuacao] = useState(true);
 
   interface UsuarioResponse {
     id: string;
@@ -137,6 +142,23 @@ function PerfilUsuarioContent() {
     return true;
   };
 
+  useEffect(() => {
+    const carregarPontuacao = async () => {
+      try {
+        const dadosPontuacao = await obterMinhaPontuacao();
+        setPontuacao(dadosPontuacao);
+      } catch (err) {
+        console.error('Erro ao carregar pontuação:', err);
+      } finally {
+        setCarregandoPontuacao(false);
+      }
+    };
+
+    if (user?.id) {
+      carregarPontuacao();
+    }
+  }, [user?.id]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -171,12 +193,50 @@ function PerfilUsuarioContent() {
       }));
       
       setTimeout(() => setSuccessMessage(null), 5000);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao atualizar perfil:', error);
-      const errorMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Erro ao atualizar perfil. Tente novamente.';
-      setError(errorMessage);
+      setError(error.response?.data?.message || 'Erro ao atualizar perfil');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handlePhotoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validar tipo de arquivo
+    if (!file.type.startsWith('image/')) {
+      setError('Por favor, selecione uma imagem válida');
+      return;
+    }
+
+    // Validar tamanho (5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setError('A imagem deve ter no máximo 5MB');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('foto', file);
+
+    try {
+      setUploadingPhoto(true);
+      setError(null);
+
+      const response = await api.post('/api/usuarios/upload-foto', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      updateUser({ ...user, foto: response.data.fotoUrl });
+      setSuccessMessage('Foto de perfil atualizada com sucesso!');
+    } catch (error: any) {
+      console.error('Erro ao fazer upload da foto:', error);
+      setError(error.response?.data?.message || 'Erro ao fazer upload da foto');
+    } finally {
+      setUploadingPhoto(false);
     }
   };
 
@@ -216,30 +276,54 @@ function PerfilUsuarioContent() {
               mb={{ xs: 3, md: 0 }}
               minWidth={200}
             >
-              <Avatar 
-                sx={{ 
-                  width: 120, 
-                  height: 120, 
-                  fontSize: 48,
-                  mb: 2
-                }}
-              >
-                {user.nome?.charAt(0).toUpperCase() || 'U'}
-              </Avatar>
-              <Typography variant="h6">{user.nome}</Typography>
-              <Typography variant="body2" color="textSecondary">
-                {user.tipo === 'ADMIN' ? 'Administrador' : 
-                 user.tipo === 'GERENTE' ? 'Gerente' : 'Usuário'}
-              </Typography>
-              <Typography variant="body2" color="textSecondary">
-                {user.email}
-              </Typography>
-              
-              {user.ultimoAcesso && (
-                <Typography variant="caption" color="textSecondary" mt={1}>
-                  Último acesso: {new Date(user.ultimoAcesso).toLocaleString()}
+              <Box position="relative" display="inline-block">
+                <Avatar 
+                  src={user?.foto || undefined} 
+                  sx={{ width: 100, height: 100, mr: 3 }}
+                >
+                  {!user?.foto && user?.nome?.charAt(0).toUpperCase()}
+                </Avatar>
+                <input
+                  accept="image/*"
+                  type="file"
+                  id="photo-upload"
+                  onChange={handlePhotoUpload}
+                  style={{ display: 'none' }}
+                  disabled={uploadingPhoto}
+                />
+                <label htmlFor="photo-upload">
+                  <IconButton
+                    color="primary"
+                    component="span"
+                    sx={{
+                      position: 'absolute',
+                      bottom: -5,
+                      right: 15,
+                      backgroundColor: 'primary.main',
+                      color: 'white',
+                      '&:hover': {
+                        backgroundColor: 'primary.dark',
+                      },
+                      width: 36,
+                      height: 36,
+                    }}
+                    disabled={uploadingPhoto}
+                  >
+                    {uploadingPhoto ? <CircularProgress size={20} color="inherit" /> : <PhotoCameraIcon />}
+                  </IconButton>
+                </label>
+              </Box>
+              <Box>
+                <Typography variant="h5" gutterBottom>
+                  {user?.nome}
                 </Typography>
-              )}
+                <Typography variant="body1" color="textSecondary">
+                  {user?.email}
+                </Typography>
+                <Typography variant="body2" color="textSecondary">
+                  Tipo: {user?.tipo}
+                </Typography>
+              </Box>
             </Box>
 
             <Box flex={1}>

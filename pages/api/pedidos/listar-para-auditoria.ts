@@ -36,9 +36,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(403).json({ message: 'Acesso negado. Usuário inativo.' });
   }
 
-  // Verificar se o usuário tem permissão para auditar (AUDITOR ou ADMIN)
-  if (currentUser.tipo !== 'AUDITOR' && currentUser.tipo !== 'ADMIN') {
-    return res.status(403).json({ message: 'Acesso negado. Permissão de auditor necessária.' });
+  // Verificar se o usuário tem permissão para auditar (CONFERENTE, AUDITOR, ADMIN ou GERENTE)
+  if (!['CONFERENTE', 'AUDITOR', 'ADMIN', 'GERENTE'].includes(currentUser.tipo)) {
+    return res.status(403).json({ message: 'Acesso negado. Permissão necessária.' });
   }
 
   try {

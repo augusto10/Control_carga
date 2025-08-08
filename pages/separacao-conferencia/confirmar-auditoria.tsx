@@ -215,7 +215,7 @@ function ConfirmarAuditoria() {
               sx={{ height: 32, width: 32 }}
             />
             <Typography variant="h6" component="div" sx={{ fontWeight: 600 }}>
-              CONFIRMAR AUDITORIA
+              CONFIRMAR CONFERÊNCIA
             </Typography>
           </Box>
         </Toolbar>

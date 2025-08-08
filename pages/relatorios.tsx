@@ -31,6 +31,13 @@ export default function Relatorios() {
               Gerar Relatório
             </button>
           </div>
+          <div className="bg-white shadow-md rounded p-4">
+            <h2 className="text-xl font-semibold mb-2">Pallets por Motorista (Gerencial)</h2>
+            <p className="text-gray-600 mb-3">Totais de pallets levados, devolvidos e diferença, agrupados por motorista.</p>
+            <a href="/relatorios/pallets-motorista" className="inline-block bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
+              Abrir Relatório
+            </a>
+          </div>
         </div>
       </div>
     </Layout>

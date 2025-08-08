@@ -36,7 +36,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           responsavel, 
           cpfMotorista = 'PENDENTE', 
           transportadora, 
-          qtdPallets, 
+          qtdPallets,
+          qtdPalletsLevados,
+          qtdPalletsDevolvidos,
+          placaVeiculo,
           observacao, 
           numeroManifesto, 
           notasIds,
@@ -59,6 +62,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             error: 'Campos obrigatórios não fornecidos',
             requiredFields: camposObrigatorios
           });
+        }
+
+        // Normalizar e validar novos campos
+        const levadosNum = Number(qtdPalletsLevados ?? 0) || 0;
+        const devolvidosNum = Number(qtdPalletsDevolvidos ?? 0) || 0;
+        const placaNormalizada = typeof placaVeiculo === 'string' ? placaVeiculo.trim().toUpperCase() : null;
+
+        if (levadosNum < 0 || devolvidosNum < 0) {
+          return res.status(400).json({ error: 'Valores de pallets não podem ser negativos.' });
         }
 
         // Validar se as notas existem e estão disponíveis
@@ -97,7 +109,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             responsavel: responsavel.trim(),
             transportadora: transportadoraValida as Transportadora,
             numeroManifesto: numeroManifestoFinal,
-            qtdPallets: qtdPallets ? Number(qtdPallets) : 0,
+            // Compatibilidade: manter campo antigo como diferença
+            qtdPallets: typeof qtdPallets !== 'undefined' ? Number(qtdPallets) || 0 : (levadosNum - devolvidosNum),
+            // Novos campos
+            qtdPalletsLevados: levadosNum,
+            qtdPalletsDevolvidos: devolvidosNum,
+            placaVeiculo: placaNormalizada,
             observacao: observacao ? observacao.trim() : null,
             finalizado: false,
             // Campos de assinatura

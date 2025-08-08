@@ -49,7 +49,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(403).json({ message: 'Acesso negado. Permissão de administrador necessária.' });
     }
 
-    const { id, nome, tipo, senha, ativo } = req.body;
+    const { id, nome, tipo, senha, ativo, foto } = req.body;
 
     if (!id) {
       return res.status(400).json({ message: 'ID do usuário é obrigatório' });
@@ -70,6 +70,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       tipo,
       ativo: Boolean(ativo)
     };
+
+    // Se foto foi fornecida, atualizar
+    if (foto !== undefined) {
+      updateData.foto = foto;
+    }
 
     // Se uma nova senha foi fornecida, criptografá-la
     if (senha && senha.trim() !== '') {

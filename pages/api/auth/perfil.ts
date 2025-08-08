@@ -211,6 +211,7 @@ export default async function handler(
           email: true,
           tipo: true,
           ativo: true,
+          foto: true,
           dataCriacao: true,
           ultimoAcesso: true
         }

@@ -18,6 +18,7 @@ import {
   ListItem,
   ListItemText,
   Checkbox,
+  FormControlLabel,
   CircularProgress,
   Autocomplete
 } from '@mui/material';
@@ -134,7 +135,9 @@ const CriarControleContent: React.FC = () => {
     transportadora: Transportadora;
     responsavel: string;
     observacao?: string; // Torna opcional para ser compatível com string | undefined
-    qtdPallets: number;
+    qtdPalletsLevados: number;
+    qtdPalletsDevolvidos: number;
+    placaVeiculo: string;
   }
 
   const [formData, setFormData] = useState<FormData>({
@@ -144,7 +147,9 @@ const CriarControleContent: React.FC = () => {
     transportadora: 'ACERT',
     responsavel: 'PENDENTE',
     observacao: '',
-    qtdPallets: 1,
+    qtdPalletsLevados: 0,
+    qtdPalletsDevolvidos: 0,
+    placaVeiculo: '',
   });
   
   useEffect(() => {
@@ -197,7 +202,7 @@ const CriarControleContent: React.FC = () => {
     const { name, value } = e.target as { name: string; value: string };
     
     // Tratamento especial para campos numéricos
-    if (name === 'qtdPallets') {
+    if (name === 'qtdPalletsLevados' || name === 'qtdPalletsDevolvidos') {
       const numValue = parseInt(value) || 0;
       setFormData(prev => ({
         ...prev,
@@ -241,8 +246,14 @@ const CriarControleContent: React.FC = () => {
         newErrors.responsavel = 'Nome do responsável é obrigatório';
       }
       
-      if (formData.qtdPallets <= 0) {
-        newErrors.qtdPallets = 'Quantidade de pallets deve ser maior que zero';
+      if (formData.qtdPalletsLevados < 0) {
+        newErrors.qtdPalletsLevados = 'Pallets levados não pode ser negativo';
+      }
+      if (formData.qtdPalletsDevolvidos < 0) {
+        newErrors.qtdPalletsDevolvidos = 'Pallets devolvidos não pode ser negativo';
+      }
+      if (!formData.placaVeiculo?.trim()) {
+        newErrors.placaVeiculo = 'Placa do veículo é obrigatória';
       }
       
       // Se houver erros de validação, exibe e interrompe o processo
@@ -266,7 +277,9 @@ const CriarControleContent: React.FC = () => {
         transportadora: (formData.transportadora === 'ACERT' || formData.transportadora === 'EXPRESSO_GOIAS' || formData.transportadora === 'TERCEIRIZADA') 
           ? formData.transportadora 
           : 'ACERT',
-        qtdPallets: Number(formData.qtdPallets) || 0,
+        qtdPalletsLevados: Number(formData.qtdPalletsLevados) || 0,
+        qtdPalletsDevolvidos: Number(formData.qtdPalletsDevolvidos) || 0,
+        placaVeiculo: formData.placaVeiculo.trim(),
         observacao: formData.observacao?.trim() || undefined,
         finalizado: false, // Adiciona o campo finalizado
         notasIds: Array.isArray(selectedNotas) ? selectedNotas : []
@@ -467,15 +480,39 @@ const CriarControleContent: React.FC = () => {
             
             <TextField
               fullWidth
-              label="Quantidade de Pallets"
-              name="qtdPallets"
+              label="Pallets Levados"
+              name="qtdPalletsLevados"
               type="number"
-              value={formData.qtdPallets}
-              onChange={(e) => setFormData({...formData, qtdPallets: parseInt(e.target.value) || 0})}
-              error={!!errors.qtdPallets}
-              helperText={errors.qtdPallets}
+              value={formData.qtdPalletsLevados}
+              onChange={handleChange}
+              error={!!errors.qtdPalletsLevados}
+              helperText={errors.qtdPalletsLevados}
               margin="normal"
-              inputProps={{ min: 1 }}
+              inputProps={{ min: 0 }}
+            />
+
+            <TextField
+              fullWidth
+              label="Pallets Devolvidos"
+              name="qtdPalletsDevolvidos"
+              type="number"
+              value={formData.qtdPalletsDevolvidos}
+              onChange={handleChange}
+              error={!!errors.qtdPalletsDevolvidos}
+              helperText={errors.qtdPalletsDevolvidos}
+              margin="normal"
+              inputProps={{ min: 0 }}
+            />
+
+            <TextField
+              fullWidth
+              label="Placa do Veículo"
+              name="placaVeiculo"
+              value={formData.placaVeiculo}
+              onChange={handleChange}
+              error={!!errors.placaVeiculo}
+              helperText={errors.placaVeiculo}
+              margin="normal"
               required
             />
             
@@ -493,6 +530,33 @@ const CriarControleContent: React.FC = () => {
           <Typography variant="h6" gutterBottom sx={{ mt: 2, mb: 2 }}>
             Notas Fiscais
           </Typography>
+          {notasDisponiveis.length > 0 && (
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={selectedNotas.length === notasNaoVinculadas.length && notasNaoVinculadas.length > 0}
+                    indeterminate={selectedNotas.length > 0 && selectedNotas.length < notasNaoVinculadas.length}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      if (checked) {
+                        const allIds = notasNaoVinculadas.map(n => n.id);
+                        setSelectedNotas(allIds);
+                      } else {
+                        setSelectedNotas([]);
+                      }
+                    }}
+                  />
+                }
+                label="Selecionar todas"
+              />
+              {selectedNotas.length > 0 && (
+                <Typography variant="body2" color="textSecondary">
+                  {selectedNotas.length} selecionada(s)
+                </Typography>
+              )}
+            </Box>
+          )}
           {notasDisponiveis.length === 0 ? (
             <Typography variant="body2" color="textSecondary" sx={{ fontStyle: 'italic' }}>
               Nenhuma nota fiscal disponível para vincular.

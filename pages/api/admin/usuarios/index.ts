@@ -43,6 +43,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           email: true,
           tipo: true,
           ativo: true,
+          foto: true,
           dataCriacao: true,
           ultimoAcesso: true
         },
@@ -88,6 +89,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           email: true,
           tipo: true,
           ativo: true,
+          foto: true,
           dataCriacao: true
         }
       });
