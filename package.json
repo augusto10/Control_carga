@@ -4,11 +4,12 @@
   "private": true,
   "scripts": {
     "dev": "node scripts/prisma/generate.js && next dev",
-    "build": "node scripts/prisma/generate.js && next build",
+    "build": "node scripts/prisma/generate.js && prisma migrate deploy && next build",
     "start": "next start",
     "postinstall": "node scripts/prisma/generate.js",
     "prisma:generate": "node scripts/prisma/generate.js",
     "prisma:init": "node scripts/prisma/init-prisma.js",
+    "prisma:migrate:deploy": "prisma migrate deploy",
     "lint": "next lint",
     "lint:fix": "next lint --fix",
     "seed": "ts-node --project tsconfig.seed.json prisma/seed.ts",
