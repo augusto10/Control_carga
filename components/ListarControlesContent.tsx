@@ -323,8 +323,10 @@ const ListarControlesContent: React.FC = () => {
       };
 
       // Cabeçalho
-      const dataAtual = new Date().toLocaleDateString('pt-BR');
-      const horaAtual = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+      // Usa a mesma referência de data/hora exibida na lista: dataCriacao do controle
+      const dataHoraCriacao = controleCompleto.dataCriacao ? new Date(controleCompleto.dataCriacao) : new Date();
+      const dataAtual = format(dataHoraCriacao, 'dd/MM/yyyy', { locale: ptBR });
+      const horaAtual = format(dataHoraCriacao, 'HH:mm', { locale: ptBR });
       
       // Ajustando posição inicial mais para baixo
       yPos -= lineHeight * 6; // Aumentado de 3 para 6 linhas (3 linhas a mais)
@@ -336,7 +338,7 @@ const ListarControlesContent: React.FC = () => {
       
       // Linha 2
       yPos -= lineHeight * 1.5;
-      page.drawText(`Placa Veículo: ${(controle as any).placaVeiculo || (controleCompleto as any).placaVeiculo || '-'}`,
+      page.drawText(`Placa Veículo: ${(((controle as any).placaVeiculo || (controleCompleto as any).placaVeiculo || '-') as string).toString().toUpperCase()}`,
         { x: 50, y: yPos, size: fontSize, font });
       page.drawText(`Nome Motorista: ${controleCompleto.motorista}`, { x: 250, y: yPos, size: fontSize, font });
       
@@ -347,15 +349,17 @@ const ListarControlesContent: React.FC = () => {
       
       // Linha 4 - Pallets (novos campos)
       yPos -= lineHeight * 1.5;
-      page.drawText(`Pallets Levados: ${(controle as any).qtdPalletsLevados ?? (controleCompleto as any).qtdPalletsLevados ?? 0}`,
+      const palletsLevados = Number((controle as any).qtdPalletsLevados ?? (controleCompleto as any).qtdPalletsLevados ?? 0);
+      const palletsDevolvidos = Number((controle as any).qtdPalletsDevolvidos ?? (controleCompleto as any).qtdPalletsDevolvidos ?? 0);
+      page.drawText(`Pallets Levados: ${palletsLevados}`,
         { x: 50, y: yPos, size: fontSize, font });
-      page.drawText(`Pallets Devolvidos: ${(controle as any).qtdPalletsDevolvidos ?? (controleCompleto as any).qtdPalletsDevolvidos ?? 0}`,
+      page.drawText(`Pallets Devolvidos: ${palletsDevolvidos}`,
         { x: 250, y: yPos, size: fontSize, font });
 
       // Linha 5 - Diferença e Data
       yPos -= lineHeight * 1.5;
-      const _lev = Number((controle as any).qtdPalletsLevados ?? (controleCompleto as any).qtdPalletsLevados ?? 0);
-      const _dev = Number((controle as any).qtdPalletsDevolvidos ?? (controleCompleto as any).qtdPalletsDevolvidos ?? 0);
+      const _lev = palletsLevados;
+      const _dev = palletsDevolvidos;
       const _diff = _lev - _dev;
       page.drawText(`Diferença: ${_diff}`,{ x: 50, y: yPos, size: fontSize, font });
       page.drawText(`Data: ${dataAtual}`, { x: 250, y: yPos, size: fontSize, font });
@@ -386,7 +390,12 @@ const ListarControlesContent: React.FC = () => {
 
       const drawNota = (idx: number, nota: any, cols: {col1:number,col2:number,col3:number,col4:number}, y: number) => {
         const volumes = parseInt(nota.volumes) || 1;
-        const dataNota = nota.dataCriacao ? new Date(nota.dataCriacao).toLocaleDateString('pt-BR') : '-';
+        const dataNota = nota.dataCriacao
+          ? new Intl.DateTimeFormat('pt-BR', {
+              timeZone: 'America/Sao_Paulo',
+              day: '2-digit', month: '2-digit', year: 'numeric',
+            }).format(new Date(nota.dataCriacao))
+          : '-';
         page.drawText((idx + 1).toString(), { x: cols.col1, y, size: fontSize, font });
         page.drawText(nota.numeroNota || '-', { x: cols.col2, y, size: fontSize, font });
         page.drawText(dataNota, { x: cols.col3, y, size: fontSize, font });
@@ -605,7 +614,11 @@ const ListarControlesContent: React.FC = () => {
             
             // Adiciona a data mesmo no fallback
             if (signatureDate) {
-              const dateStr = new Date(signatureDate).toLocaleString('pt-BR');
+              const dateStr = new Intl.DateTimeFormat('pt-BR', {
+                timeZone: 'America/Sao_Paulo',
+                day: '2-digit', month: '2-digit', year: 'numeric',
+                hour: '2-digit', minute: '2-digit', hour12: false,
+              }).format(new Date(signatureDate));
               page.drawText(`Assinado em: ${dateStr}`, {
                 x,
                 y: fallbackY - 15,
@@ -1375,12 +1388,12 @@ const ListarControlesContent: React.FC = () => {
                       <Tooltip title="Ver detalhes completos">
                         <IconButton 
                           onClick={() => handleAbrirDetalhes(controle)}
-                          color={!controle.finalizado ? "success" : "primary"}
+                          color={!controle.finalizado ? 'success' : 'primary'}
                           size="small"
                           disabled={loadingButtons[controle.id]}
                           sx={{
                             ...buttonStyles,
-                            minHeight: '44px', // Melhor área de toque mobile
+                            minHeight: '44px',
                             minWidth: '44px',
                             '&:hover': {
                               backgroundColor: !controle.finalizado ? 'rgba(46, 125, 50, 0.08)' : 'rgba(25, 118, 210, 0.08)',
@@ -1392,7 +1405,7 @@ const ListarControlesContent: React.FC = () => {
                           <VisibilityIcon fontSize="small" />
                         </IconButton>
                       </Tooltip>
-                      
+
                       <Tooltip title="Gerar PDF">
                         <IconButton 
                           onClick={() => gerarPdf(controle)}
@@ -1404,7 +1417,7 @@ const ListarControlesContent: React.FC = () => {
                           <PictureAsPdfIcon fontSize="small" />
                         </IconButton>
                       </Tooltip>
-                      
+
                       {canEdit(controle) && (
                         <>
                           <Tooltip title="Editar">
@@ -1420,103 +1433,109 @@ const ListarControlesContent: React.FC = () => {
                               </IconButton>
                             </span>
                           </Tooltip>
-                          
-                          <Tooltip title="Excluir">
-                            <span>
-                              <IconButton 
-                                onClick={() => handleExcluirControle(controle)} 
-                                color="error" 
-                                size="small"
-                                disabled={loadingButtons[`delete_${controle.id}`]}
-                                sx={buttonStyles}
-                              >
-                                {loadingButtons[`delete_${controle.id}`] ? (
-                                  <CircularProgress size={20} color="inherit" />
-                                ) : (
-                                  <DeleteIcon fontSize="small" />
-                                )}
-                              </IconButton>
-                            </span>
-                          </Tooltip>
+
+                          {(
+                            (!controle.finalizado && (user?.tipo === 'ADMIN' || user?.tipo === 'GERENTE')) ||
+                            (controle.finalizado && user?.tipo === 'ADMIN')
+                          ) && (
+                            <Tooltip title="Excluir">
+                              <span>
+                                <IconButton 
+                                  onClick={() => handleExcluirControle(controle)} 
+                                  color="error" 
+                                  size="small"
+                                  disabled={loadingButtons[`delete_${controle.id}`]}
+                                  sx={buttonStyles}
+                                >
+                                  {loadingButtons[`delete_${controle.id}`] ? (
+                                    <CircularProgress size={20} color="inherit" />
+                                  ) : (
+                                    <DeleteIcon fontSize="small" />
+                                  )}
+                                </IconButton>
+                              </span>
+                            </Tooltip>
+                          )}
+
+                          {!controle.finalizado ? (
+                            <Tooltip title="Finalizar">
+                              <span>
+                                <Button
+                                  variant="contained"
+                                  color="primary"
+                                  size="small"
+                                  onClick={() => handleFinalizarControle(controle)}
+                                  disabled={loadingButtons[controle.id]}
+                                  sx={{
+                                    ...buttonStyles,
+                                    minWidth: '40px',
+                                    minHeight: '40px',
+                                    padding: '8px'
+                                  }}
+                                >
+                                  {loadingButtons[controle.id] ? (
+                                    <CircularProgress size={18} color="inherit" />
+                                  ) : (
+                                    <HowToRegIcon fontSize="small" />
+                                  )}
+                                </Button>
+                              </span>
+                            </Tooltip>
+                          ) : (
+                            <Box sx={{ display: 'flex', gap: 1 }}>
+                              <Tooltip title={controle.assinaturaMotorista ? 'Assinatura do motorista já registrada' : 'Assinar como motorista'}>
+                                <Button
+                                  variant="contained"
+                                  color={controle.assinaturaMotorista ? 'success' : 'primary'}
+                                  size="small"
+                                  onClick={() => handleAbrirAssinatura(controle, 'motorista')}
+                                  disabled={loadingButtons[`sign_motorista_${controle.id}`] || !controle.finalizado}
+                                  startIcon={controle.assinaturaMotorista ? 
+                                    <CheckCircleOutlineIcon /> : 
+                                    <EditIcon />
+                                  }
+                                  sx={{
+                                    ...buttonStyles,
+                                    textTransform: 'none',
+                                    fontWeight: 500,
+                                    letterSpacing: '0.5px',
+                                    display: controle.finalizado ? 'inline-flex' : 'none'
+                                  }}
+                                >
+                                  {loadingButtons[`sign_motorista_${controle.id}`] ? (
+                                    <CircularProgress size={16} color="inherit" sx={{ mr: 1 }} />
+                                  ) : null}
+                                  {controle.assinaturaMotorista ? 'Assinado' : 'Assinar'}
+                                </Button>
+                              </Tooltip>
+                              <Tooltip title={controle.assinaturaResponsavel ? 'Assinatura do responsável já registrada' : 'Assinar como responsável'}>
+                                <Button
+                                  variant="contained"
+                                  color={controle.assinaturaResponsavel ? 'success' : 'primary'}
+                                  size="small"
+                                  onClick={() => handleAbrirAssinatura(controle, 'responsavel')}
+                                  disabled={salvandoAssinatura || loadingButtons[`sign_responsavel_${controle.id}`] || !controle.finalizado}
+                                  startIcon={controle.assinaturaResponsavel ? 
+                                    <CheckCircleOutlineIcon /> : 
+                                    <EditIcon />
+                                  }
+                                  sx={{
+                                    ...buttonStyles,
+                                    textTransform: 'none',
+                                    fontWeight: 500,
+                                    letterSpacing: '0.5px',
+                                    display: controle.finalizado ? 'inline-flex' : 'none'
+                                  }}
+                                >
+                                  {loadingButtons[`sign_responsavel_${controle.id}`] ? (
+                                    <CircularProgress size={16} color="inherit" sx={{ mr: 1 }} />
+                                  ) : null}
+                                  {controle.assinaturaResponsavel ? 'Assinado' : 'Assinar'}
+                                </Button>
+                              </Tooltip>
+                            </Box>
+                          )}
                         </>
-                      )}
-                      {!controle.finalizado ? (
-                        <Tooltip title="Finalizar">
-                          <span>
-                            <Button
-                              variant="contained"
-                              color="primary"
-                              size="small"
-                              onClick={() => handleFinalizarControle(controle)}
-                              disabled={loadingButtons[controle.id]}
-                              sx={{
-                                ...buttonStyles,
-                                minWidth: '40px',
-                                minHeight: '40px',
-                                padding: '8px'
-                              }}
-                            >
-                              {loadingButtons[controle.id] ? (
-                                <CircularProgress size={18} color="inherit" />
-                              ) : (
-                                <HowToRegIcon fontSize="small" />
-                              )}
-                            </Button>
-                          </span>
-                        </Tooltip>
-                      ) : (
-                        <Box sx={{ display: 'flex', gap: 1 }}>
-                          <Tooltip title={controle.assinaturaMotorista ? 'Assinatura do motorista já registrada' : 'Assinar como motorista'}>
-                            <Button
-                              variant="contained"
-                              color={controle.assinaturaMotorista ? 'success' : 'primary'}
-                              size="small"
-                              onClick={() => handleAbrirAssinatura(controle, 'motorista')}
-                              disabled={loadingButtons[`sign_motorista_${controle.id}`] || !controle.finalizado}
-                              startIcon={controle.assinaturaMotorista ? 
-                                <CheckCircleOutlineIcon /> : 
-                                <EditIcon />
-                              }
-                              sx={{
-                                ...buttonStyles,
-                                textTransform: 'none',
-                                fontWeight: 500,
-                                letterSpacing: '0.5px',
-                                display: controle.finalizado ? 'inline-flex' : 'none'
-                              }}
-                            >
-                              {loadingButtons[`sign_motorista_${controle.id}`] ? (
-                                <CircularProgress size={16} color="inherit" sx={{ mr: 1 }} />
-                              ) : null}
-                              {controle.assinaturaMotorista ? 'Assinado' : 'Assinar'}
-                            </Button>
-                          </Tooltip>
-                          <Tooltip title={controle.assinaturaResponsavel ? 'Assinatura do responsável já registrada' : 'Assinar como responsável'}>
-                            <Button
-                              variant="contained"
-                              color={controle.assinaturaResponsavel ? 'success' : 'primary'}
-                              size="small"
-                              onClick={() => handleAbrirAssinatura(controle, 'responsavel')}
-                              disabled={salvandoAssinatura || loadingButtons[`sign_responsavel_${controle.id}`] || !controle.finalizado}
-                              startIcon={controle.assinaturaResponsavel ? 
-                                <CheckCircleOutlineIcon /> : 
-                                <EditIcon />
-                              }
-                              sx={{
-                                ...buttonStyles,
-                                textTransform: 'none',
-                                fontWeight: 500,
-                                letterSpacing: '0.5px',
-                                display: controle.finalizado ? 'inline-flex' : 'none'
-                              }}
-                            >
-                              {loadingButtons[`sign_responsavel_${controle.id}`] ? (
-                                <CircularProgress size={16} color="inherit" sx={{ mr: 1 }} />
-                              ) : null}
-                              {controle.assinaturaResponsavel ? 'Assinado' : 'Assinar'}
-                            </Button>
-                          </Tooltip>
-                        </Box>
                       )}
                     </Box>
                   </TableCell>

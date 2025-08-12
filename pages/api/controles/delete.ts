@@ -54,7 +54,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any;
     
-    // Verificar permissões
+    // Verificar permissões básicas
     if (!['ADMIN', 'GERENTE'].includes(decoded.tipo)) {
       return res.status(403).json({ error: 'Permissão negada' });
     }
@@ -67,6 +67,11 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     if (!controle) {
       return res.status(404).json({ error: 'Controle não encontrado' });
+    }
+
+    // Se o controle estiver finalizado, apenas ADMIN pode excluir
+    if (controle.finalizado && decoded.tipo !== 'ADMIN') {
+      return res.status(403).json({ error: 'Apenas ADMIN pode excluir controle finalizado' });
     }
 
     // Desvincular notas antes de excluir

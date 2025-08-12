@@ -21,10 +21,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             numeroManifesto: true,
             // Campo antigo ainda existente
             qtdPallets: true,
+            // Novos campos de pallets
+            qtdPalletsLevados: true,
+            qtdPalletsDevolvidos: true,
             observacao: true,
             finalizado: true,
             dataCriacao: true,
-            // Não selecionar campos novos ausentes no banco (qtdPalletsLevados, qtdPalletsDevolvidos, placaVeiculo)
+            // Seleciona placaVeiculo para exibir no PDF e na lista
+            placaVeiculo: true,
             notas: true,
           },
         });
