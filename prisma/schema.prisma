@@ -171,6 +171,7 @@ enum Transportadora {
   EXPRESSO_GOIAS
   ACCERT
   TERCEIRIZADA
+  DETAFRA_TRANSPORTES
 }
 
 enum AcaoPontuacao {

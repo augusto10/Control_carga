@@ -107,16 +107,20 @@ async function listar(req: NextApiRequest, res: NextApiResponse) {
       orderBy: { nome: 'asc' },
     });
 
+    // Mapeamento das transportadoras
+    const transportadorasMap: Record<string, string> = {
+      'ACERT': 'ACCERT Transportes',
+      'EXPRESSO_GOIAS': 'Expresso Goiás',
+      'TERCEIRIZADA': 'Terceirizada',
+      'DETAFRA_TRANSPORTES': 'Detafra Transportes'
+    };
+
     // Adiciona um objeto de descrição da transportadora para compatibilidade com o front-end
     const motoristas = motoristasDb.map((m: typeof motoristasDb[number]) => ({
       ...m,
       transportadora: {
         id: m.transportadoraId,
-        descricao: m.transportadoraId === 'ACERT' 
-          ? 'ACCERT Transportes' 
-          : m.transportadoraId === 'TERCEIRIZADA' 
-            ? 'Terceirizada' 
-            : 'Expresso Goiás',
+        descricao: transportadorasMap[m.transportadoraId] || m.transportadoraId,
       },
     }));
 

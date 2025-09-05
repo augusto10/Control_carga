@@ -301,7 +301,13 @@ const menuItems = [
   { 
     text: 'Relatórios e Análises', 
     icon: <ReportIcon />,
-    path: '/relatorios'
+    subItems: [
+      {
+        text: 'Relatório de Pallets',
+        icon: <AnalyticsIcon />,
+        path: '/relatorios/pallets'
+      }
+    ]
   },
   { 
     text: 'Meu Perfil', 

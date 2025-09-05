@@ -110,7 +110,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
 
         // Garantir que a transportadora tenha um valor válido
-        const transportadoraValida = (transportadora === 'ACERT' || transportadora === 'EXPRESSO_GOIAS' || transportadora === 'TERCEIRIZADA') 
+        const transportadoraValida = (['ACERT', 'EXPRESSO_GOIAS', 'TERCEIRIZADA', 'DETAFRA_TRANSPORTES'].includes(transportadora)) 
           ? transportadora 
           : 'ACERT';
           

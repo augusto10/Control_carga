@@ -105,20 +105,12 @@ const CriarControleContent: React.FC = () => {
   
   const [motoristas, setMotoristas] = useState<Motorista[]>([]);
   
-  // Opções fixas de transportadoras
-  // Usamos 'ACERT' como ID para compatibilidade com o backend, mas exibimos 'ACCERT' na interface
-  const transportadorasFixas = [
-    { id: 'ACERT', nome: 'ACCERT', descricao: 'ACCERT' },
-    { id: 'EXPRESSO_GOIAS', nome: 'EXPRESSO_GOIAS', descricao: 'EXPRESSO GOIÁS' },
-    { id: 'TERCEIRIZADA', nome: 'TERCEIRIZADA', descricao: 'TERCEIRIZADA' }
-  ];
-
   // Encontra a transportadora padrão (ACERT)
-  const transportadoraPadrao = transportadorasFixas.find(t => t.id === 'ACERT');
+  const transportadoraPadrao = transportadoras.find(t => t.id === 'ACERT') || transportadoras[0];
   
   // Função para obter o objeto da transportadora pelo ID
   const getTransportadoraById = (id: string) => {
-    const encontrada = transportadorasFixas.find(t => t.id === id);
+    const encontrada = transportadoras.find(t => t.id === id);
     if (!encontrada) {
       console.warn(`Transportadora com ID ${id} não encontrada, usando padrão`);
       return transportadoraPadrao;
@@ -126,7 +118,7 @@ const CriarControleContent: React.FC = () => {
     return encontrada;
   };
 
-  type Transportadora = 'ACERT' | 'EXPRESSO_GOIAS' | 'TERCEIRIZADA';
+  type Transportadora = 'ACERT' | 'EXPRESSO_GOIAS' | 'TERCEIRIZADA' | 'DETAFRA_TRANSPORTES';
   
   interface FormData {
     motorista: string;
@@ -274,7 +266,7 @@ const CriarControleContent: React.FC = () => {
         motorista: (formData.motorista || 'PENDENTE').trim(),
         cpfMotorista: formData.cpfMotorista ? formData.cpfMotorista.replace(/[^\d]/g, '') : 'PENDENTE',
         responsavel: (formData.responsavel || 'PENDENTE').trim(),
-        transportadora: (formData.transportadora === 'ACERT' || formData.transportadora === 'EXPRESSO_GOIAS' || formData.transportadora === 'TERCEIRIZADA') 
+        transportadora: (['ACERT', 'EXPRESSO_GOIAS', 'TERCEIRIZADA', 'DETAFRA_TRANSPORTES'].includes(formData.transportadora)) 
           ? formData.transportadora 
           : 'ACERT',
         qtdPalletsLevados: Number(formData.qtdPalletsLevados) || 0,
@@ -395,7 +387,7 @@ const CriarControleContent: React.FC = () => {
                       motorista: newValue.nome,
                       cpfMotorista: newValue.cpf,
                       telefoneMotorista: newValue.telefone || '',
-                      transportadora: (transportadoraSelecionada?.id === 'ACERT' || transportadoraSelecionada?.id === 'EXPRESSO_GOIAS' 
+                      transportadora: (['ACERT', 'EXPRESSO_GOIAS', 'TERCEIRIZADA', 'DETAFRA_TRANSPORTES'].includes(transportadoraSelecionada?.id) 
                         ? transportadoraSelecionada.id 
                         : 'ACERT') as Transportadora
                     }));
@@ -467,7 +459,7 @@ const CriarControleContent: React.FC = () => {
                 onChange={handleChange}
                 label="Transportadora"
               >
-                {transportadorasFixas.map((t) => (
+                {transportadoras.map((t) => (
                   <MenuItem key={t.id} value={t.id}>
                     {t.descricao}
                   </MenuItem>

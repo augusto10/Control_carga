@@ -31,6 +31,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         nome: 'TERCEIRIZADA',
         descricao: 'Terceirizada',
       },
+      {
+        id: 'DETAFRA_TRANSPORTES',
+        nome: 'DETAFRA_TRANSPORTES',
+        descricao: 'Detafra Transportes',
+      },
     ];
 
     return res.status(200).json(transportadoras);
