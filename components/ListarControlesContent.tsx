@@ -105,7 +105,8 @@ const ListarControlesContent: React.FC = () => {
     { id: 'ACERT', nome: 'ACCERT', descricao: 'ACCERT Transportes' },
     { id: 'EXPRESSO_GOIAS', nome: 'EXPRESSO_GOIAS', descricao: 'Expresso Goiás' },
     { id: 'TERCEIRIZADA', nome: 'TERCEIRIZADA', descricao: 'Terceirizada' },
-    { id: 'DETAFRA_TRANSPORTES', nome: 'DETAFRA_TRANSPORTES', descricao: 'Detafra Transportes' }
+    { id: 'DETAFRA_TRANSPORTES', nome: 'DETAFRA_TRANSPORTES', descricao: 'Detafra Transportes' },
+    { id: 'RETIRA_VENDEDOR', nome: 'RETIRA_VENDEDOR', descricao: 'Retira Vendedor' }
   ];
 
   // Função para obter o objeto da transportadora pelo ID
@@ -858,7 +859,7 @@ const ListarControlesContent: React.FC = () => {
       if (editData.responsavel !== undefined) dadosAtualizacao.responsavel = editData.responsavel as string;
       if (editData.cpfMotorista !== undefined) dadosAtualizacao.cpfMotorista = editData.cpfMotorista as string;
       if (editData.transportadora !== undefined) {
-        const transportadoraValida = (['ACERT', 'EXPRESSO_GOIAS', 'TERCEIRIZADA', 'DETAFRA_TRANSPORTES'].includes(editData.transportadora)) ? editData.transportadora : 'ACERT';
+        const transportadoraValida = (['ACERT', 'EXPRESSO_GOIAS', 'TERCEIRIZADA', 'DETAFRA_TRANSPORTES', 'RETIRA_VENDEDOR'].includes(editData.transportadora)) ? editData.transportadora : 'ACERT';
         dadosAtualizacao.transportadora = transportadoraValida;
       }
       if (editData.qtdPallets !== undefined) dadosAtualizacao.qtdPallets = Number(editData.qtdPallets) || 0;
@@ -1587,6 +1588,7 @@ const ListarControlesContent: React.FC = () => {
                 <MenuItem value="EXPRESSO_GOIAS">EXPRESSO GOIÁS</MenuItem>
                 <MenuItem value="TERCEIRIZADA">TERCEIRIZADA</MenuItem>
                 <MenuItem value="DETAFRA_TRANSPORTES">DETAFRA TRANSPORTES</MenuItem>
+                <MenuItem value="RETIRA_VENDEDOR">RETIRA VENDEDOR</MenuItem>
               </Select>
             </FormControl>
             <TextField

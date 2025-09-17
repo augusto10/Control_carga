@@ -87,6 +87,39 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     console.log(`Encontrados ${controles.length} controles`);
 
+    // Também buscar ajustes de pallets (devoluções avulsas) no período/filters
+    const whereAjustes: any = {};
+    if (filtros.dataCriacao?.gte || filtros.dataCriacao?.lte) {
+      whereAjustes.dataRecebimento = {
+        ...(filtros.dataCriacao?.gte ? { gte: filtros.dataCriacao.gte } : {}),
+        ...(filtros.dataCriacao?.lte ? { lte: filtros.dataCriacao.lte } : {}),
+      };
+    }
+    if (filtros.transportadora) {
+      whereAjustes.transportadora = filtros.transportadora;
+    }
+    if (filtros.motorista) {
+      // filtros.motorista é um objeto { contains, mode }
+      whereAjustes.motorista = filtros.motorista;
+    }
+
+    type AjusteRow = { motorista: string | null; transportadora: string | null; quantidade: number; dataRecebimento: Date };
+    let ajustes: AjusteRow[] = [];
+    try {
+      ajustes = await (prisma as any).palletAjuste.findMany({
+        where: whereAjustes,
+        select: {
+          motorista: true,
+          transportadora: true,
+          quantidade: true,
+          dataRecebimento: true,
+        },
+      });
+    } catch (e: any) {
+      // Se a tabela ainda não existir no ambiente (ex.: produção antes da migração), prosseguir sem ajustes
+      console.warn('Ajustes de pallets indisponíveis (tabela ausente). Prosseguindo sem somar ajustes.');
+    }
+
     // Agrupar dados por motorista e transportadora
     const agrupamento = new Map<string, RelatorioPallets>();
 
@@ -110,6 +143,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           totalPalletsDevolvidos: palletsDevolvidos,
           totalPalletsLiquido: palletsLevados - palletsDevolvidos,
           totalControles: 1
+        });
+      }
+    });
+
+    // Somar ajustes (devoluções avulsas) aos devolvidos
+    ajustes.forEach((aj: AjusteRow) => {
+      const motoristaKey = aj.motorista || 'DESCONHECIDO';
+      const transpKey = aj.transportadora || 'TERCEIRIZADA';
+      const chave = `${motoristaKey}|${transpKey}`;
+      if (agrupamento.has(chave)) {
+        const item = agrupamento.get(chave)!;
+        item.totalPalletsDevolvidos += aj.quantidade || 0;
+        item.totalPalletsLiquido = item.totalPalletsLevados - item.totalPalletsDevolvidos;
+      } else {
+        // Caso não exista controle no período para este par, criar entrada só com ajustes
+        const palletsDevolvidos = aj.quantidade || 0;
+        agrupamento.set(chave, {
+          motorista: motoristaKey,
+          transportadora: transpKey,
+          totalPalletsLevados: 0,
+          totalPalletsDevolvidos: palletsDevolvidos,
+          totalPalletsLiquido: 0 - palletsDevolvidos,
+          totalControles: 0,
         });
       }
     });

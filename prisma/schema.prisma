@@ -69,6 +69,7 @@ model Usuario {
   pedidosValidados  PedidoConferido[]    @relation("Validacao")
   pontuacao         PontuacaoUsuario?
   auditoriasAcesso  AuditoriaAcesso[]
+  ajustesPallets    PalletAjuste[]
 }
 
 model AuditoriaAcesso {
@@ -166,12 +167,30 @@ model HistoricoPontuacao {
   @@index([dataAcao])
 }
 
+/// Registros de recebimento/ajuste de pallets devolvidos "avulsos"
+model PalletAjuste {
+  id               String         @id @default(uuid())
+  dataCriacao      DateTime       @default(now())
+  dataRecebimento  DateTime       @default(now())
+  motorista        String?
+  transportadora   String?
+  quantidade       Int            // quantidade devolvida neste recebimento (sempre positiva)
+  observacao       String?
+  usuarioId        String
+  usuario          Usuario        @relation(fields: [usuarioId], references: [id])
+
+  @@index([dataRecebimento])
+  @@index([transportadora])
+  @@index([usuarioId])
+}
+
 enum Transportadora {
   ACERT
   EXPRESSO_GOIAS
   ACCERT
   TERCEIRIZADA
   DETAFRA_TRANSPORTES
+  RETIRA_VENDEDOR
 }
 
 enum AcaoPontuacao {

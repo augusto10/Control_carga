@@ -33,12 +33,30 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           },
         });
         
+        // Processar controles para identificar RETIRA_VENDEDOR pelo marcador [RV]
+        const controlesProcessados = controles.map(controle => {
+          let transportadora = controle.transportadora;
+          let motorista = controle.motorista;
+          
+          // Se o motorista tem marcador [RV], é RETIRA_VENDEDOR
+          if (controle.motorista.includes('[RV]')) {
+            transportadora = 'RETIRA_VENDEDOR' as any;
+            motorista = controle.motorista.replace(' [RV]', '');
+          }
+          
+          return {
+            ...controle,
+            motorista,
+            transportadora
+          };
+        });
+        
         // Adiciona cabeçalhos para evitar cache
         res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
         res.setHeader('Pragma', 'no-cache');
         res.setHeader('Expires', '0');
         
-        res.status(200).json(controles);
+        res.status(200).json(controlesProcessados);
       } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Erro ao listar controles' });
@@ -110,20 +128,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
 
         // Garantir que a transportadora tenha um valor válido
-        const transportadoraValida = (['ACERT', 'EXPRESSO_GOIAS', 'TERCEIRIZADA', 'DETAFRA_TRANSPORTES'].includes(transportadora)) 
+        const transportadoraValida = (['ACERT', 'EXPRESSO_GOIAS', 'TERCEIRIZADA', 'DETAFRA_TRANSPORTES', 'RETIRA_VENDEDOR'].includes(transportadora)) 
           ? transportadora 
           : 'ACERT';
+
+        // SOLUÇÃO TEMPORÁRIA: Mapear RETIRA_VENDEDOR para TERCEIRIZADA no banco (igual aos motoristas)
+        let transportadoraParaBanco = transportadoraValida;
+        let motoristaParaSalvar = motorista.trim();
+        
+        if (transportadoraValida === 'RETIRA_VENDEDOR') {
+          transportadoraParaBanco = 'TERCEIRIZADA';
+          // Adicionar marcador [RV] no nome do motorista para identificar depois
+          if (!motoristaParaSalvar.includes('[RV]')) {
+            motoristaParaSalvar = `${motoristaParaSalvar} [RV]`;
+          }
+          console.log('[Controle] Mapeando RETIRA_VENDEDOR -> TERCEIRIZADA para compatibilidade');
+        }
           
         // Gera o próximo número de manifesto automaticamente
-        const numeroManifestoFinal = numeroManifesto || await gerarProximoNumeroManifesto(transportadoraValida);
+        const numeroManifestoFinal = numeroManifesto || await gerarProximoNumeroManifesto(transportadoraParaBanco);
         
         // Criar o controle com os dados fornecidos
         const controle = await prisma.controleCarga.create({
           data: {
-            motorista: motorista.trim(),
+            motorista: motoristaParaSalvar,
             cpfMotorista: cpfMotorista ? cpfMotorista.replace(/[\D]/g, '') : 'PENDENTE',
             responsavel: responsavel.trim(),
-            transportadora: transportadoraValida as Transportadora,
+            transportadora: transportadoraParaBanco as Transportadora,
             numeroManifesto: numeroManifestoFinal,
             // Compatibilidade: manter campo antigo como diferença
             qtdPallets: typeof qtdPallets !== 'undefined' ? Number(qtdPallets) || 0 : (levadosNum - devolvidosNum),
@@ -149,6 +180,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             notas: true
           }
         });
+        
+        // Se foi mapeado RETIRA_VENDEDOR, ajustar o retorno
+        if (transportadoraValida === 'RETIRA_VENDEDOR') {
+          (controle as any).transportadora = 'RETIRA_VENDEDOR';
+          (controle as any).motorista = motorista.trim(); // Retornar nome sem marcador
+        }
         
         res.status(201).json(controle);
       } catch (error: any) {

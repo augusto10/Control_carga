@@ -118,7 +118,7 @@ const CriarControleContent: React.FC = () => {
     return encontrada;
   };
 
-  type Transportadora = 'ACERT' | 'EXPRESSO_GOIAS' | 'TERCEIRIZADA' | 'DETAFRA_TRANSPORTES';
+  type Transportadora = 'ACERT' | 'EXPRESSO_GOIAS' | 'TERCEIRIZADA' | 'DETAFRA_TRANSPORTES' | 'RETIRA_VENDEDOR';
   
   interface FormData {
     motorista: string;
@@ -266,7 +266,7 @@ const CriarControleContent: React.FC = () => {
         motorista: (formData.motorista || 'PENDENTE').trim(),
         cpfMotorista: formData.cpfMotorista ? formData.cpfMotorista.replace(/[^\d]/g, '') : 'PENDENTE',
         responsavel: (formData.responsavel || 'PENDENTE').trim(),
-        transportadora: (['ACERT', 'EXPRESSO_GOIAS', 'TERCEIRIZADA', 'DETAFRA_TRANSPORTES'].includes(formData.transportadora)) 
+        transportadora: (['ACERT', 'EXPRESSO_GOIAS', 'TERCEIRIZADA', 'DETAFRA_TRANSPORTES', 'RETIRA_VENDEDOR'].includes(formData.transportadora)) 
           ? formData.transportadora 
           : 'ACERT',
         qtdPalletsLevados: Number(formData.qtdPalletsLevados) || 0,
@@ -387,7 +387,7 @@ const CriarControleContent: React.FC = () => {
                       motorista: newValue.nome,
                       cpfMotorista: newValue.cpf,
                       telefoneMotorista: newValue.telefone || '',
-                      transportadora: (['ACERT', 'EXPRESSO_GOIAS', 'TERCEIRIZADA', 'DETAFRA_TRANSPORTES'].includes(transportadoraSelecionada?.id) 
+                      transportadora: (['ACERT', 'EXPRESSO_GOIAS', 'TERCEIRIZADA', 'DETAFRA_TRANSPORTES', 'RETIRA_VENDEDOR'].includes(transportadoraSelecionada?.id) 
                         ? transportadoraSelecionada.id 
                         : 'ACERT') as Transportadora
                     }));

@@ -112,17 +112,31 @@ async function listar(req: NextApiRequest, res: NextApiResponse) {
       'ACERT': 'ACCERT Transportes',
       'EXPRESSO_GOIAS': 'Expresso Goiás',
       'TERCEIRIZADA': 'Terceirizada',
-      'DETAFRA_TRANSPORTES': 'Detafra Transportes'
+      'DETAFRA_TRANSPORTES': 'Detafra Transportes',
+      'RETIRA_VENDEDOR': 'Retira Vendedor'
     };
 
     // Adiciona um objeto de descrição da transportadora para compatibilidade com o front-end
-    const motoristas = motoristasDb.map((m: typeof motoristasDb[number]) => ({
-      ...m,
-      transportadora: {
-        id: m.transportadoraId,
-        descricao: transportadorasMap[m.transportadoraId] || m.transportadoraId,
-      },
-    }));
+    const motoristas = motoristasDb.map((m: typeof motoristasDb[number]) => {
+      let transportadoraId = m.transportadoraId;
+      let nome = m.nome;
+      
+      // LÓGICA TEMPORÁRIA: Identificar motoristas "RETIRA_VENDEDOR" pelo marcador [RV] no nome
+      if (m.nome.includes('[RV]')) {
+        transportadoraId = 'RETIRA_VENDEDOR' as any;
+        nome = m.nome.replace(' [RV]', ''); // Remover o marcador do nome
+      }
+      
+      return {
+        ...m,
+        nome,
+        transportadoraId,
+        transportadora: {
+          id: transportadoraId,
+          descricao: transportadorasMap[transportadoraId] || transportadoraId,
+        },
+      };
+    });
 
     return res.status(200).json(motoristas);
   } catch (error) {
@@ -178,6 +192,9 @@ async function criar(req: NextApiRequest, res: NextApiResponse) {
     transportadoraId?: Transportadora;
   };
 
+  console.log('[Motorista] Dados recebidos:', { nome, telefone, cpf, cnh, transportadoraId });
+  console.log('[Motorista] Tipo da transportadoraId:', typeof transportadoraId);
+
   if (!nome?.trim()) return res.status(400).json({ error: 'Nome é obrigatório' });
   if (!telefone?.trim()) return res.status(400).json({ error: 'Telefone é obrigatório' });
   if (!cpf?.trim()) return res.status(400).json({ error: 'CPF é obrigatório' });
@@ -185,19 +202,70 @@ async function criar(req: NextApiRequest, res: NextApiResponse) {
   if (!transportadoraId?.trim())
     return res.status(400).json({ error: 'Transportadora é obrigatória' });
 
+  // Validar se a transportadora é válida
+  const transportadorasValidas = ['ACERT', 'EXPRESSO_GOIAS', 'TERCEIRIZADA', 'DETAFRA_TRANSPORTES', 'RETIRA_VENDEDOR'];
+  if (!transportadorasValidas.includes(transportadoraId)) {
+    return res.status(400).json({ 
+      error: `Transportadora inválida: ${transportadoraId}. Valores aceitos: ${transportadorasValidas.join(', ')}` 
+    });
+  }
+
+  // SOLUÇÃO TEMPORÁRIA: Mapear RETIRA_VENDEDOR para uma transportadora existente no banco
+  // Isso permite que a funcionalidade funcione sem alterar o enum do banco
+  let transportadoraParaBanco = transportadoraId as Transportadora;
+  if ((transportadoraId as string) === 'RETIRA_VENDEDOR') {
+    transportadoraParaBanco = 'TERCEIRIZADA' as Transportadora; // Usar TERCEIRIZADA como base no banco
+    console.log('[Motorista] Mapeando RETIRA_VENDEDOR -> TERCEIRIZADA para compatibilidade com banco');
+  }
+
   try {
+    console.log('[Motorista] Verificando duplicidade por CPF:', cpf);
+    
     // Verificar duplicidade por CPF
     const existente = await prisma.motorista.findUnique({ where: { cpf } });
     if (existente) {
+      console.log('[Motorista] CPF já existe:', existente);
       return res.status(400).json({ error: 'Já existe motorista com esse CPF' });
     }
 
-    const novo = await prisma.motorista.create({
-      data: { nome, telefone, cpf, cnh, transportadoraId },
+    console.log('[Motorista] Criando motorista com dados:', { 
+      nome, telefone, cpf, cnh, 
+      transportadoraOriginal: transportadoraId,
+      transportadoraParaBanco 
     });
+    
+    // Criar motorista usando a transportadora mapeada para o banco
+    // Se for RETIRA_VENDEDOR, adicionar um marcador no nome para identificar depois
+    let nomeParaSalvar = nome;
+    if ((transportadoraId as string) === 'RETIRA_VENDEDOR') {
+      nomeParaSalvar = `${nome} [RV]`; // Adicionar marcador [RV] = Retira Vendedor
+    }
+    
+    const novo = await prisma.motorista.create({
+      data: { nome: nomeParaSalvar, telefone, cpf, cnh, transportadoraId: transportadoraParaBanco },
+    });
+    
+    // Se foi mapeado RETIRA_VENDEDOR, ajustar o retorno para mostrar a transportadora original e nome limpo
+    if ((transportadoraId as string) === 'RETIRA_VENDEDOR') {
+      (novo as any).transportadoraId = 'RETIRA_VENDEDOR';
+      (novo as any).nome = nome; // Retornar nome sem o marcador
+    }
+    
+    console.log('[Motorista] Motorista criado com sucesso:', novo);
+    
     return res.status(201).json(novo);
   } catch (error: any) {
-    console.error('Erro ao criar motorista:', error);
-    return res.status(500).json({ error: 'Erro interno do servidor', message: error.message });
+    console.error('[Motorista] Erro detalhado ao criar motorista:', {
+      message: error.message,
+      code: error.code,
+      meta: error.meta,
+      stack: error.stack
+    });
+    return res.status(500).json({ 
+      error: 'Erro interno do servidor', 
+      message: error.message,
+      code: error.code,
+      details: error.meta 
+    });
   }
 }

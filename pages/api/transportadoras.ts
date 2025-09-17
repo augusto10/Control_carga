@@ -36,6 +36,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         nome: 'DETAFRA_TRANSPORTES',
         descricao: 'Detafra Transportes',
       },
+      {
+        id: 'RETIRA_VENDEDOR',
+        nome: 'RETIRA_VENDEDOR',
+        descricao: 'Retira Vendedor',
+      },
     ];
 
     return res.status(200).json(transportadoras);

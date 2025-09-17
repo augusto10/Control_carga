@@ -59,7 +59,7 @@ const VincularNotasPage = () => {
   const [motorista, setMotorista] = useState('');
   const [cpfMotorista, setCpfMotorista] = useState('');
   const [responsavel, setResponsavel] = useState('');
-  const [transportadora, setTransportadora] = useState<'ACERT' | 'EXPRESSO_GOIAS' | 'TERCEIRIZADA' | 'DETAFRA_TRANSPORTES'>('ACERT');
+  const [transportadora, setTransportadora] = useState<'ACERT' | 'EXPRESSO_GOIAS' | 'TERCEIRIZADA' | 'DETAFRA_TRANSPORTES' | 'RETIRA_VENDEDOR'>('ACERT');
   const [numeroManifesto, setNumeroManifesto] = useState('');
   const [qtdPallets, setQtdPallets] = useState<number>(0);
   const [observacao, setObservacao] = useState('');
@@ -415,7 +415,7 @@ const VincularNotasPage = () => {
               label="Transportadora"
               value={transportadora}
               onChange={(e: React.ChangeEvent<{ value: unknown }>) => 
-                setTransportadora(e.target.value as 'ACERT' | 'EXPRESSO_GOIAS' | 'TERCEIRIZADA' | 'DETAFRA_TRANSPORTES')
+                setTransportadora(e.target.value as 'ACERT' | 'EXPRESSO_GOIAS' | 'TERCEIRIZADA' | 'DETAFRA_TRANSPORTES' | 'RETIRA_VENDEDOR')
               }
               fullWidth
               margin="normal"
@@ -424,6 +424,7 @@ const VincularNotasPage = () => {
               <MenuItem value="EXPRESSO_GOIAS">Expresso Goiás</MenuItem>
               <MenuItem value="TERCEIRIZADA">TERCEIRIZADA</MenuItem>
               <MenuItem value="DETAFRA_TRANSPORTES">Detafra Transportes</MenuItem>
+              <MenuItem value="RETIRA_VENDEDOR">Retira Vendedor</MenuItem>
             </TextField>
             
             <TextField
