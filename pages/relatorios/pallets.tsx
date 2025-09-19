@@ -310,8 +310,14 @@ const RelatorioPalletsPage: React.FC = () => {
                     <Typography variant="body2">
                       <strong>Pallets Devolvidos:</strong> {resumo.totalPalletsDevolvidos}
                     </Typography>
-                    <Typography variant="body2" color="primary">
-                      <strong>Pallets Líquido:</strong> {resumo.totalPalletsLiquido}
+                    <Typography 
+                      variant="body2" 
+                      sx={{ 
+                        color: resumo.totalPalletsDevolvidos > resumo.totalPalletsLevados ? 'green' : 'red',
+                        fontWeight: 'bold'
+                      }}
+                    >
+                      <strong>Diferença Pallets:</strong> {resumo.totalPalletsDevolvidos > resumo.totalPalletsLevados ? '+' : '-'}{Math.abs(resumo.totalPalletsLiquido)}
                     </Typography>
                     <Typography variant="body2">
                       <strong>Total de Controles:</strong> {resumo.totalControles}
@@ -340,7 +346,7 @@ const RelatorioPalletsPage: React.FC = () => {
                 <TableCell><strong>Transportadora</strong></TableCell>
                 <TableCell align="right"><strong>Pallets Levados</strong></TableCell>
                 <TableCell align="right"><strong>Pallets Devolvidos</strong></TableCell>
-                <TableCell align="right"><strong>Pallets Líquido</strong></TableCell>
+                <TableCell align="right"><strong>Diferença Pallets</strong></TableCell>
                 <TableCell align="right"><strong>Total Controles</strong></TableCell>
               </TableRow>
             </TableHead>
@@ -366,8 +372,10 @@ const RelatorioPalletsPage: React.FC = () => {
                     <TableCell align="right">{item.totalPalletsLevados}</TableCell>
                     <TableCell align="right">{item.totalPalletsDevolvidos}</TableCell>
                     <TableCell align="right">
-                      <strong style={{ color: item.totalPalletsLiquido >= 0 ? 'green' : 'red' }}>
-                        {item.totalPalletsLiquido}
+                      <strong style={{ 
+                        color: item.totalPalletsDevolvidos > item.totalPalletsLevados ? 'green' : 'red' 
+                      }}>
+                        {item.totalPalletsDevolvidos > item.totalPalletsLevados ? '+' : '-'}{Math.abs(item.totalPalletsLiquido)}
                       </strong>
                     </TableCell>
                     <TableCell align="right">{item.totalControles}</TableCell>

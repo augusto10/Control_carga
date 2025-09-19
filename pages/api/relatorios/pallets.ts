@@ -9,7 +9,7 @@ interface RelatorioPallets {
   transportadora: string;
   totalPalletsLevados: number;
   totalPalletsDevolvidos: number;
-  totalPalletsLiquido: number;
+  totalPalletsLiquido: number; // Mantém o nome original para compatibilidade da API
   totalControles: number;
 }
 
@@ -17,7 +17,7 @@ interface ResumoTransportadora {
   transportadora: string;
   totalPalletsLevados: number;
   totalPalletsDevolvidos: number;
-  totalPalletsLiquido: number;
+  totalPalletsLiquido: number; // Mantém o nome original para compatibilidade da API
   totalControles: number;
   totalMotoristas: number;
 }

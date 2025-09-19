@@ -49,8 +49,47 @@ function AdminDashboardContent() {
   const loadStats = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/api/admin/dashboard');
-      setStats(response.data);
+      
+      // Buscar dados reais de diferentes endpoints
+      const [usuariosRes, controlesRes] = await Promise.all([
+        fetch('/api/admin/usuarios', { credentials: 'include' }),
+        fetch('/api/controles', { credentials: 'include' })
+      ]);
+
+      let statsData: DashboardStats = {
+        totalUsuarios: 0,
+        usuariosAtivos: 0,
+        totalControles: 0,
+        controlesFinalizados: 0,
+        controlesPendentes: 0,
+        ultimosUsuarios: []
+      };
+
+      // Processar dados de usuários
+      if (usuariosRes.ok) {
+        const usuarios = await usuariosRes.json();
+        statsData.totalUsuarios = usuarios.length;
+        statsData.usuariosAtivos = usuarios.filter((u: any) => u.ativo).length;
+        statsData.ultimosUsuarios = usuarios
+          .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+          .slice(0, 5)
+          .map((u: any) => ({
+            id: u.id,
+            nome: u.nome,
+            email: u.email,
+            ultimoAcesso: u.updatedAt
+          }));
+      }
+
+      // Processar dados de controles
+      if (controlesRes.ok) {
+        const controles = await controlesRes.json();
+        statsData.totalControles = controles.length;
+        statsData.controlesFinalizados = controles.filter((c: any) => c.finalizado).length;
+        statsData.controlesPendentes = controles.filter((c: any) => !c.finalizado).length;
+      }
+
+      setStats(statsData);
     } catch (error) {
       console.error('Erro ao carregar estatísticas:', error);
     } finally {
@@ -60,6 +99,13 @@ function AdminDashboardContent() {
 
   useEffect(() => {
     loadStats();
+    
+    // Atualizar dados automaticamente a cada 3 minutos
+    const interval = setInterval(() => {
+      loadStats();
+    }, 3 * 60 * 1000);
+
+    return () => clearInterval(interval);
   }, []);
 
   const StatCard = ({ 

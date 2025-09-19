@@ -1,14 +1,16 @@
 import { useState, useEffect } from 'react';
-import { Button, Container, Typography, Box, CircularProgress, Chip, TextField, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, IconButton, Tooltip, Paper } from '@mui/material';
-import { DeleteRounded } from '@mui/icons-material';
+import { Button, Container, Typography, Box, CircularProgress, Chip, TextField, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, IconButton, Tooltip, Paper, Grid, Card, CardContent } from '@mui/material';
+import { DeleteRounded, Search as SearchIcon, Today as TodayIcon, CalendarMonth as CalendarIcon } from '@mui/icons-material';
 import { useStore } from '../store/store';
 import { enqueueSnackbar } from 'notistack';
 import { format } from 'date-fns';
 
 const ListarNotas = () => {
   const [loading, setLoading] = useState(true);
-  const [start, setStart] = useState('');
-  const [end, setEnd] = useState('');
+  // Inicializar com a data atual
+  const hoje = format(new Date(), 'yyyy-MM-dd');
+  const [start, setStart] = useState(hoje);
+  const [end, setEnd] = useState(hoje);
   const { notas, fetchNotas } = useStore();
 
   useEffect(() => {
@@ -19,75 +21,185 @@ const ListarNotas = () => {
     loadNotas();
   }, [fetchNotas, start, end]);
 
+  const handleFiltrarHoje = () => {
+    const hoje = format(new Date(), 'yyyy-MM-dd');
+    setStart(hoje);
+    setEnd(hoje);
+    setLoading(true);
+  };
+
+  const handleLimparFiltros = () => {
+    setStart('');
+    setEnd('');
+    setLoading(true);
+  };
+
   return (
-    <Container maxWidth="sm">
-      <Typography variant="h4" component="h1" gutterBottom>
-        Consultar Notas
+    <Container maxWidth="xl">
+      <Typography variant="h4" component="h1" gutterBottom sx={{ mb: 3 }}>
+        Consultar Notas Fiscais
       </Typography>
-      <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
-        <TextField
-          label="Data início"
-          type="date"
-          InputLabelProps={{ shrink: true }}
-          value={start}
-          onChange={(e) => setStart(e.target.value)}
-        />
-        <TextField
-          label="Data fim"
-          type="date"
-          InputLabelProps={{ shrink: true }}
-          value={end}
-          onChange={(e) => setEnd(e.target.value)}
-        />
-        <Button variant="contained" onClick={() => setLoading(true)}>Filtrar</Button>
-      </Box>
+      
+      {/* Filtros */}
+      <Card sx={{ mb: 3, boxShadow: 2 }}>
+        <CardContent>
+          <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <SearchIcon color="primary" />
+            Filtros de Consulta
+          </Typography>
+          <Grid container spacing={2} alignItems="center">
+            <Grid item xs={12} sm={3}>
+              <TextField
+                fullWidth
+                label="Data Início"
+                type="date"
+                InputLabelProps={{ shrink: true }}
+                value={start}
+                onChange={(e) => setStart(e.target.value)}
+                size="small"
+              />
+            </Grid>
+            <Grid item xs={12} sm={3}>
+              <TextField
+                fullWidth
+                label="Data Fim"
+                type="date"
+                InputLabelProps={{ shrink: true }}
+                value={end}
+                onChange={(e) => setEnd(e.target.value)}
+                size="small"
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                <Button 
+                  variant="contained" 
+                  startIcon={<TodayIcon />}
+                  onClick={handleFiltrarHoje}
+                  size="small"
+                >
+                  Hoje
+                </Button>
+                <Button 
+                  variant="outlined" 
+                  startIcon={<CalendarIcon />}
+                  onClick={handleLimparFiltros}
+                  size="small"
+                >
+                  Todas as Datas
+                </Button>
+                <Button 
+                  variant="contained" 
+                  color="secondary"
+                  startIcon={<SearchIcon />}
+                  onClick={() => setLoading(true)}
+                  size="small"
+                >
+                  Buscar
+                </Button>
+              </Box>
+            </Grid>
+          </Grid>
+          
+          {/* Resumo */}
+          <Box sx={{ mt: 2, p: 2, bgcolor: '#f5f5f5', borderRadius: 1 }}>
+            <Typography variant="body2" color="text.secondary">
+              <strong>Período:</strong> {start ? format(new Date(start), 'dd/MM/yyyy') : 'Sem limite'} até {end ? format(new Date(end), 'dd/MM/yyyy') : 'Sem limite'}
+              {' | '}
+              <strong>Total encontrado:</strong> {notas.length} nota(s)
+            </Typography>
+          </Box>
+        </CardContent>
+      </Card>
       {loading ? (
         <Box sx={{ display: 'flex', justifyContent: 'center' }}>
           <CircularProgress />
         </Box>
       ) : (
-        <Box sx={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
-          <TableContainer component={Paper} sx={{ mt: 3, borderRadius: 3, boxShadow: 4, overflowX: 'auto', width: '90%', maxWidth: 1200, minWidth: 700 }}>
-          <Table size="small">
+        <TableContainer component={Paper} sx={{ borderRadius: 2, boxShadow: 3 }}>
+          <Table>
             <TableHead>
-              <TableRow sx={{ backgroundColor: '#ff9800', height: 48 }}>
-                <TableCell sx={{ color: '#fff', fontWeight: 'bold', fontSize: 15, px: 2 }}>Data</TableCell>
-                <TableCell sx={{ color: '#fff', fontWeight: 'bold', fontSize: 15, px: 2 }}>Número da Nota</TableCell>
-                <TableCell sx={{ color: '#fff', fontWeight: 'bold', fontSize: 15, px: 2 }}>Status</TableCell>
-                <TableCell sx={{ color: '#fff', fontWeight: 'bold', fontSize: 15, px: 2 }}>Ações</TableCell>
+              <TableRow sx={{ backgroundColor: '#ff6b35' }}>
+                <TableCell sx={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>
+                  Data de Criação
+                </TableCell>
+                <TableCell sx={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>
+                  Número da Nota
+                </TableCell>
+                <TableCell sx={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>
+                  Status
+                </TableCell>
+                <TableCell sx={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }} align="center">
+                  Ações
+                </TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {notas.map((nota, idx) => (
-                <TableRow key={nota.id} sx={{ backgroundColor: idx % 2 === 0 ? '#fff9f1' : '#fff', height: 54 }}>
-                  <TableCell sx={{ minWidth: 120, fontSize: 14, py: 1, px: 2 }}>{nota.dataCriacao ? format(new Date(nota.dataCriacao), 'dd/MM/yyyy') : '-'}</TableCell>
-                  <TableCell sx={{ minWidth: 120, fontSize: 14, py: 1, px: 2 }}>{nota.numeroNota}</TableCell>
-                  <TableCell>
-                    {nota.controleId ? (
-                      <Chip label="Em carga" color="success" size="small" sx={{ minWidth: 90, fontWeight: 600, letterSpacing: 0.5, fontSize: 13, height: 28, px: 1 }} />
-                    ) : (
-                      <Chip label="Disponível" color="warning" size="small" sx={{ minWidth: 90, fontWeight: 600, letterSpacing: 0.5, fontSize: 13, height: 28, px: 1 }} />
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {!nota.controleId && (
-                      <Tooltip title="Excluir Nota">
-                        <IconButton 
-                          onClick={() => handleExcluirNota(nota.id)} 
-                          size="small" 
-                          sx={{ ml: 1, color: '#ff5722', bgcolor: '#fff3e0', borderRadius: 2, '&:hover': { bgcolor: '#ffe0b2', color: '#d84315' } }}
-                        >
-                          <DeleteRounded fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                    )}
+              {notas.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={4} align="center" sx={{ py: 4 }}>
+                    <Typography variant="body1" color="text.secondary">
+                      {start || end ? 'Nenhuma nota encontrada para o período selecionado.' : 'Nenhuma nota cadastrada.'}
+                    </Typography>
                   </TableCell>
                 </TableRow>
-              ))}
+              ) : (
+                notas.map((nota, idx) => (
+                  <TableRow 
+                    key={nota.id} 
+                    sx={{ 
+                      backgroundColor: idx % 2 === 0 ? '#fff' : '#f8fafc',
+                      '&:hover': { backgroundColor: '#fff3e0' }
+                    }}
+                  >
+                    <TableCell sx={{ fontSize: 14, py: 2 }}>
+                      {nota.dataCriacao ? format(new Date(nota.dataCriacao), 'dd/MM/yyyy HH:mm') : '-'}
+                    </TableCell>
+                    <TableCell sx={{ fontSize: 14, py: 2, fontWeight: 500 }}>
+                      {nota.numeroNota}
+                    </TableCell>
+                    <TableCell sx={{ py: 2 }}>
+                      {nota.controleId ? (
+                        <Chip 
+                          label="Em Carga" 
+                          color="success" 
+                          size="small" 
+                          sx={{ fontWeight: 600, minWidth: 90 }} 
+                        />
+                      ) : (
+                        <Chip 
+                          label="Disponível" 
+                          color="warning" 
+                          size="small" 
+                          sx={{ fontWeight: 600, minWidth: 90 }} 
+                        />
+                      )}
+                    </TableCell>
+                    <TableCell align="center" sx={{ py: 2 }}>
+                      {!nota.controleId && (
+                        <Tooltip title="Excluir Nota Fiscal">
+                          <IconButton 
+                            onClick={() => handleExcluirNota(nota.id)} 
+                            size="small" 
+                            sx={{ 
+                              color: '#d32f2f', 
+                              '&:hover': { 
+                                backgroundColor: '#ffebee',
+                                color: '#b71c1c'
+                              } 
+                            }}
+                          >
+                            <DeleteRounded />
+                          </IconButton>
+                        </Tooltip>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </TableContainer>
-        </Box>
       )}
     </Container>
   );

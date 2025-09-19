@@ -80,7 +80,7 @@ export default function RelatorioPalletsPorMotorista() {
             <div><span className="font-semibold">Total Motoristas:</span> {data.length}</div>
             <div><span className="font-semibold">Pallets Levados:</span> {totalLevados}</div>
             <div><span className="font-semibold">Pallets Devolvidos:</span> {totalDevolvidos}</div>
-            <div><span className="font-semibold">Diferença:</span> {totalDiferenca}</div>
+            <div><span className="font-semibold">Diferença Pallets:</span> <span className={totalDevolvidos > totalLevados ? 'text-green-700' : 'text-red-700'}>{totalDevolvidos > totalLevados ? '+' : '-'}{Math.abs(totalDiferenca)}</span></div>
           </div>
         </div>
 
@@ -92,7 +92,7 @@ export default function RelatorioPalletsPorMotorista() {
                 <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CPF</th>
                 <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Levados</th>
                 <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Devolvidos</th>
-                <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Diferença</th>
+                <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Diferença Pallets</th>
                 <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Qtde Controles</th>
               </tr>
             </thead>
@@ -103,7 +103,7 @@ export default function RelatorioPalletsPorMotorista() {
                   <td className="px-4 py-2 whitespace-nowrap">{row.cpfMotorista || '-'}</td>
                   <td className="px-4 py-2 text-right">{row.qtdPalletsLevados}</td>
                   <td className="px-4 py-2 text-right">{row.qtdPalletsDevolvidos}</td>
-                  <td className={`px-4 py-2 text-right ${row.diferenca >= 0 ? 'text-green-700' : 'text-red-700'}`}>{row.diferenca}</td>
+                  <td className={`px-4 py-2 text-right ${row.qtdPalletsDevolvidos > row.qtdPalletsLevados ? 'text-green-700' : 'text-red-700'}`}>{row.qtdPalletsDevolvidos > row.qtdPalletsLevados ? '+' : '-'}{Math.abs(row.diferenca)}</td>
                   <td className="px-4 py-2 text-right">{row.totalControles}</td>
                 </tr>
               ))}

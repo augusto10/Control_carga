@@ -128,29 +128,51 @@ const PainelGerencial: React.FC = () => {
     try {
       setLoading(true);
       
-      // Carregar funcionários logados (simulação - implementar API real)
-      const funcionariosResponse = await fetch('/api/admin/usuarios');
+      // Carregar funcionários ativos
+      const funcionariosResponse = await fetch('/api/admin/usuarios', {
+        credentials: 'include'
+      });
       if (funcionariosResponse.ok) {
         const funcionariosData = await funcionariosResponse.json();
-        setFuncionarios(funcionariosData.filter((f: any) => f.ativo));
+        const funcionariosAtivos = funcionariosData.filter((f: any) => f.ativo);
+        setFuncionarios(funcionariosAtivos);
       }
 
       // Carregar controles
-      const controlesResponse = await fetch('/api/controles');
+      const controlesResponse = await fetch('/api/controles', {
+        credentials: 'include'
+      });
       if (controlesResponse.ok) {
         const controlesData = await controlesResponse.json();
         setControles(controlesData);
+        
+        // Calcular estatísticas dos controles
+        const controlesPendentes = controlesData.filter((c: any) => !c.finalizado).length;
+        const controlesFinalizados = controlesData.filter((c: any) => c.finalizado).length;
+        
+        setEstatisticas(prev => ({
+          ...prev,
+          totalControles: controlesData.length,
+          controlesPendentes,
+          controlesFinalizados,
+          funcionariosAtivos: funcionarios.length
+        }));
       }
 
-      // Carregar pedidos (simulação - implementar API real se necessário)
-      // const pedidosResponse = await fetch('/api/pedidos');
-      // if (pedidosResponse.ok) {
-      //   const pedidosData = await pedidosResponse.json();
-      //   setPedidos(pedidosData);
-      // }
-
-      // Calcular estatísticas
-      calcularEstatisticas();
+      // Carregar dados de notas fiscais
+      const notasResponse = await fetch('/api/notas', {
+        credentials: 'include'
+      });
+      if (notasResponse.ok) {
+        const notasData = await notasResponse.json();
+        
+        setEstatisticas(prev => ({
+          ...prev,
+          totalPedidos: notasData.length,
+          pedidosSeparados: notasData.filter((n: any) => n.controleId).length,
+          pedidosConferidos: notasData.filter((n: any) => n.controleId && n.finalizado).length
+        }));
+      }
       
     } catch (error) {
       console.error('Erro ao carregar dados do painel:', error);
@@ -159,18 +181,14 @@ const PainelGerencial: React.FC = () => {
     }
   };
 
-  const calcularEstatisticas = () => {
-    // Implementar cálculo real das estatísticas baseado nos dados carregados
-    setEstatisticas({
-      totalControles: controles.length,
-      controlesPendentes: controles.filter((c: any) => !c.finalizado).length,
-      controlesFinalizados: controles.filter((c: any) => c.finalizado).length,
-      totalPedidos: pedidos.length,
-      pedidosSeparados: pedidos.filter((p: any) => p.separado).length,
-      pedidosConferidos: pedidos.filter((p: any) => p.conferido).length,
-      funcionariosAtivos: funcionarios.length
-    });
-  };
+  // Atualizar dados automaticamente a cada 5 minutos
+  useEffect(() => {
+    const interval = setInterval(() => {
+      carregarDados();
+    }, 5 * 60 * 1000); // 5 minutos
+
+    return () => clearInterval(interval);
+  }, []);
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
@@ -210,14 +228,26 @@ const PainelGerencial: React.FC = () => {
   return (
     <Layout>
       <Box sx={{ p: 3 }}>
-        <Typography variant="h4" component="h1" gutterBottom sx={{ 
-          fontWeight: 600,
-          color: theme.palette.primary.main,
-          mb: 3
-        }}>
-          <DashboardIcon sx={{ mr: 2, verticalAlign: 'middle' }} />
-          Painel Gerencial
-        </Typography>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+          <Typography variant="h4" component="h1" sx={{ 
+            fontWeight: 600,
+            color: theme.palette.primary.main,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 2
+          }}>
+            <DashboardIcon />
+            Painel Gerencial
+          </Typography>
+          <Button
+            variant="outlined"
+            onClick={carregarDados}
+            disabled={loading}
+            startIcon={loading ? <CircularProgress size={20} /> : <TrendingUpIcon />}
+          >
+            {loading ? 'Atualizando...' : 'Atualizar Dados'}
+          </Button>
+        </Box>
 
         {loading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
