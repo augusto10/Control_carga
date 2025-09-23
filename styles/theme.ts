@@ -54,46 +54,70 @@ export const professionalTheme = createTheme({
     ].join(','),
     h1: {
       fontWeight: 900,
-      fontSize: 'clamp(2rem, 5vw, 3rem)',
+      fontSize: 'clamp(1.75rem, 5vw, 3rem)',
       letterSpacing: '0.5px',
       color: '#1a1a1a',
+      '@media (max-width: 600px)': {
+        fontSize: '1.75rem',
+      },
     },
     h2: {
       fontWeight: 700,
-      fontSize: 'clamp(1.75rem, 4vw, 2.5rem)',
+      fontSize: 'clamp(1.5rem, 4vw, 2.5rem)',
       letterSpacing: '0.3px',
       color: '#1a1a1a',
+      '@media (max-width: 600px)': {
+        fontSize: '1.5rem',
+      },
     },
     h3: {
       fontWeight: 600,
-      fontSize: 'clamp(1.5rem, 3.5vw, 2rem)',
+      fontSize: 'clamp(1.25rem, 3.5vw, 2rem)',
       letterSpacing: '0.2px',
       color: '#1a1a1a',
+      '@media (max-width: 600px)': {
+        fontSize: '1.25rem',
+      },
     },
     h4: {
       fontWeight: 600,
-      fontSize: 'clamp(1.25rem, 3vw, 1.5rem)',
+      fontSize: 'clamp(1.125rem, 3vw, 1.5rem)',
       color: '#1a1a1a',
+      '@media (max-width: 600px)': {
+        fontSize: '1.125rem',
+      },
     },
     h5: {
       fontWeight: 500,
-      fontSize: 'clamp(1.1rem, 2.5vw, 1.25rem)',
+      fontSize: 'clamp(1rem, 2.5vw, 1.25rem)',
       color: '#1a1a1a',
+      '@media (max-width: 600px)': {
+        fontSize: '1rem',
+      },
     },
     h6: {
       fontWeight: 500,
-      fontSize: 'clamp(1rem, 2vw, 1rem)',
+      fontSize: 'clamp(0.875rem, 2vw, 1rem)',
       color: '#1a1a1a',
+      '@media (max-width: 600px)': {
+        fontSize: '0.875rem',
+      },
     },
     body1: {
       fontSize: '1rem',
       lineHeight: 1.6,
       color: '#1a1a1a',
+      '@media (max-width: 600px)': {
+        fontSize: '0.9rem',
+      },
     },
     body2: {
       fontSize: '0.875rem',
       lineHeight: 1.5,
       color: '#666666',
+      '@media (max-width: 600px)': {
+        fontSize: '0.8rem',
+      },
     },
   },
   shape: {
@@ -111,14 +135,19 @@ export const professionalTheme = createTheme({
           transition: 'all 0.3s ease',
           boxShadow: 'none',
           minHeight: '44px', // Melhor área de toque para mobile
-          '@media (max-width: 900px)': {
-            padding: '14px 20px',
-            fontSize: '0.95rem',
+          '@media (max-width: 600px)': {
+            padding: '12px 16px',
+            fontSize: '0.9rem',
             minHeight: '48px',
+            borderRadius: '8px',
           },
           '&:hover': {
             transform: 'translateY(-2px)',
             boxShadow: '0 6px 20px rgba(0,0,0,0.15)',
+            '@media (hover: none)': {
+              transform: 'none',
+              boxShadow: 'none',
+            },
           },
         },
         contained: {
@@ -148,16 +177,16 @@ export const professionalTheme = createTheme({
           backdropFilter: 'blur(10px)',
           border: '1px solid rgba(255, 255, 255, 0.2)',
           transition: 'all 0.3s ease',
-          '@media (max-width: 900px)': {
-            borderRadius: '12px',
-            margin: '8px',
-            boxShadow: '0 4px 16px rgba(0,0,0,0.08)',
+          '@media (max-width: 600px)': {
+            borderRadius: '8px',
+            margin: '4px',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
           },
           '&:hover': {
             transform: 'translateY(-4px)',
             boxShadow: '0 12px 40px rgba(0,0,0,0.15)',
-            '@media (max-width: 900px)': {
-              transform: 'none', // Desabilita hover em mobile
+            '@media (hover: none)': {
+              transform: 'none', // Desabilita hover em touchscreen
             },
           },
         },

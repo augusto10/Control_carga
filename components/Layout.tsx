@@ -172,6 +172,12 @@ const MenuItemButton = styled(ListItemButton)(({ theme }) => ({
   transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
   position: 'relative',
   overflow: 'hidden',
+  // Mobile-first adjustments
+  [theme.breakpoints.down('sm')]: {
+    minHeight: 56,
+    padding: theme.spacing(1.5, 2),
+    margin: theme.spacing(0.3, 1),
+  },
   '&::before': {
     content: '""',
     position: 'absolute',
@@ -202,6 +208,10 @@ const MenuItemButton = styled(ListItemButton)(({ theme }) => ({
     background: 'linear-gradient(135deg, rgba(255, 107, 53, 0.08) 0%, rgba(255, 140, 66, 0.05) 100%)',
     transform: 'translateX(4px)',
     boxShadow: '0 6px 25px rgba(255, 107, 53, 0.15)',
+    // Desabilita efeitos hover em touchscreen
+    '@media (hover: none)': {
+      transform: 'none',
+    },
     '&::before': {
       background: 'linear-gradient(180deg, #ff8c42 0%, #ff8c42 100%)',
       width: '3px',
@@ -479,9 +489,10 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         <ListItemIcon 
           sx={{ 
             minWidth: 0, 
-            mr: open ? 2 : 'auto',
+            mr: open || isMobile ? 2 : 'auto',
             justifyContent: 'center',
             color: active ? '#ff8c42' : '#64748b',
+            fontSize: isMobile ? '1.3rem' : '1.1rem',
           }}
         >
           {item.icon}
@@ -489,12 +500,21 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         <ListItemText 
           primary={item.text} 
           primaryTypographyProps={{
-            fontWeight: active ? 600 : 'normal',
-            color: active ? '#1e293b' : '#64748b',
+            fontWeight: active ? 600 : 500,
+            color: active ? '#1e293b' : '#475569',
+            fontSize: isMobile ? '0.95rem' : '0.9rem',
+            letterSpacing: '0.3px',
           }} 
-          sx={{ opacity: open ? 1 : 0 }} 
+          sx={{ 
+            opacity: open || isMobile ? 1 : 0,
+            '& .MuiTypography-root': {
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+            }
+          }} 
         />
-        {hasSubItems && open && (
+        {hasSubItems && (open || isMobile) && (
           isSubmenuOpen ? <ExpandLess /> : <ExpandMore />
         )}
       </>
@@ -564,23 +584,34 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh' }}>
-      <AppBar position="fixed" open={open} elevation={0} sx={{ bgcolor: '#ff9800', color: '#fff' }}>
+      <AppBar position="fixed" open={!isMobile && open} elevation={0} sx={{ bgcolor: '#ff9800', color: '#fff' }}>
         {/* Adicionado elevation={0} para remover a sombra padrão do AppBar */}
-        <Toolbar>
+        <Toolbar sx={{ minHeight: { xs: 56, sm: 64 } }}>
           <IconButton
             color="inherit"
             aria-label="open drawer"
             onClick={toggleDrawer}
             edge="start"
             sx={{
-              marginRight: 2,
-              color: 'text.primary',
+              marginRight: { xs: 1, sm: 2 },
+              color: 'white',
+              padding: { xs: '10px', sm: '8px' },
             }}
           >
-            <MenuIcon />
+            <MenuIcon sx={{ fontSize: { xs: '1.5rem', sm: '1.75rem' } }} />
           </IconButton>
           <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center' }}>
-            <Typography variant="h6" noWrap component="div" sx={{ color: 'text.primary' }}>
+            <Typography 
+              variant="h6" 
+              noWrap 
+              component="div" 
+              sx={{ 
+                color: 'white',
+                fontSize: { xs: '1rem', sm: '1.25rem' },
+                fontWeight: 600,
+                display: { xs: isMobile ? 'block' : 'none', sm: 'block' }
+              }}
+            >
               Controle de Carga
             </Typography>
           </Box>
@@ -678,9 +709,10 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           ModalProps={{
             keepMounted: true, // Better open performance on mobile.
           }}
-          sx={{
-            '& .MuiDrawer-paper': {
-              width: drawerWidth,
+          PaperProps={{
+            sx: {
+              width: '85%',
+              maxWidth: drawerWidth,
               background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)',
               borderRight: 'none',
               boxShadow: '4px 0 20px rgba(0,0,0,0.1)',
@@ -688,10 +720,26 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           }}
         >
           <DrawerHeader>
-            <Typography variant="h6" sx={{ fontWeight: 600, color: '#ffffff' }}>
-              Controle de Carga
-            </Typography>
-            <IconButton onClick={handleDrawerClose} sx={{ color: '#ffffff' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography variant="h6" sx={{ 
+                fontWeight: 600, 
+                color: '#ffffff',
+                fontSize: '1.1rem',
+                whiteSpace: 'nowrap'
+              }}>
+                Controle de Carga
+              </Typography>
+            </Box>
+            <IconButton 
+              onClick={handleDrawerClose} 
+              sx={{ 
+                color: '#ffffff',
+                padding: '12px',
+                '& svg': {
+                  fontSize: '1.5rem'
+                }
+              }}
+            >
               <ChevronLeftIcon />
             </IconButton>
           </DrawerHeader>
@@ -852,12 +900,17 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         component="main" 
         sx={{ 
           flexGrow: 1, 
-          p: 3, 
+          p: { xs: 1.5, sm: 2, md: 3 }, 
           width: '100%', 
-          mt: '64px',
+          mt: { xs: '56px', sm: '64px' },
+          ml: { xs: 0, md: !isMobile && open ? 0 : 0 },
           background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)',
-          minHeight: 'calc(100vh - 64px)',
-          fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif'
+          minHeight: { xs: 'calc(100vh - 56px)', sm: 'calc(100vh - 64px)' },
+          fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+          transition: theme.transitions.create(['margin'], {
+            easing: theme.transitions.easing.sharp,
+            duration: theme.transitions.duration.leavingScreen,
+          }),
         }}
       >
         {children}
