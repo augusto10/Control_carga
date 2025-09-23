@@ -2,31 +2,45 @@ const { execSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 
-console.log('🔧 Verificando se precisamos gerar o Prisma Client...');
+console.log('🔧 Gerando Prisma Client para produção...');
 
-// Verifica se estamos em produção
-const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
+// Definir variáveis de ambiente para produção
+process.env.PRISMA_GENERATE_DATAPROXY = 'false';
+process.env.PRISMA_SKIP_POSTINSTALL_GENERATE = 'false';
+process.env.PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING = '1';
+process.env.NODE_ENV = 'production';
 
-// Caminho para o diretório .next
-const nextDir = path.join(process.cwd(), '.next');
+console.log('🚀 Executando: npx prisma generate --no-engine');
 
-// Caminho para o diretório do Prisma Client
-const prismaClientDir = path.join(process.cwd(), 'node_modules/.prisma/client');
-
-// Verifica se o diretório .next existe
-const nextDirExists = fs.existsSync(nextDir);
-
-// Verifica se o diretório do Prisma Client existe
-const prismaClientExists = fs.existsSync(prismaClientDir);
-
-// Sempre gere o Prisma Client para evitar versões desatualizadas (ex.: Data Proxy vs Engine local)
-console.log('🚀 Gerando Prisma Client...');
 try {
-  // Definir variável de ambiente para ignorar checksums ausentes
-  process.env.PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING = '1';
-  execSync('npx prisma generate --no-engine', { stdio: 'inherit', env: { ...process.env, PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING: '1' } });
+  // Executar comando simples sem engine
+  execSync('npx prisma generate --no-engine', {
+    stdio: 'inherit',
+    env: {
+      ...process.env,
+      PRISMA_GENERATE_DATAPROXY: 'false',
+      PRISMA_SKIP_POSTINSTALL_GENERATE: 'false',
+      PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING: '1'
+    }
+  });
   console.log('✅ Prisma Client gerado com sucesso!');
 } catch (error) {
-  console.error('❌ Erro ao gerar o Prisma Client:', error);
-  process.exit(1);
+  console.error('❌ Erro ao gerar o Prisma Client:', error.message);
+  // Tentar abordagem alternativa
+  try {
+    console.log('🔄 Tentando abordagem alternativa...');
+    execSync('npx prisma generate', {
+      stdio: 'inherit',
+      env: {
+        ...process.env,
+        PRISMA_GENERATE_DATAPROXY: 'false',
+        PRISMA_SKIP_POSTINSTALL_GENERATE: 'false',
+        PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING: '1'
+      }
+    });
+    console.log('✅ Prisma Client gerado com abordagem alternativa!');
+  } catch (fallbackError) {
+    console.error('❌ Erro na abordagem alternativa:', fallbackError.message);
+    process.exit(1);
+  }
 }

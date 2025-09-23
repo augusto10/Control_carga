@@ -14,11 +14,17 @@
       "PRISMA_GENERATE_DATAPROXY": "false",
       "PRISMA_SKIP_POSTINSTALL_GENERATE": "false",
       "PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING": "1",
-      "PRISMA_BINARY_CACHE_DIR": "/tmp"
+      "PRISMA_BINARY_CACHE_DIR": "/tmp",
+      "NODE_ENV": "production"
     }
   },
-  "buildCommand": "npm install && npx prisma generate && next build",
+  "buildCommand": "npm run build:vercel",
   "installCommand": "npm install",
+  "functions": {
+    "pages/api/**/*.ts": {
+      "runtime": "nodejs20.x"
+    }
+  },
   "rewrites": [
     {
       "source": "/(.*)",

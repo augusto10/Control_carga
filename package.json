@@ -7,6 +7,7 @@
     "build": "node scripts/prisma/generate.js && next build",
     "build:production": "node build-production.js",
     "build:safe": "node scripts/prisma/generate.js && next build",
+    "build:vercel": "npx prisma generate --no-engine && next build",
     "start": "next start",
     "postinstall": "node scripts/prisma/generate.js",
     "prisma:generate": "node scripts/prisma/generate.js",
