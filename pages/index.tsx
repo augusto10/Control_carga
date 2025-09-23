@@ -1,4 +1,4 @@
-import { Typography, Box, Card, Grid, CircularProgress } from '@mui/material';
+import { Container, Typography, Box, Card, CardContent, Grid, CircularProgress } from '@mui/material';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
@@ -10,7 +10,6 @@ import {
 import ListAltIcon from '@mui/icons-material/ListAlt';
 import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
 import { useAuth } from '../contexts/AuthContext';
-import ResponsiveContainer from '../components/ResponsiveContainer';
 
 type MenuCard = {
   title: string;
@@ -67,12 +66,17 @@ function HomeContent() {
   ];
 
   return (
-    <ResponsiveContainer 
-      title="Controle de Cargas Esplendor"
-      subtitle="Sistema de gerenciamento de cargas e notas fiscais"
-      showPaper={false}
-    >
-      <Grid container spacing={{ xs: 1.5, sm: 2, md: 3 }} alignItems="stretch" justifyContent="center" sx={{ mt: 2 }}>
+    <Container maxWidth="md" sx={{ py: 4 }}>
+      <Box sx={{ textAlign: 'center', mb: 6 }}>
+        <Typography variant="h4" component="h1" gutterBottom sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+          Controle de Cargas Esplendor
+        </Typography>
+        <Typography variant="subtitle1" color="text.secondary">
+          Sistema de gerenciamento de cargas e notas fiscais
+        </Typography>
+      </Box>
+
+      <Grid container spacing={3} alignItems="stretch" justifyContent="center" sx={{ mt: 2 }}>
         {menuCards.map((card) => (
           <Grid item xs={12} sm={6} key={card.title} sx={{ display: 'flex' }}>
             <Link href={card.href} passHref style={{ textDecoration: 'none', width: '100%', height: '100%' }}>
@@ -125,7 +129,7 @@ function HomeContent() {
           </Grid>
         ))}
       </Grid>
-    </ResponsiveContainer>
+    </Container>
   );
 }
 
