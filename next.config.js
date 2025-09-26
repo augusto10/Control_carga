@@ -29,7 +29,13 @@ const nextConfig = {
       dns: false,
       child_process: false
     };
-    
+
+    // Alias para resolver módulo faltante do MUI em ambientes Node
+    config.resolve.alias = {
+      ...(config.resolve.alias || {}),
+      '@mui/private-theming/node/ThemeProvider/nested': '@mui/private-theming/ThemeProvider/nested'
+    };
+
     return config;
   },
   

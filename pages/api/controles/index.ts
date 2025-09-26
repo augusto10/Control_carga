@@ -29,6 +29,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             dataCriacao: true,
             // Seleciona placaVeiculo para exibir no PDF e na lista
             placaVeiculo: true,
+            // Campos de assinatura digital
+            assinaturaMotorista: true,
+            assinaturaResponsavel: true,
+            dataAssinaturaMotorista: true,
+            dataAssinaturaResponsavel: true,
             notas: true,
           },
         });

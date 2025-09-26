@@ -7,7 +7,7 @@ import { z } from 'zod';
 // Esquema de validação para o corpo da requisição
 const assinaturaSchema = z.object({
   controleId: z.string().min(1, 'ID do controle é obrigatório'),
-  tipo: z.enum(['motorista', 'responsavel']),
+  tipoAssinatura: z.enum(['motorista', 'responsavel']),
   assinatura: z.string()
     .min(100, 'Assinatura inválida')
     .refine(data => data.startsWith('data:image/'), {
@@ -80,7 +80,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
     
     console.log('[API atualizar-assinatura] Validação bem-sucedida');
-    const { controleId, tipo, assinatura } = validation.data;
+    const { controleId, tipoAssinatura: tipo, assinatura } = validation.data;
     console.log('[API atualizar-assinatura] Dados validados:', {
       controleId,
       tipo,

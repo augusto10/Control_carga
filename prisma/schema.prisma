@@ -111,6 +111,24 @@ model Motorista {
   transportadoraId Transportadora
 }
 
+model FuncionarioCliente {
+  id               String         @id @default(uuid())
+  dataCriacao      DateTime       @default(now())
+  nome             String
+  cpf              String?
+  telefone         String?
+  email            String?
+  tipo             String         // MOTORISTA, FUNCIONARIO, CLIENTE, RESPONSAVEL
+  transportadoraId String?        // Mudado para String para compatibilidade
+  cnh              String?        // Para motoristas
+  ativo            Boolean        @default(true)
+  observacoes      String?
+  
+  @@index([tipo])
+  @@index([ativo])
+  @@index([nome])
+}
+
 model PedidoConferido {
   id                    String          @id @default(uuid())
   dataCriacao           DateTime        @default(now())

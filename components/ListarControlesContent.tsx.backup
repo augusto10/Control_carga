@@ -27,25 +27,23 @@ import {
   MenuItem,
   Paper,
   Table, 
+  TableBody, 
   TableCell, 
   TableContainer, 
   TableHead, 
   TableRow, 
-  TableBody,
   Box, 
+  Select,
+  TextField,
   Tooltip,
   useMediaQuery,
-  useTheme,
-  Alert,
-  Snackbar,
-  Select,
-  TextField
+  useTheme
 } from '@mui/material';
+import { useSnackbar } from 'notistack';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { useRouter } from 'next/router';
-import { useSnackbar } from 'notistack';
 import api from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
@@ -56,13 +54,10 @@ import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import SaveIcon from '@mui/icons-material/Save';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import AddIcon from '@mui/icons-material/Add';
-import CloseIcon from '@mui/icons-material/Close';
-import HowToRegIcon from '@mui/icons-material/HowToReg';
 
 import ResponsiveTable from './ResponsiveTable';
 import ResponsiveContainer from './ResponsiveContainer';
 import ModalAssinaturaDigitalPro from './ModalAssinaturaDigitalPro';
-import ModalAssinaturaSimplesAlternativo from './ModalAssinaturaSimplesAlternativo';
 
 interface Controle extends Omit<PrismaControleCarga, 'notas' | 'numeroManifesto' | 'assinaturaMotorista' | 'assinaturaResponsavel' | 'dataAssinaturaMotorista' | 'dataAssinaturaResponsavel'> {
   numeroManifesto: string | null;
@@ -205,36 +200,15 @@ const ListarControlesContent: React.FC = () => {
   const router = useRouter();
   const { enqueueSnackbar } = useSnackbar();
   const converterControles = useCallback((controlesStore: PrismaControleCarga[]): ControleComNotas[] => {
-    console.log('[converterControles] Convertendo controles:', controlesStore.length);
-    return controlesStore.map(controle => {
-      const converted = {
-        ...controle,
-        dataCriacao: new Date(controle.dataCriacao),
-        dataAssinaturaMotorista: controle.dataAssinaturaMotorista ? new Date(controle.dataAssinaturaMotorista) : null,
-        dataAssinaturaResponsavel: controle.dataAssinaturaResponsavel ? new Date(controle.dataAssinaturaResponsavel) : null,
-        // Garante que os campos de assinatura sejam preservados
-        assinaturaMotorista: controle.assinaturaMotorista || null,
-        assinaturaResponsavel: controle.assinaturaResponsavel || null,
-        notas: (controle as any).notas || [],
-        auditor: (controle as any).auditor || null,
-        dataAuditoria: (controle as any).dataAuditoria ? new Date((controle as any).dataAuditoria) : null
-      };
-      
-      // Log para debug das assinaturas
-      if (converted.assinaturaMotorista || converted.assinaturaResponsavel) {
-        console.log(`[converterControles] Controle ${controle.id} - Assinaturas:`, {
-          motorista: !!converted.assinaturaMotorista,
-          responsavel: !!converted.assinaturaResponsavel,
-          motoristaLength: converted.assinaturaMotorista?.length || 0,
-          responsavelLength: converted.assinaturaResponsavel?.length || 0
-        });
-      } else {
-        // Log também quando não há assinaturas para debug
-        console.log(`[converterControles] Controle ${controle.id} - SEM assinaturas`);
-      }
-      
-      return converted;
-    });
+    return controlesStore.map(controle => ({
+      ...controle,
+      dataCriacao: new Date(controle.dataCriacao),
+      dataAssinaturaMotorista: controle.dataAssinaturaMotorista ? new Date(controle.dataAssinaturaMotorista) : null,
+      dataAssinaturaResponsavel: controle.dataAssinaturaResponsavel ? new Date(controle.dataAssinaturaResponsavel) : null,
+      notas: (controle as any).notas || [],
+      auditor: (controle as any).auditor || null,
+      dataAuditoria: (controle as any).dataAuditoria ? new Date((controle as any).dataAuditoria) : null
+    }));
   }, []);
 
   useEffect(() => {
@@ -524,14 +498,14 @@ const ListarControlesContent: React.FC = () => {
             // Desenha a assinatura
             page.drawImage(signatureImage, {
               x: x,
-              y: nameY - 20 - signatureHeight, // Reduzido para ficar mais próximo do carimbo
+              y: nameY - 25 - signatureHeight,
               width: signatureWidth,
               height: signatureHeight,
             });
             
             // Desenha o carimbo digital abaixo da assinatura com mais espaço
             const stampX = x - 8;
-            const stampY = nameY - 35 - signatureHeight; // Reduzido para ficar mais próximo da assinatura
+            const stampY = nameY - 50 - signatureHeight; // Aumentado o espaço acima do carimbo
             const stampWidth = signatureWidth + 16;
             const stampHeight = 45; // Aumentado para acomodar melhor o conteúdo
             
@@ -906,12 +880,6 @@ const ListarControlesContent: React.FC = () => {
       return;
     }
     
-    // Define o botão como loading
-    setLoadingButtons(prev => ({
-      ...prev,
-      [`sign_${tipo}_${controle.id}`]: true
-    }));
-    
     setAssinaturaAberta({
       aberto: true,
       controleId: controle.id,
@@ -935,9 +903,7 @@ const ListarControlesContent: React.FC = () => {
   }, []);
 
   const handleFecharAssinatura = useCallback(() => {
-    console.log('[Modal Assinatura] Fechando modal...');
     if (assinaturaAberta.controleId && assinaturaAberta.tipo) {
-      // Remove o loading do botão
       setLoadingButtons(prev => ({
         ...prev,
         [`sign_${assinaturaAberta.tipo}_${assinaturaAberta.controleId}`]: false
@@ -1381,82 +1347,57 @@ const ListarControlesContent: React.FC = () => {
                               </span>
                             </Tooltip>
                           ) : (
-                            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-                              {/* Se ambos assinaram, mostra apenas um ícone verde */}
-                              {controle.assinaturaMotorista && controle.assinaturaResponsavel ? (
-                                <Tooltip title="Controle totalmente assinado (Motorista e Responsável)">
-                                  <Chip
-                                    icon={<CheckCircleOutlineIcon />}
-                                    label="Assinado"
-                                    color="success"
-                                    variant="filled"
-                                    sx={{
-                                      backgroundColor: '#4caf50',
-                                      color: 'white',
-                                      fontWeight: 600,
-                                      '& .MuiChip-icon': {
-                                        color: 'white'
-                                      }
-                                    }}
-                                  />
-                                </Tooltip>
-                              ) : (
-                                <>
-                                  {/* Botão Motorista */}
-                                  <Tooltip title={controle.assinaturaMotorista ? 'Assinatura do motorista já registrada' : 'Assinar como motorista'}>
-                                    <Button
-                                      variant="contained"
-                                      color={controle.assinaturaMotorista ? 'success' : 'primary'}
-                                      size="small"
-                                      onClick={() => handleAbrirAssinatura(controle, 'motorista')}
-                                      disabled={loadingButtons[`sign_motorista_${controle.id}`] || !controle.finalizado}
-                                      startIcon={controle.assinaturaMotorista ? 
-                                        <CheckCircleOutlineIcon /> : 
-                                        <EditIcon />
-                                      }
-                                      sx={{
-                                        ...buttonStyles,
-                                        textTransform: 'none',
-                                        fontWeight: 500,
-                                        letterSpacing: '0.5px',
-                                        display: controle.finalizado ? 'inline-flex' : 'none'
-                                      }}
-                                    >
-                                      {loadingButtons[`sign_motorista_${controle.id}`] ? (
-                                        <CircularProgress size={16} color="inherit" sx={{ mr: 1 }} />
-                                      ) : null}
-                                      {controle.assinaturaMotorista ? 'Motorista ✓' : 'Motorista'}
-                                    </Button>
-                                  </Tooltip>
-                                  
-                                  {/* Botão Responsável */}
-                                  <Tooltip title={controle.assinaturaResponsavel ? 'Assinatura do responsável já registrada' : 'Assinar como responsável'}>
-                                    <Button
-                                      variant="contained"
-                                      color={controle.assinaturaResponsavel ? 'success' : 'primary'}
-                                      size="small"
-                                      onClick={() => handleAbrirAssinatura(controle, 'responsavel')}
-                                      disabled={loadingButtons[`sign_responsavel_${controle.id}`] || !controle.finalizado}
-                                      startIcon={controle.assinaturaResponsavel ? 
-                                        <CheckCircleOutlineIcon /> : 
-                                        <EditIcon />
-                                      }
-                                      sx={{
-                                        ...buttonStyles,
-                                        textTransform: 'none',
-                                        fontWeight: 500,
-                                        letterSpacing: '0.5px',
-                                        display: controle.finalizado ? 'inline-flex' : 'none'
-                                      }}
-                                    >
-                                      {loadingButtons[`sign_responsavel_${controle.id}`] ? (
-                                        <CircularProgress size={16} color="inherit" sx={{ mr: 1 }} />
-                                      ) : null}
-                                      {controle.assinaturaResponsavel ? 'Responsável ✓' : 'Responsável'}
-                                    </Button>
-                                  </Tooltip>
-                                </>
-                              )}
+                            <Box sx={{ display: 'flex', gap: 1 }}>
+                              <Tooltip title={controle.assinaturaMotorista ? 'Assinatura do motorista já registrada' : 'Assinar como motorista'}>
+                                <Button
+                                  variant="contained"
+                                  color={controle.assinaturaMotorista ? 'success' : 'primary'}
+                                  size="small"
+                                  onClick={() => handleAbrirAssinatura(controle, 'motorista')}
+                                  disabled={loadingButtons[`sign_motorista_${controle.id}`] || !controle.finalizado}
+                                  startIcon={controle.assinaturaMotorista ? 
+                                    <CheckCircleOutlineIcon /> : 
+                                    <EditIcon />
+                                  }
+                                  sx={{
+                                    ...buttonStyles,
+                                    textTransform: 'none',
+                                    fontWeight: 500,
+                                    letterSpacing: '0.5px',
+                                    display: controle.finalizado ? 'inline-flex' : 'none'
+                                  }}
+                                >
+                                  {loadingButtons[`sign_motorista_${controle.id}`] ? (
+                                    <CircularProgress size={16} color="inherit" sx={{ mr: 1 }} />
+                                  ) : null}
+                                  {controle.assinaturaMotorista ? 'Assinado' : 'Assinar'}
+                                </Button>
+                              </Tooltip>
+                              <Tooltip title={controle.assinaturaResponsavel ? 'Assinatura do responsável já registrada' : 'Assinar como responsável'}>
+                                <Button
+                                  variant="contained"
+                                  color={controle.assinaturaResponsavel ? 'success' : 'primary'}
+                                  size="small"
+                                  onClick={() => handleAbrirAssinatura(controle, 'responsavel')}
+                                  disabled={false || loadingButtons[`sign_responsavel_${controle.id}`] || !controle.finalizado}
+                                  startIcon={controle.assinaturaResponsavel ? 
+                                    <CheckCircleOutlineIcon /> : 
+                                    <EditIcon />
+                                  }
+                                  sx={{
+                                    ...buttonStyles,
+                                    textTransform: 'none',
+                                    fontWeight: 500,
+                                    letterSpacing: '0.5px',
+                                    display: controle.finalizado ? 'inline-flex' : 'none'
+                                  }}
+                                >
+                                  {loadingButtons[`sign_responsavel_${controle.id}`] ? (
+                                    <CircularProgress size={16} color="inherit" sx={{ mr: 1 }} />
+                                  ) : null}
+                                  {controle.assinaturaResponsavel ? 'Assinado' : 'Assinar'}
+                                </Button>
+                              </Tooltip>
                             </Box>
                           )}
                         </>
@@ -1472,232 +1413,30 @@ const ListarControlesContent: React.FC = () => {
 
       {/* Modal de Edição */}
       {editing && (
-        <Dialog open={!!editing} onClose={handleCloseEdit} maxWidth="md" fullWidth>
-          <DialogTitle>Editar Controle</DialogTitle>
-          <DialogContent>
-            <Grid container spacing={2} sx={{ mt: 1 }}>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Motorista"
-                  value={editData.motorista || ''}
-                  onChange={(e) => setEditData(prev => ({ ...prev, motorista: e.target.value }))}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="CPF do Motorista"
-                  value={editData.cpfMotorista || ''}
-                  onChange={(e) => setEditData(prev => ({ ...prev, cpfMotorista: e.target.value }))}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Responsável"
-                  value={editData.responsavel || ''}
-                  onChange={(e) => setEditData(prev => ({ ...prev, responsavel: e.target.value }))}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <FormControl fullWidth>
-                  <InputLabel>Transportadora</InputLabel>
-                  <Select
-                    value={editData.transportadora || 'ACERT'}
-                    onChange={(e) => setEditData(prev => ({ ...prev, transportadora: e.target.value as any }))}
-                    label="Transportadora"
-                  >
-                    {transportadorasFixas.map((transportadora) => (
-                      <MenuItem key={transportadora.id} value={transportadora.id}>
-                        {transportadora.descricao}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Quantidade de Pallets"
-                  type="number"
-                  value={editData.qtdPallets || 0}
-                  onChange={(e) => setEditData(prev => ({ ...prev, qtdPallets: parseInt(e.target.value) || 0 }))}
-                />
-              </Grid>
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="Observações"
-                  multiline
-                  rows={3}
-                  value={editData.observacao || ''}
-                  onChange={(e) => setEditData(prev => ({ ...prev, observacao: e.target.value }))}
-                />
-              </Grid>
-            </Grid>
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={handleCloseEdit}>Cancelar</Button>
-            <Button onClick={handleSaveEdit} variant="contained">Salvar</Button>
-          </DialogActions>
-        </Dialog>
-      )}
+
 
       {/* Modal de Visualização de PDF */}
       {pdfUrl && (
-        <Dialog open={pdfOpen} onClose={() => setPdfOpen(false)} maxWidth="lg" fullWidth>
-          <DialogTitle>Visualizar PDF</DialogTitle>
-          <DialogContent>
-            <iframe
-              src={pdfUrl}
-              width="100%"
-              height="600px"
-              style={{ border: 'none' }}
-              title="PDF do Controle"
-            />
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setPdfOpen(false)}>Fechar</Button>
+
           </DialogActions>
         </Dialog>
       )}
 
-      {/* Diálogo de Assinatura - Usa o componente alternativo mais simples */}
-      <ModalAssinaturaSimplesAlternativo
+      {/* Diálogo de Assinatura - Usa o novo componente ModalAssinaturaDigitalPro */}
+      <ModalAssinaturaDigitalPro
         open={assinaturaAberta.aberto}
         onClose={handleFecharAssinatura}
         controleId={assinaturaAberta.controleId || ''}
         tipoAssinatura={assinaturaAberta.tipo}
-        onAssinaturaSalva={async () => {
-          console.log('[ListarControles] Assinatura salva, recarregando dados...');
-          try {
-            // Aguarda um pouco para garantir que o banco foi atualizado
-            await new Promise(resolve => setTimeout(resolve, 500));
-            
-            // Recarrega os dados dos controles para atualizar o estado da assinatura
-            console.log('[ListarControles] Chamando fetchControles...');
-            await fetchControles();
-            
-            // Aguarda um pouco mais para garantir que o store foi atualizado
-            await new Promise(resolve => setTimeout(resolve, 200));
-            
-            // Força a atualização da lista local
-            console.log('[ListarControles] Atualizando lista local...');
-            const novosControles = converterControles(controlesStore as any);
-            
-            // Força atualização do controle específico que foi assinado
-            const controleAtualizado = novosControles.find(c => c.id === assinaturaAberta.controleId);
-            if (controleAtualizado) {
-              console.log('[ListarControles] Controle encontrado:', {
-                id: controleAtualizado.id,
-                motorista: !!controleAtualizado.assinaturaMotorista,
-                responsavel: !!controleAtualizado.assinaturaResponsavel,
-                assinaturaMotoristaValue: controleAtualizado.assinaturaMotorista?.substring(0, 50) + '...',
-                assinaturaResponsavelValue: controleAtualizado.assinaturaResponsavel?.substring(0, 50) + '...'
-              });
-            } else {
-              console.warn('[ListarControles] Controle NÃO encontrado! ID:', assinaturaAberta.controleId);
-              console.log('[ListarControles] IDs disponíveis:', novosControles.map(c => c.id));
-            }
-            
-            setControles([...novosControles]); // Força re-render com spread
-            
-            // Força uma segunda atualização para garantir que o React detecte a mudança
-            setTimeout(() => {
-              setControles(prev => [...prev]);
-            }, 100);
-            // Log para verificar se os dados foram atualizados
-            console.log('[ListarControles] Controles atualizados:', novosControles.length);
-            
-            // Mostra feedback de sucesso
-            enqueueSnackbar('Assinatura salva com sucesso!', { 
-              variant: 'success',
-              autoHideDuration: 3000,
-              anchorOrigin: { vertical: 'top', horizontal: 'center' }
-            });
-          } catch (error) {
-            console.error('[ListarControles] Erro ao recarregar dados:', error);
-            enqueueSnackbar('Assinatura salva, mas houve erro ao atualizar a lista', { 
-              variant: 'warning',
-              autoHideDuration: 5000 
-            });
-          }
+        onAssinaturaSalva={() => {
+          fetchControles();
         }}
       />
 
 
       {/* Modal de Visualização Detalhada */}
       {detalhesModal.aberto && detalhesModal.controle && (
-        <Dialog open={detalhesModal.aberto} onClose={handleFecharDetalhes} maxWidth="lg" fullWidth>
-          <DialogTitle sx={{ 
-            backgroundColor: 'primary.main', 
-            color: 'white',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between'
-          }}>
-            <Typography variant="h6">
-              Detalhes do Controle - {detalhesModal.controle.numeroManifesto || 'N/A'}
-            </Typography>
-            <IconButton edge="end" color="inherit" onClick={handleFecharDetalhes}>
-              <CloseIcon />
-            </IconButton>
-          </DialogTitle>
-          <DialogContent sx={{ mt: 2 }}>
-            <Box sx={{ mb: 3 }}>
-              {/* Informações Básicas */}
-              <Typography variant="h6" gutterBottom sx={{ 
-                color: 'primary.main', 
-                fontWeight: 600,
-                borderBottom: '2px solid',
-                borderColor: 'primary.main',
-                pb: 1,
-                mb: 2
-              }}>
-                Informações Básicas
-              </Typography>
-              
-              <Grid container spacing={2} sx={{ mb: 3 }}>
-                <Grid item xs={12} md={6}>
-                  <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
-                    <Typography variant="subtitle2" color="text.secondary">Data de Criação</Typography>
-                    <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                      {format(new Date(detalhesModal.controle.dataCriacao), "dd/MM/yyyy HH:mm", { locale: ptBR })}
-                    </Typography>
-                  </Paper>
-                </Grid>
-                <Grid item xs={12} md={6}>
-                  <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
-                    <Typography variant="subtitle2" color="text.secondary">Status</Typography>
-                    <Chip 
-                      label={detalhesModal.controle.finalizado ? 'Finalizado' : 'Em andamento'} 
-                      color={detalhesModal.controle.finalizado ? 'success' : 'warning'}
-                      sx={{ mt: 1 }}
-                    />
-                  </Paper>
-                </Grid>
-              </Grid>
 
-              {/* Assinaturas */}
-              <Typography variant="h6" gutterBottom sx={{ 
-                color: 'primary.main', 
-                fontWeight: 600,
-                borderBottom: '2px solid',
-                borderColor: 'primary.main',
-                pb: 1,
-                mb: 2
-              }}>
-                Assinaturas
-              </Typography>
-              
-              <Grid container spacing={2} sx={{ mb: 3 }}>
-                <Grid item xs={12} md={6}>
-                  <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
-                    <Typography variant="subtitle2" color="text.secondary">Motorista</Typography>
-                    <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                      {detalhesModal.controle.motorista || 'PENDENTE'}
-                    </Typography>
                     {detalhesModal.controle.assinaturaMotorista && (
                       <Chip 
                         label="Assinado Digitalmente" 
@@ -1783,7 +1522,7 @@ const ListarControlesContent: React.FC = () => {
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {detalhesModal.controle.notas.map((nota: any) => (
+                      {detalhesModal.controle.notas.map((nota) => (
                         <TableRow key={nota.id} hover>
                           <TableCell sx={{ fontWeight: 500 }}>{nota.numeroNota}</TableCell>
                           <TableCell>
@@ -1852,8 +1591,6 @@ const ListarControlesContent: React.FC = () => {
 };
 
 export default ListarControlesContent;
-
-
 
 
 
