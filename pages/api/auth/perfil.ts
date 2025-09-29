@@ -1,6 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { PrismaClient, Usuario } from '@prisma/client';
-import jwt from 'jsonwebtoken';
+import * as jwt from 'jsonwebtoken';
 import { parseCookies } from 'nookies';
 import { compare, hash } from 'bcryptjs';
 import { ApiResponse } from '../../../types/api';

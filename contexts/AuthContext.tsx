@@ -5,7 +5,7 @@ import Cookies from 'js-cookie';
 import { api } from '../services/api';
 import { User, USER_TYPES, LoginCredentials, AuthError } from '../types/auth-types';
 import { AuthState, AuthContextType } from '../types/auth-context';
-import jwt from 'jsonwebtoken';
+import * as jwt from 'jsonwebtoken';
 
 type ServerRequest = NextPageContext['req'] & {
   headers: {

@@ -2,7 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { prisma } from '../../../prisma/config';
 import { PrismaClientWithConfiguracaoSistema } from '../../../prisma/config';
 import { ApiError, ApiResponse } from '../../../types/api';
-import jwt from 'jsonwebtoken';
+import * as jwt from 'jsonwebtoken';
 import { parseCookies } from 'nookies';
 
 // Lista de origens permitidas
