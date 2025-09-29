@@ -1,14 +1,5 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "package.json",
-      "use": "@vercel/next",
-      "config": {
-        "includeFiles": ["prisma/schema.prisma"]
-      }
-    }
-  ],
   "build": {
     "env": {
       "PRISMA_GENERATE_DATAPROXY": "false",
@@ -22,7 +13,8 @@
   "installCommand": "npm install",
   "functions": {
     "pages/api/**/*.ts": {
-      "runtime": "nodejs20.x"
+      "memory": 1024,
+      "maxDuration": 30
     }
   },
   "rewrites": [
