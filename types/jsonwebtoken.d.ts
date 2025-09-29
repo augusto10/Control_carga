@@ -45,6 +45,24 @@ declare module 'jsonwebtoken' {
     json?: boolean;
   }
 
+  export class JsonWebTokenError extends Error {
+    name: 'JsonWebTokenError';
+    message: string;
+    constructor(message: string);
+  }
+
+  export class TokenExpiredError extends JsonWebTokenError {
+    name: 'TokenExpiredError';
+    expiredAt: Date;
+    constructor(message: string, expiredAt: Date);
+  }
+
+  export class NotBeforeError extends JsonWebTokenError {
+    name: 'NotBeforeError';
+    date: Date;
+    constructor(message: string, date: Date);
+  }
+
   export function sign(
     payload: string | Buffer | object,
     secretOrPrivateKey: string | Buffer,
