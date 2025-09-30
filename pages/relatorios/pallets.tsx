@@ -66,6 +66,7 @@ const RelatorioPalletsPage: React.FC = () => {
   const [openAjuste, setOpenAjuste] = useState(false);
   const [salvandoAjuste, setSalvandoAjuste] = useState(false);
   const [ajuste, setAjuste] = useState<AjustePayload>({ quantidade: 1, dataRecebimento: format(new Date(), 'yyyy-MM-dd') });
+  const [funcionalidadeDisponivel, setFuncionalidadeDisponivel] = useState<boolean | null>(null);
   
   // Filtros
   const [dataInicio, setDataInicio] = useState<Date | null>(startOfMonth(new Date()));
@@ -125,7 +126,42 @@ const RelatorioPalletsPage: React.FC = () => {
     buscarDados();
   };
 
-  const handleOpenAjuste = () => {
+  const verificarDisponibilidade = async () => {
+    try {
+      const resp = await fetch('/api/pallets/ajustes?teste=true', {
+        method: 'GET',
+        credentials: 'include'
+      });
+      
+      if (resp.status === 503) {
+        setFuncionalidadeDisponivel(false);
+        return false;
+      }
+      
+      setFuncionalidadeDisponivel(true);
+      return true;
+    } catch (error) {
+      setFuncionalidadeDisponivel(false);
+      return false;
+    }
+  };
+
+  const handleOpenAjuste = async () => {
+    const disponivel = await verificarDisponibilidade();
+    
+    if (!disponivel) {
+      alert(
+        '⚠️ Funcionalidade Temporariamente Indisponível\n\n' +
+        'A funcionalidade de ajustes de pallets não está disponível porque a tabela do banco de dados ainda não foi criada.\n\n' +
+        '📋 Para habilitar esta funcionalidade:\n' +
+        '1. Acesse o console do seu banco Neon\n' +
+        '2. Execute o SQL fornecido no arquivo INSTRUCOES_PALLET_AJUSTE.md\n' +
+        '3. Ou execute: node fix-pallet-ajuste.js para ver instruções detalhadas\n\n' +
+        '💡 Esta é uma funcionalidade adicional que permite registrar devoluções avulsas de pallets e gerar recibos em PDF.'
+      );
+      return;
+    }
+    
     setAjuste({ quantidade: 1, dataRecebimento: format(new Date(), 'yyyy-MM-dd') });
     setOpenAjuste(true);
   };
@@ -135,48 +171,214 @@ const RelatorioPalletsPage: React.FC = () => {
   };
 
   const gerarPdfRecibo = async (aj: AjustePayload & { criadoEm?: string }) => {
-    const pdfDoc = await PDFDocument.create();
-    const page = pdfDoc.addPage([595.28, 841.89]); // A4 portrait in points
-    const { width } = page.getSize();
-    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-    const title = 'Recibo de Recebimento de Pallets';
-    const nowStr = format(new Date(), 'dd/MM/yyyy HH:mm');
-
-    let y = 800;
-    page.drawText(title, { x: 50, y, size: 18, font, color: rgb(0, 0, 0) });
-    y -= 30;
-    page.drawLine({ start: { x: 50, y }, end: { x: width - 50, y }, thickness: 1, color: rgb(0.1, 0.1, 0.1) });
-    y -= 30;
-
-    const lines: string[] = [
-      `Data do recebimento: ${aj.dataRecebimento ? format(new Date(aj.dataRecebimento), 'dd/MM/yyyy') : nowStr}`,
-      `Motorista: ${aj.motorista || 'N/I'}`,
-      `Transportadora: ${aj.transportadora || 'N/I'}`,
-      `Quantidade devolvida: ${aj.quantidade}`,
-      `Observação: ${aj.observacao || '-'}`,
-      `Emitido em: ${nowStr}`,
-    ];
-
-    lines.forEach((t) => {
-      page.drawText(t, { x: 50, y, size: 12, font });
-      y -= 22;
-    });
-
-    y -= 40;
-    page.drawText('Recebido por:', { x: 50, y, size: 12, font });
-    y -= 40;
-    page.drawLine({ start: { x: 50, y }, end: { x: 300, y }, thickness: 1 });
-    y -= 16;
-    page.drawText(`Usuário: ${user?.nome || user?.email || 'Usuário'}`, { x: 50, y, size: 10, font });
-
-    const bytes = await pdfDoc.save();
-    const blob = new Blob([bytes], { type: 'application/pdf' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `recibo-pallets-${aj.transportadora || 'geral'}-${aj.dataRecebimento || format(new Date(), 'yyyy-MM-dd')}.pdf`;
-    a.click();
-    URL.revokeObjectURL(url);
+    try {
+      // Usar o mesmo template do listar controles
+      const existingBytes = await fetch('/templates/modelo-romaneio.pdf').then(res => res.arrayBuffer());
+      const doc = await PDFDocument.load(existingBytes);
+      let page = doc.getPage(0);
+      let { width, height } = page.getSize();
+      const font = await doc.embedFont(StandardFonts.Helvetica);
+      const boldFont = await doc.embedFont(StandardFonts.HelveticaBold);
+      
+      // Configurações de layout adaptadas ao template
+      const leftMargin = 60;
+      const rightMargin = 60;
+      const fontSize = 10;
+      const titleFontSize = 14;
+      const lineHeight = 14;
+      
+      // Posição inicial ajustada para não sobrepor o cabeçalho do template
+      let yPos = height - 200; // Começar mais abaixo para não sobrepor o cabeçalho
+      
+      // Título principal (menor e posicionado para não conflitar)
+      const titulo = 'RECIBO DE RECEBIMENTO DE PALLETS';
+      const tituloWidth = boldFont.widthOfTextAtSize(titulo, titleFontSize);
+      const tituloX = (width - tituloWidth) / 2;
+      page.drawText(titulo, {
+        x: tituloX,
+        y: yPos,
+        size: titleFontSize,
+        font: boldFont,
+        color: rgb(0.2, 0.2, 0.2) // Cor mais suave
+      });
+      
+      yPos -= 30;
+      
+      // Linha separadora
+      page.drawLine({
+        start: { x: leftMargin, y: yPos },
+        end: { x: width - rightMargin, y: yPos },
+        thickness: 1,
+        color: rgb(0.3, 0.3, 0.3)
+      });
+      
+      yPos -= 25;
+      
+      // Data e hora de emissão
+      const agora = new Date();
+      const dataEmissao = new Intl.DateTimeFormat('pt-BR', {
+        timeZone: 'America/Sao_Paulo',
+        day: '2-digit', month: '2-digit', year: 'numeric',
+        hour: '2-digit', minute: '2-digit'
+      }).format(agora);
+      
+      page.drawText(`Emitido em: ${dataEmissao}`, {
+        x: width - rightMargin - 120,
+        y: yPos,
+        size: fontSize - 1,
+        font,
+        color: rgb(0.4, 0.4, 0.4)
+      });
+      
+      yPos -= 30;
+      
+      // Informações do recebimento
+      const informacoes = [
+        { label: 'Data do Recebimento:', valor: aj.dataRecebimento ? format(new Date(aj.dataRecebimento), 'dd/MM/yyyy') : format(agora, 'dd/MM/yyyy') },
+        { label: 'Transportadora:', valor: aj.transportadora || 'Não informada' },
+        { label: 'Motorista:', valor: aj.motorista || 'Não informado' },
+        { label: 'Quantidade Devolvida:', valor: `${aj.quantidade} pallets` },
+        { label: 'Observação:', valor: aj.observacao || 'Nenhuma observação' }
+      ];
+      
+      informacoes.forEach((info) => {
+        page.drawText(info.label, {
+          x: leftMargin,
+          y: yPos,
+          size: fontSize,
+          font: boldFont,
+          color: rgb(0, 0, 0)
+        });
+        
+        page.drawText(info.valor, {
+          x: leftMargin + 120,
+          y: yPos,
+          size: fontSize,
+          font,
+          color: rgb(0, 0, 0)
+        });
+        
+        yPos -= lineHeight + 2;
+      });
+      
+      yPos -= 20;
+      
+      // Seção de assinatura
+      page.drawText('CONFIRMAÇÃO DE RECEBIMENTO', {
+        x: leftMargin,
+        y: yPos,
+        size: fontSize + 1,
+        font: boldFont,
+        color: rgb(0, 0, 0)
+      });
+      
+      yPos -= 25;
+      
+      // Linha separadora
+      page.drawLine({
+        start: { x: leftMargin, y: yPos },
+        end: { x: width - rightMargin, y: yPos },
+        thickness: 0.5,
+        color: rgb(0.5, 0.5, 0.5)
+      });
+      
+      yPos -= 20;
+      
+      // Responsável pelo recebimento
+      page.drawText('Responsável pelo Recebimento:', {
+        x: leftMargin,
+        y: yPos,
+        size: fontSize,
+        font: boldFont,
+        color: rgb(0, 0, 0)
+      });
+      
+      yPos -= 15;
+      
+      page.drawText(`Nome: ${user?.nome || user?.email || 'Usuário do Sistema'}`, {
+        x: leftMargin,
+        y: yPos,
+        size: fontSize,
+        font,
+        color: rgb(0, 0, 0)
+      });
+      
+      yPos -= 40;
+      
+      // Linha para assinatura
+      page.drawLine({
+        start: { x: leftMargin, y: yPos },
+        end: { x: leftMargin + 200, y: yPos },
+        thickness: 1,
+        color: rgb(0, 0, 0)
+      });
+      
+      yPos -= 15;
+      
+      page.drawText('Assinatura', {
+        x: leftMargin + 75,
+        y: yPos,
+        size: fontSize - 1,
+        font,
+        color: rgb(0.4, 0.4, 0.4)
+      });
+      
+      yPos -= 30;
+      
+      // Carimbo digital se usuário autenticado
+      if (user) {
+        page.drawText('DOCUMENTO GERADO DIGITALMENTE', {
+          x: leftMargin,
+          y: yPos,
+          size: fontSize - 1,
+          font: boldFont,
+          color: rgb(0, 0.6, 0)
+        });
+        
+        yPos -= 12;
+        
+        page.drawText(`Sistema: Controle de Carga | Usuário: ${user.email}`, {
+          x: leftMargin,
+          y: yPos,
+          size: fontSize - 2,
+          font,
+          color: rgb(0, 0.4, 0)
+        });
+      }
+      
+      // Rodapé
+      const rodapeY = 50;
+      page.drawLine({
+        start: { x: leftMargin, y: rodapeY + 20 },
+        end: { x: width - rightMargin, y: rodapeY + 20 },
+        thickness: 0.5,
+        color: rgb(0.7, 0.7, 0.7)
+      });
+      
+      page.drawText('Este documento comprova o recebimento de pallets devolvidos conforme informações acima.', {
+        x: leftMargin,
+        y: rodapeY,
+        size: fontSize - 2,
+        font,
+        color: rgb(0.5, 0.5, 0.5)
+      });
+      
+      // Gerar e baixar PDF
+      const pdfBytes = await doc.save();
+      const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `recibo-pallets-${aj.transportadora || 'geral'}-${aj.dataRecebimento || format(new Date(), 'yyyy-MM-dd')}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      
+    } catch (error) {
+      console.error('Erro ao gerar PDF:', error);
+      alert('Erro ao gerar PDF. Tente novamente.');
+    }
   };
 
   const handleSalvarAjuste = async () => {
@@ -192,13 +394,30 @@ const RelatorioPalletsPage: React.FC = () => {
           dataRecebimento: ajuste.dataRecebimento,
         }),
       });
-      if (!resp.ok) throw new Error('Falha ao salvar ajuste');
+      
       const json = await resp.json();
+      
+      if (!resp.ok) {
+        if (resp.status === 503) {
+          // Funcionalidade temporariamente indisponível
+          alert(
+            `⚠️ ${json.error}\n\n${json.details}\n\n` +
+            '📋 Consulte o arquivo INSTRUCOES_PALLET_AJUSTE.md para instruções detalhadas de como resolver este problema.'
+          );
+          setOpenAjuste(false);
+          return;
+        }
+        throw new Error(json.error || 'Falha ao salvar ajuste');
+      }
+      
+      // Sucesso - gerar PDF e atualizar dados
       await gerarPdfRecibo({ ...ajuste });
       setOpenAjuste(false);
       buscarDados();
-    } catch (e) {
+      alert('✅ Ajuste de pallets salvo com sucesso e PDF gerado!');
+    } catch (e: any) {
       console.error('Erro ao salvar ajuste:', e);
+      alert(`❌ Erro ao salvar ajuste: ${e.message}`);
     } finally {
       setSalvandoAjuste(false);
     }
@@ -283,8 +502,13 @@ const RelatorioPalletsPage: React.FC = () => {
             >
               {loading ? 'Carregando...' : 'Filtrar'}
             </Button>
-            <Button variant="outlined" color="secondary" onClick={handleOpenAjuste}>
-              Ajustes de Pallets
+            <Button 
+              variant="outlined" 
+              color="secondary" 
+              onClick={handleOpenAjuste}
+              title={funcionalidadeDisponivel === false ? 'Funcionalidade temporariamente indisponível - clique para mais informações' : 'Registrar devolução avulsa de pallets'}
+            >
+              {funcionalidadeDisponivel === false ? '⚠️ ' : ''}Ajustes de Pallets
             </Button>
           </Grid>
         </Grid>

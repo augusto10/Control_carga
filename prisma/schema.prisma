@@ -107,26 +107,9 @@ model Motorista {
   nome             String
   telefone         String
   cpf              String         @unique
-  cnh              String
+  cnh              String?
   transportadoraId Transportadora
-}
-
-model FuncionarioCliente {
-  id               String         @id @default(uuid())
-  dataCriacao      DateTime       @default(now())
-  nome             String
-  cpf              String?
-  telefone         String?
-  email            String?
-  tipo             String         // MOTORISTA, FUNCIONARIO, CLIENTE, RESPONSAVEL
-  transportadoraId String?        // Mudado para String para compatibilidade
-  cnh              String?        // Para motoristas
-  ativo            Boolean        @default(true)
-  observacoes      String?
-  
-  @@index([tipo])
-  @@index([ativo])
-  @@index([nome])
+  tipo             TipoPessoa     @default(MOTORISTA)
 }
 
 model PedidoConferido {
@@ -203,12 +186,12 @@ model PalletAjuste {
 }
 
 enum Transportadora {
-  ACERT
-  EXPRESSO_GOIAS
   ACCERT
+  EXPRESSO_GOIAS
   TERCEIRIZADA
   DETAFRA_TRANSPORTES
   RETIRA_VENDEDOR
+  RETIRA_CLIENTE
 }
 
 enum AcaoPontuacao {
@@ -233,4 +216,10 @@ enum TipoUsuario {
   SEPARADOR
   CONFERENTE
   AUDITOR
+}
+
+enum TipoPessoa {
+  MOTORISTA
+  FUNCIONARIO
+  CLIENTE
 }

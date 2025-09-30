@@ -45,15 +45,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const filtros: any = {};
 
     if (dataInicio) {
+      // Criar data de início em UTC (00:00:00.000Z)
+      const dataInicioDate = new Date(dataInicio as string + 'T00:00:00.000Z');
       filtros.dataCriacao = {
         ...filtros.dataCriacao,
-        gte: new Date(dataInicio as string)
+        gte: dataInicioDate
       };
     }
 
     if (dataFim) {
-      const dataFimDate = new Date(dataFim as string);
-      dataFimDate.setHours(23, 59, 59, 999); // Incluir o dia inteiro
+      // Criar data de fim em UTC (23:59:59.999Z)
+      const dataFimDate = new Date(dataFim as string + 'T23:59:59.999Z');
       filtros.dataCriacao = {
         ...filtros.dataCriacao,
         lte: dataFimDate

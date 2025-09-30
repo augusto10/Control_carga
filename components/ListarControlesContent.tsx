@@ -97,13 +97,13 @@ const ListarControlesContent: React.FC = () => {
   });
   
   // Opções fixas de transportadoras
-  // Usamos 'ACERT' como ID para compatibilidade com o backend, mas exibimos 'ACCERT' na interface
   const transportadorasFixas = [
-    { id: 'ACERT', nome: 'ACCERT', descricao: 'ACCERT Transportes' },
+    { id: 'ACCERT', nome: 'ACCERT', descricao: 'ACCERT Transportes' },
     { id: 'EXPRESSO_GOIAS', nome: 'EXPRESSO_GOIAS', descricao: 'Expresso Goiás' },
     { id: 'TERCEIRIZADA', nome: 'TERCEIRIZADA', descricao: 'Terceirizada' },
     { id: 'DETAFRA_TRANSPORTES', nome: 'DETAFRA_TRANSPORTES', descricao: 'Detafra Transportes' },
-    { id: 'RETIRA_VENDEDOR', nome: 'RETIRA_VENDEDOR', descricao: 'Retira Vendedor' }
+    { id: 'RETIRA_VENDEDOR', nome: 'RETIRA_VENDEDOR', descricao: 'Retira Vendedor' },
+    { id: 'RETIRA_CLIENTE', nome: 'RETIRA_CLIENTE', descricao: 'Retira Cliente' }
   ];
 
   // Função para obter o objeto da transportadora pelo ID
@@ -353,7 +353,7 @@ const ListarControlesContent: React.FC = () => {
       
       // Linha 1
       console.log('[PDF] Transportadora do controle:', controleCompleto.transportadora);
-      const transportadoraExibida = getTransportadoraById(controleCompleto.transportadora || 'ACERT');
+      const transportadoraExibida = getTransportadoraById(controleCompleto.transportadora || 'ACCERT');
       console.log('[PDF] Transportadora exibida:', transportadoraExibida);
       page.drawText(`Transportadora: ${transportadoraExibida.descricao}`, { x: 50, y: yPos, size: fontSize, font });
       page.drawText(`Usuário: ${controleCompleto.responsavel}`, { x: 250, y: yPos, size: fontSize, font });
@@ -877,7 +877,7 @@ const ListarControlesContent: React.FC = () => {
       if (editData.responsavel !== undefined) dadosAtualizacao.responsavel = editData.responsavel as string;
       if (editData.cpfMotorista !== undefined) dadosAtualizacao.cpfMotorista = editData.cpfMotorista as string;
       if (editData.transportadora !== undefined) {
-        const transportadoraValida = (['ACERT', 'EXPRESSO_GOIAS', 'TERCEIRIZADA', 'DETAFRA_TRANSPORTES', 'RETIRA_VENDEDOR'].includes(editData.transportadora)) ? editData.transportadora : 'ACERT';
+        const transportadoraValida = (['ACCERT', 'EXPRESSO_GOIAS', 'TERCEIRIZADA', 'DETAFRA_TRANSPORTES', 'RETIRA_VENDEDOR', 'RETIRA_CLIENTE'].includes(editData.transportadora)) ? editData.transportadora : 'ACCERT';
         dadosAtualizacao.transportadora = transportadoraValida;
       }
       if (editData.qtdPallets !== undefined) dadosAtualizacao.qtdPallets = Number(editData.qtdPallets) || 0;
@@ -1570,58 +1570,55 @@ const ListarControlesContent: React.FC = () => {
         controleId={assinaturaAberta.controleId || ''}
         tipoAssinatura={assinaturaAberta.tipo}
         onAssinaturaSalva={async () => {
-          console.log('[ListarControles] Assinatura salva, recarregando dados...');
+          console.log('🔄 [RELOAD] Iniciando processo de reload após assinatura...');
+          
           try {
-            // Aguarda um pouco para garantir que o banco foi atualizado
-            await new Promise(resolve => setTimeout(resolve, 500));
+            // 1. Fechar modal imediatamente
+            setAssinaturaAberta({ aberto: false, controleId: '', tipo: 'motorista' });
             
-            // Recarrega os dados dos controles para atualizar o estado da assinatura
-            console.log('[ListarControles] Chamando fetchControles...');
-            await fetchControles();
+            // 2. Mostrar loading
+            setLoading(true);
             
-            // Aguarda um pouco mais para garantir que o store foi atualizado
-            await new Promise(resolve => setTimeout(resolve, 200));
+            // 3. Aguardar um pouco para a assinatura ser processada
+            console.log('🔄 [RELOAD] Aguardando assinatura ser processada...');
+            await new Promise(resolve => setTimeout(resolve, 1500));
             
-            // Força a atualização da lista local
-            console.log('[ListarControles] Atualizando lista local...');
-            const novosControles = converterControles(controlesStore as any);
-            
-            // Força atualização do controle específico que foi assinado
-            const controleAtualizado = novosControles.find(c => c.id === assinaturaAberta.controleId);
-            if (controleAtualizado) {
-              console.log('[ListarControles] Controle encontrado:', {
-                id: controleAtualizado.id,
-                motorista: !!controleAtualizado.assinaturaMotorista,
-                responsavel: !!controleAtualizado.assinaturaResponsavel,
-                assinaturaMotoristaValue: controleAtualizado.assinaturaMotorista?.substring(0, 50) + '...',
-                assinaturaResponsavelValue: controleAtualizado.assinaturaResponsavel?.substring(0, 50) + '...'
-              });
-            } else {
-              console.warn('[ListarControles] Controle NÃO encontrado! ID:', assinaturaAberta.controleId);
-              console.log('[ListarControles] IDs disponíveis:', novosControles.map(c => c.id));
-            }
-            
-            setControles([...novosControles]); // Força re-render com spread
-            
-            // Força uma segunda atualização para garantir que o React detecte a mudança
-            setTimeout(() => {
-              setControles(prev => [...prev]);
-            }, 100);
-            // Log para verificar se os dados foram atualizados
-            console.log('[ListarControles] Controles atualizados:', novosControles.length);
-            
-            // Mostra feedback de sucesso
-            enqueueSnackbar('Assinatura salva com sucesso!', { 
+            // 4. Mostrar feedback antes do reload
+            enqueueSnackbar('✅ Assinatura salva! Atualizando página...', { 
               variant: 'success',
-              autoHideDuration: 3000,
+              autoHideDuration: 2000,
               anchorOrigin: { vertical: 'top', horizontal: 'center' }
             });
+            
+            // 5. Aguardar um pouco para o usuário ver o feedback
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            console.log('🔄 [RELOAD] Fazendo reload da página...');
+            
+            // 6. RELOAD COMPLETO DA PÁGINA
+            window.location.reload();
+            
           } catch (error) {
-            console.error('[ListarControles] Erro ao recarregar dados:', error);
-            enqueueSnackbar('Assinatura salva, mas houve erro ao atualizar a lista', { 
-              variant: 'warning',
-              autoHideDuration: 5000 
-            });
+            console.error('❌ [RELOAD] Erro no processo:', error);
+            setLoading(false);
+            
+            // Fallback: tentar atualização manual
+            try {
+              await fetchControles();
+              const novosControles = converterControles(controlesStore as any);
+              setControles([...novosControles]);
+              
+              enqueueSnackbar('Assinatura salva! Lista atualizada manualmente.', { 
+                variant: 'success',
+                autoHideDuration: 3000 
+              });
+            } catch (fallbackError) {
+              console.error('❌ [RELOAD] Erro no fallback:', fallbackError);
+              enqueueSnackbar('Assinatura salva, mas é necessário atualizar a página manualmente', { 
+                variant: 'warning',
+                autoHideDuration: 5000 
+              });
+            }
           }
         }}
       />

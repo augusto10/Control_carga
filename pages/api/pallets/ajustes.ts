@@ -19,23 +19,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     if (req.method === 'POST') {
       const { motorista, transportadora, quantidade, observacao, dataRecebimento } = req.body || {};
-
       if (!quantidade || typeof quantidade !== 'number' || quantidade <= 0) {
         return res.status(400).json({ error: 'Quantidade inválida. Deve ser um número positivo.' });
       }
 
       // transportadora é opcional, mas se vier deve ser um dos enums conhecidos; Prisma validará
-      const ajuste = await (prisma as any).palletAjuste.create({
-        data: {
-          id: randomUUID(),
-          motorista: motorista || null,
-          transportadora: transportadora || null,
-          quantidade,
-          observacao: observacao || null,
-          dataRecebimento: dataRecebimento ? new Date(dataRecebimento) : undefined,
-          usuarioId: decoded.id,
-        },
-      });
+      let ajuste;
+      try {
+        ajuste = await (prisma as any).palletAjuste.create({
+          data: {
+            id: randomUUID(),
+            motorista: motorista || null,
+            transportadora: transportadora || null,
+            quantidade,
+            observacao: observacao || null,
+            dataRecebimento: dataRecebimento ? new Date(dataRecebimento) : undefined,
+            usuarioId: decoded.id,
+          },
+        });
+      } catch (error: any) {
+        if (error.code === 'P2021' || error.message?.includes('does not exist')) {
+          return res.status(503).json({ 
+            error: 'Funcionalidade de ajustes de pallets temporariamente indisponível', 
+            details: 'A tabela PalletAjuste não foi criada no banco de dados. Entre em contato com o administrador do sistema para criar a tabela.' 
+          });
+        }
+        throw error;
+      }
 
       return res.status(201).json({ ok: true, ajuste });
     }
@@ -48,16 +58,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (dataInicio) {
         where.dataRecebimento = {
           ...where.dataRecebimento,
-          gte: new Date(String(dataInicio)),
+          gte: new Date(String(dataInicio) + 'T00:00:00.000Z'),
         };
       }
 
       if (dataFim) {
-        const fim = new Date(String(dataFim));
-        fim.setHours(23, 59, 59, 999);
         where.dataRecebimento = {
           ...where.dataRecebimento,
-          lte: fim,
+          lte: new Date(String(dataFim) + 'T23:59:59.999Z'),
         };
       }
 
@@ -78,10 +86,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         observacao?: string | null;
         dataRecebimento: Date;
       };
-      const ajustes: AjusteRow[] = await (prisma as any).palletAjuste.findMany({
-        where,
-        orderBy: { dataRecebimento: 'desc' },
-      });
+      
+      let ajustes: AjusteRow[] = [];
+      try {
+        ajustes = await (prisma as any).palletAjuste.findMany({
+          where,
+          orderBy: { dataRecebimento: 'desc' },
+        });
+      } catch (error: any) {
+        if (error.code === 'P2021' || error.message?.includes('does not exist')) {
+          return res.status(503).json({ 
+            error: 'Funcionalidade de ajustes de pallets temporariamente indisponível', 
+            details: 'A tabela PalletAjuste não foi criada no banco de dados. Entre em contato com o administrador do sistema para criar a tabela.',
+            ajustes: [] 
+          });
+        }
+        throw error;
+      }
 
       return res.status(200).json({ ajustes });
     }

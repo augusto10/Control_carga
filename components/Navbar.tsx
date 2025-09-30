@@ -48,7 +48,7 @@ export default function Navbar() {
                     {isMobile ? '📝' : 'Listar Conferências'}
                   </Button>
                 </Link>
-                <Link href="/relatorios/conferencias" passHref>
+                <Link href="/relatorios" passHref>
                   <Button color="inherit" sx={{ fontWeight: 600 }}>
                     {isMobile ? '📊' : 'Relatórios'}
                   </Button>

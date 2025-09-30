@@ -64,11 +64,9 @@ async function listarConferencias(req: NextApiRequest, res: NextApiResponse) {
     // Filtrar por data
     if (dataInicio || dataFim) {
       where.dataCriacao = {};
-      if (dataInicio) where.dataCriacao.gte = new Date(dataInicio);
+      if (dataInicio) where.dataCriacao.gte = new Date(dataInicio + 'T00:00:00.000Z');
       if (dataFim) {
-        const endOfDay = new Date(dataFim);
-        endOfDay.setHours(23, 59, 59, 999);
-        where.dataCriacao.lte = endOfDay;
+        where.dataCriacao.lte = new Date(dataFim + 'T23:59:59.999Z');
       }
     }
     

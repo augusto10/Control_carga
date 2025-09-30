@@ -15,12 +15,9 @@ const handler = async (req: AuthenticatedRequest, res: NextApiResponse) => {
 
     if (start || end) {
       let dataCriacao: Prisma.DateTimeFilter = {};
-      if (start) dataCriacao = { ...dataCriacao, gte: new Date(start) };
+      if (start) dataCriacao = { ...dataCriacao, gte: new Date(start + 'T00:00:00.000Z') };
       if (end) {
-        const endDate = new Date(end);
-        // inclui o dia final inteiro
-        endDate.setHours(23, 59, 59, 999);
-        dataCriacao = { ...dataCriacao, lte: endDate };
+        dataCriacao = { ...dataCriacao, lte: new Date(end + 'T23:59:59.999Z') };
       }
       where.dataCriacao = dataCriacao;
     }

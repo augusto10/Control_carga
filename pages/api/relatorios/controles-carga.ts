@@ -79,15 +79,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const filtros: any = {};
 
     if (dataInicio) {
+      // Criar data de início em UTC (00:00:00.000Z)
+      const dataInicioDate = new Date(dataInicio as string + 'T00:00:00.000Z');
       filtros.dataCriacao = {
         ...filtros.dataCriacao,
-        gte: new Date(dataInicio as string)
+        gte: dataInicioDate
       };
     }
 
     if (dataFim) {
-      const dataFimDate = new Date(dataFim as string);
-      dataFimDate.setHours(23, 59, 59, 999);
+      // Criar data de fim em UTC (23:59:59.999Z)
+      const dataFimDate = new Date(dataFim as string + 'T23:59:59.999Z');
       filtros.dataCriacao = {
         ...filtros.dataCriacao,
         lte: dataFimDate
@@ -130,6 +132,37 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     });
 
+    // Buscar ajustes de pallets no mesmo período
+    const whereAjustes: any = {};
+    if (filtros.dataCriacao?.gte || filtros.dataCriacao?.lte) {
+      whereAjustes.dataRecebimento = {
+        ...(filtros.dataCriacao?.gte ? { gte: filtros.dataCriacao.gte } : {}),
+        ...(filtros.dataCriacao?.lte ? { lte: filtros.dataCriacao.lte } : {}),
+      };
+    }
+    if (filtros.transportadora) {
+      whereAjustes.transportadora = filtros.transportadora;
+    }
+    if (filtros.motorista) {
+      whereAjustes.motorista = filtros.motorista;
+    }
+
+    type AjusteRow = { motorista: string | null; transportadora: string | null; quantidade: number; dataRecebimento: Date };
+    let ajustes: AjusteRow[] = [];
+    try {
+      ajustes = await (prisma as any).palletAjuste.findMany({
+        where: whereAjustes,
+        select: {
+          motorista: true,
+          transportadora: true,
+          quantidade: true,
+          dataRecebimento: true,
+        },
+      });
+    } catch (e: any) {
+      console.warn('Ajustes de pallets indisponíveis (tabela ausente). Prosseguindo sem somar ajustes.');
+    }
+
     console.log(`Encontrados ${controles.length} controles`);
 
     // Processar dados para o relatório
@@ -147,6 +180,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       assinaturaResponsavel: !!controle.assinaturaResponsavel
     }));
 
+    // Aplicar ajustes de pallets aos controles
+    const controlesPorChave = new Map<string, RelatorioControle>();
+    dadosRelatorio.forEach(controle => {
+      const chave = `${controle.motorista}|${controle.transportadora}`;
+      controlesPorChave.set(chave, controle);
+    });
+
+    // Somar ajustes aos pallets devolvidos
+    ajustes.forEach((ajuste: AjusteRow) => {
+      const motoristaKey = ajuste.motorista || 'DESCONHECIDO';
+      const transpKey = ajuste.transportadora || 'TERCEIRIZADA';
+      const chave = `${motoristaKey}|${transpKey}`;
+      
+      const controle = controlesPorChave.get(chave);
+      if (controle) {
+        controle.qtdPalletsDevolvidos += ajuste.quantidade || 0;
+        controle.diferencaPallets = controle.qtdPalletsLevados - controle.qtdPalletsDevolvidos;
+      }
+    });
+
     // Criar resumo por transportadora
     const resumoTransportadoraMap = new Map<string, ResumoTransportadora>();
 
@@ -161,7 +214,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if (item.assinaturaMotorista && item.assinaturaResponsavel) {
           resumo.controlesAssinados += 1;
         }
+        resumo.percentualAssinados = Math.round((resumo.controlesAssinados / resumo.totalControles) * 100);
       } else {
+        const controlesAssinados = (item.assinaturaMotorista && item.assinaturaResponsavel) ? 1 : 0;
         resumoTransportadoraMap.set(item.transportadora, {
           transportadora: item.transportadora,
           totalControles: 1,
@@ -169,18 +224,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           totalPalletsDevolvidos: item.qtdPalletsDevolvidos,
           diferencaPallets: item.diferencaPallets,
           totalNotas: item.totalNotas,
-          controlesAssinados: (item.assinaturaMotorista && item.assinaturaResponsavel) ? 1 : 0,
-          percentualAssinados: 0
+          controlesAssinados,
+          percentualAssinados: controlesAssinados > 0 ? 100 : 0
         });
       }
     });
 
-    // Calcular percentuais
-    const resumoTransportadoras = Array.from(resumoTransportadoraMap.values()).map(resumo => ({
-      ...resumo,
-      percentualAssinados: resumo.totalControles > 0 ? 
-        Math.round((resumo.controlesAssinados / resumo.totalControles) * 100) : 0
-    })).sort((a, b) => a.transportadora.localeCompare(b.transportadora));
+    const resumoTransportadoras = Array.from(resumoTransportadoraMap.values())
+      .sort((a, b) => a.transportadora.localeCompare(b.transportadora));
 
     // Criar resumo por motorista
     const resumoMotoristaMap = new Map<string, ResumoMotorista>();
@@ -198,6 +249,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           resumo.controlesAssinados += 1;
         }
       } else {
+        const controlesAssinados = (item.assinaturaMotorista && item.assinaturaResponsavel) ? 1 : 0;
         resumoMotoristaMap.set(chave, {
           motorista: item.motorista,
           transportadora: item.transportadora,
@@ -206,7 +258,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           totalPalletsDevolvidos: item.qtdPalletsDevolvidos,
           diferencaPallets: item.diferencaPallets,
           totalNotas: item.totalNotas,
-          controlesAssinados: (item.assinaturaMotorista && item.assinaturaResponsavel) ? 1 : 0
+          controlesAssinados
         });
       }
     });
@@ -239,7 +291,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     };
 
-    // Timeline por dia (últimos 30 dias ou período selecionado)
+    // Timeline por dia
     const timelineMap = new Map<string, number>();
     dadosRelatorio.forEach(item => {
       const data = item.dataCriacao;
@@ -254,7 +306,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.log(`Resumo de ${resumoMotoristas.length} motoristas`);
 
     return res.status(200).json({
-      controles: dadosRelatorio,
+      dados: dadosRelatorio,
       resumoTransportadoras,
       resumoMotoristas,
       dadosGrafico,
@@ -274,7 +326,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   } catch (error) {
     console.error('Erro ao gerar relatório de controles:', error);
-    return res.status(500).json({ 
+    return res.status(500).json({
       error: 'Erro interno do servidor',
       details: error instanceof Error ? error.message : 'Erro desconhecido'
     });

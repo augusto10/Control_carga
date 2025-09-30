@@ -103,7 +103,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
 async function listar(req: NextApiRequest, res: NextApiResponse) {
   try {
+    // Buscar apenas motoristas usando Prisma
     const motoristasDb = await prisma.motorista.findMany({
+      where: {
+        tipo: 'MOTORISTA'
+      },
       orderBy: { nome: 'asc' },
     });
 
@@ -113,7 +117,8 @@ async function listar(req: NextApiRequest, res: NextApiResponse) {
       'EXPRESSO_GOIAS': 'Expresso Goiás',
       'TERCEIRIZADA': 'Terceirizada',
       'DETAFRA_TRANSPORTES': 'Detafra Transportes',
-      'RETIRA_VENDEDOR': 'Retira Vendedor'
+      'RETIRA_VENDEDOR': 'Retira Vendedor',
+      'RETIRA_CLIENTE': 'Retira Cliente'
     };
 
     // Adiciona um objeto de descrição da transportadora para compatibilidade com o front-end

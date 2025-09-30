@@ -17,7 +17,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Retorna as opções do enum Transportadora
     const transportadoras: Transportadora[] = [
       {
-        id: 'ACERT',
+        id: 'ACCERT',
         nome: 'ACCERT',
         descricao: 'ACCERT Transportes',
       },
@@ -40,6 +40,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         id: 'RETIRA_VENDEDOR',
         nome: 'RETIRA_VENDEDOR',
         descricao: 'Retira Vendedor',
+      },
+      {
+        id: 'RETIRA_CLIENTE',
+        nome: 'RETIRA_CLIENTE',
+        descricao: 'Retira Cliente',
       },
     ];
 

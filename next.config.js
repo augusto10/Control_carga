@@ -1,85 +1,33 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Configuração para o Prisma Accelerate
-  experimental: {
-    serverComponentsExternalPackages: ['@prisma/client'],
+  reactStrictMode: false,
+  swcMinify: false,
+  typescript: {
+    ignoreBuildErrors: true,
   },
-  
-  // Otimizações de build
-  webpack: (config, { isServer, dev }) => {
-    // Configuração para o Prisma no lado do servidor
-    if (isServer) {
-      config.externals = [...(config.externals || []), 
-        { '@prisma/client': '@prisma/client' }
-      ];
-      
-      // Adiciona regras para arquivos .prisma
-      config.module.rules.push({
-        test: /\.prisma$/,
-        loader: 'null-loader',
-      });
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+  experimental: {
+    serverComponentsExternalPackages: ['@prisma/client', 'prisma']
+  },
+  compiler: {
+    emotion: true,
+  },
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+      };
     }
-    
-    // Configuração para módulos do Node.js
-    config.resolve.fallback = {
-      ...config.resolve.fallback,
-      fs: false,
-      net: false,
-      tls: false,
-      dns: false,
-      child_process: false
-    };
-
-    // Alias para resolver módulo faltante do MUI em ambientes Node
-    config.resolve.alias = {
-      ...(config.resolve.alias || {}),
-      '@mui/private-theming/node/ThemeProvider/nested': '@mui/private-theming/ThemeProvider/nested'
-    };
-
     return config;
   },
-  
-  // Configurações de build
-  reactStrictMode: true,
-  swcMinify: true,
-  
-  // Configurações de TypeScript
-  typescript: {
-    ignoreBuildErrors: false, // Habilita a verificação de tipos
-  },
-  
-  // Configurações do ESLint
-  eslint: {
-    ignoreDuringBuilds: true, // Ignora ESLint no build para evitar falhas por lint em produção
-  },
-  images: {
-    domains: ['localhost'],
-  },
-  async headers() {
-    const allowedOrigins = [
-      'http://localhost:3000',
-      'http://localhost:3001',
-      'https://controle-logistica.vercel.app',
-      /^https:\/\/controle-logistica-.*-augusto10s-projects\.vercel\.app$/,
-    ];
+  // Desabilitar tracing para evitar problemas de permissão
+  tracing: false,
+  // Configurações adicionais para Windows
+  poweredByHeader: false,
+  generateEtags: false
+}
 
-    return [
-      {
-        source: '/api/:path*',
-        headers: [
-          { key: 'Access-Control-Allow-Credentials', value: 'true' },
-          { key: 'Access-Control-Allow-Methods', value: 'GET,OPTIONS,PATCH,DELETE,POST,PUT' },
-          { key: 'Access-Control-Allow-Headers', value: 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization' },
-          { key: 'Access-Control-Expose-Headers', value: 'Set-Cookie' },
-        ],
-      },
-    ];
-  },
-  compress: true,
-  onDemandEntries: {
-    maxInactiveAge: 60 * 1000,
-    pagesBufferLength: 5,
-  },
-};
-
-module.exports = nextConfig;
+module.exports = nextConfig

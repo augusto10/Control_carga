@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Autenticação</title>
+</head>
+<body>
+    <h1>Debug de Autenticação</h1>
+    <div id="info"></div>
+    <button onclick="testarLogin()">Testar Login</button>
+    <button onclick="testarAjuste()">Testar Ajuste</button>
+    
+    <script>
+        function mostrarInfo() {
+            const info = document.getElementById('info');
+            info.innerHTML = `
+                <h3>Cookies atuais:</h3>
+                <pre>${document.cookie || 'Nenhum cookie encontrado'}</pre>
+                
+                <h3>Local Storage:</h3>
+                <pre>${JSON.stringify(localStorage, null, 2)}</pre>
+                
+                <h3>Session Storage:</h3>
+                <pre>${JSON.stringify(sessionStorage, null, 2)}</pre>
+            `;
+        }
+        
+        async function testarLogin() {
+            try {
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        email: 'admin@controlecarga.com',
+                        senha: '12345678'
+                    })
+                });
+                
+                const data = await response.json();
+                console.log('Login response:', data);
+                alert(`Login: ${response.status} - ${JSON.stringify(data)}`);
+                mostrarInfo();
+            } catch (error) {
+                console.error('Erro no login:', error);
+                alert('Erro no login: ' + error.message);
+            }
+        }
+        
+        async function testarAjuste() {
+            try {
+                const response = await fetch('/api/pallets/ajustes', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        motorista: 'João Silva (Teste)',
+                        transportadora: 'ACCERT',
+                        quantidade: 5,
+                        observacao: 'Teste de ajuste via HTML',
+                        dataRecebimento: new Date().toISOString().split('T')[0]
+                    })
+                });
+                
+                const data = await response.json();
+                console.log('Ajuste response:', data);
+                alert(`Ajuste: ${response.status} - ${JSON.stringify(data)}`);
+            } catch (error) {
+                console.error('Erro no ajuste:', error);
+                alert('Erro no ajuste: ' + error.message);
+            }
+        }
+        
+        // Mostrar info inicial
+        mostrarInfo();
+    </script>
+</body>
+</html>

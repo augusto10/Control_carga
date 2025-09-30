@@ -133,9 +133,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
 
         // Garantir que a transportadora tenha um valor válido
-        const transportadoraValida = (['ACERT', 'EXPRESSO_GOIAS', 'TERCEIRIZADA', 'DETAFRA_TRANSPORTES', 'RETIRA_VENDEDOR'].includes(transportadora)) 
+        const transportadoraValida = (['ACCERT', 'EXPRESSO_GOIAS', 'TERCEIRIZADA', 'DETAFRA_TRANSPORTES', 'RETIRA_VENDEDOR', 'RETIRA_CLIENTE'].includes(transportadora)) 
           ? transportadora 
-          : 'ACERT';
+          : 'ACCERT';
 
         // SOLUÇÃO TEMPORÁRIA: Mapear RETIRA_VENDEDOR para TERCEIRIZADA no banco (igual aos motoristas)
         let transportadoraParaBanco = transportadoraValida;
@@ -148,6 +148,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             motoristaParaSalvar = `${motoristaParaSalvar} [RV]`;
           }
           console.log('[Controle] Mapeando RETIRA_VENDEDOR -> TERCEIRIZADA para compatibilidade');
+        }
+        // ACCERT e RETIRA_CLIENTE já estão no enum, não precisam de mapeamento
+        else if (transportadoraValida === 'ACCERT' || transportadoraValida === 'RETIRA_CLIENTE') {
+          console.log(`[Controle] Usando ${transportadoraValida} diretamente (já no enum)`);
         }
           
         // Gera o próximo número de manifesto automaticamente
@@ -191,6 +195,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           (controle as any).transportadora = 'RETIRA_VENDEDOR';
           (controle as any).motorista = motorista.trim(); // Retornar nome sem marcador
         }
+        // ACCERT e RETIRA_CLIENTE já são salvos corretamente, não precisam ajuste
         
         res.status(201).json(controle);
       } catch (error: any) {

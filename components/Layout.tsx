@@ -366,9 +366,15 @@ const menuItems = [
         path: '/admin/motoristas'
       },
       {
-        text: 'Funcionários e Clientes',
-        icon: <GroupsIcon sx={{ fontSize: 20 }} />,
-        path: '/funcionarios-clientes',
+        text: 'Funcionários',
+        icon: <PersonIcon sx={{ fontSize: 20 }} />,
+        path: '/funcionarios',
+        adminOnly: true
+      },
+      {
+        text: 'Clientes',
+        icon: <BusinessIcon sx={{ fontSize: 20 }} />,
+        path: '/clientes',
         adminOnly: true
       }
     ]

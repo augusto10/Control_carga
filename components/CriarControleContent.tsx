@@ -30,13 +30,16 @@ import { ptBR } from 'date-fns/locale';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '@/services/api';
 
-interface Motorista {
+interface Pessoa {
   id: string;
   nome: string;
   cpf: string;
   telefone: string;
-  cnh: string;
+  cnh?: string | null;
   transportadoraId: string;
+  tipo: 'MOTORISTA' | 'FUNCIONARIO' | 'CLIENTE';
+  tipoLabel: string;
+  displayName: string;
   transportadora?: {
     id: string;
     descricao: string;
@@ -95,18 +98,18 @@ const CriarControleContent: React.FC = () => {
     transportadoras: boolean;
     notas: boolean;
     submit: boolean;
-    motoristas: boolean;
+    pessoas: boolean;
   }>({
     transportadoras: false,
     notas: false,
     submit: false,
-    motoristas: false
+    pessoas: false
   });
   
-  const [motoristas, setMotoristas] = useState<Motorista[]>([]);
+  const [pessoas, setPessoas] = useState<Pessoa[]>([]);
   
-  // Encontra a transportadora padrão (ACERT)
-  const transportadoraPadrao = transportadoras.find(t => t.id === 'ACERT') || transportadoras[0];
+  // Encontra a transportadora padrão (ACCERT)
+  const transportadoraPadrao = transportadoras.find(t => t.id === 'ACCERT') || transportadoras[0];
   
   // Função para obter o objeto da transportadora pelo ID
   const getTransportadoraById = (id: string) => {
@@ -136,7 +139,7 @@ const CriarControleContent: React.FC = () => {
     motorista: 'PENDENTE',
     cpfMotorista: '',
     telefoneMotorista: '',
-    transportadora: 'ACERT',
+    transportadora: 'ACCERT' as Transportadora,
     responsavel: 'PENDENTE',
     observacao: '',
     qtdPalletsLevados: 0,
@@ -168,7 +171,7 @@ const CriarControleContent: React.FC = () => {
   useEffect(() => {
     const carregarDados = async () => {
       try {
-        setIsLoading(prev => ({ ...prev, transportadoras: true, notas: true, motoristas: true }));
+        setIsLoading(prev => ({ ...prev, transportadoras: true, notas: true, pessoas: true }));
         
         // Carrega transportadoras e notas em paralelo
         await Promise.all([
@@ -176,14 +179,14 @@ const CriarControleContent: React.FC = () => {
           fetchNotas()
         ]);
         
-        // Carrega motoristas
-        const response = await api.get<Motorista[]>('/api/motoristas');
-        setMotoristas(response.data);
+        // Carrega pessoas (motoristas, funcionários e clientes)
+        const response = await api.get('/api/pessoas/para-controles');
+        setPessoas(response.data.todas);
       } catch (error) {
         console.error('Erro ao carregar dados:', error);
         enqueueSnackbar('Erro ao carregar os dados. Tente novamente.', { variant: 'error' });
       } finally {
-        setIsLoading(prev => ({ ...prev, transportadoras: false, notas: false, motoristas: false }));
+        setIsLoading(prev => ({ ...prev, transportadoras: false, notas: false, pessoas: false }));
       }
     };
 
@@ -266,9 +269,9 @@ const CriarControleContent: React.FC = () => {
         motorista: (formData.motorista || 'PENDENTE').trim(),
         cpfMotorista: formData.cpfMotorista ? formData.cpfMotorista.replace(/[^\d]/g, '') : 'PENDENTE',
         responsavel: (formData.responsavel || 'PENDENTE').trim(),
-        transportadora: (['ACERT', 'EXPRESSO_GOIAS', 'TERCEIRIZADA', 'DETAFRA_TRANSPORTES', 'RETIRA_VENDEDOR'].includes(formData.transportadora)) 
+        transportadora: (['ACCERT', 'EXPRESSO_GOIAS', 'TERCEIRIZADA', 'DETAFRA_TRANSPORTES', 'RETIRA_VENDEDOR', 'RETIRA_CLIENTE'].includes(formData.transportadora)) 
           ? formData.transportadora 
-          : 'ACERT',
+          : 'ACCERT',
         qtdPalletsLevados: Number(formData.qtdPalletsLevados) || 0,
         qtdPalletsDevolvidos: Number(formData.qtdPalletsDevolvidos) || 0,
         placaVeiculo: formData.placaVeiculo.trim(),
@@ -368,9 +371,14 @@ const CriarControleContent: React.FC = () => {
             />
                         <FormControl fullWidth margin="normal" error={!!errors.motorista}>
               <Autocomplete
-                options={motoristas}
-                getOptionLabel={(option) => typeof option === 'string' ? option : `${option.nome} (${option.cpf})`}
-                value={motoristas.find(m => m.nome === formData.motorista) || null}
+                options={pessoas}
+                getOptionLabel={(option) => {
+                  if (typeof option === 'string') return option;
+                  const tipoIcon = option.tipo === 'MOTORISTA' ? '🚛' : 
+                                  option.tipo === 'FUNCIONARIO' ? '👨‍💼' : '🏢';
+                  return `${tipoIcon} ${option.nome} (${option.tipoLabel})`;
+                }}
+                value={pessoas.find(p => p.nome === formData.motorista) || null}
                 onChange={(_, newValue) => {
                   if (typeof newValue === 'string') {
                     setFormData(prev => ({
@@ -380,16 +388,13 @@ const CriarControleContent: React.FC = () => {
                       telefoneMotorista: ''
                     }));
                   } else if (newValue) {
-                    // Atualiza todos os campos do motorista, incluindo a transportadora
-                    const transportadoraSelecionada = getTransportadoraById(newValue.transportadoraId);
+                    // Atualiza todos os campos da pessoa selecionada
                     setFormData(prev => ({
                       ...prev,
                       motorista: newValue.nome,
                       cpfMotorista: newValue.cpf,
                       telefoneMotorista: newValue.telefone || '',
-                      transportadora: (['ACERT', 'EXPRESSO_GOIAS', 'TERCEIRIZADA', 'DETAFRA_TRANSPORTES', 'RETIRA_VENDEDOR'].includes(transportadoraSelecionada?.id) 
-                        ? transportadoraSelecionada.id 
-                        : 'ACERT') as Transportadora
+                      transportadora: newValue.transportadoraId as Transportadora
                     }));
                   } else {
                     setFormData(prev => ({
@@ -401,27 +406,71 @@ const CriarControleContent: React.FC = () => {
                   }
                 }}
                 freeSolo
-                renderOption={(props, option) => (
-                  <li {...props}>
-                    <div>
-                      <div><strong>{option.nome}</strong></div>
-                      <div>CPF: {option.cpf}</div>
-                      <div>Telefone: {option.telefone || 'Não informado'}</div>
-                      <div>Transportadora: {option.transportadora?.descricao || 'Não informada'}</div>
-                    </div>
-                  </li>
-                )}
+                groupBy={(option) => {
+                  if (option.tipo === 'MOTORISTA') return '🚛 Motoristas';
+                  if (option.tipo === 'FUNCIONARIO') return '👨‍💼 Funcionários';
+                  return '🏢 Clientes';
+                }}
+                renderOption={(props, option) => {
+                  const transportadoraMap: Record<string, string> = {
+                    'ACCERT': 'ACCERT Transportes',
+                    'ACERT': 'ACCERT Transportes', // Compatibilidade
+                    'EXPRESSO_GOIAS': 'Expresso Goiás',
+                    'TERCEIRIZADA': 'Terceirizada',
+                    'DETAFRA_TRANSPORTES': 'Detafra Transportes',
+                    'RETIRA_VENDEDOR': 'Retira Vendedor',
+                    'RETIRA_CLIENTE': 'Retira Cliente'
+                  };
+                  
+                  const transportadoraNome = transportadoraMap[option.transportadoraId] || option.transportadoraId;
+                  const tipoColor = option.tipo === 'MOTORISTA' ? '#1976d2' : 
+                                   option.tipo === 'FUNCIONARIO' ? '#ed6c02' : '#2e7d32';
+                  
+                  return (
+                    <li {...props}>
+                      <div style={{ width: '100%', padding: '8px 0' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                          <strong style={{ color: tipoColor }}>{option.nome}</strong>
+                          <span style={{ 
+                            backgroundColor: tipoColor, 
+                            color: 'white', 
+                            padding: '2px 6px', 
+                            borderRadius: '4px', 
+                            fontSize: '10px',
+                            fontWeight: 'bold'
+                          }}>
+                            {option.tipoLabel.toUpperCase()}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: '12px', color: '#666', marginBottom: '2px' }}>
+                          CPF: {option.cpf}
+                        </div>
+                        <div style={{ fontSize: '12px', color: '#666', marginBottom: '2px' }}>
+                          Telefone: {option.telefone || 'Não informado'}
+                        </div>
+                        <div style={{ fontSize: '12px', color: '#666' }}>
+                          Transportadora: <strong>{transportadoraNome}</strong>
+                        </div>
+                        {option.cnh && (
+                          <div style={{ fontSize: '12px', color: '#666' }}>
+                            CNH: {option.cnh}
+                          </div>
+                        )}
+                      </div>
+                    </li>
+                  );
+                }}
                 renderInput={(params) => (
                   <TextField
                     {...params}
-                    label="Motorista"
+                    label="Pessoa Responsável (Motorista/Funcionário/Cliente)"
                     name="motorista"
                     required
                     error={!!errors.motorista}
                     helperText={errors.motorista}
                   />
                 )}
-                loading={isLoading.motoristas}
+                loading={isLoading.pessoas}
               />
             </FormControl>
             
