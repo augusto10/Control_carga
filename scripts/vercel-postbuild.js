@@ -1,10 +1,12 @@
 #!/usr/bin/env node
-// Script que executa após o build no Vercel para corrigir o banco automaticamente
+// Script que executa após o build no Vercel usando Prisma Deploy
 
-const { PrismaClient } = require('@prisma/client');
+const { exec } = require('child_process');
+const { promisify } = require('util');
+const execAsync = promisify(exec);
 
 async function runPostBuildMigration() {
-  console.log('🚀 [VERCEL POST-BUILD] Iniciando migração automática...');
+  console.log('🚀 [VERCEL POST-BUILD] Iniciando migração via Prisma Deploy...');
   
   // Só executar em produção
   if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL_ENV) {
@@ -12,122 +14,77 @@ async function runPostBuildMigration() {
     return;
   }
 
-  const prisma = new PrismaClient();
-  
   try {
-    console.log('🔍 Verificando se precisa de migração...');
+    // 1. Executar prisma migrate deploy (aplica migrações pendentes)
+    console.log('🔄 Executando prisma migrate deploy...');
     
-    // 1. Verificar se coluna tipo existe
-    let needsTipoMigration = false;
-    try {
-      await prisma.motorista.findFirst({
-        select: { tipo: true }
-      });
-      console.log('✅ Campo tipo já existe');
-    } catch (error) {
-      if (error.message.includes('does not exist')) {
-        needsTipoMigration = true;
-        console.log('❗ Campo tipo não existe - será criado');
-      }
+    const { stdout: deployOutput, stderr: deployError } = await execAsync('npx prisma migrate deploy');
+    
+    if (deployError) {
+      console.log('⚠️ Stderr do migrate deploy:', deployError);
     }
     
-    // 2. Verificar se existem valores ACERT
-    let needsAcertFix = false;
+    console.log('📋 Output do migrate deploy:');
+    console.log(deployOutput);
+    
+    // 2. Executar script de correção de dados
+    console.log('🔧 Executando correção de dados...');
+    
+    const { PrismaClient } = require('@prisma/client');
+    const prisma = new PrismaClient();
+    
     try {
+      // Verificar se existem valores ACERT para corrigir
       const acertCount = await prisma.$queryRaw`
         SELECT COUNT(*) as count FROM "ControleCarga" 
         WHERE "transportadora"::text = 'ACERT'
       `;
+      
       if (Number(acertCount[0].count) > 0) {
-        needsAcertFix = true;
-        console.log(`❗ Encontrados ${acertCount[0].count} registros ACERT - serão corrigidos`);
+        console.log(`🔧 Corrigindo ${acertCount[0].count} registros ACERT...`);
+        
+        // Corrigir dados usando raw SQL para evitar problemas de enum
+        await prisma.$executeRaw`
+          UPDATE "ControleCarga" 
+          SET "transportadora" = 'ACCERT'
+          WHERE "transportadora" = 'ACERT'
+        `;
+        
+        await prisma.$executeRaw`
+          UPDATE "NotaFiscal" 
+          SET "transportadora" = 'ACCERT'
+          WHERE "transportadora" = 'ACERT'
+        `;
+        
+        await prisma.$executeRaw`
+          UPDATE "Motorista" 
+          SET "transportadoraId" = 'ACCERT'
+          WHERE "transportadoraId" = 'ACERT'
+        `;
+        
+        console.log('✅ Valores ACERT corrigidos para ACCERT');
       } else {
         console.log('✅ Não há valores ACERT para corrigir');
       }
-    } catch (error) {
-      // Se der erro, provavelmente é porque tem ACERT no banco
-      needsAcertFix = true;
-      console.log('❗ Erro ao verificar ACERT - assumindo que precisa correção');
+      
+      // Testar APIs básicas
+      const motoristas = await prisma.motorista.count();
+      const controles = await prisma.controleCarga.count();
+      const notas = await prisma.notaFiscal.count();
+      
+      console.log(`✅ Testes OK: ${motoristas} motoristas, ${controles} controles, ${notas} notas`);
+      
+    } catch (dataError) {
+      console.error('❌ Erro na correção de dados:', dataError.message);
+    } finally {
+      await prisma.$disconnect();
     }
-
-    // 3. Executar migrações se necessário
-    if (needsTipoMigration) {
-      console.log('🔧 Adicionando campo tipo...');
-      
-      await prisma.$executeRaw`
-        ALTER TABLE "Motorista" 
-        ADD COLUMN IF NOT EXISTS "tipo" "TipoPessoa"
-      `;
-      
-      await prisma.$executeRaw`
-        UPDATE "Motorista" 
-        SET "tipo" = CASE 
-          WHEN "cnh" IS NOT NULL AND "cnh" != '' THEN 'MOTORISTA'::"TipoPessoa"
-          WHEN "transportadoraId" IS NOT NULL THEN 'FUNCIONARIO'::"TipoPessoa"
-          ELSE 'MOTORISTA'::"TipoPessoa"
-        END
-        WHERE "tipo" IS NULL
-      `;
-      
-      await prisma.$executeRaw`
-        ALTER TABLE "Motorista" 
-        ALTER COLUMN "tipo" SET NOT NULL
-      `;
-      
-      console.log('✅ Campo tipo adicionado e configurado');
-    }
-
-    if (needsAcertFix) {
-      console.log('🔧 Corrigindo valores ACERT para ACCERT...');
-      
-      // Temporariamente adicionar ACERT ao enum para permitir a correção
-      try {
-        await prisma.$executeRaw`
-          ALTER TYPE "Transportadora" ADD VALUE IF NOT EXISTS 'ACERT'
-        `;
-      } catch (error) {
-        // Valor já existe ou outro erro - continuar
-      }
-
-      // Corrigir os dados
-      const controles = await prisma.$executeRaw`
-        UPDATE "ControleCarga" 
-        SET "transportadora" = 'ACCERT'::"Transportadora"
-        WHERE "transportadora"::text = 'ACERT'
-      `;
-      
-      const notas = await prisma.$executeRaw`
-        UPDATE "NotaFiscal" 
-        SET "transportadora" = 'ACCERT'::"Transportadora"
-        WHERE "transportadora"::text = 'ACERT'
-      `;
-      
-      const motoristas = await prisma.$executeRaw`
-        UPDATE "Motorista" 
-        SET "transportadoraId" = 'ACCERT'::"Transportadora"
-        WHERE "transportadoraId"::text = 'ACERT'
-      `;
-      
-      console.log(`✅ Corrigidos: ${controles} controles, ${notas} notas, ${motoristas} motoristas`);
-    }
-
-    // 4. Testar se tudo funciona
-    console.log('🧪 Testando APIs...');
     
-    const testMotoristas = await prisma.motorista.count();
-    const testControles = await prisma.controleCarga.count();
-    const testNotas = await prisma.notaFiscal.count();
-    
-    console.log(`✅ Testes OK: ${testMotoristas} motoristas, ${testControles} controles, ${testNotas} notas`);
-    
-    console.log('🎉 [VERCEL POST-BUILD] Migração concluída com sucesso!');
+    console.log('🎉 [VERCEL POST-BUILD] Migração concluída!');
     
   } catch (error) {
-    console.error('❌ [VERCEL POST-BUILD] Erro na migração:', error);
-    // Não falhar o build por causa da migração
+    console.error('❌ [VERCEL POST-BUILD] Erro na migração:', error.message);
     console.log('⚠️ Continuando build apesar do erro de migração');
-  } finally {
-    await prisma.$disconnect();
   }
 }
 
