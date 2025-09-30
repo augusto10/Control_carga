@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "npm run build",
+  "buildCommand": "npm run build && npm run postbuild",
   "installCommand": "npm install",
   "functions": {
     "pages/api/**/*.ts": {
