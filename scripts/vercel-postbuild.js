@@ -6,26 +6,18 @@ const { promisify } = require('util');
 const execAsync = promisify(exec);
 
 async function runPostBuildMigration() {
-  console.log('🚀 [VERCEL POST-BUILD] Iniciando migração via Prisma Deploy...');
+  console.log('🚀 [VERCEL POST-BUILD] Iniciando verificação de dados...');
   
   // Só executar em produção
   if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL_ENV) {
-    console.log('⏭️ Pulando migração (não é produção)');
+    console.log('⏭️ Pulando verificação (não é produção)');
     return;
   }
 
   try {
-    // 1. Executar prisma migrate deploy (aplica migrações pendentes)
-    console.log('🔄 Executando prisma migrate deploy...');
-    
-    const { stdout: deployOutput, stderr: deployError } = await execAsync('npx prisma migrate deploy');
-    
-    if (deployError) {
-      console.log('⚠️ Stderr do migrate deploy:', deployError);
-    }
-    
-    console.log('📋 Output do migrate deploy:');
-    console.log(deployOutput);
+    // NOTA: Não executamos migrations em produção pois o banco já existe
+    // O Prisma Client já foi gerado no build principal
+    console.log('✅ Prisma Client já gerado no build principal');
     
     // 2. Executar script de correção de dados
     console.log('🔧 Executando correção de dados...');

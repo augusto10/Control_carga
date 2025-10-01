@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "npm run build && npm run postbuild",
+  "buildCommand": "npm run build",
   "installCommand": "npm install",
   "functions": {
     "pages/api/**/*.ts": {
@@ -9,6 +9,7 @@
     }
   },
   "env": {
-    "PRISMA_GENERATE_DATAPROXY": "false"
+    "PRISMA_GENERATE_DATAPROXY": "false",
+    "PRISMA_SKIP_MIGRATIONS": "true"
   }
 }
