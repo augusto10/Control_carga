@@ -19,44 +19,42 @@ async function runPostBuildMigration() {
     // O Prisma Client já foi gerado no build principal
     console.log('✅ Prisma Client já gerado no build principal');
     
-    // 2. Executar script de correção de dados
-    console.log('🔧 Executando correção de dados...');
+    // 1. Executar migration do campo 'tipo' na tabela Motorista
+    console.log('🔧 Executando migration: adicionar campo tipo...');
     
     const { PrismaClient } = require('@prisma/client');
     const prisma = new PrismaClient();
     
     try {
-      // Verificar se existem valores ACERT para corrigir
-      const acertCount = await prisma.$queryRaw`
-        SELECT COUNT(*) as count FROM "ControleCarga" 
-        WHERE "transportadora"::text = 'ACERT'
+      // Verificar se a coluna 'tipo' já existe
+      const checkColumn = await prisma.$queryRaw`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'Motorista' 
+        AND column_name = 'tipo'
       `;
       
-      if (Number(acertCount[0].count) > 0) {
-        console.log(`🔧 Corrigindo ${acertCount[0].count} registros ACERT...`);
+      if (checkColumn.length === 0) {
+        console.log('📝 Coluna tipo não existe, criando...');
         
-        // Corrigir dados usando raw SQL para evitar problemas de enum
+        // Criar enum TipoPessoa se não existir
         await prisma.$executeRaw`
-          UPDATE "ControleCarga" 
-          SET "transportadora" = 'ACCERT'
-          WHERE "transportadora" = 'ACERT'
+          DO $$ BEGIN
+            CREATE TYPE "TipoPessoa" AS ENUM ('MOTORISTA', 'FUNCIONARIO', 'CLIENTE');
+          EXCEPTION
+            WHEN duplicate_object THEN null;
+          END $$;
         `;
         
+        // Adicionar coluna tipo
         await prisma.$executeRaw`
-          UPDATE "NotaFiscal" 
-          SET "transportadora" = 'ACCERT'
-          WHERE "transportadora" = 'ACERT'
+          ALTER TABLE "Motorista" 
+          ADD COLUMN "tipo" "TipoPessoa" DEFAULT 'MOTORISTA' NOT NULL
         `;
         
-        await prisma.$executeRaw`
-          UPDATE "Motorista" 
-          SET "transportadoraId" = 'ACCERT'
-          WHERE "transportadoraId" = 'ACERT'
-        `;
-        
-        console.log('✅ Valores ACERT corrigidos para ACCERT');
+        console.log('✅ Coluna tipo adicionada com sucesso');
       } else {
-        console.log('✅ Não há valores ACERT para corrigir');
+        console.log('✅ Coluna tipo já existe');
       }
       
       // Testar APIs básicas
@@ -67,7 +65,8 @@ async function runPostBuildMigration() {
       console.log(`✅ Testes OK: ${motoristas} motoristas, ${controles} controles, ${notas} notas`);
       
     } catch (dataError) {
-      console.error('❌ Erro na correção de dados:', dataError.message);
+      console.error('❌ Erro na migration:', dataError.message);
+      console.error('Stack:', dataError.stack);
     } finally {
       await prisma.$disconnect();
     }
