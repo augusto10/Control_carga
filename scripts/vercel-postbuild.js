@@ -15,58 +15,26 @@ async function runPostBuildMigration() {
   }
 
   try {
-    // NOTA: Não executamos migrations em produção pois o banco já existe
+    // NOTA: Migrations devem ser executadas manualmente devido a permissões do banco
     // O Prisma Client já foi gerado no build principal
     console.log('✅ Prisma Client já gerado no build principal');
+    console.log('ℹ️ Migrations devem ser executadas manualmente (ver EXECUTAR_MIGRATION_MANUAL.md)');
     
-    // 1. Executar migration do campo 'tipo' na tabela Motorista
-    console.log('🔧 Executando migration: adicionar campo tipo...');
-    
+    // Apenas validar conexão com o banco
     const { PrismaClient } = require('@prisma/client');
     const prisma = new PrismaClient();
     
     try {
-      // Verificar se a coluna 'tipo' já existe
-      const checkColumn = await prisma.$queryRaw`
-        SELECT column_name 
-        FROM information_schema.columns 
-        WHERE table_name = 'Motorista' 
-        AND column_name = 'tipo'
-      `;
-      
-      if (checkColumn.length === 0) {
-        console.log('📝 Coluna tipo não existe, criando...');
-        
-        // Criar enum TipoPessoa se não existir
-        await prisma.$executeRaw`
-          DO $$ BEGIN
-            CREATE TYPE "TipoPessoa" AS ENUM ('MOTORISTA', 'FUNCIONARIO', 'CLIENTE');
-          EXCEPTION
-            WHEN duplicate_object THEN null;
-          END $$;
-        `;
-        
-        // Adicionar coluna tipo
-        await prisma.$executeRaw`
-          ALTER TABLE "Motorista" 
-          ADD COLUMN "tipo" "TipoPessoa" DEFAULT 'MOTORISTA' NOT NULL
-        `;
-        
-        console.log('✅ Coluna tipo adicionada com sucesso');
-      } else {
-        console.log('✅ Coluna tipo já existe');
-      }
-      
-      // Testar APIs básicas
+      // Testar conexão básica
       const motoristas = await prisma.motorista.count();
       const controles = await prisma.controleCarga.count();
       const notas = await prisma.notaFiscal.count();
       
-      console.log(`✅ Testes OK: ${motoristas} motoristas, ${controles} controles, ${notas} notas`);
+      console.log(`✅ Conexão OK: ${motoristas} motoristas, ${controles} controles, ${notas} notas`);
       
     } catch (dataError) {
-      console.error('❌ Erro na migration:', dataError.message);
-      console.error('Stack:', dataError.stack);
+      console.error('❌ Erro na validação:', dataError.message);
+      console.log('⚠️ Verifique se a migration manual foi executada (ver EXECUTAR_MIGRATION_MANUAL.md)');
     } finally {
       await prisma.$disconnect();
     }
