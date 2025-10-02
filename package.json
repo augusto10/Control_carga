@@ -9,7 +9,10 @@
     "start": "next start",
     "postinstall": "prisma generate",
     "lint": "next lint --fix || true",
-    "type-check": "tsc --noEmit || true"
+    "type-check": "tsc --noEmit || true",
+    "correcao-temporaria": "ts-node scripts/aplicar-correcao-temporaria.ts",
+    "reverter-correcao-temporaria": "ts-node scripts/aplicar-correcao-temporaria.ts reverter",
+    "migration-producao": "ts-node scripts/executar-migration-producao.ts"
   },
   "engines": {
     "node": "20.x"
