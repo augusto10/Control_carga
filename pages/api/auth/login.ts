@@ -249,11 +249,11 @@ const handler = async (req: LoginRequest, res: NextApiResponse) => {
     // Configurar cookie
     console.log('12. Configurando o cookie de autenticação');
     
-    // Configuração simplificada do cookie para garantir compatibilidade cross-origin
+    // Configuração do cookie otimizada para desenvolvimento e produção
     const cookieOptions: SerializeOptions = {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      sameSite: 'lax', // Mudança: sempre usar 'lax' para melhor compatibilidade
       maxAge: 60 * 60 * 24 * 7, // 7 dias
       path: '/',
       // Não definir domínio - deixar o navegador gerenciar automaticamente

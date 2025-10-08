@@ -154,9 +154,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
           error: null
         });
         
-        // Se estiver na página de login, redireciona para o dashboard apropriado
+        // Se estiver na página de login, redireciona para a página apropriada
         if (router.pathname === '/login') {
-          const redirectPath = response.data.user.tipo === USER_TYPES.ADMIN ? '/admin' : '/dashboard';
+          const redirectPath = response.data.user.tipo === USER_TYPES.ADMIN ? '/admin' : '/';
           console.log(`[AuthContext] Redirecionando para ${redirectPath}...`);
           router.push(redirectPath);
         }
@@ -276,16 +276,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       switch (loggedInUser.tipo) {
         case 'ADMIN':
-          redirectPath = '/admin/dashboard';
+          redirectPath = '/admin';
           break;
         case 'SEPARADOR':
         case 'CONFERENTE':
         case 'AUDITOR':
         case 'GERENTE':
+        case 'USUARIO':
+        case 'FUNCIONARIO':
+        case 'CLIENTE':
           redirectPath = '/';
           break;
         default:
-          redirectPath = '/acesso-negado';
+          redirectPath = '/';
           break;
       }
 
