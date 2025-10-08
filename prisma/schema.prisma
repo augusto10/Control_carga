@@ -16,9 +16,6 @@ model ControleCarga {
   transportadora            Transportadora @default(ACCERT)
   numeroManifesto           String?
   qtdPallets                Int            @default(0)
-  qtdPalletsLevados         Int            @default(0)
-  qtdPalletsDevolvidos      Int            @default(0)
-  placaVeiculo              String?
   observacao                String?
   finalizado                Boolean        @default(false)
   cpfMotorista              String         @default("PENDENTE")
@@ -26,6 +23,9 @@ model ControleCarga {
   assinaturaResponsavel     String?
   dataAssinaturaMotorista   DateTime?
   dataAssinaturaResponsavel DateTime?
+  placaVeiculo              String?
+  qtdPalletsDevolvidos      Int            @default(0)
+  qtdPalletsLevados         Int            @default(0)
   notas                     NotaFiscal[]
   pedidos                   Pedido[]
 }
@@ -63,13 +63,13 @@ model Usuario {
   foto              String?
   historicoPontos   HistoricoPontuacao[]
   notas             NotaFiscal[]
+  ajustesPallets    PalletAjuste[]
   pedidosAuditados  PedidoConferido[]    @relation("Auditoria")
   pedidosConferidos PedidoConferido[]    @relation("Conferencia")
   pedidosSeparados  PedidoConferido[]    @relation("Separacao")
   pedidosValidados  PedidoConferido[]    @relation("Validacao")
   pontuacao         PontuacaoUsuario?
   auditoriasAcesso  AuditoriaAcesso[]
-  ajustesPallets    PalletAjuste[]
 }
 
 model AuditoriaAcesso {
@@ -110,6 +110,7 @@ model Motorista {
   cnh              String?
   transportadoraId Transportadora
   tipo             TipoPessoa     @default(MOTORISTA)
+  ativo            Boolean        @default(true)
 }
 
 model PedidoConferido {
@@ -170,15 +171,15 @@ model HistoricoPontuacao {
 
 /// Registros de recebimento/ajuste de pallets devolvidos "avulsos"
 model PalletAjuste {
-  id               String         @id @default(uuid())
-  dataCriacao      DateTime       @default(now())
-  dataRecebimento  DateTime       @default(now())
-  motorista        String?
-  transportadora   String?
-  quantidade       Int            // quantidade devolvida neste recebimento (sempre positiva)
-  observacao       String?
-  usuarioId        String
-  usuario          Usuario        @relation(fields: [usuarioId], references: [id])
+  id              String   @id @default(uuid())
+  dataCriacao     DateTime @default(now())
+  dataRecebimento DateTime @default(now())
+  motorista       String?
+  transportadora  String?
+  quantidade      Int
+  observacao      String?
+  usuarioId       String
+  usuario         Usuario  @relation(fields: [usuarioId], references: [id])
 
   @@index([dataRecebimento])
   @@index([transportadora])
@@ -186,6 +187,7 @@ model PalletAjuste {
 }
 
 enum Transportadora {
+  ACERT
   ACCERT
   EXPRESSO_GOIAS
   TERCEIRIZADA
@@ -207,6 +209,12 @@ enum StatusValidacao {
   VALIDADO_INCORRETO
 }
 
+enum TipoPessoa {
+  MOTORISTA
+  FUNCIONARIO
+  CLIENTE
+}
+
 enum TipoUsuario {
   ADMIN
   GERENTE
@@ -216,10 +224,4 @@ enum TipoUsuario {
   SEPARADOR
   CONFERENTE
   AUDITOR
-}
-
-enum TipoPessoa {
-  MOTORISTA
-  FUNCIONARIO
-  CLIENTE
 }
