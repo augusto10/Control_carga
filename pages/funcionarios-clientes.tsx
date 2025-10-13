@@ -44,6 +44,7 @@ import { useSnackbar } from 'notistack';
 import { useAuth } from '../contexts/AuthContext';
 import Layout from '../components/Layout';
 import api from '../services/api';
+import InputMask from '../components/InputMask';
 
 interface FuncionarioCliente {
   id: string;
@@ -513,21 +514,23 @@ const FuncionariosClientes: React.FC = () => {
                 </FormControl>
               </Grid>
               <Grid item xs={12} sm={6}>
-                <TextField
+                <InputMask
                   fullWidth
                   label="CPF"
+                  mask="cpf"
                   value={formData.cpf}
-                  onChange={(e) => setFormData(prev => ({ ...prev, cpf: e.target.value }))}
+                  onChange={(value) => setFormData(prev => ({ ...prev, cpf: value }))}
                   error={!!formErrors.cpf}
                   helperText={formErrors.cpf}
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
-                <TextField
+                <InputMask
                   fullWidth
                   label="Telefone"
+                  mask="telefone"
                   value={formData.telefone}
-                  onChange={(e) => setFormData(prev => ({ ...prev, telefone: e.target.value }))}
+                  onChange={(value) => setFormData(prev => ({ ...prev, telefone: value }))}
                 />
               </Grid>
               <Grid item xs={12}>

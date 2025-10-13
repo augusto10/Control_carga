@@ -25,6 +25,7 @@ import {
 import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon } from '@mui/icons-material';
 import { api } from '@/services/api';
 import ProtectedRoute from '@/components/ProtectedRoute';
+import InputMask from '@/components/InputMask';
 // Tipo retornado pela API de transportadoras
 interface TransportadoraApi {
   id: string;
@@ -160,9 +161,32 @@ function MotoristasContent() {
         <DialogTitle>{isEditing?'Editar':'Novo'} Motorista</DialogTitle>
         <DialogContent>
           <TextField label="Nome" name="nome" value={current?.nome||''} onChange={handleChange} fullWidth margin="normal" required />
-          <TextField label="Telefone" name="telefone" value={current?.telefone||''} onChange={handleChange} fullWidth margin="normal" />
-          <TextField label="CPF" name="cpf" value={current?.cpf||''} onChange={handleChange} fullWidth margin="normal" required />
-          <TextField label="CNH" name="cnh" value={current?.cnh||''} onChange={handleChange} fullWidth margin="normal" required />
+          <InputMask 
+            label="Telefone" 
+            mask="telefone" 
+            value={current?.telefone||''} 
+            onChange={(value) => setCurrent(prev => ({ ...prev!, telefone: value }))} 
+            fullWidth 
+            margin="normal" 
+          />
+          <InputMask 
+            label="CPF" 
+            mask="cpf" 
+            value={current?.cpf||''} 
+            onChange={(value) => setCurrent(prev => ({ ...prev!, cpf: value }))} 
+            fullWidth 
+            margin="normal" 
+            required 
+          />
+          <InputMask 
+            label="CNH" 
+            mask="cnh" 
+            value={current?.cnh||''} 
+            onChange={(value) => setCurrent(prev => ({ ...prev!, cnh: value }))} 
+            fullWidth 
+            margin="normal" 
+            required 
+          />
           <TextField select label="Transportadora" name="transportadoraId" value={current?.transportadoraId||''} onChange={handleChange} fullWidth margin="normal" required>
             {transportadoras.map(t=> (
               <MenuItem key={t.id} value={t.id}>{t.descricao}</MenuItem>

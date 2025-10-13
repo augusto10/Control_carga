@@ -32,6 +32,7 @@ import {
 } from '@mui/icons-material';
 import { useSnackbar } from 'notistack';
 import Layout from '../components/Layout';
+import InputMask from '../components/InputMask';
 
 interface Cliente {
   id: string;
@@ -315,18 +316,20 @@ const ClientesPage: React.FC = () => {
                 required
               />
               
-              <TextField
+              <InputMask
                 label="Telefone"
+                mask="telefone"
                 value={formData.telefone}
-                onChange={(e) => setFormData({ ...formData, telefone: e.target.value })}
+                onChange={(value) => setFormData({ ...formData, telefone: value })}
                 fullWidth
                 required
               />
               
-              <TextField
+              <InputMask
                 label="CPF"
+                mask="cpf"
                 value={formData.cpf}
-                onChange={(e) => setFormData({ ...formData, cpf: e.target.value })}
+                onChange={(value) => setFormData({ ...formData, cpf: value })}
                 fullWidth
                 required
                 disabled={!!editando}
