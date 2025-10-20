@@ -1,9 +1,12 @@
 {
   "version": 2,
-  "buildCommand": "npm run build",
-  "installCommand": "npm install",
   "env": {
     "PRISMA_GENERATE_DATAPROXY": "false",
     "PRISMA_SKIP_MIGRATIONS": "true"
+  },
+  "functions": {
+    "api/**/*.ts": {
+      "maxDuration": 30
+    }
   }
 }
