@@ -2,12 +2,6 @@
   "version": 2,
   "buildCommand": "npm run build",
   "installCommand": "npm install",
-  "functions": {
-    "pages/api/**/*.ts": {
-      "memory": 1024,
-      "maxDuration": 30
-    }
-  },
   "env": {
     "PRISMA_GENERATE_DATAPROXY": "false",
     "PRISMA_SKIP_MIGRATIONS": "true"
