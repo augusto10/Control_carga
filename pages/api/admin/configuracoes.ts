@@ -251,22 +251,44 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         });
 
       case 'PUT':
-        const { id, valor } = req.body;
-        if (!id || !valor) {
-          return res.status(400).json({
-            success: false,
-            message: 'ID e valor são obrigatórios'
+        const { configuracoes: configuracoesParaAtualizar } = req.body;
+
+        if (!configuracoesParaAtualizar || !Array.isArray(configuracoesParaAtualizar)) {
+          // Fallback para atualização individual (compatibilidade)
+          const { id, valor } = req.body;
+          if (!id || !valor) {
+            return res.status(400).json({
+              success: false,
+              message: 'ID e valor são obrigatórios'
+            });
+          }
+
+          const configuracao = await prismaClient.configuracaoSistema.update({
+            where: { id },
+            data: { valor }
+          });
+
+          return res.status(200).json({
+            success: true,
+            data: configuracao
           });
         }
 
-        const configuracao = await prismaClient.configuracaoSistema.update({
+        // Atualizar múltiplas configurações
+        const atualizacoes = configuracoesParaAtualizar.map(({ id, valor }: { id: string; valor: string }) => ({
           where: { id },
           data: { valor }
-        });
+        }));
+
+        const resultados = await Promise.all(
+          atualizacoes.map(({ where, data }: any) =>
+            prismaClient.configuracaoSistema.update({ where, data })
+          )
+        );
 
         return res.status(200).json({
           success: true,
-          data: configuracao
+          data: resultados
         });
 
       default:

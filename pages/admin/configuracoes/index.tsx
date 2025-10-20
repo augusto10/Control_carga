@@ -57,7 +57,9 @@ function ConfiguracoesContent() {
     try {
       setLoading(true);
       const response = await api.get('/api/admin/configuracoes');
-      setConfiguracoes(response.data);
+      // A API retorna { success: true, data: configuracoes }
+      // Então precisamos acessar response.data.data
+      setConfiguracoes(response.data.data || []);
     } catch (error: unknown) {
       console.error('Erro ao carregar configurações:', error);
       const errorMessage = error instanceof Error ? error.message : 'Erro ao carregar configurações';

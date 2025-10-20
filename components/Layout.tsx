@@ -588,15 +588,24 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
                     const path = subItem.path.toLowerCase();
                     const itemText = subItem.text.toLowerCase();
-                    
+
                     if (userRole === 'SEPARADOR' && (path.includes('separadores') || itemText.includes('cadastrar separação'))) return true;
                     if (userRole === 'CONFERENTE' && (path.includes('conferentes') || itemText.includes('confirmar separação') || itemText.includes('relatório de separação'))) return true;
                     if (userRole === 'AUDITOR' && (path.includes('auditores') || itemText.includes('confirmar separação'))) return true;
 
                     return false;
                   }
-                  
-                  // Para outros menus sem roles, mostra tudo
+
+                  // CONFERENTE e SEPARADOR têm acesso restrito - só aos menus específicos
+                  if (user?.tipo === 'CONFERENTE' || user?.tipo === 'SEPARADOR') {
+                    // Permite acesso ao menu "Controle de Materiais" (para solicitar mercadorias)
+                    if (item.text === 'Controle de Materiais') return true;
+                    // Permite acesso ao menu "Separation Pro" (ranking e histórico)
+                    if (item.text === 'Separation Pro') return true;
+                    return false;
+                  }
+
+                  // Para outros menus sem roles, mostra tudo (apenas para ADMIN, GERENTE, USUARIO, etc.)
                   return true;
                 })
                 .map((subItem: any) => (
@@ -807,6 +816,13 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                   if (item.adminOnly && user?.tipo !== 'ADMIN' && user?.tipo !== 'GERENTE') {
                     return false;
                   }
+
+                  // CONFERENTE e SEPARADOR têm acesso apenas aos menus específicos
+                  if (user?.tipo === 'CONFERENTE' || user?.tipo === 'SEPARADOR') {
+                    const allowedMenus = ['Separação e Conferência', 'Controle de Materiais', 'Separation Pro', 'Meu Perfil'];
+                    return allowedMenus.includes(item.text);
+                  }
+
                   return true;
                 })
                 .map((item) => (
@@ -890,6 +906,13 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                   if (item.adminOnly && user?.tipo !== 'ADMIN' && user?.tipo !== 'GERENTE') {
                     return false;
                   }
+
+                  // CONFERENTE e SEPARADOR têm acesso apenas aos menus específicos
+                  if (user?.tipo === 'CONFERENTE' || user?.tipo === 'SEPARADOR') {
+                    const allowedMenus = ['Separação e Conferência', 'Controle de Materiais', 'Separation Pro', 'Meu Perfil'];
+                    return allowedMenus.includes(item.text);
+                  }
+
                   return true;
                 })
                 .map((item) => (

@@ -26,11 +26,13 @@ import {
 import {
   CheckCircle as CheckIcon,
   Cancel as CancelIcon,
-  Assignment as AssignmentIcon
+  Assignment as AssignmentIcon,
+  Delete as DeleteIcon
 } from '@mui/icons-material';
 import Layout from '@/components/Layout';
 import { useSnackbar } from 'notistack';
 import api from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -78,6 +80,7 @@ const statusLabels: Record<string, string> = {
 
 export default function AprovarSolicitacoes() {
   const { enqueueSnackbar } = useSnackbar();
+  const { user } = useAuth();
   const [solicitacoes, setSolicitacoes] = useState<Solicitacao[]>([]);
   const [loading, setLoading] = useState(false);
   const [tabAtual, setTabAtual] = useState(0);
@@ -90,6 +93,9 @@ export default function AprovarSolicitacoes() {
   // Dialog de rejeição
   const [dialogRejeitarAberto, setDialogRejeitarAberto] = useState(false);
   const [motivoRejeicao, setMotivoRejeicao] = useState('');
+
+  // Dialog de exclusão
+  const [dialogExcluirAberto, setDialogExcluirAberto] = useState(false);
 
   useEffect(() => {
     carregarSolicitacoes();
@@ -127,6 +133,11 @@ export default function AprovarSolicitacoes() {
     setSolicitacaoSelecionada(solicitacao);
     setMotivoRejeicao('');
     setDialogRejeitarAberto(true);
+  };
+
+  const handleAbrirDialogExcluir = (solicitacao: Solicitacao) => {
+    setSolicitacaoSelecionada(solicitacao);
+    setDialogExcluirAberto(true);
   };
 
   const handleAprovar = async () => {
@@ -177,6 +188,25 @@ export default function AprovarSolicitacoes() {
       carregarSolicitacoes();
     } catch (error: any) {
       enqueueSnackbar(error.response?.data?.error || 'Erro ao rejeitar solicitação', { variant: 'error' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleExcluir = async () => {
+    if (!solicitacaoSelecionada) return;
+
+    try {
+      setLoading(true);
+
+      await api.delete(`/api/solicitacoes-material/${solicitacaoSelecionada.id}`);
+
+      enqueueSnackbar('Solicitação excluída com sucesso!', { variant: 'success' });
+      setDialogExcluirAberto(false);
+      setSolicitacaoSelecionada(null);
+      carregarSolicitacoes();
+    } catch (error: any) {
+      enqueueSnackbar(error.response?.data?.error || 'Erro ao excluir solicitação', { variant: 'error' });
     } finally {
       setLoading(false);
     }
@@ -277,28 +307,43 @@ export default function AprovarSolicitacoes() {
                       </Table>
                     </TableContainer>
 
-                    {solicitacao.status === 'PENDENTE' && (
-                      <Box sx={{ mt: 2, display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
+                    <Box sx={{ mt: 2, display: 'flex', gap: 2, justifyContent: 'flex-end', alignItems: 'center' }}>
+                      {user?.tipo === 'ADMIN' && (
                         <Button
                           variant="outlined"
                           color="error"
-                          startIcon={<CancelIcon />}
-                          onClick={() => handleAbrirDialogRejeitar(solicitacao)}
+                          size="small"
+                          startIcon={<DeleteIcon />}
+                          onClick={() => handleAbrirDialogExcluir(solicitacao)}
                           disabled={loading}
                         >
-                          Rejeitar
+                          Excluir
                         </Button>
-                        <Button
-                          variant="contained"
-                          color="success"
-                          startIcon={<CheckIcon />}
-                          onClick={() => handleAbrirDialogAprovar(solicitacao)}
-                          disabled={loading}
-                        >
-                          Aprovar
-                        </Button>
-                      </Box>
-                    )}
+                      )}
+
+                      {solicitacao.status === 'PENDENTE' && (
+                        <>
+                          <Button
+                            variant="outlined"
+                            color="error"
+                            startIcon={<CancelIcon />}
+                            onClick={() => handleAbrirDialogRejeitar(solicitacao)}
+                            disabled={loading}
+                          >
+                            Rejeitar
+                          </Button>
+                          <Button
+                            variant="contained"
+                            color="success"
+                            startIcon={<CheckIcon />}
+                            onClick={() => handleAbrirDialogAprovar(solicitacao)}
+                            disabled={loading}
+                          >
+                            Aprovar
+                          </Button>
+                        </>
+                      )}
+                    </Box>
 
                     {solicitacao.status === 'APROVADA' && solicitacao.aprovador && (
                       <Typography variant="body2" color="textSecondary" sx={{ mt: 2 }}>
@@ -403,6 +448,40 @@ export default function AprovarSolicitacoes() {
             </Button>
             <Button onClick={handleRejeitar} variant="contained" color="error" disabled={loading}>
               Confirmar Rejeição
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Dialog de Exclusão */}
+        <Dialog open={dialogExcluirAberto} onClose={() => setDialogExcluirAberto(false)} maxWidth="sm" fullWidth>
+          <DialogTitle>Confirmar Exclusão</DialogTitle>
+          <DialogContent>
+            <Alert severity="warning" sx={{ mb: 2 }}>
+              <strong>Atenção:</strong> Esta ação não pode ser desfeita!
+            </Alert>
+            <Typography>
+              Tem certeza que deseja excluir permanentemente a solicitação #{solicitacaoSelecionada?.id.slice(0, 8)}?
+            </Typography>
+            {solicitacaoSelecionada && (
+              <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+                <Typography variant="subtitle2" color="textSecondary">
+                  Solicitante: {solicitacaoSelecionada.solicitante.nome}
+                </Typography>
+                <Typography variant="body2" color="textSecondary">
+                  Data: {format(new Date(solicitacaoSelecionada.dataCriacao), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                </Typography>
+                <Typography variant="body2" color="textSecondary">
+                  Itens: {solicitacaoSelecionada.itens.length} material(is)
+                </Typography>
+              </Box>
+            )}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setDialogExcluirAberto(false)} disabled={loading}>
+              Cancelar
+            </Button>
+            <Button onClick={handleExcluir} variant="contained" color="error" disabled={loading}>
+              {loading ? 'Excluindo...' : 'Confirmar Exclusão'}
             </Button>
           </DialogActions>
         </Dialog>
