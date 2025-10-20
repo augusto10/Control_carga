@@ -55,6 +55,15 @@ export function useConfiguracoes() {
       setError(null);
       return configs;
     } catch (err) {
+      const error = err as any;
+      // Se for erro 403 (não admin), não tratar como erro crítico
+      if (error.response?.status === 403) {
+        console.warn('Usuário não tem permissão para carregar configurações (não admin)');
+        setConfiguracoes({});
+        setError(null);
+        return {};
+      }
+      
       console.error('Erro ao carregar configurações:', err);
       setError(err instanceof Error ? err : new Error('Erro desconhecido'));
       return {}; // Retorna um objeto vazio em caso de erro

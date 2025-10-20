@@ -116,19 +116,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           }
         });
 
-        // Registrar histórico (SAIDA)
-        await tx.historicoEstoque.create({
-          data: {
-            materialId: item.materialId,
-            tipo: 'SAIDA',
-            quantidade: quantidadeAprovada,
-            quantidadeAntes,
-            quantidadeDepois,
-            usuarioId: decoded.id,
-            observacao: `Saída por aprovação da solicitação ${id}`,
-            solicitacaoId: id
-          }
-        });
+        // Registrar histórico (SAIDA) - apenas se a tabela existir
+        try {
+          await tx.historicoEstoque.create({
+            data: {
+              materialId: item.materialId,
+              tipo: 'SAIDA',
+              quantidade: quantidadeAprovada,
+              quantidadeAntes,
+              quantidadeDepois,
+              usuarioId: decoded.id,
+              observacao: `Saída por aprovação da solicitação ${id}`,
+              solicitacaoId: id
+            }
+          });
+        } catch (historicoError) {
+          // Se a tabela HistoricoEstoque não existir, apenas logar e continuar
+          console.warn('Tabela HistoricoEstoque não encontrada, pulando registro de histórico:', (historicoError as Error).message);
+        }
       }
 
       // Atualizar solicitação como aprovada

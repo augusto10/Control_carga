@@ -73,7 +73,7 @@ const statusColors: Record<string, 'default' | 'warning' | 'success' | 'error'> 
 
 const statusLabels: Record<string, string> = {
   PENDENTE: 'Pendente',
-  APROVADA: 'Aprovada',
+  APROVADA: 'APROVADA',  // Em maiúsculo para destacar
   REJEITADA: 'Rejeitada',
   ENTREGUE: 'Entregue'
 };
@@ -256,6 +256,11 @@ export default function AprovarSolicitacoes() {
                       <Chip
                         label={statusLabels[solicitacao.status]}
                         color={statusColors[solicitacao.status]}
+                        icon={solicitacao.status === 'APROVADA' ? <CheckIcon /> : undefined}
+                        sx={{
+                          fontWeight: solicitacao.status === 'APROVADA' ? 'bold' : 'normal',
+                          fontSize: solicitacao.status === 'APROVADA' ? '0.875rem' : '0.8125rem'
+                        }}
                       />
                     </Box>
 
