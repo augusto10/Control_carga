@@ -23,9 +23,6 @@ const nextConfig = {
     }
     return config;
   },
-  // Desabilitar tracing para evitar problemas de permissão
-  tracing: false,
-  // Configurações adicionais para Windows
   poweredByHeader: false,
   generateEtags: false
 }
