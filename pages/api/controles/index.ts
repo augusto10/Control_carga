@@ -10,7 +10,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   switch (req.method) {
     case 'GET': {
       try {
-        const controles = await prisma.controleCarga.findMany({
+        // Usar type assertion para resolver problemas de tipo com imagens
+        const controles = await (prisma.controleCarga.findMany as any)({
           orderBy: { dataCriacao: 'desc' },
           select: {
             id: true,
@@ -34,12 +35,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             assinaturaResponsavel: true,
             dataAssinaturaMotorista: true,
             dataAssinaturaResponsavel: true,
+            // Campo de imagens
+            imagens: true,
             notas: true,
           },
         });
         
         // Processar controles para identificar RETIRA_VENDEDOR pelo marcador [RV]
-        const controlesProcessados = controles.map(controle => {
+        const controlesProcessados = controles.map((controle: any) => {
           let transportadora = controle.transportadora;
           let motorista = controle.motorista;
           
@@ -85,7 +88,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           assinaturaMotorista,
           assinaturaResponsavel,
           dataAssinaturaMotorista,
-          dataAssinaturaResponsavel
+          dataAssinaturaResponsavel,
+          imagens
         } = req.body;
 
         // Validar campos obrigatórios
@@ -178,6 +182,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             ...(assinaturaResponsavel && { assinaturaResponsavel }),
             ...(dataAssinaturaMotorista && { dataAssinaturaMotorista: new Date(dataAssinaturaMotorista) }),
             ...(dataAssinaturaResponsavel && { dataAssinaturaResponsavel: new Date(dataAssinaturaResponsavel) }),
+            // Campo de imagens
+            imagens: imagens || [],
             // Vincula as notas diretamente na criação
             ...(notasIds && notasIds.length > 0 && {
               notas: {

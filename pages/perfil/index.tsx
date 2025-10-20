@@ -21,9 +21,10 @@ import {
   IconButton,
   InputAdornment,
 } from '@mui/material';
-import { Save, Edit, Visibility, VisibilityOff } from '@mui/icons-material';
+import { Save, Edit, Visibility, VisibilityOff, PhotoCamera } from '@mui/icons-material';
 import { api } from '../../services/api';
 import ProtectedRoute from '../../components/ProtectedRoute';
+import ImageCapture from '../../components/ImageCapture';
 
 type UserData = {
   id: string;
@@ -50,6 +51,8 @@ function PerfilContent() {
   const [editing, setEditing] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [userData, setUserData] = useState<UserData | null>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [openCamera, setOpenCamera] = useState(false);
   
   const [formData, setFormData] = useState<FormData>({
     nome: '',
@@ -127,6 +130,67 @@ function PerfilContent() {
     }
   };
 
+  const openFilePicker = () => {
+    const input = document.getElementById('photo-upload') as HTMLInputElement | null;
+    input?.click();
+  };
+
+  const handlePhotoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setError('Por favor, selecione uma imagem válida');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError('A imagem deve ter no máximo 5MB');
+      return;
+    }
+    const formData = new FormData();
+    formData.append('foto', file);
+
+    try {
+      setUploadingPhoto(true);
+      setError('');
+      const response = await api.post('/api/usuarios/upload-foto', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      updateUser({ ...user, foto: response.data.fotoUrl });
+      setSuccess('Foto de perfil atualizada com sucesso!');
+    } catch (err: any) {
+      setError(err?.response?.data?.message || 'Erro ao fazer upload da foto');
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
+  const dataUrlToFile = async (dataUrl: string, filename: string): Promise<File> => {
+    const res = await fetch(dataUrl);
+    const blob = await res.blob();
+    const type = blob.type || 'image/jpeg';
+    return new File([blob], filename, { type });
+  };
+
+  const handleCameraImage = async (imageDataUrl: string) => {
+    try {
+      setUploadingPhoto(true);
+      const file = await dataUrlToFile(imageDataUrl, 'camera.jpg');
+      const form = new FormData();
+      form.append('foto', file);
+      const response = await api.post('/api/usuarios/upload-foto', form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      updateUser({ ...user, foto: response.data.fotoUrl });
+      setSuccess('Foto de perfil atualizada com sucesso!');
+    } catch (err: any) {
+      setError(err?.response?.data?.message || 'Erro ao enviar foto da câmera');
+    } finally {
+      setUploadingPhoto(false);
+      setOpenCamera(false);
+    }
+  };
+
   if (!userData) {
     return (
       <Container maxWidth="md" sx={{ py: 4 }}>
@@ -136,6 +200,7 @@ function PerfilContent() {
   }
 
   return (
+    <>
     <Container maxWidth="md" sx={{ py: 4 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
         <Typography variant="h4" component="h1" fontWeight="bold">
@@ -161,9 +226,32 @@ function PerfilContent() {
               mb: 2,
               bgcolor: 'primary.main',
             }}
+            src={user?.foto || undefined}
           >
-            {userData.nome?.charAt(0).toUpperCase() || 'U'}
+            {!user?.foto && (userData.nome?.charAt(0).toUpperCase() || 'U')}
           </Avatar>
+          {editing && (
+            <>
+              <input
+                id="photo-upload"
+                type="file"
+                accept="image/*"
+                onChange={handlePhotoUpload}
+                // @ts-ignore
+                capture="environment"
+                style={{ display: 'none' }}
+                disabled={uploadingPhoto}
+              />
+              <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
+                <Button size="small" variant="outlined" onClick={openFilePicker} disabled={uploadingPhoto}>
+                  Anexar do dispositivo
+                </Button>
+                <Button size="small" variant="contained" onClick={() => setOpenCamera(true)} disabled={uploadingPhoto}>
+                  Tirar foto agora
+                </Button>
+              </Box>
+            </>
+          )}
           
           <Box sx={{ textAlign: 'center', mb: 2 }}>
             <Typography variant="h5" component="div" fontWeight="bold">
@@ -317,6 +405,14 @@ function PerfilContent() {
         </Box>
       </Paper>
     </Container>
+    <ImageCapture
+      open={openCamera}
+      onClose={() => setOpenCamera(false)}
+      onImageCapture={handleCameraImage}
+      maxImages={1}
+      currentImages={[]}
+    />
+    </>
   );
 }
 

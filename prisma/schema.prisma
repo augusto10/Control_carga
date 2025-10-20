@@ -26,6 +26,7 @@ model ControleCarga {
   placaVeiculo              String?
   qtdPalletsDevolvidos      Int            @default(0)
   qtdPalletsLevados         Int            @default(0)
+  imagens                   String[]       // Array de imagens em base64
   notas                     NotaFiscal[]
   pedidos                   Pedido[]
 }
@@ -52,24 +53,27 @@ model NotaFiscal {
 }
 
 model Usuario {
-  id                String               @id @default(uuid())
-  nome              String
-  email             String               @unique
-  senha             String
-  tipo              TipoUsuario          @default(USUARIO)
-  ativo             Boolean              @default(true)
-  dataCriacao       DateTime             @default(now())
-  ultimoAcesso      DateTime?
-  foto              String?
-  historicoPontos   HistoricoPontuacao[]
-  notas             NotaFiscal[]
-  ajustesPallets    PalletAjuste[]
-  pedidosAuditados  PedidoConferido[]    @relation("Auditoria")
-  pedidosConferidos PedidoConferido[]    @relation("Conferencia")
-  pedidosSeparados  PedidoConferido[]    @relation("Separacao")
-  pedidosValidados  PedidoConferido[]    @relation("Validacao")
-  pontuacao         PontuacaoUsuario?
-  auditoriasAcesso  AuditoriaAcesso[]
+  id                   String                  @id @default(uuid())
+  nome                 String
+  email                String                  @unique
+  senha                String
+  tipo                 TipoUsuario             @default(USUARIO)
+  ativo                Boolean                 @default(true)
+  dataCriacao          DateTime                @default(now())
+  ultimoAcesso         DateTime?
+  foto                 String?
+  historicoPontos      HistoricoPontuacao[]
+  notas                NotaFiscal[]
+  ajustesPallets       PalletAjuste[]
+  pedidosAuditados     PedidoConferido[]       @relation("Auditoria")
+  pedidosConferidos    PedidoConferido[]       @relation("Conferencia")
+  pedidosSeparados     PedidoConferido[]       @relation("Separacao")
+  pedidosValidados     PedidoConferido[]       @relation("Validacao")
+  pontuacao            PontuacaoUsuario?
+  auditoriasAcesso     AuditoriaAcesso[]
+  solicitacoesMaterial SolicitacaoMaterial[]   @relation("SolicitacoesMaterial")
+  aprovacoesMateria    SolicitacaoMaterial[]   @relation("AprovacoesMateria")
+  historicosEstoque    HistoricoEstoque[]
 }
 
 model AuditoriaAcesso {
@@ -224,4 +228,89 @@ enum TipoUsuario {
   SEPARADOR
   CONFERENTE
   AUDITOR
+}
+
+/// Sistema de Controle de Materiais (fitas, stretch, resmas, etc)
+model MaterialEstoque {
+  id                String                     @id @default(uuid())
+  dataCriacao       DateTime                   @default(now())
+  dataAtualizacao   DateTime                   @updatedAt
+  nome              String
+  descricao         String?
+  unidadeMedida     String                     @default("UN") // UN, CX, PCT, RL, etc
+  quantidadeEstoque Int                        @default(0)
+  estoqueMinimo     Int                        @default(0)
+  valor             Float?                     // Valor unitário do material
+  ativo             Boolean                    @default(true)
+  itens             ItemSolicitacaoMaterial[]
+  historicos        HistoricoEstoque[]
+
+  @@index([ativo])
+  @@index([nome])
+}
+
+model SolicitacaoMaterial {
+  id              String                     @id @default(uuid())
+  dataCriacao     DateTime                   @default(now())
+  dataAtualizacao DateTime                   @updatedAt
+  solicitanteId   String
+  solicitante     Usuario                    @relation("SolicitacoesMaterial", fields: [solicitanteId], references: [id])
+  status          StatusSolicitacao          @default(PENDENTE)
+  observacao      String?
+  dataAprovacao   DateTime?
+  aprovadorId     String?
+  aprovador       Usuario?                   @relation("AprovacoesMateria", fields: [aprovadorId], references: [id])
+  motivoRejeicao  String?
+  itens           ItemSolicitacaoMaterial[]
+
+  @@index([solicitanteId])
+  @@index([status])
+  @@index([dataCriacao])
+}
+
+model ItemSolicitacaoMaterial {
+  id             String              @id @default(uuid())
+  solicitacaoId  String
+  solicitacao    SolicitacaoMaterial @relation(fields: [solicitacaoId], references: [id], onDelete: Cascade)
+  materialId     String
+  material       MaterialEstoque     @relation(fields: [materialId], references: [id])
+  quantidade     Int
+  quantidadeAprovada Int?
+  observacao     String?
+
+  @@index([solicitacaoId])
+  @@index([materialId])
+}
+
+enum StatusSolicitacao {
+  PENDENTE
+  APROVADA
+  REJEITADA
+  ENTREGUE
+}
+
+/// Histórico de movimentações de estoque de materiais
+model HistoricoEstoque {
+  id               String            @id @default(uuid())
+  dataCriacao      DateTime          @default(now())
+  materialId       String
+  material         MaterialEstoque   @relation(fields: [materialId], references: [id])
+  tipo             TipoMovimentacao
+  quantidade       Int
+  quantidadeAntes  Int
+  quantidadeDepois Int
+  usuarioId        String
+  usuario          Usuario           @relation(fields: [usuarioId], references: [id])
+  observacao       String?
+  solicitacaoId    String?           // Se foi por solicitação
+
+  @@index([materialId])
+  @@index([dataCriacao])
+  @@index([usuarioId])
+}
+
+enum TipoMovimentacao {
+  ENTRADA
+  SAIDA
+  AJUSTE
 }

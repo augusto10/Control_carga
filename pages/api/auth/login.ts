@@ -273,6 +273,7 @@ const handler = async (req: LoginRequest, res: NextApiResponse) => {
         email: usuario.email,
         tipo: usuario.tipo,
         ativo: usuario.ativo,
+        foto: (await prisma.usuario.findUnique({ where: { id: usuario.id }, select: { foto: true } }))?.foto || null,
         dataCriacao: usuario.dataCriacao,
         ultimoAcesso: usuario.ultimoAcesso
       }

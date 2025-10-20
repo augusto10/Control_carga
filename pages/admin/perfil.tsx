@@ -21,6 +21,7 @@ import AdminLayout from '../../components/admin/AdminLayout';
 import AdminRoute from '../../components/admin/AdminRoute';
 import RankingComponent from '../../components/RankingComponent';
 import { obterMinhaPontuacao, PontuacaoResponse } from '../../services/gamificacaoService';
+import ImageCapture from '../../components/ImageCapture';
 
 interface PerfilFormData {
   nome: string;
@@ -52,6 +53,11 @@ function PerfilUsuarioContent() {
   const [error, setError] = useState<string | null>(null);
   const [pontuacao, setPontuacao] = useState<PontuacaoResponse | null>(null);
   const [carregandoPontuacao, setCarregandoPontuacao] = useState(true);
+  const [openCamera, setOpenCamera] = useState(false);
+  const openFilePicker = () => {
+    const input = document.getElementById('photo-upload') as HTMLInputElement | null;
+    input?.click();
+  };
 
   interface UsuarioResponse {
     id: string;
@@ -240,6 +246,34 @@ function PerfilUsuarioContent() {
     }
   };
 
+  const dataUrlToFile = async (dataUrl: string, filename: string): Promise<File> => {
+    const res = await fetch(dataUrl);
+    const blob = await res.blob();
+    const type = blob.type || 'image/jpeg';
+    return new File([blob], filename, { type });
+  };
+
+  const handleCameraImage = async (imageDataUrl: string) => {
+    try {
+      setUploadingPhoto(true);
+      setError(null);
+      const file = await dataUrlToFile(imageDataUrl, 'camera.jpg');
+      const formData = new FormData();
+      formData.append('foto', file);
+      const response = await api.post('/api/usuarios/upload-foto', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      updateUser({ ...user, foto: response.data.fotoUrl });
+      setSuccessMessage('Foto de perfil atualizada com sucesso!');
+    } catch (error: any) {
+      console.error('Erro ao enviar foto da câmera:', error);
+      setError(error?.response?.data?.message || 'Erro ao enviar foto da câmera');
+    } finally {
+      setUploadingPhoto(false);
+      setOpenCamera(false);
+    }
+  };
+
   if (!user) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
@@ -288,31 +322,45 @@ function PerfilUsuarioContent() {
                   type="file"
                   id="photo-upload"
                   onChange={handlePhotoUpload}
+                  // @ts-ignore
+                  capture="environment"
                   style={{ display: 'none' }}
                   disabled={uploadingPhoto}
                 />
-                <label htmlFor="photo-upload">
-                  <IconButton
-                    color="primary"
-                    component="span"
-                    sx={{
-                      position: 'absolute',
-                      bottom: -5,
-                      right: 15,
-                      backgroundColor: 'primary.main',
-                      color: 'white',
-                      '&:hover': {
-                        backgroundColor: 'primary.dark',
-                      },
-                      width: 36,
-                      height: 36,
-                    }}
-                    disabled={uploadingPhoto}
-                  >
-                    {uploadingPhoto ? <CircularProgress size={20} color="inherit" /> : <PhotoCameraIcon />}
-                  </IconButton>
-                </label>
+                {editing && (
+                  <label htmlFor="photo-upload">
+                    <IconButton
+                      color="primary"
+                      component="span"
+                      sx={{
+                        position: 'absolute',
+                        bottom: -5,
+                        right: 15,
+                        backgroundColor: 'primary.main',
+                        color: 'white',
+                        '&:hover': {
+                          backgroundColor: 'primary.dark',
+                        },
+                        width: 36,
+                        height: 36,
+                      }}
+                      disabled={uploadingPhoto}
+                    >
+                      {uploadingPhoto ? <CircularProgress size={20} color="inherit" /> : <PhotoCameraIcon />}
+                    </IconButton>
+                  </label>
+                )}
               </Box>
+              {editing && (
+                <Box sx={{ mt: 1, display: 'flex', gap: 1 }}>
+                  <Button size="small" variant="outlined" onClick={openFilePicker} disabled={uploadingPhoto}>
+                    Anexar do dispositivo
+                  </Button>
+                  <Button size="small" variant="contained" onClick={() => setOpenCamera(true)} disabled={uploadingPhoto}>
+                    Tirar foto agora
+                  </Button>
+                </Box>
+              )}
               <Box>
                 <Typography variant="h5" gutterBottom>
                   {user?.nome}
@@ -446,6 +494,15 @@ function PerfilUsuarioContent() {
           {success}
         </Alert>
       </Snackbar>
+
+      {/* Modal de câmera */}
+      <ImageCapture
+        open={openCamera}
+        onClose={() => setOpenCamera(false)}
+        onImageCapture={handleCameraImage}
+        maxImages={1}
+        currentImages={[]}
+      />
     </AdminLayout>
   );
 }

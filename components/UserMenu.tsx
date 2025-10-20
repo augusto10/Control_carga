@@ -63,8 +63,8 @@ export default function UserMenu() {
           aria-haspopup="true"
           aria-expanded={open ? 'true' : undefined}
         >
-          <Avatar sx={{ width: 32, height: 32, bgcolor: 'primary.main' }}>
-            {user.nome?.charAt(0).toUpperCase() || <PersonIcon />}
+          <Avatar sx={{ width: 32, height: 32, bgcolor: 'primary.main' }} src={user.foto || undefined}>
+            {!user.foto && (user.nome?.charAt(0).toUpperCase() || <PersonIcon />)}
           </Avatar>
         </IconButton>
       </Tooltip>
@@ -104,7 +104,7 @@ export default function UserMenu() {
         anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
       >
         <MenuItem onClick={handleProfile}>
-          <Avatar />
+          <Avatar src={user.foto || undefined} />
           <Box>
             <Typography variant="subtitle2">{user.nome}</Typography>
             <Typography variant="caption" color="text.secondary">

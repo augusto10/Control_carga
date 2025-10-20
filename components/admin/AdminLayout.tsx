@@ -147,8 +147,8 @@ export default function AdminLayout({ children, title }: AdminLayoutProps) {
                 aria-haspopup="true"
                 aria-expanded={open ? 'true' : undefined}
               >
-                <Avatar sx={{ width: 32, height: 32 }}>
-                  {user?.nome?.charAt(0) || <AccountCircleIcon />}
+                <Avatar sx={{ width: 32, height: 32 }} src={user?.foto || undefined}>
+                  {!user?.foto && (user?.nome?.charAt(0) || <AccountCircleIcon />)}
                 </Avatar>
               </IconButton>
             </Tooltip>

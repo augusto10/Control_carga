@@ -52,6 +52,8 @@ export default function Login() {
       ...prev,
       [name]: value
     }));
+
+    // Sem pré-visualização de foto no login
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

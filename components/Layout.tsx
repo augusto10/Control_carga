@@ -379,6 +379,36 @@ const menuItems = [
       }
     ]
   },
+  {
+    text: 'Controle de Materiais',
+    icon: <InventoryIcon sx={{ fontSize: 22 }} />,
+    subItems: [
+      {
+        text: 'Cadastro de Materiais',
+        icon: <PlaylistAddIcon sx={{ fontSize: 20 }} />,
+        path: '/materiais/cadastro',
+        roles: ['ADMIN', 'GERENTE'] // Apenas ADMIN e GERENTE
+      },
+      {
+        text: 'Solicitar Materiais',
+        icon: <ListAltIcon sx={{ fontSize: 20 }} />,
+        path: '/materiais/solicitar',
+        roles: ['ADMIN', 'GERENTE', 'SEPARADOR', 'CONFERENTE', 'AUDITOR', 'USUARIO'] // Todos podem solicitar
+      },
+      {
+        text: 'Aprovar Solicitações',
+        icon: <AssignmentTurnedInIcon sx={{ fontSize: 20 }} />,
+        path: '/materiais/aprovar',
+        roles: ['ADMIN', 'GERENTE'] // Apenas ADMIN e GERENTE podem aprovar
+      },
+      {
+        text: 'Relatórios',
+        icon: <ReportIcon sx={{ fontSize: 20 }} />,
+        path: '/materiais/relatorios',
+        roles: ['ADMIN', 'GERENTE'] // Apenas ADMIN e GERENTE
+      }
+    ]
+  },
   { 
     text: 'Relatórios e Análises', 
     icon: <TrendingUpIcon sx={{ fontSize: 22 }} />,
@@ -544,21 +574,30 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             <List component="div" disablePadding>
               {item.subItems
                 .filter((subItem: any) => {
-                  if (!user) return true; // Mostra tudo se não houver usuário (ou pode ser false)
-                  if (item.text !== 'Separação e Conferência') return true; // Não filtra outros menus
-
-                  // Lógica de filtro para 'Separação e Conferência'
-                  const userRole = user.tipo;
-                  if (userRole === 'ADMIN' || userRole === 'GERENTE') return true;
-
-                  const path = subItem.path.toLowerCase();
-                  const itemText = subItem.text.toLowerCase();
+                  if (!user) return false;
                   
-                  if (userRole === 'SEPARADOR' && (path.includes('separadores') || itemText.includes('cadastrar separação'))) return true;
-                  if (userRole === 'CONFERENTE' && (path.includes('conferentes') || itemText.includes('confirmar separação') || itemText.includes('relatório de separação'))) return true;
-                  if (userRole === 'AUDITOR' && (path.includes('auditores') || itemText.includes('confirmar separação'))) return true;
+                  // Se o subitem tem roles definidas, verifica permissão
+                  if (subItem.roles && Array.isArray(subItem.roles)) {
+                    return subItem.roles.includes(user.tipo);
+                  }
+                  
+                  // Lógica específica para 'Separação e Conferência'
+                  if (item.text === 'Separação e Conferência') {
+                    const userRole = user.tipo;
+                    if (userRole === 'ADMIN' || userRole === 'GERENTE') return true;
 
-                  return false;
+                    const path = subItem.path.toLowerCase();
+                    const itemText = subItem.text.toLowerCase();
+                    
+                    if (userRole === 'SEPARADOR' && (path.includes('separadores') || itemText.includes('cadastrar separação'))) return true;
+                    if (userRole === 'CONFERENTE' && (path.includes('conferentes') || itemText.includes('confirmar separação') || itemText.includes('relatório de separação'))) return true;
+                    if (userRole === 'AUDITOR' && (path.includes('auditores') || itemText.includes('confirmar separação'))) return true;
+
+                    return false;
+                  }
+                  
+                  // Para outros menus sem roles, mostra tudo
+                  return true;
                 })
                 .map((subItem: any) => (
                   <Link href={subItem.path} key={subItem.path} passHref>
@@ -636,8 +675,8 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               aria-haspopup="true"
               aria-expanded={menuOpen ? 'true' : undefined}
               startIcon={
-                <Avatar sx={{ width: 32, height: 32, bgcolor: 'primary.main' }}>
-                  {user?.nome?.charAt(0).toUpperCase() || <PersonIcon />}
+                <Avatar sx={{ width: 32, height: 32, bgcolor: 'primary.main' }} src={user?.foto || undefined}>
+                  {!user?.foto && (user?.nome?.charAt(0).toUpperCase() || <PersonIcon />)}
                 </Avatar>
               }
             >
@@ -792,8 +831,8 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                   background: 'linear-gradient(135deg, #ff8c42 0%, #ff8c42 100%)',
                   fontWeight: 600,
                   fontSize: '1.1rem'
-                }}>
-                  {user?.nome?.charAt(0).toUpperCase() || <PersonIcon fontSize="small" />}
+                }} src={user?.foto || undefined}>
+                  {!user?.foto && (user?.nome?.charAt(0).toUpperCase() || <PersonIcon fontSize="small" />)}
                 </Avatar>
                 <Box>
                   <Typography 
@@ -876,8 +915,8 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                   background: 'linear-gradient(135deg, #ff8c42 0%, #ff8c42 100%)',
                   fontWeight: 600,
                   fontSize: '1.1rem'
-                }}>
-                  {user?.nome?.charAt(0).toUpperCase() || <PersonIcon fontSize="small" />}
+                }} src={user?.foto || undefined}>
+                  {!user?.foto && (user?.nome?.charAt(0).toUpperCase() || <PersonIcon fontSize="small" />)}
                 </Avatar>
                 <Box>
                   <Typography 

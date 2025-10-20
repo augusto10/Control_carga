@@ -58,11 +58,14 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import AddIcon from '@mui/icons-material/Add';
 import CloseIcon from '@mui/icons-material/Close';
 import HowToRegIcon from '@mui/icons-material/HowToReg';
+import CameraAltIcon from '@mui/icons-material/CameraAlt';
+import CheckIcon from '@mui/icons-material/Check';
 
 import ResponsiveTable from './ResponsiveTable';
 import ResponsiveContainer from './ResponsiveContainer';
 import ModalAssinaturaDigitalPro from './ModalAssinaturaDigitalPro';
 import ModalAssinaturaSimplesAlternativo from './ModalAssinaturaSimplesAlternativo';
+import ImageCapture from './ImageCapture';
 
 interface Controle extends Omit<PrismaControleCarga, 'notas' | 'numeroManifesto' | 'assinaturaMotorista' | 'assinaturaResponsavel' | 'dataAssinaturaMotorista' | 'dataAssinaturaResponsavel'> {
   numeroManifesto: string | null;
@@ -249,7 +252,143 @@ const ListarControlesContent: React.FC = () => {
     controleId: '',
     tipo: 'motorista'
   });
-  // Carrega os controles ao montar o componente
+
+  const [imageCaptureOpen, setImageCaptureOpen] = React.useState(false);
+  const [currentControleId, setCurrentControleId] = React.useState<string>('');
+  const [previewImageOpen, setPreviewImageOpen] = React.useState(false);
+  const [capturedImage, setCapturedImage] = React.useState<string>('');
+
+  // Função para capturar imagem
+  const handleCapturarImagem = (controle: ControleComNotas) => {
+    setCurrentControleId(controle.id);
+    setImageCaptureOpen(true);
+  };
+
+  // Função chamada quando a imagem é capturada (abre preview)
+  const handleImageCapture = async (imageDataUrl: string) => {
+    setCapturedImage(imageDataUrl);
+    setImageCaptureOpen(false);
+    setPreviewImageOpen(true);
+  };
+
+  // Função para aprovar e salvar a imagem
+  const handleAprovarImagem = async () => {
+    try {
+      setLoading(true);
+
+      // Buscar controle atual
+      const controleAtual = controles.find(c => c.id === currentControleId);
+      if (!controleAtual) {
+        throw new Error('Controle não encontrado');
+      }
+
+      // Adicionar nova imagem ao array existente
+      const imagensAtuais = controleAtual.imagens || [];
+      const novasImagens = [...imagensAtuais, capturedImage];
+
+      // Atualizar controle no banco usando a API específica
+      await api.put(`/api/controles/${currentControleId}/imagens`, {
+        imagens: novasImagens
+      });
+
+      // Criar controle atualizado localmente
+      const controleAtualizado = {
+        ...controleAtual,
+        imagens: novasImagens
+      };
+
+      // Atualizar a lista local substituindo o controle antigo pelo novo
+      setControles(prevControles => 
+        prevControles.map(c => 
+          c.id === currentControleId ? controleAtualizado : c
+        )
+      );
+
+      // Atualizar o modal de detalhes se estiver aberto
+      if (detalhesModal.aberto && detalhesModal.controle?.id === currentControleId) {
+        setDetalhesModal({
+          aberto: true,
+          controle: controleAtualizado
+        });
+      }
+
+      enqueueSnackbar('Imagem adicionada com sucesso!', { variant: 'success' });
+
+      // Fechar modal e limpar estados
+      setPreviewImageOpen(false);
+      setCapturedImage('');
+      setCurrentControleId('');
+
+    } catch (error) {
+      console.error('Erro ao salvar imagem:', error);
+      enqueueSnackbar('Erro ao salvar imagem', { variant: 'error' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Função para rejeitar a imagem e tirar outra
+  const handleRejeitarImagem = () => {
+    setCapturedImage('');
+    setPreviewImageOpen(false);
+    setImageCaptureOpen(true);
+  };
+
+  // Função para cancelar completamente
+  const handleCancelarCaptura = () => {
+    setCapturedImage('');
+    setPreviewImageOpen(false);
+    setCurrentControleId('');
+  };
+
+  // Função para excluir uma imagem específica
+  const handleExcluirImagem = async (controleId: string, indexImagem: number) => {
+    if (!confirm('Deseja realmente excluir esta imagem?')) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      // Buscar controle atual
+      const controleAtual = controles.find(c => c.id === controleId);
+      if (!controleAtual) {
+        throw new Error('Controle não encontrado');
+      }
+
+      // Remover a imagem do array
+      const imagensAtuais = controleAtual.imagens || [];
+      const novasImagens = imagensAtuais.filter((_, index) => index !== indexImagem);
+
+      // Atualizar controle no banco
+      await api.put(`/api/controles/${controleId}/imagens`, {
+        imagens: novasImagens
+      });
+
+      // Atualizar lista local
+      await fetchControles();
+      setControles(converterControles(controlesStore as any));
+
+      // Atualizar o modal de detalhes se estiver aberto
+      if (detalhesModal.aberto && detalhesModal.controle?.id === controleId) {
+        const controleAtualizado = controles.find(c => c.id === controleId);
+        if (controleAtualizado) {
+          setDetalhesModal({
+            aberto: true,
+            controle: controleAtualizado
+          });
+        }
+      }
+
+      enqueueSnackbar('Imagem excluída com sucesso!', { variant: 'success' });
+
+    } catch (error) {
+      console.error('Erro ao excluir imagem:', error);
+      enqueueSnackbar('Erro ao excluir imagem', { variant: 'error' });
+    } finally {
+      setLoading(false);
+    }
+  };
   useEffect(() => {
     const carregarDados = async () => {
       try {
@@ -386,17 +525,68 @@ const ListarControlesContent: React.FC = () => {
       page.drawText(`Diferença: ${_diff}`,{ x: 50, y: yPos, size: fontSize, font });
       page.drawText(`Data: ${dataAtual}`, { x: 250, y: yPos, size: fontSize, font });
 
-      // Observações (se houver)
-      if (controleCompleto.observacao && String(controleCompleto.observacao).trim().length > 0) {
+      // Imagens (se houver)
+      if (controleCompleto.imagens && controleCompleto.imagens.length > 0) {
         yPos -= lineHeight * 1.5;
-        page.drawText('Observações:', { x: 50, y: yPos, size: fontSize, font });
+        page.drawText('Imagens Anexadas:', { x: 50, y: yPos, size: fontSize, font });
         yPos -= lineHeight;
-        const obsText = String(controleCompleto.observacao);
-        const wrap = (text: string, max = 95) => text.match(new RegExp(`.{1,${max}}`, 'g')) || [];
-        wrap(obsText).forEach((ln) => {
-          page.drawText(ln, { x: 50, y: yPos, size: fontSize, font });
-          yPos -= lineHeight * 1.1;
-        });
+
+        // Processar imagens sequencialmente
+        for (let index = 0; index < controleCompleto.imagens.length; index++) {
+          const imagem = controleCompleto.imagens[index];
+
+          if (yPos < 100) { // Se não houver espaço suficiente, criar nova página
+            addNewPage();
+            yPos = height - topMargin;
+          }
+
+          try {
+            // Detectar o formato da imagem
+            const imageMatch = imagem.match(/^data:image\/([a-z]+);base64,/);
+            const imageFormat = imageMatch ? imageMatch[1] : 'png';
+            
+            const imageBuffer = Buffer.from(imagem.replace(/^data:image\/[a-z]+;base64,/, ''), 'base64');
+            
+            // Usar o método correto baseado no formato
+            let image;
+            if (imageFormat === 'jpeg' || imageFormat === 'jpg') {
+              image = await doc.embedJpg(imageBuffer);
+            } else {
+              image = await doc.embedPng(imageBuffer);
+            }
+
+            const imageAspectRatio = image.width / image.height;
+            const imageWidth = Math.min(80, width - 100); // Reduzido para 80px de largura
+            const imageHeight = imageWidth / imageAspectRatio;
+
+            page.drawImage(image, {
+              x: 50,
+              y: yPos - imageHeight,
+              width: imageWidth,
+              height: imageHeight,
+            });
+
+            page.drawText(`Imagem ${index + 1}`, {
+              x: 50,
+              y: yPos - imageHeight - 10,
+              size: fontSize - 1,
+              font
+            });
+
+            yPos -= imageHeight + 15; // Reduzido espaço entre imagens de 30 para 15
+
+          } catch (error) {
+            console.error(`Erro ao adicionar imagem ${index + 1}:`, error);
+            page.drawText(`[Imagem ${index + 1} - Erro ao carregar]`, {
+              x: 50,
+              y: yPos,
+              size: fontSize - 1,
+              font,
+              color: rgb(0.8, 0, 0)
+            });
+            yPos -= lineHeight * 2;
+          }
+        }
       }
       
       // Tabela de Notas (duas colunas)
@@ -1317,6 +1507,44 @@ const ListarControlesContent: React.FC = () => {
                         </IconButton>
                       </Tooltip>
 
+                      <Tooltip title={controle.imagens && controle.imagens.length > 0 ? `${controle.imagens.length} foto(s) anexada(s)` : "Adicionar Foto"}>
+                        <IconButton
+                          onClick={() => handleCapturarImagem(controle)}
+                          color={controle.imagens && controle.imagens.length > 0 ? "success" : "secondary"}
+                          size="small"
+                          disabled={loadingButtons[controle.id]}
+                          sx={{
+                            ...buttonStyles,
+                            ...(controle.imagens && controle.imagens.length > 0 && {
+                              backgroundColor: 'rgba(76, 175, 80, 0.1)',
+                              '&:hover': {
+                                backgroundColor: 'rgba(76, 175, 80, 0.2)',
+                              }
+                            })
+                          }}
+                        >
+                          {controle.imagens && controle.imagens.length > 0 ? (
+                            <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                              <CameraAltIcon fontSize="small" />
+                              <CheckIcon 
+                                fontSize="small" 
+                                sx={{ 
+                                  position: 'absolute', 
+                                  top: -4, 
+                                  right: -4, 
+                                  fontSize: '0.7rem',
+                                  color: 'success.main',
+                                  backgroundColor: 'white',
+                                  borderRadius: '50%'
+                                }} 
+                              />
+                            </Box>
+                          ) : (
+                            <CameraAltIcon fontSize="small" />
+                          )}
+                        </IconButton>
+                      </Tooltip>
+
                       {canEdit(controle) && (
                         <>
                           <Tooltip title="Editar">
@@ -1735,6 +1963,67 @@ const ListarControlesContent: React.FC = () => {
                 </Grid>
               </Grid>
 
+              {/* Imagens */}
+              {detalhesModal.controle.imagens && detalhesModal.controle.imagens.length > 0 && (
+                <>
+                  <Typography variant="h6" gutterBottom sx={{ 
+                    color: 'primary.main', 
+                    fontWeight: 600,
+                    borderBottom: '2px solid',
+                    borderColor: 'primary.main',
+                    pb: 1,
+                    mb: 2
+                  }}>
+                    Imagens Anexadas ({detalhesModal.controle.imagens.length})
+                  </Typography>
+                  <Grid container spacing={2} sx={{ mb: 3 }}>
+                    {detalhesModal.controle.imagens.map((imagem, index) => (
+                      <Grid item xs={12} sm={6} md={4} key={index}>
+                        <Paper sx={{ p: 1, textAlign: 'center', position: 'relative' }}>
+                          <Box sx={{ position: 'relative' }}>
+                            <img
+                              src={imagem}
+                              alt={`Imagem ${index + 1}`}
+                              style={{
+                                width: '100%',
+                                height: '200px',
+                                objectFit: 'cover',
+                                borderRadius: '4px',
+                                cursor: 'pointer'
+                              }}
+                              onClick={() => {
+                                // Abrir imagem em nova aba/janela para visualização ampliada
+                                window.open(imagem, '_blank');
+                              }}
+                            />
+                            <IconButton
+                              onClick={() => handleExcluirImagem(detalhesModal.controle!.id, index)}
+                              sx={{
+                                position: 'absolute',
+                                top: 8,
+                                right: 8,
+                                backgroundColor: 'rgba(244, 67, 54, 0.9)',
+                                color: 'white',
+                                '&:hover': {
+                                  backgroundColor: 'rgba(211, 47, 47, 1)',
+                                },
+                                boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
+                              }}
+                              size="small"
+                            >
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                          </Box>
+                          <Typography variant="caption" display="block" sx={{ mt: 1 }}>
+                            Imagem {index + 1}
+                          </Typography>
+                        </Paper>
+                      </Grid>
+                    ))}
+                  </Grid>
+                </>
+              )}
+
               {/* Observações */}
               {detalhesModal.controle.observacao && (
                 <>
@@ -1844,14 +2133,104 @@ const ListarControlesContent: React.FC = () => {
         </Dialog>
       )}
 
+      {/* Modal de Captura de Imagem */}
+      <ImageCapture
+        open={imageCaptureOpen}
+        onClose={() => {
+          setImageCaptureOpen(false);
+          setCurrentControleId('');
+        }}
+        onImageCapture={handleImageCapture}
+        currentImages={controles.find(c => c.id === currentControleId)?.imagens || []}
+      />
+
+      {/* Modal de Preview da Imagem Capturada */}
+      <Dialog 
+        open={previewImageOpen} 
+        onClose={handleCancelarCaptura}
+        maxWidth="md" 
+        fullWidth
+      >
+        <DialogTitle sx={{ 
+          backgroundColor: 'primary.main', 
+          color: 'white',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between'
+        }}>
+          <Typography variant="h6">
+            Confirmar Foto
+          </Typography>
+          <IconButton edge="end" color="inherit" onClick={handleCancelarCaptura}>
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent sx={{ mt: 2, textAlign: 'center' }}>
+          {capturedImage && (
+            <Box sx={{ 
+              position: 'relative',
+              display: 'inline-block',
+              maxWidth: '100%'
+            }}>
+              <img
+                src={capturedImage}
+                alt="Foto capturada"
+                style={{
+                  width: '100%',
+                  maxHeight: '500px',
+                  objectFit: 'contain',
+                  borderRadius: '8px',
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.1)'
+                }}
+              />
+            </Box>
+          )}
+          <Typography variant="body1" sx={{ mt: 2, color: 'text.secondary' }}>
+            Deseja salvar esta foto?
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ p: 2, gap: 1, justifyContent: 'center' }}>
+          <Button
+            onClick={handleRejeitarImagem}
+            variant="outlined"
+            color="error"
+            startIcon={<DeleteIcon />}
+            sx={{
+              borderRadius: '8px',
+              textTransform: 'none',
+              fontWeight: 500,
+              minWidth: '140px'
+            }}
+          >
+            Tirar Outra
+          </Button>
+          <Button
+            onClick={handleAprovarImagem}
+            variant="contained"
+            color="success"
+            startIcon={<CheckIcon />}
+            disabled={loading}
+            sx={{
+              borderRadius: '8px',
+              textTransform: 'none',
+              fontWeight: 500,
+              minWidth: '140px',
+              backgroundColor: '#4caf50',
+              '&:hover': {
+                backgroundColor: '#388e3c',
+              }
+            }}
+          >
+            {loading ? <CircularProgress size={24} color="inherit" /> : 'Salvar Foto'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
     </Container>
   );
 };
 
 export default ListarControlesContent;
-
-
-
 
 
 
