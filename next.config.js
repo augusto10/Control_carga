@@ -1,7 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: false,
-  swcMinify: false,
+  swcMinify: true,
+  output: 'standalone',
   typescript: {
     ignoreBuildErrors: true,
   },
@@ -11,20 +12,17 @@ const nextConfig = {
   experimental: {
     serverComponentsExternalPackages: ['@prisma/client', 'prisma']
   },
-  compiler: {
-    emotion: true,
-  },
   webpack: (config, { isServer }) => {
     if (!isServer) {
       config.resolve.fallback = {
         ...config.resolve.fallback,
         fs: false,
+        net: false,
+        tls: false,
       };
     }
     return config;
-  },
-  poweredByHeader: false,
-  generateEtags: false
+  }
 }
 
 module.exports = nextConfig
