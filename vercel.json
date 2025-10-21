@@ -5,7 +5,7 @@
     "PRISMA_SKIP_MIGRATIONS": "true"
   },
   "functions": {
-    "api/**/*.ts": {
+    "pages/api/**/*.ts": {
       "maxDuration": 30
     }
   }
