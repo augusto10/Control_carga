@@ -147,20 +147,37 @@ function PerfilContent() {
       setError('A imagem deve ter no máximo 5MB');
       return;
     }
-    const formData = new FormData();
-    formData.append('foto', file);
 
     try {
       setUploadingPhoto(true);
       setError('');
-      const response = await api.post('/api/usuarios/upload-foto', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-      updateUser({ ...user, foto: response.data.fotoUrl });
-      setSuccess('Foto de perfil atualizada com sucesso!');
+      
+      // Converter arquivo para base64
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const fotoBase64 = e.target?.result as string;
+        
+        try {
+          const response = await api.post('/api/usuarios/upload-foto-base64', {
+            fotoBase64
+          });
+          updateUser({ ...user, foto: response.data.fotoUrl });
+          setSuccess('Foto de perfil atualizada com sucesso!');
+        } catch (err: any) {
+          setError(err?.response?.data?.message || 'Erro ao fazer upload da foto');
+        } finally {
+          setUploadingPhoto(false);
+        }
+      };
+      
+      reader.onerror = () => {
+        setError('Erro ao ler o arquivo');
+        setUploadingPhoto(false);
+      };
+      
+      reader.readAsDataURL(file);
     } catch (err: any) {
-      setError(err?.response?.data?.message || 'Erro ao fazer upload da foto');
-    } finally {
+      setError('Erro ao processar a imagem');
       setUploadingPhoto(false);
     }
   };
@@ -175,12 +192,13 @@ function PerfilContent() {
   const handleCameraImage = async (imageDataUrl: string) => {
     try {
       setUploadingPhoto(true);
-      const file = await dataUrlToFile(imageDataUrl, 'camera.jpg');
-      const form = new FormData();
-      form.append('foto', file);
-      const response = await api.post('/api/usuarios/upload-foto', form, {
-        headers: { 'Content-Type': 'multipart/form-data' },
+      setError('');
+      
+      // Enviar base64 diretamente
+      const response = await api.post('/api/usuarios/upload-foto-base64', {
+        fotoBase64: imageDataUrl
       });
+      
       updateUser({ ...user, foto: response.data.fotoUrl });
       setSuccess('Foto de perfil atualizada com sucesso!');
     } catch (err: any) {
@@ -237,8 +255,6 @@ function PerfilContent() {
                 type="file"
                 accept="image/*"
                 onChange={handlePhotoUpload}
-                // @ts-ignore
-                capture="environment"
                 style={{ display: 'none' }}
                 disabled={uploadingPhoto}
               />

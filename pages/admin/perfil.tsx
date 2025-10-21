@@ -223,25 +223,37 @@ function PerfilUsuarioContent() {
       return;
     }
 
-    const formData = new FormData();
-    formData.append('foto', file);
-
     try {
       setUploadingPhoto(true);
       setError(null);
 
-      const response = await api.post('/api/usuarios/upload-foto', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-
-      updateUser({ ...user, foto: response.data.fotoUrl });
-      setSuccessMessage('Foto de perfil atualizada com sucesso!');
+      // Converter arquivo para base64
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const fotoBase64 = e.target?.result as string;
+        
+        try {
+          const response = await api.post('/api/usuarios/upload-foto-base64', {
+            fotoBase64
+          });
+          updateUser({ ...user, foto: response.data.fotoUrl });
+          setSuccessMessage('Foto de perfil atualizada com sucesso!');
+        } catch (error: any) {
+          console.error('Erro ao fazer upload da foto:', error);
+          setError(error.response?.data?.message || 'Erro ao fazer upload da foto');
+        } finally {
+          setUploadingPhoto(false);
+        }
+      };
+      
+      reader.onerror = () => {
+        setError('Erro ao ler o arquivo');
+        setUploadingPhoto(false);
+      };
+      
+      reader.readAsDataURL(file);
     } catch (error: any) {
-      console.error('Erro ao fazer upload da foto:', error);
-      setError(error.response?.data?.message || 'Erro ao fazer upload da foto');
-    } finally {
+      setError('Erro ao processar a imagem');
       setUploadingPhoto(false);
     }
   };
@@ -257,12 +269,12 @@ function PerfilUsuarioContent() {
     try {
       setUploadingPhoto(true);
       setError(null);
-      const file = await dataUrlToFile(imageDataUrl, 'camera.jpg');
-      const formData = new FormData();
-      formData.append('foto', file);
-      const response = await api.post('/api/usuarios/upload-foto', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+      
+      // Enviar base64 diretamente
+      const response = await api.post('/api/usuarios/upload-foto-base64', {
+        fotoBase64: imageDataUrl
       });
+      
       updateUser({ ...user, foto: response.data.fotoUrl });
       setSuccessMessage('Foto de perfil atualizada com sucesso!');
     } catch (error: any) {
@@ -322,8 +334,6 @@ function PerfilUsuarioContent() {
                   type="file"
                   id="photo-upload"
                   onChange={handlePhotoUpload}
-                  // @ts-ignore
-                  capture="environment"
                   style={{ display: 'none' }}
                   disabled={uploadingPhoto}
                 />
