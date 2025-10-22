@@ -443,10 +443,10 @@ const ListarControlesContent: React.FC = () => {
       // Usar fonte padrão do PDF
       const font = await doc.embedFont(StandardFonts.Helvetica);
       const fontSize = 9; // fonte menor para caber mais linhas
-      const lineHeight = 14; // reduzir altura da linha
-      const topMargin = 50;
-      const bottomMargin = 60; // espaço para rodapés/assinaturas
-      const minSpaceForSignatures = 180; // espaço otimizado para duas assinaturas
+      const lineHeight = 12; // altura da linha ainda mais reduzida
+      const topMargin = 40; // margem superior reduzida
+      const bottomMargin = 50; // espaço para rodapés/assinaturas reduzido
+      const minSpaceForSignatures = 160; // espaço otimizado para duas assinaturas
       let yPos = height - topMargin;
 
       // Helpers de paginação (duas colunas)
@@ -488,7 +488,7 @@ const ListarControlesContent: React.FC = () => {
       const horaAtual = format(dataHoraCriacao, 'HH:mm', { locale: ptBR });
       
       // Ajustando posição inicial mais para baixo
-      yPos -= lineHeight * 6; // Aumentado de 3 para 6 linhas (3 linhas a mais)
+      yPos -= lineHeight * 9; // Aumentado de 6 para 9 linhas (3 linhas a mais)
       
       // Linha 1
       console.log('[PDF] Transportadora do controle:', controleCompleto.transportadora);
@@ -525,72 +525,127 @@ const ListarControlesContent: React.FC = () => {
       page.drawText(`Diferença: ${_diff}`,{ x: 50, y: yPos, size: fontSize, font });
       page.drawText(`Data: ${dataAtual}`, { x: 250, y: yPos, size: fontSize, font });
 
-      // Imagens (se houver)
+      // Imagens (se houver) - Layout otimizado para caber em uma folha
       if (controleCompleto.imagens && controleCompleto.imagens.length > 0) {
         yPos -= lineHeight * 1.5;
         page.drawText('Imagens Anexadas:', { x: 50, y: yPos, size: fontSize, font });
         yPos -= lineHeight;
 
-        // Processar imagens sequencialmente
-        for (let index = 0; index < controleCompleto.imagens.length; index++) {
-          const imagem = controleCompleto.imagens[index];
+        // Calcular espaço disponível para imagens
+        const espacoDisponivel = yPos - (bottomMargin + minSpaceForSignatures + 100); // Reserva espaço para tabela e assinaturas
+        const numImagens = controleCompleto.imagens.length;
+        
+        // Determinar layout baseado no número de imagens e espaço disponível
+        let imagensLayout: { width: number; height: number; cols: number; rows: number };
+        
+        if (numImagens === 1) {
+          // Uma imagem: tamanho médio
+          imagensLayout = { width: 120, height: 90, cols: 1, rows: 1 };
+        } else if (numImagens === 2) {
+          // Duas imagens: lado a lado
+          imagensLayout = { width: 100, height: 75, cols: 2, rows: 1 };
+        } else if (numImagens <= 4) {
+          // 3-4 imagens: 2x2 ou 2x1
+          imagensLayout = { width: 80, height: 60, cols: 2, rows: Math.ceil(numImagens / 2) };
+        } else if (numImagens <= 6) {
+          // 5-6 imagens: layout compacto 3 colunas
+          imagensLayout = { width: 60, height: 45, cols: 3, rows: Math.ceil(numImagens / 3) };
+        } else {
+          // Muitas imagens (7+): layout ultra compacto 4 colunas
+          imagensLayout = { width: 45, height: 35, cols: 4, rows: Math.ceil(numImagens / 4) };
+        }
 
-          if (yPos < 100) { // Se não houver espaço suficiente, criar nova página
-            addNewPage();
-            yPos = height - topMargin;
-          }
+        // Ajustar tamanho se não couber no espaço disponível
+        const alturaTotal = imagensLayout.rows * (imagensLayout.height + 20); // +20 para espaçamento
+        if (alturaTotal > espacoDisponivel) {
+          const fatorReducao = espacoDisponivel / alturaTotal * 0.9; // 90% para margem de segurança
+          imagensLayout.width *= fatorReducao;
+          imagensLayout.height *= fatorReducao;
+        }
 
-          try {
-            // Detectar o formato da imagem
-            const imageMatch = imagem.match(/^data:image\/([a-z]+);base64,/);
-            const imageFormat = imageMatch ? imageMatch[1] : 'png';
+        // Processar imagens no layout otimizado
+        let imagemIndex = 0;
+        for (let row = 0; row < imagensLayout.rows && imagemIndex < numImagens; row++) {
+          for (let col = 0; col < imagensLayout.cols && imagemIndex < numImagens; col++) {
+            const imagem = controleCompleto.imagens[imagemIndex];
             
-            const imageBuffer = Buffer.from(imagem.replace(/^data:image\/[a-z]+;base64,/, ''), 'base64');
-            
-            // Usar o método correto baseado no formato
-            let image;
-            if (imageFormat === 'jpeg' || imageFormat === 'jpg') {
-              image = await doc.embedJpg(imageBuffer);
-            } else {
-              image = await doc.embedPng(imageBuffer);
+            try {
+              // Detectar o formato da imagem
+              const imageMatch = imagem.match(/^data:image\/([a-z]+);base64,/);
+              const imageFormat = imageMatch ? imageMatch[1] : 'png';
+              
+              const imageBuffer = Buffer.from(imagem.replace(/^data:image\/[a-z]+;base64,/, ''), 'base64');
+              
+              // Usar o método correto baseado no formato
+              let image;
+              if (imageFormat === 'jpeg' || imageFormat === 'jpg') {
+                image = await doc.embedJpg(imageBuffer);
+              } else {
+                image = await doc.embedPng(imageBuffer);
+              }
+
+              // Calcular posição da imagem
+              const xPos = 50 + col * (imagensLayout.width + 15); // 15px de espaçamento horizontal
+              const yPosImagem = yPos - row * (imagensLayout.height + 25) - imagensLayout.height; // 25px de espaçamento vertical
+
+              // Desenhar imagem mantendo proporção
+              const imageAspectRatio = image.width / image.height;
+              let finalWidth = imagensLayout.width;
+              let finalHeight = imagensLayout.height;
+              
+              // Ajustar para manter proporção
+              if (imageAspectRatio > finalWidth / finalHeight) {
+                finalHeight = finalWidth / imageAspectRatio;
+              } else {
+                finalWidth = finalHeight * imageAspectRatio;
+              }
+
+              page.drawImage(image, {
+                x: xPos,
+                y: yPosImagem,
+                width: finalWidth,
+                height: finalHeight,
+              });
+
+              // Label da imagem (menor e mais compacto)
+              page.drawText(`${imagemIndex + 1}`, {
+                x: xPos + finalWidth / 2 - 5,
+                y: yPosImagem - 12,
+                size: fontSize - 2,
+                font,
+                color: rgb(0.5, 0.5, 0.5)
+              });
+
+            } catch (error) {
+              console.error(`Erro ao adicionar imagem ${imagemIndex + 1}:`, error);
+              const xPos = 50 + col * (imagensLayout.width + 15);
+              const yPosImagem = yPos - row * (imagensLayout.height + 25);
+              
+              page.drawText(`[Erro Img ${imagemIndex + 1}]`, {
+                x: xPos,
+                y: yPosImagem,
+                size: fontSize - 2,
+                font,
+                color: rgb(0.8, 0, 0)
+              });
             }
-
-            const imageAspectRatio = image.width / image.height;
-            const imageWidth = Math.min(80, width - 100); // Reduzido para 80px de largura
-            const imageHeight = imageWidth / imageAspectRatio;
-
-            page.drawImage(image, {
-              x: 50,
-              y: yPos - imageHeight,
-              width: imageWidth,
-              height: imageHeight,
-            });
-
-            page.drawText(`Imagem ${index + 1}`, {
-              x: 50,
-              y: yPos - imageHeight - 10,
-              size: fontSize - 1,
-              font
-            });
-
-            yPos -= imageHeight + 15; // Reduzido espaço entre imagens de 30 para 15
-
-          } catch (error) {
-            console.error(`Erro ao adicionar imagem ${index + 1}:`, error);
-            page.drawText(`[Imagem ${index + 1} - Erro ao carregar]`, {
-              x: 50,
-              y: yPos,
-              size: fontSize - 1,
-              font,
-              color: rgb(0.8, 0, 0)
-            });
-            yPos -= lineHeight * 2;
+            
+            imagemIndex++;
           }
         }
+
+        // Ajustar yPos após todas as imagens
+        yPos -= imagensLayout.rows * (imagensLayout.height + 25) + 10;
       }
       
-      // Tabela de Notas (duas colunas)
-      yPos -= lineHeight * 2; // Espaço antes da tabela
+      // Tabela de Notas (duas colunas) - Ajustada dinamicamente
+      yPos -= lineHeight * 1.5; // Espaço reduzido antes da tabela
+      
+      // Calcular quantas linhas cabem no espaço restante
+      const espacoRestante = yPos - (bottomMargin + minSpaceForSignatures);
+      const maxRowsPossivel = Math.floor(espacoRestante / lineHeight) - 4; // -4 para cabeçalho e totais
+      const maxRowsPerColumn = Math.max(8, Math.min(15, Math.floor(maxRowsPossivel / 2))); // Entre 8 e 15 linhas por coluna
+      
       // Cabeçalho para ambas as colunas na mesma linha
       const leftHeader = drawTableHeaderForColumn(leftBaseX, yPos);
       const rightHeader = drawTableHeaderForColumn(rightBaseX, yPos);
@@ -598,7 +653,6 @@ const ListarControlesContent: React.FC = () => {
       let yRight = rightHeader.nextY;
       let rowsLeft = 0;
       let rowsRight = 0;
-      const maxRowsPerColumn = 15; // objetivo: 15 por lado
 
       const drawNota = (idx: number, nota: any, cols: {col1:number,col2:number,col3:number,col4:number}, y: number) => {
         const volumes = parseInt(nota.volumes) || 1;
