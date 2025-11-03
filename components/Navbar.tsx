@@ -18,6 +18,18 @@ export default function Navbar() {
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [checklistMenuAnchor, setChecklistMenuAnchor] = useState<null | HTMLElement>(null);
   const [relatoriosMenuAnchor, setRelatoriosMenuAnchor] = useState<null | HTMLElement>(null);
+  const [scrolled, setScrolled] = useState(false);
+
+  // Add shadow to navbar on scroll
+  if (typeof window !== 'undefined') {
+    window.addEventListener('scroll', () => {
+      if (window.scrollY > 10) {
+        setScrolled(true);
+      } else {
+        setScrolled(false);
+      }
+    });
+  }
 
   const handleLogout = async () => {
     try {
@@ -30,8 +42,13 @@ export default function Navbar() {
 
   return (
     <AppBar 
-      position="static" 
-      elevation={0}
+      position="sticky"
+      elevation={scrolled ? 4 : 0}
+      sx={{
+        backdropFilter: 'blur(10px)',
+        bgcolor: scrolled ? 'rgba(25, 118, 210, 0.95)' : 'primary.main',
+        transition: 'all 0.3s ease'
+      }}
     >
       <Container maxWidth="xl">
         <Toolbar 
@@ -155,25 +172,77 @@ export default function Navbar() {
                   open={Boolean(checklistMenuAnchor)}
                   onClose={() => setChecklistMenuAnchor(null)}
                   PaperProps={{
+                    elevation: 8,
                     sx: {
                       mt: 1,
-                      minWidth: 200,
+                      minWidth: isMobile ? '90vw' : 200,
+                      maxWidth: '95vw',
                       borderRadius: 2,
-                      boxShadow: '0 8px 32px rgba(0,0,0,0.12)'
+                      boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
+                      '& .MuiMenuItem-root': {
+                        minHeight: isMobile ? 56 : 42,
+                        borderRadius: 1,
+                        mx: 0.5,
+                        my: 0.25,
+                        '&:active': {
+                          bgcolor: 'action.selected'
+                        }
+                      }
                     }
                   }}
+                  transformOrigin={{ horizontal: 'center', vertical: 'top' }}
+                  anchorOrigin={{ horizontal: 'center', vertical: 'bottom' }}
                 >
-                  <MenuItem onClick={() => { router.push('/checklist-recebimento/regras-ouro'); setChecklistMenuAnchor(null); }}>
-                    <ChecklistIcon sx={{ mr: 2, color: 'primary.main' }} />
-                    Novo Checklist
+                  <MenuItem 
+                    onClick={() => { router.push('/checklist-recebimento/regras-ouro'); setChecklistMenuAnchor(null); }}
+                    sx={{ 
+                      py: isMobile ? 2 : 1,
+                      display: 'flex',
+                      alignItems: 'center'
+                    }}
+                  >
+                    <ChecklistIcon sx={{ mr: 2, color: 'primary.main', fontSize: isMobile ? 24 : 20 }} />
+                    <Box sx={{ 
+                      display: 'flex', 
+                      flexDirection: 'column'
+                    }}>
+                      <Box sx={{ fontWeight: 600 }}>Novo Checklist</Box>
+                      {isMobile && <Box sx={{ fontSize: '0.8rem', color: 'text.secondary' }}>Criar checklist de recebimento</Box>}
+                    </Box>
                   </MenuItem>
-                  <MenuItem onClick={() => { router.push('/checklist-recebimento/relatorios'); setChecklistMenuAnchor(null); }}>
-                    <ReportIcon sx={{ mr: 2, color: 'info.main' }} />
-                    Relatórios Checklist
+                  <MenuItem 
+                    onClick={() => { router.push('/checklist-recebimento/relatorios'); setChecklistMenuAnchor(null); }}
+                    sx={{ 
+                      py: isMobile ? 2 : 1,
+                      display: 'flex',
+                      alignItems: 'center'
+                    }}
+                  >
+                    <ReportIcon sx={{ mr: 2, color: 'info.main', fontSize: isMobile ? 24 : 20 }} />
+                    <Box sx={{ 
+                      display: 'flex', 
+                      flexDirection: 'column'
+                    }}>
+                      <Box sx={{ fontWeight: 600 }}>Relatórios Checklist</Box>
+                      {isMobile && <Box sx={{ fontSize: '0.8rem', color: 'text.secondary' }}>Visualizar relatórios de checklist</Box>}
+                    </Box>
                   </MenuItem>
-                  <MenuItem onClick={() => { router.push('/checklist-recebimento/relatorio-validade'); setChecklistMenuAnchor(null); }}>
-                    <AlertIcon sx={{ mr: 2, color: 'warning.main' }} />
-                    Alertas de Validade
+                  <MenuItem 
+                    onClick={() => { router.push('/checklist-recebimento/relatorio-validade'); setChecklistMenuAnchor(null); }}
+                    sx={{ 
+                      py: isMobile ? 2 : 1,
+                      display: 'flex',
+                      alignItems: 'center'
+                    }}
+                  >
+                    <AlertIcon sx={{ mr: 2, color: 'warning.main', fontSize: isMobile ? 24 : 20 }} />
+                    <Box sx={{ 
+                      display: 'flex', 
+                      flexDirection: 'column'
+                    }}>
+                      <Box sx={{ fontWeight: 600 }}>Alertas de Validade</Box>
+                      {isMobile && <Box sx={{ fontSize: '0.8rem', color: 'text.secondary' }}>Ver produtos com validade próxima</Box>}
+                    </Box>
                   </MenuItem>
                 </Menu>
 

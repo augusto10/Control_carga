@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { useRouter } from 'next/router';
+import { useDeviceDetect } from '../../hooks/useDeviceDetect';
 import {
   Box,
   Typography,
@@ -1077,53 +1078,130 @@ function ChecklistRecebimentoPage() {
     }
   };
 
+  const { isMobile } = useDeviceDetect();
+
   return (
     <ProtectedRoute>
-      <Box sx={{ maxWidth: 1200, mx: 'auto', p: 3 }}>
-        <Paper sx={{ p: 4 }}>
-          <Box display="flex" alignItems="center" mb={4}>
-            <AssignmentIcon sx={{ fontSize: 40, mr: 2, color: 'primary.main' }} />
-            <Typography variant="h4" component="h1">
+      <Box sx={{ 
+        maxWidth: 1200, 
+        mx: 'auto', 
+        p: isMobile ? 1 : 3,
+        minHeight: '100vh',
+        bgcolor: 'background.default'
+      }}>
+        <Paper sx={{ 
+          p: isMobile ? 2 : 4,
+          borderRadius: isMobile ? '0px' : '8px',
+          boxShadow: isMobile ? 'none' : 1
+        }}>
+          <Box display="flex" alignItems="center" mb={isMobile ? 2 : 4}>
+            <AssignmentIcon sx={{ 
+              fontSize: isMobile ? 28 : 40, 
+              mr: 2, 
+              color: 'primary.main' 
+            }} />
+            <Typography 
+              variant={isMobile ? "h5" : "h4"} 
+              component="h1"
+              sx={{ 
+                fontSize: isMobile ? '1.5rem' : undefined,
+                fontWeight: 600
+              }}
+            >
               Checklist de Recebimento
             </Typography>
           </Box>
 
-          <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
-            {steps.map((label) => (
-              <Step key={label}>
-                <StepLabel>{label}</StepLabel>
-              </Step>
-            ))}
-          </Stepper>
+          {isMobile ? (
+            // Versão mobile: mostra apenas o passo atual
+            <Box sx={{ mb: 3, textAlign: 'center' }}>
+              <Chip
+                label={`${activeStep + 1}/${steps.length}: ${steps[activeStep]}`}
+                color="primary"
+                sx={{ 
+                  fontSize: '1rem',
+                  py: 2,
+                  width: '100%',
+                  borderRadius: 2
+                }}
+              />
+            </Box>
+          ) : (
+            // Versão desktop: mostra todos os passos
+            <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
+              {steps.map((label) => (
+                <Step key={label}>
+                  <StepLabel>{label}</StepLabel>
+                </Step>
+              ))}
+            </Stepper>
+          )}
 
           <Box sx={{ mt: 3, mb: 3 }}>
             {renderStepContent(activeStep)}
           </Box>
 
-          <Box sx={{ display: 'flex', flexDirection: 'row', pt: 2 }}>
-            <Button
-              color="inherit"
-              disabled={activeStep === 0}
-              onClick={handleBack}
-              sx={{ mr: 1 }}
-            >
-              Voltar
-            </Button>
-            <Box sx={{ flex: '1 1 auto' }} />
+          <Box sx={{ 
+            display: 'flex', 
+            flexDirection: isMobile ? 'column' : 'row',
+            gap: isMobile ? 2 : 1,
+            pt: 2,
+            position: isMobile ? 'sticky' : 'static',
+            bottom: isMobile ? 0 : 'auto',
+            left: 0,
+            right: 0,
+            bgcolor: 'background.paper',
+            p: isMobile ? 2 : 0,
+            borderTop: isMobile ? 1 : 0,
+            borderColor: 'divider',
+            mt: isMobile ? 4 : 2,
+            mx: isMobile ? -2 : 0
+          }}>
             {activeStep === steps.length - 1 ? (
               <Button
                 variant="contained"
                 onClick={handleSubmit}
                 disabled={saving}
                 startIcon={saving ? <CircularProgress size={20} /> : <SaveIcon />}
+                fullWidth={isMobile}
+                size={isMobile ? 'large' : 'medium'}
+                sx={{ 
+                  py: isMobile ? 2 : 1,
+                  order: isMobile ? 1 : 2
+                }}
               >
                 {saving ? 'Salvando...' : 'Finalizar Checklist'}
               </Button>
             ) : (
-              <Button variant="contained" onClick={handleNext}>
+              <Button 
+                variant="contained" 
+                onClick={handleNext}
+                fullWidth={isMobile}
+                size={isMobile ? 'large' : 'medium'}
+                sx={{ 
+                  py: isMobile ? 2 : 1,
+                  order: isMobile ? 1 : 2
+                }}
+              >
                 Próximo
               </Button>
             )}
+            
+            <Button
+              color="inherit"
+              disabled={activeStep === 0}
+              onClick={handleBack}
+              fullWidth={isMobile}
+              size={isMobile ? 'large' : 'medium'}
+              variant={isMobile ? 'outlined' : 'text'}
+              sx={{ 
+                py: isMobile ? 2 : 1,
+                order: isMobile ? 2 : 1
+              }}
+            >
+              Voltar
+            </Button>
+            {!isMobile && <Box sx={{ flex: '1 1 auto' }} />}
           </Box>
         </Paper>
 
