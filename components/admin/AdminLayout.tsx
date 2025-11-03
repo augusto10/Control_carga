@@ -138,7 +138,7 @@ export default function AdminLayout({ children, title }: AdminLayoutProps) {
             {title}
           </Typography>
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <Typography variant="body2" sx={{ mr: 2, display: { xs: 'none', sm: 'block' } }}>
+            <Typography variant="body2" sx={{ mr: 2, display: { xs: 'block', sm: 'block' } }}>
               {user?.nome}
             </Typography>
             <Tooltip title="Configurações da conta">

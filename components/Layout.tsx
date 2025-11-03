@@ -706,13 +706,14 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                       }}>
                         {subItem.icon}
                       </ListItemIcon>
-                      <ListItemText
-                        primary={subItem.text}
+                      <ListItemText 
+                        primary={subItem.text} 
                         primaryTypographyProps={{
                           fontSize: '0.9rem',
                           color: isActive(subItem.path, true) ? 'primary.main' : 'text.secondary',
-                        }}
-                        sx={{ opacity: open ? 1 : 0 }}
+                        }} 
+                        /* Garantir que em mobile (isMobile) o texto dos subitens apareça mesmo quando o drawer estiver 'fechado' */
+                        sx={{ opacity: open || isMobile ? 1 : 0 }}
                       />
                     </SubMenuItemButton>
                   </Link>
@@ -1015,10 +1016,11 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             
             {/* Espaço para informações do usuário no rodapé */}
             <Box sx={{ 
-              p: 2, 
-              mt: 'auto', 
-              borderTop: '1px solid rgba(25, 118, 210, 0.2)', 
-              opacity: open ? 1 : 0,
+              p: 2,
+              mt: 'auto',
+              borderTop: '1px solid rgba(25, 118, 210, 0.2)',
+              /* Mostrar o bloco do usuário no rodapé também em mobile */
+              opacity: open || isMobile ? 1 : 0,
               background: 'linear-gradient(135deg, rgba(25, 118, 210, 0.05) 0%, rgba(66, 165, 245, 0.05) 100%)',
               borderRadius: '12px 12px 0 0'
             }}>
