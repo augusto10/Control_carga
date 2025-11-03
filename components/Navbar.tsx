@@ -167,8 +167,8 @@ export default function Navbar() {
                     fontWeight: 600, 
                     display: 'flex', 
                     alignItems: 'center',
-                    minWidth: isMobile ? 48 : 'auto',
-                    px: isMobile ? 1 : 2,
+                    minWidth: isMobile ? 'auto' : 120,
+                    px: isMobile ? 1.5 : 2,
                     borderRadius: 2,
                     '&:hover': {
                       bgcolor: 'rgba(255,255,255,0.1)',
@@ -177,10 +177,17 @@ export default function Navbar() {
                     transition: 'all 0.2s ease'
                   }}
                   onClick={(e) => setChecklistMenuAnchor(e.currentTarget)}
-                  endIcon={!isMobile ? <ExpandMoreIcon sx={{ fontSize: 16 }} /> : null}
+                  endIcon={<ExpandMoreIcon sx={{ fontSize: isMobile ? 20 : 16 }} />}
                 >
-                  <ChecklistIcon sx={{ mr: isMobile ? 0 : 1, fontSize: isMobile ? 20 : 18 }} />
-                  {!isMobile && 'Checklist'}
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <ChecklistIcon sx={{ fontSize: isMobile ? 20 : 18 }} />
+                    <span style={{ 
+                      display: 'block',
+                      fontSize: isMobile ? '0.9rem' : 'inherit'
+                    }}>
+                      Checklist
+                    </span>
+                  </Box>
                 </Button>
                 <Menu
                   anchorEl={checklistMenuAnchor}
@@ -268,8 +275,8 @@ export default function Navbar() {
                     fontWeight: 600, 
                     display: 'flex', 
                     alignItems: 'center',
-                    minWidth: isMobile ? 48 : 'auto',
-                    px: isMobile ? 1 : 2,
+                    minWidth: isMobile ? 'auto' : 120,
+                    px: isMobile ? 1.5 : 2,
                     borderRadius: 2,
                     '&:hover': {
                       bgcolor: 'rgba(255,255,255,0.1)',
@@ -278,10 +285,17 @@ export default function Navbar() {
                     transition: 'all 0.2s ease'
                   }}
                   onClick={(e) => setRelatoriosMenuAnchor(e.currentTarget)}
-                  endIcon={!isMobile ? <ExpandMoreIcon sx={{ fontSize: 16 }} /> : null}
+                  endIcon={<ExpandMoreIcon sx={{ fontSize: isMobile ? 20 : 16 }} />}
                 >
-                  <ReportIcon sx={{ mr: isMobile ? 0 : 1, fontSize: isMobile ? 20 : 18 }} />
-                  {!isMobile && 'Relatórios'}
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <ReportIcon sx={{ fontSize: isMobile ? 20 : 18 }} />
+                    <span style={{ 
+                      display: 'block',
+                      fontSize: isMobile ? '0.9rem' : 'inherit'
+                    }}>
+                      Relatórios
+                    </span>
+                  </Box>
                 </Button>
                 <Menu
                   anchorEl={relatoriosMenuAnchor}

@@ -266,7 +266,11 @@ function HomeContent() {
             container 
             spacing={isMobile ? 2 : 3} 
             justifyContent="center"
-            sx={{ maxWidth: 1400, mx: 'auto' }}
+            sx={{ 
+              maxWidth: 1400, 
+              mx: 'auto',
+              px: isMobile ? 1 : 3
+            }}
           >
             {menuCards.map((card) => (
               <Grid 
