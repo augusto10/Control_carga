@@ -86,13 +86,20 @@ async function createChecklist(req: NextApiRequest, res: NextApiResponse, userId
   try {
     console.log('📋 [Checklist] Criando novo checklist');
 
-    // Parse do form data
+    // Parse do form data (promisificado para compatibilidade)
     const form = formidable({
       maxFileSize: 10 * 1024 * 1024, // 10MB
       keepExtensions: true,
     });
 
-    const [fields, files] = await form.parse(req);
+    const parseForm = () => new Promise<{ fields: formidable.Fields; files: formidable.Files }>((resolve, reject) => {
+      form.parse(req, (err, fields, files) => {
+        if (err) return reject(err);
+        resolve({ fields, files });
+      });
+    });
+
+    const { fields, files } = await parseForm();
 
     // Função helper para obter valor do campo
     const getFieldValue = (fieldName: string): string => {
@@ -188,14 +195,14 @@ async function createChecklist(req: NextApiRequest, res: NextApiResponse, userId
     }
 
     // Processar produtos (novo formato com múltiplos produtos)
-    let produtos = [];
+    let produtos: any[] = [];
     try {
       const produtosJson = getFieldValue('produtos');
       if (produtosJson) {
         produtos = JSON.parse(produtosJson);
       }
     } catch (error) {
-      console.error('Erro ao processar produtos:', error);
+      console.error('Erro ao processar produtos JSON, tentando fallback:', error);
       // Fallback para formato antigo (um produto só)
       produtos = [{
         nomeFabricante: getFieldValue('nomeFabricante') || '',
@@ -206,7 +213,7 @@ async function createChecklist(req: NextApiRequest, res: NextApiResponse, userId
         admProduto: getFieldValue('admProduto') || '',
         codigoBarrasCaixaMaster: getFieldValue('codigoBarrasCaixaMaster') || '',
         codigoBarrasCaixaInterna: getFieldValue('codigoBarrasCaixaInterna') || '',
-        codigoBarrasItem: getFieldValue('codigoBarrasItem') || ''
+        codigoBarrasItem: getFieldValue('codigoBarrasCaixaInterna') || ''
       }];
     }
 
@@ -239,7 +246,16 @@ async function createChecklist(req: NextApiRequest, res: NextApiResponse, userId
     // Processar dados de alerta de validade
     const alertaValidadeAutorizado = getBooleanValue('alertaValidadeAutorizado');
     const nomeAutorizadorLider = getFieldValue('nomeAutorizadorLider') || null;
-    const produtosComAlertaValidade = getFieldValue('produtosComAlertaValidade') || null;
+    let produtosComAlertaValidadeRaw = getFieldValue('produtosComAlertaValidade') || null;
+    let produtosComAlertaValidade: string | null = null;
+    try {
+      if (produtosComAlertaValidadeRaw) {
+        const parsed = JSON.parse(produtosComAlertaValidadeRaw);
+        produtosComAlertaValidade = JSON.stringify(parsed);
+      }
+    } catch (e) {
+      produtosComAlertaValidade = produtosComAlertaValidadeRaw ? String(produtosComAlertaValidadeRaw) : null;
+    }
     
     console.log('⚠️ [Checklist] Alerta de validade:', {
       autorizado: alertaValidadeAutorizado,

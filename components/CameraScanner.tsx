@@ -62,25 +62,31 @@ const CameraScanner: React.FC<CameraScannerProps> = ({
       const cameras = videoDevices.filter(device => device.kind === 'videoinput');
       setDevices(cameras);
 
-      // Use first camera by default
-      if (cameras.length > 0 && !selectedDevice) {
-        setSelectedDevice(cameras[0].deviceId);
+      // Determine which deviceId to use right now
+      const firstDeviceId = cameras.length > 0 ? cameras[0].deviceId : '';
+      const deviceIdToUse = selectedDevice || firstDeviceId;
+
+      if (!codeReader.current || !deviceIdToUse) {
+        setIsScanning(false);
+        return;
       }
 
-      if (!codeReader.current || !selectedDevice) return;
+      // Ensure state reflects chosen device
+      if (!selectedDevice && firstDeviceId) setSelectedDevice(firstDeviceId);
 
       await codeReader.current.decodeFromVideoDevice(
-        selectedDevice,
+        deviceIdToUse,
         videoRef.current!,
         (result: Result | null, error?: Error) => {
           if (result) {
             const code = result.getText();
             console.log('📱 [CameraScanner] Código lido:', code);
             onScan(code);
-            onClose();
+            handleClose();
           }
           if (error) {
-            console.warn('📱 [CameraScanner] Erro de leitura:', error);
+            // não logar como erro crítico sempre
+            console.debug('📱 [CameraScanner] Erro de leitura (não crítico):', error?.message || error);
           }
         }
       );
