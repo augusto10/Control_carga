@@ -4,6 +4,7 @@ import { getTokenFromCookies, verifyToken } from '../../../lib/auth';
 import formidable from 'formidable';
 import fs from 'fs';
 import path from 'path';
+import { optimizeImage } from '../../../lib/imageUtils';
 
 const prisma = new PrismaClient();
 
@@ -16,21 +17,32 @@ export const config = {
 
 // Função para salvar arquivo
 const saveFile = async (file: formidable.File, folder: string): Promise<string> => {
-  const uploadDir = path.join(process.cwd(), 'public', 'uploads', folder);
-  
-  // Criar diretório se não existir
-  if (!fs.existsSync(uploadDir)) {
-    fs.mkdirSync(uploadDir, { recursive: true });
-  }
+  try {
+    const uploadDir = path.join(process.cwd(), 'public', 'uploads', folder);
+    
+    // Criar diretório se não existir
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
 
-  const fileName = `${Date.now()}-${file.originalFilename}`;
-  const filePath = path.join(uploadDir, fileName);
-  
-  // Mover arquivo
-  const data = fs.readFileSync(file.filepath);
-  fs.writeFileSync(filePath, data);
-  
-  return `/uploads/${folder}/${fileName}`;
+    const fileName = `${Date.now()}-${file.originalFilename?.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+    const filePath = path.join(uploadDir, fileName);
+    
+    // Ler arquivo e otimizar imagem
+    const data = fs.readFileSync(file.filepath);
+    const optimizedBuffer = await optimizeImage(data);
+    
+    // Salvar arquivo otimizado
+    fs.writeFileSync(filePath, optimizedBuffer);
+    
+    // Remover arquivo temporário
+    fs.unlinkSync(file.filepath);
+    
+    return `/uploads/${folder}/${fileName}`;
+  } catch (error) {
+    console.error('Erro ao salvar arquivo:', error);
+    throw new Error('Falha ao processar upload de arquivo');
+  }
 };
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {

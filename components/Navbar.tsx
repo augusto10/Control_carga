@@ -106,7 +106,12 @@ export default function Navbar() {
                       transition: 'all 0.2s ease'
                     }}
                   >
-                    {isMobile ? '➕' : 'Separar Pedido'}
+                    {isMobile ? (
+                    <>
+                      <span style={{ marginRight: 8 }}>➕</span>
+                      <span style={{ fontSize: '0.9rem' }}>Separar</span>
+                    </>
+                  ) : 'Separar Pedido'}
                   </Button>
                 </Link>
                 <Link href="/separacao-conferencia/conferentes" passHref>
@@ -124,7 +129,12 @@ export default function Navbar() {
                       transition: 'all 0.2s ease'
                     }}
                   >
-                    {isMobile ? '📋' : 'Conferir Pedido'}
+                    {isMobile ? (
+                    <>
+                      <span style={{ marginRight: 8 }}>📋</span>
+                      <span style={{ fontSize: '0.9rem' }}>Conferências</span>
+                    </>
+                  ) : 'Listar Conferências'}
                   </Button>
                 </Link>
                 <Link href="/conferencias" passHref>
@@ -142,7 +152,12 @@ export default function Navbar() {
                       transition: 'all 0.2s ease'
                     }}
                   >
-                    {isMobile ? '📝' : 'Listar Conferências'}
+                    {isMobile ? (
+                    <>
+                      <span style={{ marginRight: 8 }}>📝</span>
+                      <span style={{ fontSize: '0.9rem' }}>Conferir</span>
+                    </>
+                  ) : 'Conferir Pedido'}
                   </Button>
                 </Link>
                 {/* Menu Checklist com submenu */}
@@ -311,7 +326,12 @@ export default function Navbar() {
                       transition: 'all 0.2s ease'
                     }}
                   >
-                    {isMobile ? '🏷️' : 'Etiquetas'}
+                    {isMobile ? (
+                    <>
+                      <span style={{ marginRight: 8 }}>🏷️</span>
+                      <span style={{ fontSize: '0.9rem' }}>Etiquetas</span>
+                    </>
+                  ) : 'Etiquetas'}
                   </Button>
                 </Link>
                 
