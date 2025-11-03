@@ -8,14 +8,9 @@ import {
   Typography,
   Box,
   Alert,
-  CircularProgress,
-  ButtonGroup
+  CircularProgress
 } from '@mui/material';
-import { 
-  QrCodeScanner as ScannerIcon,
-  CameraAlt as CameraIcon
-} from '@mui/icons-material';
-import CameraScanner from './CameraScanner';
+import { QrCodeScanner as ScannerIcon } from '@mui/icons-material';
 
 interface AndroidScannerProps {
   onScan: (result: string) => void;
@@ -47,27 +42,22 @@ const AndroidScanner: React.FC<AndroidScannerProps> = ({
   const [isScanning, setIsScanning] = useState(false);
   const [scannerAvailable, setScannerAvailable] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [cameraScannerOpen, setCameraScannerOpen] = useState(false);
 
   useEffect(() => {
-    const checkDevice = async () => {
-      try {
-        const capabilities = await detectDeviceCapabilities();
-        setScannerAvailable(capabilities.hasNativeScanner || capabilities.hasCameraAccess);
-        
-        console.log('📱 [AndroidScanner] Capacidades do dispositivo:', {
-          isAndroid: capabilities.isAndroid,
-          isMovfast: capabilities.isMovfast,
-          hasNativeScanner: capabilities.hasNativeScanner,
-          hasCameraAccess: capabilities.hasCameraAccess
-        });
-      } catch (error) {
-        console.error('📱 [AndroidScanner] Erro ao detectar capacidades:', error);
-        setScannerAvailable(false);
-      }
-    };
+    // Verificar se é dispositivo Android
+    const isAndroid = /Android/i.test(navigator.userAgent);
+    const isMovfast = /Movfast|Ranger/i.test(navigator.userAgent);
     
-    checkDevice();
+    // Verificar se scanner está disponível
+    const hasAndroidInterface = window.Android && typeof window.Android.scanBarcode === 'function';
+    const hasBarcodeScanner = window.BarcodeScanner && typeof window.BarcodeScanner.scan === 'function';
+    
+    setScannerAvailable(isAndroid && (hasAndroidInterface || hasBarcodeScanner || isMovfast));
+    
+    console.log('📱 [AndroidScanner] Dispositivo Android:', isAndroid);
+    console.log('📱 [AndroidScanner] Dispositivo Movfast:', isMovfast);
+    console.log('📱 [AndroidScanner] Interface Android disponível:', hasAndroidInterface);
+    console.log('📱 [AndroidScanner] Scanner disponível:', scannerAvailable);
   }, []);
 
   const handleScan = async () => {
@@ -154,38 +144,22 @@ const AndroidScanner: React.FC<AndroidScannerProps> = ({
 
   return (
     <>
-      <ButtonGroup variant="outlined" color="primary">
-        <Button
-          startIcon={<ScannerIcon />}
-          onClick={handleScan}
-          disabled={disabled || isScanning}
-          sx={{
-            minWidth: 'auto',
-            px: 2,
-            '&:hover': {
-              backgroundColor: 'primary.light',
-              color: 'white'
-            }
-          }}
-        >
-          {isScanning ? 'Escaneando...' : 'Scanner'}
-        </Button>
-        <Button
-          startIcon={<CameraIcon />}
-          onClick={() => setCameraScannerOpen(true)}
-          disabled={disabled || isScanning}
-          sx={{
-            minWidth: 'auto',
-            px: 2,
-            '&:hover': {
-              backgroundColor: 'primary.light',
-              color: 'white'
-            }
-          }}
-        >
-          Câmera
-        </Button>
-      </ButtonGroup>
+      <Button
+        variant="outlined"
+        startIcon={<ScannerIcon />}
+        onClick={handleScan}
+        disabled={disabled || isScanning}
+        color="primary"
+        sx={{
+          minWidth: 120,
+          '&:hover': {
+            backgroundColor: 'primary.light',
+            color: 'white'
+          }
+        }}
+      >
+        {isScanning ? 'Escaneando...' : buttonText}
+      </Button>
 
       <Dialog
         open={dialogOpen}
@@ -253,13 +227,6 @@ const AndroidScanner: React.FC<AndroidScannerProps> = ({
           </Button>
         </DialogActions>
       </Dialog>
-
-      <CameraScanner
-        open={cameraScannerOpen}
-        onClose={() => setCameraScannerOpen(false)}
-        onScan={onScan}
-        onError={onError}
-      />
     </>
   );
 };
