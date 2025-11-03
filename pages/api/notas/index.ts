@@ -14,15 +14,45 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (req.method === 'GET') {
     try {
+      const { start, end } = req.query;
       console.log('🔄 [TEMP] Listando notas com compatibilidade');
+      console.log('📅 [TEMP] Filtros recebidos:', { start, end });
       
-      // Buscar notas sem joins que possam causar erro de enum
+      // Construir filtros de data
+      const where: any = {};
+      if (start || end) {
+        where.dataCriacao = {};
+        if (start) {
+          where.dataCriacao.gte = new Date(`${start}T00:00:00`);
+          console.log('📅 [TEMP] Data início:', where.dataCriacao.gte);
+        }
+        if (end) {
+          where.dataCriacao.lte = new Date(`${end}T23:59:59`);
+          console.log('📅 [TEMP] Data fim:', where.dataCriacao.lte);
+        }
+      }
+      
+      // Buscar notas com filtros aplicados
       const notas = await prisma.notaFiscal.findMany({
+        where,
         orderBy: { dataCriacao: 'desc' },
-        take: 100 // Limitar para evitar sobrecarga
+        take: 500 // Aumentar limite para permitir mais resultados
       });
 
-      console.log(`📊 [TEMP] Encontradas ${notas.length} notas`);
+      console.log(`📊 [TEMP] Encontradas ${notas.length} notas com filtros:`, where);
+      
+      if (notas.length > 0) {
+        console.log('📅 [TEMP] Primeira nota:', {
+          id: notas[0].id,
+          numeroNota: notas[0].numeroNota,
+          dataCriacao: notas[0].dataCriacao
+        });
+        console.log('📅 [TEMP] Última nota:', {
+          id: notas[notas.length - 1].id,
+          numeroNota: notas[notas.length - 1].numeroNota,
+          dataCriacao: notas[notas.length - 1].dataCriacao
+        });
+      }
 
       // Buscar controles separadamente para evitar erro de enum
       const notasComControles = await Promise.all(

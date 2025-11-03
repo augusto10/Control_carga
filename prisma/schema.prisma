@@ -74,6 +74,8 @@ model Usuario {
   solicitacoesMaterial SolicitacaoMaterial[]   @relation("SolicitacoesMaterial")
   aprovacoesMateria    SolicitacaoMaterial[]   @relation("AprovacoesMateria")
   historicosEstoque    HistoricoEstoque[]
+  etiquetasLotes       EtiquetaLote[]         // Etiquetas de transporte criadas
+  checklistsRecebimento ChecklistRecebimento[] // Checklists de recebimento criados
 }
 
 model AuditoriaAcesso {
@@ -309,8 +311,110 @@ model HistoricoEstoque {
   @@index([usuarioId])
 }
 
+/// Sistema de Etiquetas de Transporte (Zebra ZD-220)
+model EtiquetaLote {
+  id              String           @id @default(uuid())
+  dataCriacao     DateTime         @default(now())
+  codigoBarras    String           // Código de barras da NF-e lida
+  numeroNota      String           // Número da nota fiscal
+  cliente         String           // Nome do cliente
+  transportadora  Transportadora   // Transportadora selecionada
+  numeroPedido    String           // Número do pedido
+  volumes         Int              // Total de volumes/etiquetas
+  observacoes     String?          // Observações opcionais
+  criadoPor       String           // ID do usuário que criou
+  criadoPorUser   Usuario          @relation(fields: [criadoPor], references: [id])
+  volumesEtiquetas EtiquetaVolume[] // Volumes individuais
+
+  @@index([dataCriacao])
+  @@index([codigoBarras])
+  @@index([numeroNota])
+  @@index([numeroPedido])
+  @@index([criadoPor])
+}
+
+model EtiquetaVolume {
+  id              String         @id @default(uuid())
+  loteId          String         // FK para EtiquetaLote
+  lote            EtiquetaLote   @relation(fields: [loteId], references: [id], onDelete: Cascade)
+  indiceVolume    Int            // 1, 2, 3... (sequencial)
+  totalVolumes    Int            // Total de volumes do lote
+  codigoVolume    String         @unique // Código único para este volume
+  impressoEm      DateTime?      // Quando foi impresso
+
+  @@index([loteId])
+  @@index([codigoVolume])
+  @@index([impressoEm])
+}
+
 enum TipoMovimentacao {
   ENTRADA
   SAIDA
   AJUSTE
+}
+
+/// Sistema de Checklist de Recebimento
+model ChecklistRecebimento {
+  id                    String    @id @default(uuid())
+  dataCriacao          DateTime  @default(now())
+  
+  // Dados básicos do recebimento
+  dataRecebimento      DateTime
+  horarioRecebimento   String
+  nomeConferente       String
+  nomeFabricante       String
+  descricaoProduto     String
+  numeroLote           String
+  dataFabricacao       DateTime
+  dataVencimento       DateTime
+  
+  // Fotos
+  fotoRecebimento      String?   // URL da foto
+  fotoDevolucao        String?   // URL da foto
+  
+  // Códigos de barras
+  admProduto           String?
+  codigoBarrasCaixaMaster   String?
+  codigoBarrasCaixaInterna  String?
+  codigoBarrasItem          String?
+  
+  // Perguntas do checklist
+  recebimentoPocket         Boolean
+  motivoNaoPocket          String?
+  possuiCodigoBarras       Boolean
+  solicitouCadastroCodigoBarras Boolean
+  paraQuemSolicitou        String?
+  dadosLoteCadastradosSantri Boolean
+  condicaoEmbalagens       CondicaoEmbalagem
+  houveRessalva            Boolean
+  descricaoRessalva        String?
+  paraQuemInformouRessalva String?
+  houveDevolucao           Boolean
+  itensDevolvidos          String?
+  quantidadeDevolvida      Int?
+  fotoTiradaDevolucao      Boolean
+  notaDevolucaoEmitida     Boolean
+  numeroNotaDevolucao      String?
+  
+  // Alertas de validade (novos campos)
+  alertaValidadeAutorizado    Boolean @default(false)
+  nomeAutorizadorLider        String?
+  produtosComAlertaValidade   String? // JSON com lista dos produtos
+  
+  // Auditoria
+  criadoPor            String
+  criadoPorUser        Usuario   @relation(fields: [criadoPor], references: [id])
+  
+  @@index([dataCriacao])
+  @@index([dataRecebimento])
+  @@index([nomeConferente])
+  @@index([nomeFabricante])
+  @@index([alertaValidadeAutorizado])
+  @@index([nomeAutorizadorLider])
+}
+
+enum CondicaoEmbalagem {
+  OTIMA
+  BOA
+  RUIM
 }

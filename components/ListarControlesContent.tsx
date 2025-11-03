@@ -39,7 +39,9 @@ import {
   Alert,
   Snackbar,
   Select,
-  TextField
+  TextField,
+  Card,
+  CardContent
 } from '@mui/material';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -60,6 +62,11 @@ import CloseIcon from '@mui/icons-material/Close';
 import HowToRegIcon from '@mui/icons-material/HowToReg';
 import CameraAltIcon from '@mui/icons-material/CameraAlt';
 import CheckIcon from '@mui/icons-material/Check';
+import SearchIcon from '@mui/icons-material/Search';
+import TodayIcon from '@mui/icons-material/Today';
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
+import FilterListIcon from '@mui/icons-material/FilterList';
+import ClearIcon from '@mui/icons-material/Clear';
 
 import ResponsiveTable from './ResponsiveTable';
 import ResponsiveContainer from './ResponsiveContainer';
@@ -98,6 +105,17 @@ const ListarControlesContent: React.FC = () => {
     aberto: false,
     controle: null
   });
+
+  // Estados para filtros
+  const [filtros, setFiltros] = useState({
+    start: '',
+    end: '',
+    numero: '',
+    motorista: '',
+    responsavel: '',
+    limit: 50
+  });
+  const [filtrosAtivos, setFiltrosAtivos] = useState(false);
   
   // Opções fixas de transportadoras
   const transportadorasFixas = [
@@ -198,9 +216,9 @@ const ListarControlesContent: React.FC = () => {
       }
     },
     '&.MuiButton-containedPrimary': {
-      backgroundColor: '#ff9800',
+      backgroundColor: '#1976d2',
       '&:hover': {
-        backgroundColor: '#f57c00',
+        backgroundColor: '#1565c0',
       }
     }
   } as const;
@@ -393,7 +411,27 @@ const ListarControlesContent: React.FC = () => {
     const carregarDados = async () => {
       try {
         setLoading(true);
-        await fetchControles();
+        
+        // Carregar apenas os últimos 2 dias por padrão
+        const hoje = new Date();
+        const doisDiasAtras = new Date();
+        doisDiasAtras.setDate(hoje.getDate() - 2);
+        
+        const filtrosIniciais = {
+          start: format(doisDiasAtras, 'yyyy-MM-dd'),
+          end: format(hoje, 'yyyy-MM-dd'),
+          limit: 50
+        };
+        
+        // Atualizar estado dos filtros
+        setFiltros(prev => ({
+          ...prev,
+          ...filtrosIniciais
+        }));
+        
+        console.log('🔄 [ListarControles] Carregando últimos 2 dias:', filtrosIniciais);
+        await fetchControles(filtrosIniciais);
+        
       } catch (error) {
         console.error('Erro ao carregar controles:', error);
         enqueueSnackbar('Erro ao carregar controles', { variant: 'error' });
@@ -409,6 +447,95 @@ const ListarControlesContent: React.FC = () => {
   useEffect(() => {
     setControles(converterControles(controlesStore as any));
   }, [controlesStore, converterControles]);
+
+  // Funções para gerenciar filtros
+  const handleFiltroChange = (campo: string, valor: string | number) => {
+    setFiltros(prev => ({
+      ...prev,
+      [campo]: valor
+    }));
+  };
+
+  const aplicarFiltros = async () => {
+    try {
+      setLoading(true);
+      console.log('🔍 [ListarControles] Aplicando filtros:', filtros);
+      
+      // Filtrar apenas campos não vazios
+      const filtrosLimpos = Object.entries(filtros).reduce((acc, [key, value]) => {
+        if (value !== '' && value !== 0) {
+          acc[key] = value;
+        }
+        return acc;
+      }, {} as any);
+      
+      await fetchControles(filtrosLimpos);
+      setFiltrosAtivos(Object.keys(filtrosLimpos).length > 1); // Mais que apenas limit
+      
+    } catch (error) {
+      console.error('Erro ao aplicar filtros:', error);
+      enqueueSnackbar('Erro ao aplicar filtros', { variant: 'error' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const limparFiltros = async () => {
+    try {
+      setLoading(true);
+      
+      // Resetar para últimos 2 dias
+      const hoje = new Date();
+      const doisDiasAtras = new Date();
+      doisDiasAtras.setDate(hoje.getDate() - 2);
+      
+      const filtrosIniciais = {
+        start: format(doisDiasAtras, 'yyyy-MM-dd'),
+        end: format(hoje, 'yyyy-MM-dd'),
+        numero: '',
+        motorista: '',
+        responsavel: '',
+        limit: 50
+      };
+      
+      setFiltros(filtrosIniciais);
+      await fetchControles({
+        start: filtrosIniciais.start,
+        end: filtrosIniciais.end,
+        limit: filtrosIniciais.limit
+      });
+      setFiltrosAtivos(false);
+      
+    } catch (error) {
+      console.error('Erro ao limpar filtros:', error);
+      enqueueSnackbar('Erro ao limpar filtros', { variant: 'error' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filtrarHoje = async () => {
+    try {
+      setLoading(true);
+      const hoje = format(new Date(), 'yyyy-MM-dd');
+      
+      const filtrosHoje = {
+        ...filtros,
+        start: hoje,
+        end: hoje
+      };
+      
+      setFiltros(filtrosHoje);
+      await fetchControles(filtrosHoje);
+      setFiltrosAtivos(true);
+      
+    } catch (error) {
+      console.error('Erro ao filtrar por hoje:', error);
+      enqueueSnackbar('Erro ao filtrar por hoje', { variant: 'error' });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const gerarPdf = async (controle: ControleComNotas) => {
     // Importar dependências necessárias
@@ -1268,6 +1395,154 @@ const ListarControlesContent: React.FC = () => {
           Novo Controle
         </Button>
       </Box>
+
+      {/* Seção de Filtros */}
+      <Card sx={{ mb: 3, boxShadow: 2 }}>
+        <CardContent>
+          <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <FilterListIcon color="primary" />
+            Filtros de Consulta
+            {filtrosAtivos && (
+              <Chip 
+                label="Filtros Ativos" 
+                color="primary" 
+                size="small" 
+                sx={{ ml: 1 }}
+              />
+            )}
+          </Typography>
+          
+          <Grid container spacing={2} alignItems="center">
+            {/* Filtros de Data */}
+            <Grid item xs={12} sm={6} md={2}>
+              <TextField
+                fullWidth
+                label="Data Início"
+                type="date"
+                InputLabelProps={{ shrink: true }}
+                value={filtros.start}
+                onChange={(e) => handleFiltroChange('start', e.target.value)}
+                size="small"
+              />
+            </Grid>
+            <Grid item xs={12} sm={6} md={2}>
+              <TextField
+                fullWidth
+                label="Data Fim"
+                type="date"
+                InputLabelProps={{ shrink: true }}
+                value={filtros.end}
+                onChange={(e) => handleFiltroChange('end', e.target.value)}
+                size="small"
+              />
+            </Grid>
+            
+            {/* Filtros de Texto */}
+            <Grid item xs={12} sm={6} md={2}>
+              <TextField
+                fullWidth
+                label="Nº Manifesto"
+                value={filtros.numero}
+                onChange={(e) => handleFiltroChange('numero', e.target.value)}
+                size="small"
+                placeholder="Ex: M-2024"
+              />
+            </Grid>
+            <Grid item xs={12} sm={6} md={2}>
+              <TextField
+                fullWidth
+                label="Motorista"
+                value={filtros.motorista}
+                onChange={(e) => handleFiltroChange('motorista', e.target.value)}
+                size="small"
+                placeholder="Nome do motorista"
+              />
+            </Grid>
+            <Grid item xs={12} sm={6} md={2}>
+              <TextField
+                fullWidth
+                label="Responsável"
+                value={filtros.responsavel}
+                onChange={(e) => handleFiltroChange('responsavel', e.target.value)}
+                size="small"
+                placeholder="Nome do responsável"
+              />
+            </Grid>
+            
+            {/* Limite de Resultados */}
+            <Grid item xs={12} sm={6} md={2}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Limite</InputLabel>
+                <Select
+                  value={filtros.limit}
+                  onChange={(e) => handleFiltroChange('limit', e.target.value as number)}
+                  label="Limite"
+                >
+                  <MenuItem value={10}>10 registros</MenuItem>
+                  <MenuItem value={25}>25 registros</MenuItem>
+                  <MenuItem value={50}>50 registros</MenuItem>
+                  <MenuItem value={100}>100 registros</MenuItem>
+                  <MenuItem value={200}>200 registros</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+          </Grid>
+          
+          {/* Botões de Ação */}
+          <Box sx={{ mt: 3, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+            <Button 
+              variant="contained" 
+              startIcon={<SearchIcon />}
+              onClick={aplicarFiltros}
+              disabled={loading}
+              size="small"
+            >
+              Buscar
+            </Button>
+            <Button 
+              variant="contained" 
+              startIcon={<TodayIcon />}
+              onClick={filtrarHoje}
+              disabled={loading}
+              size="small"
+              color="secondary"
+            >
+              Hoje
+            </Button>
+            <Button 
+              variant="outlined" 
+              startIcon={<CalendarMonthIcon />}
+              onClick={limparFiltros}
+              disabled={loading}
+              size="small"
+            >
+              Últimos 2 Dias
+            </Button>
+            <Button 
+              variant="outlined" 
+              startIcon={<ClearIcon />}
+              onClick={limparFiltros}
+              disabled={loading}
+              size="small"
+              color="error"
+            >
+              Limpar Filtros
+            </Button>
+          </Box>
+          
+          {/* Resumo dos Resultados */}
+          <Box sx={{ mt: 2, p: 2, bgcolor: '#f5f5f5', borderRadius: 1 }}>
+            <Typography variant="body2" color="text.secondary">
+              <strong>Período:</strong> {filtros.start ? format(new Date(filtros.start), 'dd/MM/yyyy') : 'Sem limite'} até {filtros.end ? format(new Date(filtros.end), 'dd/MM/yyyy') : 'Sem limite'}
+              {' | '}
+              <strong>Total encontrado:</strong> {controles.length} controle(s)
+              {filtros.numero && ` | Manifesto: ${filtros.numero}`}
+              {filtros.motorista && ` | Motorista: ${filtros.motorista}`}
+              {filtros.responsavel && ` | Responsável: ${filtros.responsavel}`}
+            </Typography>
+          </Box>
+        </CardContent>
+      </Card>
       
       <Paper 
         sx={{ 
@@ -1283,25 +1558,29 @@ const ListarControlesContent: React.FC = () => {
       >
         <TableContainer 
           sx={{ 
-            maxHeight: 'calc(100vh - 300px)',
+            maxHeight: 'calc(100vh - 400px)', // Aumentar espaço para os filtros
+            minHeight: '400px', // Altura mínima garantida
+            overflowY: 'auto', // Garantir scroll vertical
+            overflowX: 'auto', // Scroll horizontal se necessário
             '&::-webkit-scrollbar': {
-              width: '8px',
-              height: '8px'
+              width: '12px', // Scrollbar mais visível
+              height: '12px'
             },
             '&::-webkit-scrollbar-track': {
-              background: 'transparent'
+              background: '#f1f1f1',
+              borderRadius: '6px'
             },
             '&::-webkit-scrollbar-thumb': {
-              backgroundColor: 'rgba(0,0,0,0.1)',
-              borderRadius: '4px',
+              backgroundColor: '#1976d2',
+              borderRadius: '6px',
               '&:hover': {
-                backgroundColor: 'rgba(0,0,0,0.2)'
+                backgroundColor: '#1565c0'
               }
             },
             // Melhorias para mobile
             '@media (max-width: 900px)': {
-              maxHeight: 'none',
-              overflowX: 'auto',
+              maxHeight: 'calc(100vh - 200px)',
+              minHeight: '300px',
               '& .MuiTable-root': {
                 minWidth: '800px' // Força largura mínima para scroll horizontal
               }
@@ -1338,11 +1617,11 @@ const ListarControlesContent: React.FC = () => {
               <TableRow>
                 <TableCell sx={{
                   fontWeight: 'bold',
-                  background: 'linear-gradient(135deg, #ff9800 0%, #f57c00 100%)',
+                  background: 'linear-gradient(135deg, #1976d2 0%, #1565c0 100%)',
                   color: '#fff',
                   borderTopLeftRadius: '8px',
                   '&:hover': {
-                    background: 'linear-gradient(135deg, #f57c00 0%, #ef6c00 100%)',
+                    background: 'linear-gradient(135deg, #1565c0 0%, #0d47a1 100%)',
                     boxShadow: 'inset 0 0 10px rgba(255,255,255,0.1)'
                   },
                   transition: 'all 0.3s ease',
@@ -1360,10 +1639,10 @@ const ListarControlesContent: React.FC = () => {
                 }}>Nº</TableCell>
                 <TableCell sx={{
                   fontWeight: 'bold',
-                  background: 'linear-gradient(135deg, #ff9800 0%, #f57c00 100%)',
+                  background: 'linear-gradient(135deg, #1976d2 0%, #1565c0 100%)',
                   color: '#fff',
                   '&:hover': {
-                    background: 'linear-gradient(135deg, #f57c00 0%, #ef6c00 100%)',
+                    background: 'linear-gradient(135deg, #1565c0 0%, #0d47a1 100%)',
                     boxShadow: 'inset 0 0 10px rgba(255,255,255,0.1)'
                   },
                   transition: 'all 0.3s ease',
@@ -1380,10 +1659,10 @@ const ListarControlesContent: React.FC = () => {
                 }}>Data</TableCell>
                 <TableCell sx={{
                   fontWeight: 'bold',
-                  background: 'linear-gradient(135deg, #ff9800 0%, #f57c00 100%)',
+                  background: 'linear-gradient(135deg, #1976d2 0%, #1565c0 100%)',
                   color: '#fff',
                   '&:hover': {
-                    background: 'linear-gradient(135deg, #f57c00 0%, #ef6c00 100%)',
+                    background: 'linear-gradient(135deg, #1565c0 0%, #0d47a1 100%)',
                     boxShadow: 'inset 0 0 10px rgba(255,255,255,0.1)'
                   },
                   transition: 'all 0.3s ease',
@@ -1400,10 +1679,10 @@ const ListarControlesContent: React.FC = () => {
                 }}>Motorista</TableCell>
                 <TableCell sx={{
                   fontWeight: 'bold',
-                  background: 'linear-gradient(135deg, #ff9800 0%, #f57c00 100%)',
+                  background: 'linear-gradient(135deg, #1976d2 0%, #1565c0 100%)',
                   color: '#fff',
                   '&:hover': {
-                    background: 'linear-gradient(135deg, #f57c00 0%, #ef6c00 100%)',
+                    background: 'linear-gradient(135deg, #1565c0 0%, #0d47a1 100%)',
                     boxShadow: 'inset 0 0 10px rgba(255,255,255,0.1)'
                   },
                   transition: 'all 0.3s ease',
@@ -1420,10 +1699,10 @@ const ListarControlesContent: React.FC = () => {
                 }}>Responsável</TableCell>
                 <TableCell sx={{
                   fontWeight: 'bold',
-                  background: 'linear-gradient(135deg, #ff9800 0%, #f57c00 100%)',
+                  background: 'linear-gradient(135deg, #1976d2 0%, #1565c0 100%)',
                   color: '#fff',
                   '&:hover': {
-                    background: 'linear-gradient(135deg, #f57c00 0%, #ef6c00 100%)',
+                    background: 'linear-gradient(135deg, #1565c0 0%, #0d47a1 100%)',
                     boxShadow: 'inset 0 0 10px rgba(255,255,255,0.1)'
                   },
                   transition: 'all 0.3s ease',
@@ -1440,10 +1719,10 @@ const ListarControlesContent: React.FC = () => {
                 }}>Notas</TableCell>
                 <TableCell sx={{
                   fontWeight: 'bold',
-                  background: 'linear-gradient(135deg, #ff9800 0%, #f57c00 100%)',
+                  background: 'linear-gradient(135deg, #1976d2 0%, #1565c0 100%)',
                   color: '#fff',
                   '&:hover': {
-                    background: 'linear-gradient(135deg, #f57c00 0%, #ef6c00 100%)',
+                    background: 'linear-gradient(135deg, #1565c0 0%, #0d47a1 100%)',
                     boxShadow: 'inset 0 0 10px rgba(255,255,255,0.1)'
                   },
                   transition: 'all 0.3s ease',
@@ -1460,11 +1739,11 @@ const ListarControlesContent: React.FC = () => {
                 }}>Status</TableCell>
                 <TableCell sx={{
                   fontWeight: 'bold',
-                  background: 'linear-gradient(135deg, #ff9800 0%, #f57c00 100%)',
+                  background: 'linear-gradient(135deg, #1976d2 0%, #1565c0 100%)',
                   color: '#fff',
                   borderTopRightRadius: '8px',
                   '&:hover': {
-                    background: 'linear-gradient(135deg, #f57c00 0%, #ef6c00 100%)',
+                    background: 'linear-gradient(135deg, #1565c0 0%, #0d47a1 100%)',
                     boxShadow: 'inset 0 0 10px rgba(255,255,255,0.1)'
                   },
                   transition: 'all 0.3s ease',
@@ -2175,9 +2454,9 @@ const ListarControlesContent: React.FC = () => {
                 borderRadius: '8px',
                 textTransform: 'none',
                 fontWeight: 500,
-                background: 'linear-gradient(135deg, #ff6b35 0%, #ff8c42 100%)',
+                background: 'linear-gradient(135deg, #1976d2 0%, #42a5f5 100%)',
                 '&:hover': {
-                  background: 'linear-gradient(135deg, #e55a2b 0%, #e57a35 100%)',
+                  background: 'linear-gradient(135deg, #1565c0 0%, #1976d2 100%)',
                 }
               }}
             >

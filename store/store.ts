@@ -52,7 +52,14 @@ interface StoreState {
   status: 'success' | 'error' | null;
   loading: boolean;
   fetchNotas: (start?: string, end?: string) => Promise<void>;
-  fetchControles: () => Promise<void>;
+  fetchControles: (filters?: {
+    start?: string;
+    end?: string;
+    numero?: string;
+    motorista?: string;
+    responsavel?: string;
+    limit?: number;
+  }) => Promise<void>;
   fetchTransportadoras: () => Promise<void>;
   addNota: (nota: Omit<NotaFiscal, 'id' | 'dataCriacao' | 'controleId'>) => Promise<NotaFiscal>;
   criarControle: (controle: Omit<ControleCarga, 'id' | 'dataCriacao' | 'finalizado' | 'notas'> & { notasIds?: string[] }) => Promise<ControleCarga>;
@@ -109,11 +116,23 @@ export const useStore = create<StoreState>((set) => ({
     }
   },
 
-  fetchControles: async () => {
-    console.log('Iniciando fetchControles...');
+  fetchControles: async (filters = {}) => {
+    console.log('Iniciando fetchControles com filtros:', filters);
     set({ loading: true });
     try {
-      const response = await fetch('/api/controles', {
+      // Construir query string com filtros
+      const params = new URLSearchParams();
+      if (filters.start) params.append('start', filters.start);
+      if (filters.end) params.append('end', filters.end);
+      if (filters.numero) params.append('numero', filters.numero);
+      if (filters.motorista) params.append('motorista', filters.motorista);
+      if (filters.responsavel) params.append('responsavel', filters.responsavel);
+      if (filters.limit) params.append('limit', filters.limit.toString());
+      
+      const url = `/api/controles${params.toString() ? '?' + params.toString() : ''}`;
+      console.log('URL da requisição:', url);
+      
+      const response = await fetch(url, {
         headers: {
           'Cache-Control': 'no-cache, no-store, must-revalidate',
           'Pragma': 'no-cache',

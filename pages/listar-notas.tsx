@@ -15,23 +15,43 @@ const ListarNotas = () => {
 
   useEffect(() => {
     const loadNotas = async () => {
-      await fetchNotas(start, end);
-      setLoading(false);
+      setLoading(true);
+      try {
+        await fetchNotas(start, end);
+      } catch (error) {
+        console.error('Erro ao carregar notas:', error);
+      } finally {
+        setLoading(false);
+      }
     };
     loadNotas();
-  }, [fetchNotas, start, end]);
+  }, [fetchNotas]);
 
-  const handleFiltrarHoje = () => {
+  const handleFiltrarHoje = async () => {
     const hoje = format(new Date(), 'yyyy-MM-dd');
     setStart(hoje);
     setEnd(hoje);
     setLoading(true);
+    try {
+      await fetchNotas(hoje, hoje);
+    } catch (error) {
+      console.error('Erro ao filtrar por hoje:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleLimparFiltros = () => {
+  const handleLimparFiltros = async () => {
     setStart('');
     setEnd('');
     setLoading(true);
+    try {
+      await fetchNotas('', '');
+    } catch (error) {
+      console.error('Erro ao limpar filtros:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -92,7 +112,16 @@ const ListarNotas = () => {
                   variant="contained" 
                   color="secondary"
                   startIcon={<SearchIcon />}
-                  onClick={() => setLoading(true)}
+                  onClick={async () => {
+                    setLoading(true);
+                    try {
+                      await fetchNotas(start, end);
+                    } catch (error) {
+                      console.error('Erro ao buscar notas:', error);
+                    } finally {
+                      setLoading(false);
+                    }
+                  }}
                   size="small"
                 >
                   Buscar
@@ -119,17 +148,25 @@ const ListarNotas = () => {
         <TableContainer component={Paper} sx={{ borderRadius: 2, boxShadow: 3 }}>
           <Table>
             <TableHead>
-              <TableRow sx={{ backgroundColor: '#ff6b35' }}>
-                <TableCell sx={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>
+              <TableRow sx={{ 
+                background: 'linear-gradient(135deg, #1976d2 0%, #1565c0 100%)',
+                '& .MuiTableCell-head': {
+                  color: '#fff',
+                  fontWeight: 'bold',
+                  fontSize: 16,
+                  borderBottom: 'none'
+                }
+              }}>
+                <TableCell>
                   Data de Criação
                 </TableCell>
-                <TableCell sx={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>
+                <TableCell>
                   Número da Nota
                 </TableCell>
-                <TableCell sx={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>
+                <TableCell>
                   Status
                 </TableCell>
-                <TableCell sx={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }} align="center">
+                <TableCell align="center">
                   Ações
                 </TableCell>
               </TableRow>

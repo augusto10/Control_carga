@@ -4,15 +4,67 @@ import { gerarProximoNumeroManifesto } from '../../../lib/gerarNumeroManifesto';
 
 const prisma = new PrismaClient();
 
-type Transportadora = 'ACERT' | 'EXPRESSO_GOIAS' | 'TERCEIRIZADA'; // Removido ACCERT que não é mais usado
+type Transportadora = 'ACCERT' | 'EXPRESSO_GOIAS' | 'TERCEIRIZADA' | 'DETAFRA_TRANSPORTES' | 'RETIRA_VENDEDOR' | 'RETIRA_CLIENTE';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   switch (req.method) {
     case 'GET': {
       try {
+        const { start, end, numero, motorista, responsavel, limit } = req.query;
+        
+        console.log('🔍 [Controles] Filtros recebidos:', { start, end, numero, motorista, responsavel, limit });
+        
+        // Construir filtros
+        const where: any = {};
+        
+        // Filtro por data
+        if (start || end) {
+          where.dataCriacao = {};
+          if (start) {
+            where.dataCriacao.gte = new Date(`${start}T00:00:00`);
+            console.log('📅 [Controles] Data início:', where.dataCriacao.gte);
+          }
+          if (end) {
+            where.dataCriacao.lte = new Date(`${end}T23:59:59`);
+            console.log('📅 [Controles] Data fim:', where.dataCriacao.lte);
+          }
+        }
+        
+        // Filtro por número do manifesto
+        if (numero) {
+          where.numeroManifesto = {
+            contains: numero as string,
+            mode: 'insensitive'
+          };
+        }
+        
+        // Filtro por motorista
+        if (motorista) {
+          where.motorista = {
+            contains: motorista as string,
+            mode: 'insensitive'
+          };
+        }
+        
+        // Filtro por responsável
+        if (responsavel) {
+          where.responsavel = {
+            contains: responsavel as string,
+            mode: 'insensitive'
+          };
+        }
+        
+        // Definir limite (padrão: últimos 50, máximo: 500)
+        const limitNum = limit ? Math.min(parseInt(limit as string), 500) : 50;
+        
+        console.log('🔍 [Controles] Where construído:', where);
+        console.log('📊 [Controles] Limite aplicado:', limitNum);
+        
         // Usar type assertion para resolver problemas de tipo com imagens
         const controles = await (prisma.controleCarga.findMany as any)({
+          where,
           orderBy: { dataCriacao: 'desc' },
+          take: limitNum,
           select: {
             id: true,
             motorista: true,
@@ -59,15 +111,31 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           };
         });
         
+        console.log(`📊 [Controles] Encontrados ${controles.length} controles com filtros aplicados`);
+        
+        if (controles.length > 0) {
+          console.log('📅 [Controles] Primeiro controle:', {
+            id: controles[0].id,
+            numeroManifesto: controles[0].numeroManifesto,
+            motorista: controles[0].motorista,
+            dataCriacao: controles[0].dataCriacao
+          });
+        }
+        
         // Adiciona cabeçalhos para evitar cache
         res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
         res.setHeader('Pragma', 'no-cache');
         res.setHeader('Expires', '0');
         
         res.status(200).json(controlesProcessados);
-      } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Erro ao listar controles' });
+      } catch (error: any) {
+        console.error('Erro completo:', error);
+        console.error('Stack:', error?.stack);
+        res.status(500).json({
+          error: 'Erro ao listar controles',
+          details: error?.message,
+          code: error?.code
+        });
       }
       break;
     }

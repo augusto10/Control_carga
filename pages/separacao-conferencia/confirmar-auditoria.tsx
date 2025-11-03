@@ -194,7 +194,7 @@ function ConfirmarAuditoria() {
         position="static" 
         sx={{ 
           mb: 3, 
-          background: 'linear-gradient(135deg, #ff6b35 0%, #ff8c42 100%)',
+          background: 'linear-gradient(135deg, #1976d2 0%, #42a5f5 100%)',
           borderRadius: 2
         }}
       >
@@ -391,7 +391,7 @@ function ConfirmarAuditoria() {
                 disabled={salvando || !pedidoSelecionado}
                 sx={{ 
                   minWidth: 120,
-                  background: 'linear-gradient(135deg, #ff6b35 0%, #ff8c42 100%)'
+                  background: 'linear-gradient(135deg, #1976d2 0%, #42a5f5 100%)'
                 }}
               >
                 {salvando ? <CircularProgress size={24} /> : 'Salvar'}

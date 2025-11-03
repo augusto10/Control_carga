@@ -30,7 +30,8 @@ import {
   AccountCircle as AccountCircleIcon,
   ChevronLeft as ChevronLeftIcon,
   ChevronRight as ChevronRightIcon,
-  Settings as SettingsIcon
+  Settings as SettingsIcon,
+  Checklist as ChecklistIcon
 } from '@mui/icons-material';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -55,6 +56,8 @@ export default function AdminLayout({ children, title }: AdminLayoutProps) {
     { text: 'Usuários', icon: <PeopleIcon />, path: '/admin/usuarios' },
     { text: 'Motoristas', icon: <LocalShippingIcon />, path: '/admin/motoristas' },
     { text: 'Controles', icon: <AssignmentIcon />, path: '/admin/controles' },
+    { text: 'Checklist Recebimento', icon: <ChecklistIcon />, path: '/checklist-recebimento/relatorios' },
+    { text: 'Alertas de Validade', icon: <ChecklistIcon />, path: '/checklist-recebimento/relatorio-validade' },
     { text: 'Configurações', icon: <SettingsIcon />, path: '/admin/configuracoes' },
   ];
 

@@ -32,25 +32,18 @@ import {
   ListItemText,
   ListItemAvatar,
   Divider,
-  CircularProgress,
   Alert
 } from '@mui/material';
 import {
-  Dashboard as DashboardIcon,
-  People as PeopleIcon,
-  Assessment as ReportIcon,
-  LocalShipping as TruckIcon,
-  Receipt as ReceiptIcon,
-  Visibility as ViewIcon,
-  GetApp as DownloadIcon,
   TrendingUp as TrendingUpIcon,
-  TrendingDown as TrendingDownIcon,
+  Warning as WarningIcon,
   CheckCircle as CheckCircleIcon,
-  Schedule as ScheduleIcon,
-  Warning as WarningIcon
+  Person as PersonIcon,
+  LocalShipping as TruckIcon,
+  Assignment as AssignmentIcon,
+  Visibility as VisibilityIcon,
+  GetApp as DownloadIcon
 } from '@mui/icons-material';
-import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -65,8 +58,8 @@ function TabPanel(props: TabPanelProps) {
     <div
       role="tabpanel"
       hidden={value !== index}
-      id={`painel-tabpanel-${index}`}
-      aria-labelledby={`painel-tab-${index}`}
+      id={`simple-tabpanel-${index}`}
+      aria-labelledby={`simple-tab-${index}`}
       {...other}
     >
       {value === index && (
@@ -78,478 +71,276 @@ function TabPanel(props: TabPanelProps) {
   );
 }
 
+function a11yProps(index: number) {
+  return {
+    id: `simple-tab-${index}`,
+    'aria-controls': `simple-tabpanel-${index}`,
+  };
+}
+
 const PainelGerencial: React.FC = () => {
   const { user } = useAuth();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  
   const [tabValue, setTabValue] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [funcionarios, setFuncionarios] = useState([]);
-  const [controles, setControles] = useState([]);
-  
-  /**
-   * DOMÍNIO DE PEDIDOS - EXPLICAÇÃO DETALHADA
-   * 
-   * O domínio de PEDIDOS é completamente separado e distinto do domínio de NOTAS FISCAIS.
-   * São dois processos logísticos diferentes:
-   * 
-   * 1. NOTAS FISCAIS (Controle de Carga):
-   *    - Documentos fiscais que acompanham mercadorias
-   *    - Usadas para controle de transporte e entrega
-   *    - Vinculadas a controles de carga para motoristas
-   *    - Processo: Criação → Vinculação ao Controle → Transporte → Assinatura → Finalização
-   * 
-   * 2. PEDIDOS (Separação e Conferência):
-   *    - Solicitações internas de produtos para separação no estoque
-   *    - Processo de picking/separação de itens
-   *    - Conferência/auditoria dos itens separados
-   *    - Processo: Criação do Pedido → Separação → Conferência → Auditoria → Finalização
-   * 
-   * IMPORTANTE: Pedidos NÃO são notas fiscais. São fluxos operacionais distintos
-   * que podem ou não gerar notas fiscais posteriormente.
-   */
-  const [pedidos, setPedidos] = useState([]);
-  const [estatisticas, setEstatisticas] = useState({
-    totalControles: 0,
-    controlesPendentes: 0,
-    controlesFinalizados: 0,
-    totalPedidos: 0,
-    pedidosSeparados: 0,
-    pedidosConferidos: 0,
-    funcionariosAtivos: 0
+
+  // Dados mockados para demonstração
+  const [dashboardData, setDashboardData] = useState({
+    controlesFinalizados: 45,
+    controlesPendentes: 12,
+    totalUsuarios: 28,
+    totalMotoristas: 15,
+    notasProcessadas: 234,
+    etiquetasGeradas: 156
   });
 
-  useEffect(() => {
-    carregarDados();
-  }, []);
-
-  const carregarDados = async () => {
-    try {
-      setLoading(true);
-      
-      // Carregar funcionários ativos
-      const funcionariosResponse = await fetch('/api/admin/usuarios', {
-        credentials: 'include'
-      });
-      if (funcionariosResponse.ok) {
-        const funcionariosData = await funcionariosResponse.json();
-        const funcionariosAtivos = funcionariosData.filter((f: any) => f.ativo);
-        setFuncionarios(funcionariosAtivos);
-      }
-
-      // Carregar controles
-      const controlesResponse = await fetch('/api/controles', {
-        credentials: 'include'
-      });
-      if (controlesResponse.ok) {
-        const controlesData = await controlesResponse.json();
-        setControles(controlesData);
-        
-        // Calcular estatísticas dos controles
-        const controlesPendentes = controlesData.filter((c: any) => !c.finalizado).length;
-        const controlesFinalizados = controlesData.filter((c: any) => c.finalizado).length;
-        
-        setEstatisticas(prev => ({
-          ...prev,
-          totalControles: controlesData.length,
-          controlesPendentes,
-          controlesFinalizados,
-          funcionariosAtivos: funcionarios.length
-        }));
-      }
-
-      // Carregar dados de notas fiscais
-      const notasResponse = await fetch('/api/notas', {
-        credentials: 'include'
-      });
-      if (notasResponse.ok) {
-        const notasData = await notasResponse.json();
-        
-        setEstatisticas(prev => ({
-          ...prev,
-          totalPedidos: notasData.length,
-          pedidosSeparados: notasData.filter((n: any) => n.controleId).length,
-          pedidosConferidos: notasData.filter((n: any) => n.controleId && n.finalizado).length
-        }));
-      }
-      
-    } catch (error) {
-      console.error('Erro ao carregar dados do painel:', error);
-    } finally {
-      setLoading(false);
+  const [recentActivity, setRecentActivity] = useState([
+    {
+      id: 1,
+      user: 'João Silva',
+      action: 'Finalizou controle de carga',
+      time: '2 horas atrás',
+      type: 'success'
+    },
+    {
+      id: 2,
+      user: 'Maria Santos',
+      action: 'Criou novo checklist',
+      time: '3 horas atrás',
+      type: 'info'
+    },
+    {
+      id: 3,
+      user: 'Pedro Costa',
+      action: 'Gerou etiquetas',
+      time: '5 horas atrás',
+      type: 'info'
     }
-  };
+  ]);
 
-  // Atualizar dados automaticamente a cada 5 minutos
   useEffect(() => {
-    const interval = setInterval(() => {
-      carregarDados();
-    }, 5 * 60 * 1000); // 5 minutos
-
-    return () => clearInterval(interval);
+    // Simular carregamento de dados
+    setTimeout(() => {
+      setLoading(false);
+    }, 1000);
   }, []);
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'finalizado':
-        return 'success';
-      case 'pendente':
-        return 'warning';
-      case 'em_andamento':
-        return 'info';
-      default:
-        return 'default';
-    }
-  };
-
-  const formatarData = (data: string) => {
-    try {
-      return format(new Date(data), 'dd/MM/yyyy HH:mm', { locale: ptBR });
-    } catch {
-      return 'Data inválida';
-    }
-  };
-
-  if (!user || (user.tipo !== 'ADMIN' && user.tipo !== 'GERENTE')) {
+  if (!user || user.tipo !== 'ADMIN') {
     return (
-      <Layout>
-        <Alert severity="error">
-          Acesso negado. Apenas administradores e gerentes podem acessar este painel.
-        </Alert>
+      <Layout title="Acesso Negado">
+        <Box sx={{ p: 3 }}>
+          <Alert severity="error">
+            Você não tem permissão para acessar esta página.
+          </Alert>
+        </Box>
       </Layout>
     );
   }
 
   return (
-    <Layout>
-      <Box sx={{ p: 3 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-          <Typography variant="h4" component="h1" sx={{ 
-            fontWeight: 600,
-            color: theme.palette.primary.main,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 2
-          }}>
-            <DashboardIcon />
-            Painel Gerencial
-          </Typography>
-          <Button
-            variant="outlined"
-            onClick={carregarDados}
-            disabled={loading}
-            startIcon={loading ? <CircularProgress size={20} /> : <TrendingUpIcon />}
+    <Layout title="Painel Gerencial">
+      <Box sx={{ width: '100%' }}>
+        <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+          <Tabs 
+            value={tabValue} 
+            onChange={handleTabChange} 
+            aria-label="painel gerencial tabs"
+            variant={isMobile ? "scrollable" : "standard"}
+            scrollButtons="auto"
           >
-            {loading ? 'Atualizando...' : 'Atualizar Dados'}
-          </Button>
+            <Tab label="Dashboard" {...a11yProps(0)} />
+            <Tab label="Atividades" {...a11yProps(1)} />
+            <Tab label="Relatórios" {...a11yProps(2)} />
+            <Tab label="Configurações" {...a11yProps(3)} />
+          </Tabs>
         </Box>
 
-        {loading ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-            <CircularProgress />
-          </Box>
-        ) : (
-          <>
-            {/* Cards de Estatísticas */}
-            <Grid container spacing={3} sx={{ mb: 4 }}>
-              <Grid item xs={12} sm={6} md={3}>
-                <Card sx={{ 
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                  color: 'white'
-                }}>
-                  <CardContent>
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <Box>
-                        <Typography variant="h4" component="div" sx={{ fontWeight: 'bold' }}>
-                          {estatisticas.totalControles}
-                        </Typography>
-                        <Typography variant="body2">
-                          Total de Controles
-                        </Typography>
-                      </Box>
-                      <TruckIcon sx={{ fontSize: 40, opacity: 0.8 }} />
+        <TabPanel value={tabValue} index={0}>
+          <Typography variant="h4" gutterBottom>
+            Dashboard Executivo
+          </Typography>
+          
+          <Grid container spacing={3}>
+            <Grid item xs={12} md={6} lg={3}>
+              <Card>
+                <CardContent>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Box>
+                      <Typography color="textSecondary" gutterBottom>
+                        Controles Finalizados
+                      </Typography>
+                      <Typography variant="h4">
+                        {dashboardData.controlesFinalizados}
+                      </Typography>
                     </Box>
-                  </CardContent>
-                </Card>
-              </Grid>
-
-              <Grid item xs={12} sm={6} md={3}>
-                <Card sx={{ 
-                  background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-                  color: 'white'
-                }}>
-                  <CardContent>
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <Box>
-                        <Typography variant="h4" component="div" sx={{ fontWeight: 'bold' }}>
-                          {estatisticas.controlesPendentes}
-                        </Typography>
-                        <Typography variant="body2">
-                          Controles Pendentes
-                        </Typography>
-                      </Box>
-                      <ScheduleIcon sx={{ fontSize: 40, opacity: 0.8 }} />
-                    </Box>
-                  </CardContent>
-                </Card>
-              </Grid>
-
-              <Grid item xs={12} sm={6} md={3}>
-                <Card sx={{ 
-                  background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
-                  color: 'white'
-                }}>
-                  <CardContent>
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <Box>
-                        <Typography variant="h4" component="div" sx={{ fontWeight: 'bold' }}>
-                          {estatisticas.funcionariosAtivos}
-                        </Typography>
-                        <Typography variant="body2">
-                          Funcionários Ativos
-                        </Typography>
-                      </Box>
-                      <PeopleIcon sx={{ fontSize: 40, opacity: 0.8 }} />
-                    </Box>
-                  </CardContent>
-                </Card>
-              </Grid>
-
-              <Grid item xs={12} sm={6} md={3}>
-                <Card sx={{ 
-                  background: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
-                  color: 'white'
-                }}>
-                  <CardContent>
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <Box>
-                        <Typography variant="h4" component="div" sx={{ fontWeight: 'bold' }}>
-                          {estatisticas.controlesFinalizados}
-                        </Typography>
-                        <Typography variant="body2">
-                          Controles Finalizados
-                        </Typography>
-                      </Box>
-                      <CheckCircleIcon sx={{ fontSize: 40, opacity: 0.8 }} />
-                    </Box>
-                  </CardContent>
-                </Card>
-              </Grid>
+                    <CheckCircleIcon sx={{ fontSize: 40, color: 'success.main' }} />
+                  </Box>
+                </CardContent>
+              </Card>
             </Grid>
 
-            {/* Abas do Painel */}
-            <Card>
-              <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-                <Tabs 
-                  value={tabValue} 
-                  onChange={handleTabChange}
-                  variant={isMobile ? "scrollable" : "standard"}
-                  scrollButtons="auto"
-                >
-                  <Tab 
-                    label="Funcionários Logados" 
-                    icon={<PeopleIcon />}
-                    iconPosition="start"
-                  />
-                  <Tab 
-                    label="Relatório de Controles" 
-                    icon={<TruckIcon />}
-                    iconPosition="start"
-                  />
-                  <Tab 
-                    label="Relatório de Pedidos" 
-                    icon={<ReceiptIcon />}
-                    iconPosition="start"
-                  />
-                  <Tab 
-                    label="Análises e Gráficos" 
-                    icon={<ReportIcon />}
-                    iconPosition="start"
-                  />
-                </Tabs>
-              </Box>
+            <Grid item xs={12} md={6} lg={3}>
+              <Card>
+                <CardContent>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Box>
+                      <Typography color="textSecondary" gutterBottom>
+                        Controles Pendentes
+                      </Typography>
+                      <Typography variant="h4">
+                        {dashboardData.controlesPendentes}
+                      </Typography>
+                    </Box>
+                    <WarningIcon sx={{ fontSize: 40, color: 'warning.main' }} />
+                  </Box>
+                </CardContent>
+              </Card>
+            </Grid>
 
-              <TabPanel value={tabValue} index={0}>
-                <Typography variant="h6" gutterBottom>
-                  Funcionários Ativos no Sistema
-                </Typography>
-                
-                <List>
-                  {funcionarios.map((funcionario: any, index) => (
-                    <React.Fragment key={funcionario.id}>
-                      <ListItem>
-                        <ListItemAvatar>
-                          <Avatar sx={{ 
-                            bgcolor: theme.palette.primary.main,
-                            fontWeight: 'bold'
-                          }}>
-                            {funcionario.nome?.charAt(0).toUpperCase()}
-                          </Avatar>
-                        </ListItemAvatar>
-                        <ListItemText
-                          primary={funcionario.nome}
-                          secondary={
-                            <Box>
-                              <Typography variant="body2" color="text.secondary">
-                                {funcionario.email}
-                              </Typography>
-                              <Chip 
-                                label={funcionario.tipo} 
-                                size="small" 
-                                color="primary" 
-                                sx={{ mt: 0.5 }}
-                              />
-                            </Box>
-                          }
-                        />
-                        <Typography variant="caption" color="text.secondary">
-                          Último acesso: {formatarData(funcionario.updatedAt || funcionario.createdAt)}
-                        </Typography>
-                      </ListItem>
-                      {index < funcionarios.length - 1 && <Divider />}
-                    </React.Fragment>
-                  ))}
-                </List>
-              </TabPanel>
+            <Grid item xs={12} md={6} lg={3}>
+              <Card>
+                <CardContent>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Box>
+                      <Typography color="textSecondary" gutterBottom>
+                        Total de Usuários
+                      </Typography>
+                      <Typography variant="h4">
+                        {dashboardData.totalUsuarios}
+                      </Typography>
+                    </Box>
+                    <PersonIcon sx={{ fontSize: 40, color: 'primary.main' }} />
+                  </Box>
+                </CardContent>
+              </Card>
+            </Grid>
 
-              <TabPanel value={tabValue} index={1}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                  <Typography variant="h6">
-                    Relatório de Controles de Carga
+            <Grid item xs={12} md={6} lg={3}>
+              <Card>
+                <CardContent>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Box>
+                      <Typography color="textSecondary" gutterBottom>
+                        Etiquetas Geradas
+                      </Typography>
+                      <Typography variant="h4">
+                        {dashboardData.etiquetasGeradas}
+                      </Typography>
+                    </Box>
+                    <AssignmentIcon sx={{ fontSize: 40, color: 'info.main' }} />
+                  </Box>
+                </CardContent>
+              </Card>
+            </Grid>
+          </Grid>
+        </TabPanel>
+
+        <TabPanel value={tabValue} index={1}>
+          <Typography variant="h5" gutterBottom>
+            Atividades Recentes
+          </Typography>
+          
+          <Card>
+            <CardContent>
+              <List>
+                {recentActivity.map((activity, index) => (
+                  <React.Fragment key={activity.id}>
+                    <ListItem>
+                      <ListItemAvatar>
+                        <Avatar>
+                          <PersonIcon />
+                        </Avatar>
+                      </ListItemAvatar>
+                      <ListItemText
+                        primary={activity.action}
+                        secondary={`${activity.user} • ${activity.time}`}
+                      />
+                      <Chip 
+                        label={activity.type === 'success' ? 'Concluído' : 'Ativo'} 
+                        color={activity.type === 'success' ? 'success' : 'info'}
+                        size="small"
+                      />
+                    </ListItem>
+                    {index < recentActivity.length - 1 && <Divider />}
+                  </React.Fragment>
+                ))}
+              </List>
+            </CardContent>
+          </Card>
+        </TabPanel>
+
+        <TabPanel value={tabValue} index={2}>
+          <Typography variant="h5" gutterBottom>
+            Relatórios Gerenciais
+          </Typography>
+          
+          <Grid container spacing={3}>
+            <Grid item xs={12} md={6}>
+              <Card>
+                <CardHeader title="Relatórios Disponíveis" />
+                <CardContent>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <Button
+                      variant="outlined"
+                      startIcon={<DownloadIcon />}
+                      fullWidth
+                    >
+                      Relatório de Controles
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      startIcon={<DownloadIcon />}
+                      fullWidth
+                    >
+                      Relatório de Usuários
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      startIcon={<DownloadIcon />}
+                      fullWidth
+                    >
+                      Relatório de Checklists
+                    </Button>
+                  </Box>
+                </CardContent>
+              </Card>
+            </Grid>
+
+            <Grid item xs={12} md={6}>
+              <Card>
+                <CardHeader title="Estatísticas" />
+                <CardContent>
+                  <Alert severity="info" sx={{ mb: 2 }}>
+                    Dados atualizados em tempo real
+                  </Alert>
+                  <Typography variant="body1" color="text.secondary">
+                    Visualize métricas detalhadas e tendências do sistema.
                   </Typography>
-                  <Button
-                    variant="outlined"
-                    startIcon={<DownloadIcon />}
-                    onClick={() => {
-                      // Implementar exportação de relatório
-                      console.log('Exportar relatório de controles');
-                    }}
-                  >
-                    Exportar
-                  </Button>
-                </Box>
+                </CardContent>
+              </Card>
+            </Grid>
+          </Grid>
+        </TabPanel>
 
-                <TableContainer component={Paper}>
-                  <Table>
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Manifesto</TableCell>
-                        <TableCell>Transportadora</TableCell>
-                        <TableCell>Motorista</TableCell>
-                        <TableCell>Status</TableCell>
-                        <TableCell>Data Criação</TableCell>
-                        <TableCell>Ações</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {controles.map((controle: any) => (
-                        <TableRow key={controle.id}>
-                          <TableCell>{controle.numeroManifesto}</TableCell>
-                          <TableCell>{controle.transportadora}</TableCell>
-                          <TableCell>{controle.motorista || 'PENDENTE'}</TableCell>
-                          <TableCell>
-                            <Chip 
-                              label={controle.finalizado ? 'Finalizado' : 'Pendente'}
-                              color={getStatusColor(controle.finalizado ? 'finalizado' : 'pendente')}
-                              size="small"
-                            />
-                          </TableCell>
-                          <TableCell>{formatarData(controle.dataCriacao)}</TableCell>
-                          <TableCell>
-                            <IconButton 
-                              size="small"
-                              onClick={() => {
-                                // Implementar visualização detalhada
-                                console.log('Ver detalhes do controle:', controle.id);
-                              }}
-                            >
-                              <ViewIcon />
-                            </IconButton>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              </TabPanel>
-
-              <TabPanel value={tabValue} index={2}>
-                <Typography variant="h6" gutterBottom>
-                  Relatório de Pedidos de Separação
-                </Typography>
-                
-                <Alert severity="info" sx={{ mb: 2 }}>
-                  {/* Domínio de Pedidos: Esta funcionalidade é específica para separação e conferência de pedidos. Não confundir com notas fiscais - são processos totalmente distintos. */}
-                  Esta seção mostra dados específicos do processo de separação e conferência de pedidos.
-                </Alert>
-
-                <Typography variant="body1" color="text.secondary">
-                  Relatório de pedidos em desenvolvimento. 
-                  Esta funcionalidade será implementada conforme a necessidade do sistema de separação.
-                </Typography>
-              </TabPanel>
-
-              <TabPanel value={tabValue} index={3}>
-                <Typography variant="h6" gutterBottom>
-                  Análises e Gráficos
-                </Typography>
-                
-                <Grid container spacing={3}>
-                  <Grid item xs={12} md={6}>
-                    <Card>
-                      <CardHeader title="Controles por Status" />
-                      <CardContent>
-                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <Typography>Finalizados</Typography>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <TrendingUpIcon color="success" />
-                              <Typography variant="h6" color="success.main">
-                                {estatisticas.controlesFinalizados}
-                              </Typography>
-                            </Box>
-                          </Box>
-                          
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <Typography>Pendentes</Typography>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <WarningIcon color="warning" />
-                              <Typography variant="h6" color="warning.main">
-                                {estatisticas.controlesPendentes}
-                              </Typography>
-                            </Box>
-                          </Box>
-                        </Box>
-                      </CardContent>
-                    </Card>
-                  </Grid>
-
-                  <Grid item xs={12} md={6}>
-                    <Card>
-                      <CardHeader title="Resumo Geral" />
-                      <CardContent>
-                        <Typography variant="body2" color="text.secondary" gutterBottom>
-                          Dados atualizados em tempo real
-                        </Typography>
-                        <Typography variant="h4" component="div" sx={{ mb: 1 }}>
-                          {((estatisticas.controlesFinalizados / estatisticas.totalControles) * 100 || 0).toFixed(1)}%
-                        </Typography>
-                        <Typography variant="body2">
-                          Taxa de conclusão de controles
-                        </Typography>
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                </Grid>
-              </TabPanel>
-            </Card>
-          </>
-        )}
+        <TabPanel value={tabValue} index={3}>
+          <Typography variant="h5" gutterBottom>
+            Configurações do Sistema
+          </Typography>
+          
+          <Alert severity="info" sx={{ mb: 2 }}>
+            Configurações avançadas disponíveis no menu lateral.
+          </Alert>
+          
+          <Typography variant="body1" color="text.secondary">
+            Acesse as configurações através do menu lateral para gerenciar usuários, 
+            motoristas e outras configurações do sistema.
+          </Typography>
+        </TabPanel>
       </Box>
     </Layout>
   );

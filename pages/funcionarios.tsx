@@ -224,9 +224,9 @@ const FuncionariosPage: React.FC = () => {
               borderRadius: '8px',
               textTransform: 'none',
               fontWeight: 500,
-              background: 'linear-gradient(135deg, #ff6b35 0%, #ff8c42 100%)',
+              background: 'linear-gradient(135deg, #1976d2 0%, #42a5f5 100%)',
               '&:hover': {
-                background: 'linear-gradient(135deg, #e55a2b 0%, #e57a35 100%)',
+                background: 'linear-gradient(135deg, #1565c0 0%, #1976d2 100%)',
               }
             }}
           >

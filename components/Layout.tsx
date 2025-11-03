@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../contexts/AuthContext';
+import GlobalBackground from './GlobalBackground';
 import { styled, useTheme, Theme, CSSObject } from '@mui/material/styles';
 import { 
   Box, 
@@ -54,7 +55,32 @@ import {
   TrendingUp as TrendingUpIcon,
   BusinessCenter as BusinessIcon,
   Star as StarIcon,
-  Insights as InsightsIcon
+  Insights as InsightsIcon,
+  Print as PrintIcon,
+  // Novos ícones modernos
+  HomeRounded as HomeIcon,
+  DescriptionRounded as DocumentIcon,
+  AddCircleOutlineRounded as AddIcon,
+  SearchRounded as SearchModernIcon,
+  QrCodeScannerRounded as QrIcon,
+  AssignmentRounded as ChecklistModernIcon,
+  AssessmentRounded as ReportsIcon,
+  NotificationsActiveRounded as AlertsIcon,
+  PeopleRounded as PeopleIcon,
+  VerifiedUserRounded as VerifiedIcon,
+  WorkspacesRounded as WorkspaceIcon,
+  InventoryRounded as InventoryModernIcon,
+  RequestQuoteRounded as RequestIcon,
+  ApprovalRounded as ApprovalIcon,
+  BarChartRounded as ChartIcon,
+  AccountCircleRounded as ProfileIcon,
+  StarRounded as StarModernIcon,
+  EmojiEventsRounded as TrophyModernIcon,
+  TimelineRounded as TimelineModernIcon,
+  BusinessCenterRounded as BusinessModernIcon,
+  LocalShippingRounded as ShippingIcon,
+  ReceiptLongRounded as ReceiptModernIcon,
+  PrintRounded as PrintModernIcon
 } from '@mui/icons-material';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -96,10 +122,10 @@ const DrawerHeader = styled('div')(({ theme }) => ({
   justifyContent: 'space-between',
   padding: theme.spacing(0, 2),
   ...theme.mixins.toolbar,
-  borderBottom: '1px solid rgba(255, 107, 53, 0.2)',
-  background: 'linear-gradient(135deg, #ff8c42 0%, #ff8c42 100%)',
+  borderBottom: '1px solid rgba(25, 118, 210, 0.2)',
+  background: 'linear-gradient(135deg, #1976d2 0%, #1565c0 100%)',
   color: '#ffffff',
-  boxShadow: '0 4px 20px rgba(255, 107, 53, 0.3)',
+  boxShadow: '0 4px 20px rgba(25, 118, 210, 0.3)',
   position: 'relative',
   '&::after': {
     content: '""',
@@ -124,11 +150,11 @@ const AppBar = styled(MuiAppBar, {
     easing: theme.transitions.easing.sharp,
     duration: theme.transitions.duration.leavingScreen,
   }),
-  background: 'linear-gradient(135deg, #ff8c42 0%, #ff8c42 100%)',
+  background: 'linear-gradient(135deg, #1976d2 0%, #1976d2 100%)',
   color: '#ffffff',
-  boxShadow: '0 4px 20px rgba(255, 107, 53, 0.3)',
+  boxShadow: '0 4px 20px rgba(25, 118, 210, 0.3)',
   backdropFilter: 'blur(10px)',
-  borderBottom: '1px solid rgba(255, 107, 53, 0.2)',
+  borderBottom: '1px solid rgba(25, 118, 210, 0.2)',
   [theme.breakpoints.up('md')]: {
     ...(open && {
       marginLeft: drawerWidth,
@@ -189,14 +215,14 @@ const MenuItemButton = styled(ListItemButton)(({ theme }) => ({
     transition: 'all 0.3s ease',
   },
   '&.active': {
-    background: 'linear-gradient(135deg, rgba(255, 107, 53, 0.15) 0%, rgba(255, 140, 66, 0.1) 100%)',
-    boxShadow: '0 4px 20px rgba(255, 107, 53, 0.2), inset 0 1px 0 rgba(255,255,255,0.1)',
-    border: '1px solid rgba(255, 107, 53, 0.3)',
+    background: 'linear-gradient(135deg, rgba(25, 118, 210, 0.15) 0%, rgba(66, 165, 245, 0.1) 100%)',
+    boxShadow: '0 4px 20px rgba(25, 118, 210, 0.2), inset 0 1px 0 rgba(255,255,255,0.1)',
+    border: '1px solid rgba(25, 118, 210, 0.3)',
     '&::before': {
-      background: 'linear-gradient(180deg, #ff8c42 0%, #ff8c42 100%)',
+      background: 'linear-gradient(180deg, #1976d2 0%, #1976d2 100%)',
     },
     '& .MuiListItemIcon-root': {
-      color: '#ff8c42',
+      color: '#1976d2',
       transform: 'scale(1.1)',
     },
     '& .MuiListItemText-primary': {
@@ -205,19 +231,19 @@ const MenuItemButton = styled(ListItemButton)(({ theme }) => ({
     },
   },
   '&:hover': {
-    background: 'linear-gradient(135deg, rgba(255, 107, 53, 0.08) 0%, rgba(255, 140, 66, 0.05) 100%)',
+    background: 'linear-gradient(135deg, rgba(25, 118, 210, 0.08) 0%, rgba(66, 165, 245, 0.05) 100%)',
     transform: 'translateX(4px)',
-    boxShadow: '0 6px 25px rgba(255, 107, 53, 0.15)',
+    boxShadow: '0 6px 25px rgba(25, 118, 210, 0.15)',
     // Desabilita efeitos hover em touchscreen
     '@media (hover: none)': {
       transform: 'none',
     },
     '&::before': {
-      background: 'linear-gradient(180deg, #ff8c42 0%, #ff8c42 100%)',
+      background: 'linear-gradient(180deg, #1976d2 0%, #1976d2 100%)',
       width: '3px',
     },
     '& .MuiListItemIcon-root': {
-      color: '#ff8c42',
+      color: '#1976d2',
       transform: 'scale(1.05)',
     },
     '& .MuiListItemText-primary': {
@@ -235,12 +261,12 @@ const SubMenuItemButton = styled(MenuItemButton)(({ theme }) => ({
     width: '2px',
   },
   '&.active': {
-    background: 'linear-gradient(135deg, rgba(255, 107, 53, 0.12) 0%, rgba(255, 140, 66, 0.08) 100%)',
+    background: 'linear-gradient(135deg, rgba(25, 118, 210, 0.12) 0%, rgba(66, 165, 245, 0.08) 100%)',
     '&::before': {
-      background: '#ff8c42',
+      background: '#1976d2',
     },
     '& .MuiListItemIcon-root': {
-      color: '#ff8c42',
+      color: '#1976d2',
     },
     '& .MuiListItemText-primary': {
       color: '#1e293b', fontWeight: 500,
@@ -257,75 +283,106 @@ const SubMenuItemButton = styled(MenuItemButton)(({ theme }) => ({
 const menuItems = [
   { 
     text: 'Dashboard', 
-    icon: <DashboardIcon sx={{ fontSize: 22 }} />, 
+    icon: <HomeIcon sx={{ fontSize: 22 }} />, 
     path: '/',
     exact: true
   },
   {
     text: 'Painel Gerencial',
-    icon: <InsightsIcon sx={{ fontSize: 22 }} />,
+    icon: <ChartIcon sx={{ fontSize: 22 }} />,
     path: '/painel-gerencial',
     adminOnly: true
   },
   { 
     text: 'Gestão de Notas', 
-    icon: <ReceiptIcon sx={{ fontSize: 22 }} />,
+    icon: <ReceiptModernIcon sx={{ fontSize: 22 }} />,
     subItems: [
       { 
         text: 'Adicionar Notas', 
-        icon: <PlaylistAddIcon sx={{ fontSize: 20 }} />, 
+        icon: <AddIcon sx={{ fontSize: 20 }} />, 
         path: '/adicionar-notas' 
       },
       { 
+        text: 'Gerar Etiquetas', 
+        icon: <QrIcon sx={{ fontSize: 20 }} />, 
+        path: '/gerar-etiquetas' 
+      },
+      { 
         text: 'Consultar Notas', 
-        icon: <SearchIcon sx={{ fontSize: 20 }} />, 
+        icon: <SearchModernIcon sx={{ fontSize: 20 }} />, 
         path: '/listar-notas' 
       }
     ]
   },
   {
     text: 'Controle de Carga',
-    icon: <TruckIcon sx={{ fontSize: 22 }} />,
+    icon: <ShippingIcon sx={{ fontSize: 22 }} />,
     subItems: [
       { 
         text: 'Criar Controle', 
-        icon: <PlaylistAddIcon sx={{ fontSize: 20 }} />, 
+        icon: <AddIcon sx={{ fontSize: 20 }} />, 
         path: '/criar-controle' 
       },
       { 
         text: 'Listar Controles', 
-        icon: <ListAltIcon sx={{ fontSize: 20 }} />, 
+        icon: <DocumentIcon sx={{ fontSize: 20 }} />, 
         path: '/listar-controles' 
       },
     ]
   },
   {
+    text: 'Checklist Recebimento',
+    icon: <ChecklistModernIcon sx={{ fontSize: 22 }} />,
+    subItems: [
+      {
+        text: 'Novo Checklist',
+        icon: <AddIcon sx={{ fontSize: 20 }} />,
+        path: '/checklist-recebimento/regras-ouro'
+      },
+      {
+        text: 'Relatórios Checklist',
+        icon: <ReportsIcon sx={{ fontSize: 20 }} />,
+        path: '/checklist-recebimento/relatorios'
+      },
+      {
+        text: 'Alertas de Validade',
+        icon: <AlertsIcon sx={{ fontSize: 20 }} />,
+        path: '/checklist-recebimento/relatorio-validade'
+      },
+      {
+        text: 'Relatórios Avançados',
+        icon: <ChartIcon sx={{ fontSize: 20 }} />,
+        path: '/checklist-recebimento/relatorios-avancados'
+      }
+    ]
+  },
+  {
     text: 'Separação e Conferência',
-    icon: <FactCheckIcon sx={{ fontSize: 22 }} />,
+    icon: <VerifiedIcon sx={{ fontSize: 22 }} />,
     subItems: [
       {
         text: 'Cadastrar Separação',
-        icon: <PlaylistAddIcon sx={{ fontSize: 20 }} />,
+        icon: <AddIcon sx={{ fontSize: 20 }} />,
         path: '/separacao-conferencia/separadores'
       },
       {
         text: 'Separadores',
-        icon: <PersonIcon sx={{ fontSize: 20 }} />,
+        icon: <PeopleIcon sx={{ fontSize: 20 }} />,
         path: '/separacao-conferencia/separadores'
       },
       {
         text: 'Confirmar Separação',
-        icon: <AssignmentTurnedInIcon sx={{ fontSize: 20 }} />,
+        icon: <VerifiedIcon sx={{ fontSize: 20 }} />,
         path: '/separacao-conferencia/confirmar-auditoria'
       },
       {
         text: 'Relatório de Separação',
-        icon: <ReportIcon sx={{ fontSize: 20 }} />,
+        icon: <ReportsIcon sx={{ fontSize: 20 }} />,
         path: '/separacao-conferencia/conferentes'
       },
       {
         text: 'Auditores',
-        icon: <PersonIcon sx={{ fontSize: 20 }} />,
+        icon: <VerifiedIcon sx={{ fontSize: 20 }} />,
         path: '/separacao-conferencia/auditores'
       },
       {
@@ -337,7 +394,7 @@ const menuItems = [
   },
   {
     text: 'Separation Pro',
-    icon: <StarIcon sx={{ fontSize: 22, color: '#ffd700' }} />,
+    icon: <TrophyModernIcon sx={{ fontSize: 22, color: '#ffd700' }} />,
     subItems: [
       {
         text: 'Ranking',
@@ -346,18 +403,18 @@ const menuItems = [
       },
       {
         text: 'Meu Histórico',
-        icon: <TimelineIcon sx={{ fontSize: 20 }} />,
+        icon: <TimelineModernIcon sx={{ fontSize: 20 }} />,
         path: '/gamificacao/historico'
       }
     ]
   },
   {
     text: 'Operações',
-    icon: <BusinessIcon sx={{ fontSize: 22 }} />,
+    icon: <WorkspaceIcon sx={{ fontSize: 22 }} />,
     subItems: [
       {
         text: 'Checklist Empilhadeiras',
-        icon: <AssignmentTurnedInIcon sx={{ fontSize: 20 }} />,
+        icon: <ChecklistModernIcon sx={{ fontSize: 20 }} />,
         path: '/checklist-empilhadeiras'
       },
       {
@@ -367,13 +424,13 @@ const menuItems = [
       },
       {
         text: 'Funcionários',
-        icon: <PersonIcon sx={{ fontSize: 20 }} />,
+        icon: <PeopleIcon sx={{ fontSize: 20 }} />,
         path: '/funcionarios',
         adminOnly: true
       },
       {
         text: 'Clientes',
-        icon: <BusinessIcon sx={{ fontSize: 20 }} />,
+        icon: <BusinessModernIcon sx={{ fontSize: 20 }} />,
         path: '/clientes',
         adminOnly: true
       }
@@ -381,29 +438,29 @@ const menuItems = [
   },
   {
     text: 'Controle de Materiais',
-    icon: <InventoryIcon sx={{ fontSize: 22 }} />,
+    icon: <InventoryModernIcon sx={{ fontSize: 22 }} />,
     subItems: [
       {
         text: 'Cadastro de Materiais',
-        icon: <PlaylistAddIcon sx={{ fontSize: 20 }} />,
+        icon: <AddIcon sx={{ fontSize: 20 }} />,
         path: '/materiais/cadastro',
         roles: ['ADMIN', 'GERENTE'] // Apenas ADMIN e GERENTE
       },
       {
         text: 'Solicitar Materiais',
-        icon: <ListAltIcon sx={{ fontSize: 20 }} />,
+        icon: <RequestIcon sx={{ fontSize: 20 }} />,
         path: '/materiais/solicitar',
         roles: ['ADMIN', 'GERENTE', 'SEPARADOR', 'CONFERENTE', 'AUDITOR', 'USUARIO'] // Todos podem solicitar
       },
       {
         text: 'Aprovar Solicitações',
-        icon: <AssignmentTurnedInIcon sx={{ fontSize: 20 }} />,
+        icon: <ApprovalIcon sx={{ fontSize: 20 }} />,
         path: '/materiais/aprovar',
         roles: ['ADMIN', 'GERENTE'] // Apenas ADMIN e GERENTE podem aprovar
       },
       {
         text: 'Relatórios',
-        icon: <ReportIcon sx={{ fontSize: 20 }} />,
+        icon: <ReportsIcon sx={{ fontSize: 20 }} />,
         path: '/materiais/relatorios',
         roles: ['ADMIN', 'GERENTE'] // Apenas ADMIN e GERENTE
       }
@@ -411,7 +468,7 @@ const menuItems = [
   },
   { 
     text: 'Relatórios e Análises', 
-    icon: <TrendingUpIcon sx={{ fontSize: 22 }} />,
+    icon: <ChartIcon sx={{ fontSize: 22 }} />,
     subItems: [
       {
         text: 'Relatório de Pallets',
@@ -420,14 +477,14 @@ const menuItems = [
       },
       {
         text: 'Relatório de Controles',
-        icon: <InsightsIcon sx={{ fontSize: 20 }} />,
+        icon: <ReportsIcon sx={{ fontSize: 20 }} />,
         path: '/relatorios/controles-carga'
       }
     ]
   },
   { 
     text: 'Meu Perfil', 
-    icon: <PersonIcon sx={{ fontSize: 22 }} />,
+    icon: <ProfileIcon sx={{ fontSize: 22 }} />,
     path: '/perfil'
   },
 ];
@@ -532,9 +589,24 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           sx={{ 
             minWidth: 0, 
             mr: open || isMobile ? 2 : 'auto',
-            justifyContent: 'center',
-            color: active ? '#ff8c42' : '#64748b',
+            color: active ? '#1976d2' : '#64748b',
             fontSize: isMobile ? '1.3rem' : '1.1rem',
+            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: 40,
+            height: 40,
+            borderRadius: '10px',
+            background: active 
+              ? 'linear-gradient(135deg, rgba(25, 118, 210, 0.1) 0%, rgba(66, 165, 245, 0.05) 100%)'
+              : 'transparent',
+            border: active ? '1px solid rgba(25, 118, 210, 0.2)' : '1px solid transparent',
+            '&:hover': {
+              background: 'linear-gradient(135deg, rgba(25, 118, 210, 0.08) 0%, rgba(66, 165, 245, 0.04) 100%)',
+              transform: 'scale(1.05)',
+              border: '1px solid rgba(25, 118, 210, 0.15)'
+            }
           }}
         >
           {item.icon}
@@ -613,7 +685,25 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                     <SubMenuItemButton
                       className={isActive(subItem.path, true) ? 'active' : ''}
                     >
-                      <ListItemIcon sx={{ minWidth: 0, mr: 2, justifyContent: 'center' }}>
+                      <ListItemIcon sx={{ 
+                        minWidth: 0, 
+                        mr: 2, 
+                        color: isActive(subItem.path, true) ? '#1976d2' : '#94a3b8',
+                        transition: 'all 0.3s ease',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: 32,
+                        height: 32,
+                        borderRadius: '8px',
+                        background: isActive(subItem.path, true) 
+                          ? 'rgba(25, 118, 210, 0.08)' 
+                          : 'transparent',
+                        '&:hover': {
+                          background: 'rgba(25, 118, 210, 0.06)',
+                          transform: 'scale(1.05)'
+                        }
+                      }}>
                         {subItem.icon}
                       </ListItemIcon>
                       <ListItemText
@@ -643,8 +733,9 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   };
 
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh' }}>
-      <AppBar position="fixed" open={!isMobile && open} elevation={0} sx={{ bgcolor: '#ff9800', color: '#fff' }}>
+    <GlobalBackground>
+      <Box sx={{ display: 'flex', minHeight: '100vh' }}>
+      <AppBar position="fixed" open={!isMobile && open} elevation={0}>
         {/* Adicionado elevation={0} para remover a sombra padrão do AppBar */}
         <Toolbar sx={{ minHeight: { xs: 56, sm: 64 } }}>
           <IconButton
@@ -836,15 +927,15 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             <Box sx={{ 
               p: 2, 
               mt: 'auto', 
-              borderTop: '1px solid rgba(255, 107, 53, 0.2)', 
-              background: 'linear-gradient(135deg, rgba(255, 107, 53, 0.05) 0%, rgba(255, 140, 66, 0.05) 100%)',
+              borderTop: '1px solid rgba(25, 118, 210, 0.2)', 
+              background: 'linear-gradient(135deg, rgba(25, 118, 210, 0.05) 0%, rgba(66, 165, 245, 0.05) 100%)',
               borderRadius: '12px 12px 0 0'
             }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <Avatar sx={{ 
                   width: 36, 
                   height: 36, 
-                  background: 'linear-gradient(135deg, #ff8c42 0%, #ff8c42 100%)',
+                  background: 'linear-gradient(135deg, #1976d2 0%, #1976d2 100%)',
                   fontWeight: 600,
                   fontSize: '1.1rem'
                 }} src={user?.foto || undefined}>
@@ -866,7 +957,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                     variant="caption" 
                     noWrap
                     sx={{
-                      color: '#ff8c42',
+                      color: '#1976d2',
                       fontWeight: 500
                     }}
                   >
@@ -926,16 +1017,16 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             <Box sx={{ 
               p: 2, 
               mt: 'auto', 
-              borderTop: '1px solid rgba(255, 107, 53, 0.2)', 
+              borderTop: '1px solid rgba(25, 118, 210, 0.2)', 
               opacity: open ? 1 : 0,
-              background: 'linear-gradient(135deg, rgba(255, 107, 53, 0.05) 0%, rgba(255, 140, 66, 0.05) 100%)',
+              background: 'linear-gradient(135deg, rgba(25, 118, 210, 0.05) 0%, rgba(66, 165, 245, 0.05) 100%)',
               borderRadius: '12px 12px 0 0'
             }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <Avatar sx={{ 
                   width: 36, 
                   height: 36, 
-                  background: 'linear-gradient(135deg, #ff8c42 0%, #ff8c42 100%)',
+                  background: 'linear-gradient(135deg, #1976d2 0%, #1976d2 100%)',
                   fontWeight: 600,
                   fontSize: '1.1rem'
                 }} src={user?.foto || undefined}>
@@ -957,7 +1048,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                     variant="caption" 
                     noWrap
                     sx={{
-                      color: '#ff8c42',
+                      color: '#1976d2',
                       fontWeight: 500
                     }}
                   >
@@ -978,7 +1069,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           width: '100%', 
           mt: { xs: '56px', sm: '64px' },
           ml: { xs: 0, md: !isMobile && open ? 0 : 0 },
-          background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)',
+          background: 'transparent',
           minHeight: { xs: 'calc(100vh - 56px)', sm: 'calc(100vh - 64px)' },
           fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
           transition: theme.transitions.create(['margin'], {
@@ -990,6 +1081,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         {children}
       </Box>
     </Box>
+    </GlobalBackground>
   );
 };
 

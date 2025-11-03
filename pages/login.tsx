@@ -228,10 +228,10 @@ export default function Login() {
                   fontSize: '1.1rem',
                   fontWeight: 600,
                   borderRadius: 2,
-                  background: 'linear-gradient(45deg, #ff6b35 30%, #ff8c42 90%)',
+                  background: 'linear-gradient(45deg, #1976d2 30%, #42a5f5 90%)',
                   boxShadow: '0 4px 20px rgba(255, 107, 53, 0.3)',
                   '&:hover': {
-                    background: 'linear-gradient(45deg, #e55a2b 30%, #e57a35 90%)',
+                    background: 'linear-gradient(45deg, #1565c0 30%, #1976d2 90%)',
                     boxShadow: '0 6px 25px rgba(255, 107, 53, 0.4)',
                     transform: 'translateY(-1px)'
                   },
@@ -255,11 +255,11 @@ export default function Login() {
                   href="/esqueci-senha" 
                   variant="body2"
                   sx={{
-                    color: '#ff6b35',
+                    color: '#1976d2',
                     fontWeight: 500,
                     textDecoration: 'none',
                     '&:hover': {
-                      color: '#e55a2b',
+                      color: '#1565c0',
                       textDecoration: 'underline'
                     }
                   }}
