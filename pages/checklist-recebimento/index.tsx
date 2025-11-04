@@ -297,16 +297,29 @@ function ChecklistRecebimentoPage() {
       if (produto.dataVencimento) {
         const dataVencimento = new Date(produto.dataVencimento);
         const diferencaMs = dataVencimento.getTime() - hoje.getTime();
+        console.log('📅 [Checklist] Validando validade:', {
+          produto: produto.descricaoProduto,
+          vencimento: produto.dataVencimento,
+          diferencaMeses: Math.floor(diferencaMs / (30 * 24 * 60 * 60 * 1000))
+        });
         
         // Se a diferença for menor que 8 meses
         if (diferencaMs < oitoMesesEmMs && diferencaMs > 0) {
           const mesesRestantes = Math.floor(diferencaMs / (30 * 24 * 60 * 60 * 1000));
-          produtosComProblema.push(`${produto.descricaoProduto || 'Produto'} (${mesesRestantes} meses restantes)`);
+          const mensagem = `${produto.descricaoProduto || 'Produto'} (${mesesRestantes} meses restantes)`;
+          produtosComProblema.push(mensagem);
+          console.log('⚠️ [Checklist] Produto com validade próxima:', mensagem);
         } else if (diferencaMs <= 0) {
-          produtosComProblema.push(`${produto.descricaoProduto || 'Produto'} (VENCIDO)`);
+          const mensagem = `${produto.descricaoProduto || 'Produto'} (VENCIDO)`;
+          produtosComProblema.push(mensagem);
+          console.log('❌ [Checklist] Produto vencido:', mensagem);
         }
       }
     });
+    
+    if (produtosComProblema.length > 0) {
+      console.log('🚨 [Checklist] Produtos com problemas de validade:', produtosComProblema);
+    }
     
     return produtosComProblema;
   };
@@ -416,15 +429,28 @@ function ChecklistRecebimentoPage() {
       // Fotos dos produtos
       formData.produtos.forEach((produto, index) => {
         if (produto.fotoProduto) {
-          checklistData.append(`fotoProduto_${index}`, produto.fotoProduto);
-          console.log(`📸 [Frontend] Adicionando foto do produto ${index}:`, produto.fotoProduto.name);
+          // Usar o ID do produto no nome do campo para garantir consistência
+          const fieldName = `fotoProduto_${produto.id}`;
+          checklistData.append(fieldName, produto.fotoProduto);
+          console.log(`📸 [Frontend] Adicionando foto do produto:`, {
+            id: produto.id,
+            fieldName,
+            fileName: produto.fotoProduto.name,
+            size: produto.fotoProduto.size
+          });
         }
       });
       
-      // Perguntas do checklist
+      // Perguntas do checklist e alertas
       Object.entries(formData).forEach(([key, value]) => {
         if (key !== 'produtos' && key !== 'fotoRecebimento' && key !== 'fotoDevolucao') {
-          checklistData.append(key, value.toString());
+          if (key === 'produtosComAlertaValidade') {
+            // Garantir que array seja enviado como JSON string
+            checklistData.append(key, JSON.stringify(value));
+            console.log('⚠️ [Frontend] Enviando produtos com alerta:', value);
+          } else {
+            checklistData.append(key, value.toString());
+          }
         }
       });
 
