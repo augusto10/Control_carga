@@ -120,6 +120,18 @@ async function createChecklist(req: NextApiRequest, res: NextApiResponse, userId
       return isNaN(parsed) ? 0 : parsed;
     };
 
+    // Validar condição das embalagens primeiro (antes de processar fotos)
+    const condicaoEmbalagens = getFieldValue('condicaoEmbalagens');
+    console.log('🔍 [Checklist] Condição das embalagens recebida:', condicaoEmbalagens);
+    
+    if (!condicaoEmbalagens || !['OTIMA', 'BOA', 'RUIM'].includes(condicaoEmbalagens.toUpperCase())) {
+      console.log('❌ [Checklist] Condição das embalagens inválida:', condicaoEmbalagens);
+      return res.status(400).json({
+        error: 'Condição das embalagens deve ser informada (OTIMA, BOA ou RUIM)',
+        received: condicaoEmbalagens
+      });
+    }
+
     // Processar uploads de fotos
     let fotoRecebimentoUrl: string | null = null;
     let fotoDevolucaoUrl: string | null = null;
@@ -138,16 +150,30 @@ async function createChecklist(req: NextApiRequest, res: NextApiResponse, userId
     }
 
     // Processar fotos dos produtos
-    for (const [key, file] of Object.entries(files)) {
-      if (key.startsWith('fotoProduto_') && file) {
+    const fotosKeys = Object.keys(files).filter(key => key.startsWith('fotoProduto'));
+    console.log('📸 [Checklist] Processando fotos dos produtos. Keys encontradas:', fotosKeys);
+    
+    for (const key of fotosKeys) {
+      const file = files[key];
+      if (file) {
         const fileObj = Array.isArray(file) ? file[0] : file;
         if (fileObj) {
-          const fotoUrl = await saveFile(fileObj, 'checklist-produtos');
-          fotosProdutos.push(fotoUrl);
-          console.log('📸 [Checklist] Foto de produto salva:', fotoUrl);
+          try {
+            const fotoUrl = await saveFile(fileObj, 'checklist-produtos');
+            fotosProdutos.push(fotoUrl);
+            console.log('📸 [Checklist] Foto de produto salva com sucesso:', { key, url: fotoUrl });
+          } catch (error) {
+            console.error('❌ [Checklist] Erro ao salvar foto do produto:', { key, error });
+          }
         }
       }
     }
+
+    // Debug: mostrar total de fotos processadas
+    console.log('📊 [Checklist] Resumo do processamento de fotos:');
+    console.log('- Foto recebimento:', fotoRecebimentoUrl ? '✓' : '✗');
+    console.log('- Foto devolução:', fotoDevolucaoUrl ? '✓' : '✗');
+    console.log('- Fotos produtos:', fotosProdutos.length, 'salvas')
 
     console.log('📸 [Checklist] Total de fotos de produtos:', fotosProdutos.length);
 
@@ -182,17 +208,7 @@ async function createChecklist(req: NextApiRequest, res: NextApiResponse, userId
       });
     }
 
-    // Validar condição das embalagens
-    const condicaoEmbalagens = getFieldValue('condicaoEmbalagens');
-    console.log('🔍 [Checklist] Condição das embalagens recebida:', condicaoEmbalagens);
-    
-    if (!condicaoEmbalagens || !['OTIMA', 'BOA', 'RUIM'].includes(condicaoEmbalagens)) {
-      console.log('❌ [Checklist] Condição das embalagens inválida:', condicaoEmbalagens);
-      return res.status(400).json({
-        error: 'Condição das embalagens deve ser informada (OTIMA, BOA ou RUIM)',
-        received: condicaoEmbalagens
-      });
-    }
+
 
     // Processar produtos (novo formato com múltiplos produtos)
     let produtos: any[] = [];

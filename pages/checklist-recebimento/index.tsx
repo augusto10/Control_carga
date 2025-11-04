@@ -206,25 +206,42 @@ function ChecklistRecebimentoPage() {
       setTimeout(() => {
         const produtosComProblema = validarValidadeProdutos();
         if (produtosComProblema.length > 0) {
-          const prosseguir = mostrarAlertaValidade(produtosComProblema);
-          if (prosseguir) {
-            const nomeAutorizador = prompt('👥 Digite o nome do líder que autorizou prosseguir com produtos próximos ao vencimento:');
+          // Em mobile, usar um Alert mais amigável
+          const mensagem = `⚠️ ALERTA DE VALIDADE\n\nOs seguintes produtos estão com validade inferior a 8 meses:\n\n${produtosComProblema.join('\n')}\n\nDeseja prosseguir?`;
+          
+          // Em mobile, garantir que o prompt seja visível e usável
+          if (window.confirm(mensagem)) {
+            let nomeAutorizador;
+            do {
+              nomeAutorizador = prompt('👥 Digite o nome do líder que autorizou prosseguir:');
+            } while (nomeAutorizador !== null && nomeAutorizador.trim() === '');
+
             if (nomeAutorizador) {
               setFormData(prev => ({
                 ...prev,
                 alertaValidadeAutorizado: true,
-                nomeAutorizadorLider: nomeAutorizador,
+                nomeAutorizadorLider: nomeAutorizador.trim(),
                 produtosComAlertaValidade: produtosComProblema
               }));
+              
+              // Feedback mais visível em mobile
               setSnackbar({ 
                 open: true, 
-                message: `⚠️ Alerta de validade registrado. Autorizado por: ${nomeAutorizador}`, 
+                message: `⚠️ Alerta de validade registrado.\nAutorizado por: ${nomeAutorizador.trim()}`, 
                 severity: 'warning' 
               });
             }
+          } else {
+            // Se não autorizado, limpar a data
+            atualizarProduto(id, campo, '');
+            setSnackbar({
+              open: true,
+              message: '❌ Produto com validade inferior a 8 meses não autorizado',
+              severity: 'error'
+            });
           }
         }
-      }, 100);
+      }, 250); // Aumentado para dar tempo do teclado virtual fechar em mobile
     }
   };
 
