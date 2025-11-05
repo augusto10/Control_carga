@@ -10,9 +10,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   switch (req.method) {
     case 'GET': {
       try {
-        const { start, end, numero, motorista, responsavel, limit } = req.query;
+        const { start, end, transportadora, notaFiscal, motorista, responsavel, limit } = req.query;
         
-        console.log('🔍 [Controles] Filtros recebidos:', { start, end, numero, motorista, responsavel, limit });
+        console.log('🔍 [Controles] Filtros recebidos:', { start, end, transportadora, notaFiscal, motorista, responsavel, limit });
         
         // Construir filtros
         const where: any = {};
@@ -30,11 +30,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           }
         }
         
-        // Filtro por número do manifesto
-        if (numero) {
-          where.numeroManifesto = {
-            contains: numero as string,
-            mode: 'insensitive'
+        // Filtro por transportadora
+        if (transportadora) {
+          where.transportadora = transportadora as string;
+        }
+        
+        // Filtro por nota fiscal (busca nas notas vinculadas)
+        if (notaFiscal) {
+          where.notas = {
+            some: {
+              numeroNota: {
+                contains: notaFiscal as string,
+                mode: 'insensitive'
+              }
+            }
           };
         }
         

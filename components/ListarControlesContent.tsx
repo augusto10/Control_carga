@@ -110,7 +110,8 @@ const ListarControlesContent: React.FC = () => {
   const [filtros, setFiltros] = useState({
     start: '',
     end: '',
-    numero: '',
+    transportadora: '',
+    notaFiscal: '',
     motorista: '',
     responsavel: '',
     limit: 50
@@ -420,6 +421,10 @@ const ListarControlesContent: React.FC = () => {
         const filtrosIniciais = {
           start: format(doisDiasAtras, 'yyyy-MM-dd'),
           end: format(hoje, 'yyyy-MM-dd'),
+          transportadora: '',
+          notaFiscal: '',
+          motorista: '',
+          responsavel: '',
           limit: 50
         };
         
@@ -492,7 +497,8 @@ const ListarControlesContent: React.FC = () => {
       const filtrosIniciais = {
         start: format(doisDiasAtras, 'yyyy-MM-dd'),
         end: format(hoje, 'yyyy-MM-dd'),
-        numero: '',
+        transportadora: '',
+        notaFiscal: '',
         motorista: '',
         responsavel: '',
         limit: 50
@@ -1439,13 +1445,30 @@ const ListarControlesContent: React.FC = () => {
             
             {/* Filtros de Texto */}
             <Grid item xs={12} sm={6} md={2}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Transportadora</InputLabel>
+                <Select
+                  value={filtros.transportadora}
+                  onChange={(e) => handleFiltroChange('transportadora', e.target.value)}
+                  label="Transportadora"
+                >
+                  <MenuItem value="">Todas</MenuItem>
+                  {transportadorasFixas.map((transportadora) => (
+                    <MenuItem key={transportadora.id} value={transportadora.id}>
+                      {transportadora.descricao}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} sm={6} md={2}>
               <TextField
                 fullWidth
-                label="Nº Manifesto"
-                value={filtros.numero}
-                onChange={(e) => handleFiltroChange('numero', e.target.value)}
+                label="Nota Fiscal"
+                value={filtros.notaFiscal}
+                onChange={(e) => handleFiltroChange('notaFiscal', e.target.value)}
                 size="small"
-                placeholder="Ex: M-2024"
+                placeholder="Ex: 12345"
               />
             </Grid>
             <Grid item xs={12} sm={6} md={2}>
@@ -1536,7 +1559,8 @@ const ListarControlesContent: React.FC = () => {
               <strong>Período:</strong> {filtros.start ? format(new Date(filtros.start), 'dd/MM/yyyy') : 'Sem limite'} até {filtros.end ? format(new Date(filtros.end), 'dd/MM/yyyy') : 'Sem limite'}
               {' | '}
               <strong>Total encontrado:</strong> {controles.length} controle(s)
-              {filtros.numero && ` | Manifesto: ${filtros.numero}`}
+              {filtros.transportadora && ` | Transportadora: ${transportadorasFixas.find(t => t.id === filtros.transportadora)?.descricao}`}
+              {filtros.notaFiscal && ` | Nota Fiscal: ${filtros.notaFiscal}`}
               {filtros.motorista && ` | Motorista: ${filtros.motorista}`}
               {filtros.responsavel && ` | Responsável: ${filtros.responsavel}`}
             </Typography>
@@ -1582,7 +1606,7 @@ const ListarControlesContent: React.FC = () => {
               maxHeight: 'calc(100vh - 200px)',
               minHeight: '300px',
               '& .MuiTable-root': {
-                minWidth: '800px' // Força largura mínima para scroll horizontal
+                minWidth: '1000px' // Força largura mínima para scroll horizontal (aumentado devido à nova coluna)
               }
             }
           }}
@@ -1716,6 +1740,26 @@ const ListarControlesContent: React.FC = () => {
                     height: '3px',
                     background: 'rgba(255,255,255,0.3)'
                   }
+                }}>Transportadora</TableCell>
+                <TableCell sx={{
+                  fontWeight: 'bold',
+                  background: 'linear-gradient(135deg, #1976d2 0%, #1565c0 100%)',
+                  color: '#fff',
+                  '&:hover': {
+                    background: 'linear-gradient(135deg, #1565c0 0%, #0d47a1 100%)',
+                    boxShadow: 'inset 0 0 10px rgba(255,255,255,0.1)'
+                  },
+                  transition: 'all 0.3s ease',
+                  position: 'relative',
+                  '&::after': {
+                    content: '""',
+                    position: 'absolute',
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    height: '3px',
+                    background: 'rgba(255,255,255,0.3)'
+                  }
                 }}>Notas</TableCell>
                 <TableCell sx={{
                   fontWeight: 'bold',
@@ -1796,6 +1840,23 @@ const ListarControlesContent: React.FC = () => {
                   </TableCell>
                   <TableCell>{controle.motorista}</TableCell>
                   <TableCell>{controle.responsavel}</TableCell>
+                  <TableCell>
+                    <Chip 
+                      label={getTransportadoraById(controle.transportadora || 'ACCERT').descricao}
+                      size="small"
+                      variant="outlined"
+                      sx={{
+                        fontSize: '0.75rem',
+                        height: '24px',
+                        borderColor: 'primary.main',
+                        color: 'primary.main',
+                        '&:hover': {
+                          backgroundColor: 'primary.light',
+                          color: 'white'
+                        }
+                      }}
+                    />
+                  </TableCell>
                   <TableCell>{controle.notas?.length || 0} nota(s)</TableCell>
                   <TableCell>
                     <Chip 

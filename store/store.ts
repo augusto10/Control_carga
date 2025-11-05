@@ -55,7 +55,8 @@ interface StoreState {
   fetchControles: (filters?: {
     start?: string;
     end?: string;
-    numero?: string;
+    transportadora?: string;
+    notaFiscal?: string;
     motorista?: string;
     responsavel?: string;
     limit?: number;
@@ -124,7 +125,8 @@ export const useStore = create<StoreState>((set) => ({
       const params = new URLSearchParams();
       if (filters.start) params.append('start', filters.start);
       if (filters.end) params.append('end', filters.end);
-      if (filters.numero) params.append('numero', filters.numero);
+      if (filters.transportadora) params.append('transportadora', filters.transportadora);
+      if (filters.notaFiscal) params.append('notaFiscal', filters.notaFiscal);
       if (filters.motorista) params.append('motorista', filters.motorista);
       if (filters.responsavel) params.append('responsavel', filters.responsavel);
       if (filters.limit) params.append('limit', filters.limit.toString());
