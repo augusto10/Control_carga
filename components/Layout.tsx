@@ -538,6 +538,11 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         }
       }
     });
+    // Garantir que o submenu 'Checklist Recebimento' esteja visível por padrão
+    // Assim os subitens ficam acessíveis sem necessidade de click adicional.
+    if (!initialSubmenus['Checklist Recebimento']) {
+      initialSubmenus['Checklist Recebimento'] = true;
+    }
     setOpenSubmenus(initialSubmenus);
   }, [router.pathname]);
 
@@ -562,6 +567,11 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       ...prev,
       [itemText]: !prev[itemText]
     }));
+
+    // Se o drawer está recolhido no desktop, abrir automaticamente ao expandir submenu
+    if (!isMobile && !open) {
+      setOpen(true);
+    }
   };
 
   const isActive = (path: string, exact = false) => {
@@ -628,7 +638,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             }
           }} 
         />
-        {hasSubItems && (open || isMobile) && (
+        {hasSubItems && (
           isSubmenuOpen ? <ExpandLess /> : <ExpandMore />
         )}
       </>
@@ -674,6 +684,8 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                     if (item.text === 'Controle de Materiais') return true;
                     // Permite acesso ao menu "Separation Pro" (ranking e histórico)
                     if (item.text === 'Separation Pro') return true;
+                    // Permite acesso ao menu "Checklist Recebimento" para que seus subitens apareçam
+                    if (item.text === 'Checklist Recebimento') return true;
                     return false;
                   }
 
@@ -911,7 +923,14 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
                   // CONFERENTE e SEPARADOR têm acesso apenas aos menus específicos
                   if (user?.tipo === 'CONFERENTE' || user?.tipo === 'SEPARADOR') {
-                    const allowedMenus = ['Separação e Conferência', 'Controle de Materiais', 'Separation Pro', 'Meu Perfil'];
+                    // Permitir acesso também ao menu 'Checklist Recebimento' para todos os perfis
+                    const allowedMenus = [
+                      'Separação e Conferência',
+                      'Controle de Materiais',
+                      'Separation Pro',
+                      'Checklist Recebimento',
+                      'Meu Perfil'
+                    ];
                     return allowedMenus.includes(item.text);
                   }
 
@@ -1001,7 +1020,14 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
                   // CONFERENTE e SEPARADOR têm acesso apenas aos menus específicos
                   if (user?.tipo === 'CONFERENTE' || user?.tipo === 'SEPARADOR') {
-                    const allowedMenus = ['Separação e Conferência', 'Controle de Materiais', 'Separation Pro', 'Meu Perfil'];
+                    // Permitir acesso também ao menu 'Checklist Recebimento' para todos os perfis
+                    const allowedMenus = [
+                      'Separação e Conferência',
+                      'Controle de Materiais',
+                      'Separation Pro',
+                      'Checklist Recebimento',
+                      'Meu Perfil'
+                    ];
                     return allowedMenus.includes(item.text);
                   }
 
