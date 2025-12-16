@@ -23,6 +23,17 @@ out/
 
 # Testes
 coverage/
+test-*.js
+test-*.ts
+*test*.js
+*test*.ts
+create-test-*.js
+scripts/teste-*.ts
+scripts/test-*.js
+scripts/test-*.ts
+components/*Test*.tsx
+pages/teste-*.tsx
+prisma/test-*.sql
 
 # Outros
 *.swp
