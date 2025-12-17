@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { parseCookies } from 'nookies';
 import * as jwt from 'jsonwebtoken';
-import prisma from '../../../lib/prisma';
+import prisma from '../../../../../../../../../../lib/prisma';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'seu_segredo_secreto';
 
@@ -260,3 +260,4 @@ export const config = {
     },
   },
 };
+

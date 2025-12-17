@@ -1,6 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import * as jwt from 'jsonwebtoken';
-import prisma from '../../lib/prisma';
+import prisma from '@/lib/prisma';
 
 const ALLOWED_ORIGINS = [
   'http://localhost:3000',
@@ -103,3 +103,4 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 }
 
 export default allowCors(handler);
+

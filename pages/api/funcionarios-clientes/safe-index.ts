@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { verify } from 'jsonwebtoken';
 import { parseCookies } from 'nookies';
-import prisma from '../../../lib/prisma';
+import prisma from '../../../../../../../../../../lib/prisma';
 import { z } from 'zod';
 
 // Schema de validação para funcionário/cliente
@@ -252,3 +252,4 @@ async function handlePost(req: NextApiRequest, res: NextApiResponse) {
     });
   }
 }
+

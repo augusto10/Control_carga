@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import * as jwt from 'jsonwebtoken';
 import { parseCookies } from 'nookies';
-import prisma from '../../../lib/prisma';
+import prisma from '../../../../../../../../../../lib/prisma';
 
 // Lista de origens permitidas
 const ALLOWED_ORIGINS = [
@@ -192,3 +192,4 @@ export const config = {
 };
 
 export default allowCors(handler);
+

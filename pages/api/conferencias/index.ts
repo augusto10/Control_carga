@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { TipoUsuario } from '@prisma/client';
 import { getToken } from 'next-auth/jwt';
-import prisma from '../../../lib/prisma';
+import prisma from '../../../../../../../../../../lib/prisma';
 
 // Tipos para os parâmetros de consulta
 type QueryParams = {
@@ -329,3 +329,4 @@ async function atualizarConferencia(req: NextApiRequest, res: NextApiResponse) {
     });
   }
 }
+

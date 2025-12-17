@@ -1,5 +1,5 @@
 import { NextApiHandler, NextApiResponse } from 'next';
-import prisma from '../../../lib/prisma';
+import prisma from '../../../../../../../../../../lib/prisma';
 import { withAuth, AuthenticatedRequest } from '../../../lib/middleware/withAuth';
 
 const handler = async (req: AuthenticatedRequest, res: NextApiResponse) => {
@@ -42,3 +42,4 @@ const handler = async (req: AuthenticatedRequest, res: NextApiResponse) => {
 };
 
 export default withAuth(handler);
+

@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import prisma from '../../../lib/prisma';
+import prisma from '../../../../../../../../../lib/prisma';
 import { verify } from 'jsonwebtoken';
 import { parseCookies } from 'nookies';
 
@@ -55,3 +55,4 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
   }
 }
+

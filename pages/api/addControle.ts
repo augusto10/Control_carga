@@ -1,6 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { Transportadora } from '@prisma/client';
-import prisma from '../../../lib/prisma';
+import prisma from '@/lib/prisma';
 
 interface CreateControleRequest {
   motorista: string;
@@ -65,3 +65,4 @@ export default async function handler(
     });
   }
 }
+

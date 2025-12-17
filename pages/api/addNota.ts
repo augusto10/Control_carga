@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import * as jwt from 'jsonwebtoken';
 import { parseCookies } from 'nookies';
-import prisma from '../../../lib/prisma';
+import prisma from '@/lib/prisma';
 
 interface AddNotaRequest {
   codigo: string;
@@ -114,3 +114,4 @@ export default async function handler(
     return res.status(405).json({ error: `Método ${req.method} não permitido` });
   }
 }
+

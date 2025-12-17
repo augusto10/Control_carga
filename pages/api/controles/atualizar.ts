@@ -2,7 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { verify } from 'jsonwebtoken';
 import { parseCookies } from 'nookies';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
-import prisma from '../../../lib/prisma';
+import prisma from '../../../../../../../../../../lib/prisma';
 
 // Interface para erros personalizados
 interface ApiError extends Error {
@@ -282,3 +282,4 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
   }
 }
+

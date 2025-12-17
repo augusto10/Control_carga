@@ -1,6 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { verify } from 'jsonwebtoken';
-import prisma from '../../../lib/prisma';
+import prisma from '../../../../../../../../../../lib/prisma';
 import { getTokenFromCookies } from '../../../lib/auth';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'seu_segredo_secreto';
@@ -88,3 +88,4 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
   }
 }
+

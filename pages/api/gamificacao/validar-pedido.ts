@@ -1,6 +1,6 @@
 import { NextApiResponse } from 'next';
 import { StatusValidacao } from '@prisma/client';
-import prisma from '../../../lib/prisma';
+import prisma from '../../../../../../../../../../lib/prisma';
 import { withAuth, AuthRequest } from '../../../middleware/auth';
 import { registrarPontuacao } from '../../../services/gamificacaoService.server';
 
@@ -85,3 +85,4 @@ const handler = async (req: AuthRequest, res: NextApiResponse) => {
 };
 
 export default withAuth(handler, ['ADMIN', 'GERENTE']);
+
