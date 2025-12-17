@@ -10,10 +10,10 @@ const prismaClientSingleton = () => {
   console.log('DATABASE_URL:', process.env.DATABASE_URL ? '***CONFIGURADO***' : 'NÃO CONFIGURADO');
   console.log('DIRECT_URL:', process.env.DIRECT_URL ? '***CONFIGURADO***' : 'NÃO CONFIGURADO');
   
-  // Forçar URL do banco para desenvolvimento local
-  const databaseUrl = 'postgres://postgres:suporteadmin@localhost:5432/controle_carga_local?sslmode=disable';
+  // Usar DIRECT_URL em produção, DATABASE_URL em desenvolvimento
+  const databaseUrl = process.env.DIRECT_URL || process.env.DATABASE_URL || 'postgres://postgres:suporteadmin@localhost:5432/controle_carga_local?sslmode=disable';
   
-  console.log(' Forçando URL do banco:', databaseUrl.split('://')[0] + '://***');
+  console.log('Usando URL do banco:', databaseUrl.split('://')[0] + '://***');
   
   const prisma = new PrismaClient({
     datasources: {
