@@ -1,7 +1,8 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 import { Transportadora } from '@prisma/client';
-import { getTokenFromCookies, verifyToken } from '@/lib/auth';
+import { parseCookies } from 'nookies';
+import * as jwt from 'jsonwebtoken';
 
 // Constantes de configuração
 const JWT_SECRET = process.env.JWT_SECRET || 'seu_segredo_secreto';
@@ -94,20 +95,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 }
 
 async function criarMotorista(req: NextApiRequest, res: NextApiResponse) {
-  // Verificar autenticação usando função utilitária
-  console.log('[Auth] Extraindo token dos cookies usando função utilitária');
-  const token = getTokenFromCookies(req);
-  console.log('[Auth] Token de autenticação:', !!token);
+  // Verificar autenticação
+  const cookies = parseCookies({ req });
+  const token = cookies.auth_token;
   
   if (!token) {
-    console.log('[Auth] Token não encontrado nos cookies');
     return res.status(401).json({ error: 'Não autenticado' });
   }
 
-  // Verificar o token JWT usando função utilitária
-  console.log('[Auth] Verificando token com função utilitária');
-  const decoded = await verifyToken(token, JWT_SECRET);
-  console.log('[Auth] Token decodificado:', decoded ? '***SUCCESS***' : '***FAILED***');
+  // Verificar o token JWT
+  const decoded = jwt.verify(token, JWT_SECRET) as any;
   
   if (!decoded || !decoded.id) {
     console.log('[Auth] Token inválido ou sem ID de usuário');
