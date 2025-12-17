@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { verify } from 'jsonwebtoken';
 import { parseCookies } from 'nookies';
-import prisma from '../../../../lib/prisma';
+import prisma from '@/lib/prisma';
 import { hash } from 'bcryptjs';
 import { getTokenFromCookies } from '../../../../lib/auth';
 

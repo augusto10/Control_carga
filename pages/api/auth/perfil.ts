@@ -4,7 +4,7 @@ import * as jwt from 'jsonwebtoken';
 import { parseCookies } from 'nookies';
 import { compare, hash } from 'bcryptjs';
 import { ApiResponse } from '../../../types/api';
-import prisma from '../../../../../../../../../../lib/prisma';
+import prisma from '@/lib/prisma';
 
 const SALT_ROUNDS = 10;
 
