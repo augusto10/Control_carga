@@ -2,7 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { verify } from 'jsonwebtoken';
 import multer from 'multer';
 import { promisify } from 'util';
-import prisma from '../../../../../../../../../../lib/prisma';
+import prisma from '@/lib/prisma';
 import { getTokenFromCookies } from '../../../lib/auth';
 import fs from 'fs';
 import path from 'path';

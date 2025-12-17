@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getTokenFromCookies } from '../../../utils/auth';
 import * as jwt from 'jsonwebtoken';
-import prisma from '../../../../../../../../../../lib/prisma';
+import prisma from '@/lib/prisma';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {

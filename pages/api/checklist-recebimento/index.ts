@@ -4,7 +4,7 @@ import formidable from 'formidable';
 import fs from 'fs';
 import path from 'path';
 import { optimizeImage } from '../../../lib/imageUtils';
-import prisma from '../../../../../../../../../../lib/prisma';
+import prisma from '@/lib/prisma';
 
 // Configuração para upload de arquivos
 export const config = {

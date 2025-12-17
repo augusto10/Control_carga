@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { verify, decode } from 'jsonwebtoken';
 import { parseCookies } from 'nookies';
-import prisma from '../../../../../../../../../../lib/prisma';
+import prisma from '@/lib/prisma';
 import { z } from 'zod';
 
 // Esquema de validação para o corpo da requisição

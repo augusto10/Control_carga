@@ -1,6 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getTokenFromCookies, verifyToken } from '../../../lib/auth';
-import prisma from '../../../../../../../../../../lib/prisma';
+import prisma from '@/lib/prisma';
 
 const ALLOWED_ORIGINS = [
   'http://localhost:3000',

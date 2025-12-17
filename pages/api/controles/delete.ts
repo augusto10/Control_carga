@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import prisma from '../../../../../../../../../../lib/prisma';
+import prisma from '@/lib/prisma';
 import { getTokenFromCookies, verifyToken } from '../../../lib/auth';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'seu_segredo_secreto';

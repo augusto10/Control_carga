@@ -1,5 +1,5 @@
 import { NextApiResponse } from 'next';
-import prisma from '../../../../../../../../../../lib/prisma';
+import prisma from '@/lib/prisma';
 import { withAuth, AuthenticatedRequest } from '../../../lib/middleware/withAuth';
 
 // Função auxiliar para atualizar pontuação do usuário
