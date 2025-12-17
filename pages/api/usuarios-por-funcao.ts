@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import prisma from '../../lib/prisma';
+import prisma from '../../../lib/prisma';
 import { verify } from 'jsonwebtoken';
 import { parseCookies } from 'nookies';
 
@@ -11,19 +11,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const token = cookies.auth_token;
 
   if (!token) {
-    return res.status(401).json({ message: 'Não autorizado' });
+    return res.status(401).json({ message: 'Unauthorized' });
   }
 
   try {
     verify(token, JWT_SECRET);
   } catch (error) {
-    return res.status(401).json({ message: 'Token inválido ou expirado' });
+    return res.status(401).json({ message: 'Invalid or expired token' });
   }
 
   // Apenas o método GET é permitido
   if (req.method !== 'GET') {
     res.setHeader('Allow', ['GET']);
-    return res.status(405).json({ message: `Método ${req.method} não permitido` });
+    return res.status(405).json({ message: `Method ${req.method} not allowed` });
   }
 
   try {
@@ -50,7 +50,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   } catch (error: any) {
     console.error('Erro ao buscar usuários por função:', error);
     return res.status(500).json({ 
-      message: 'Erro interno do servidor',
+      message: 'Internal server error',
       error: error?.message || 'Erro desconhecido'
     });
   }

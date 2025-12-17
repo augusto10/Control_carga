@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import prisma from '../../lib/prisma';
+import prisma from '../../../lib/prisma';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
@@ -8,15 +8,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     
     return res.status(200).json({
       success: true,
-      message: 'Conexão com o banco de dados bem-sucedida',
+      message: 'Database connection successful',
       count
     });
   } catch (error) {
     console.error('Erro ao conectar com o banco de dados:', error);
     return res.status(500).json({
       success: false,
-      message: 'Erro ao conectar com o banco de dados',
-      error: error instanceof Error ? error.message : 'Erro desconhecido'
+      message: 'Failed to connect to database',
+      error: error instanceof Error ? error.message : 'Unknown error'
     });
   }
 }

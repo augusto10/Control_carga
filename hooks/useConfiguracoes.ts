@@ -24,7 +24,8 @@ export function useConfiguracoes() {
       
       // Converter os valores para seus respectivos tipos
       const configs: Record<string, any> = {};
-      response.data.forEach((config: ConfiguracaoSistema) => {
+      const configArray = Array.isArray(response.data) ? response.data : (response.data?.data || []);
+      configArray.forEach((config: ConfiguracaoSistema) => {
         switch (config.tipo) {
           case 'number':
             configs[config.chave] = parseFloat(config.valor) || 0;

@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { PrismaClient } from '@prisma/client';
 import * as jwt from 'jsonwebtoken';
 import { parseCookies } from 'nookies';
+import prisma from '../../../lib/prisma';
 
 // Lista de origens permitidas
 const ALLOWED_ORIGINS = [
@@ -72,7 +72,9 @@ const allowCors = (fn: any) => async (req: NextApiRequest, res: NextApiResponse)
   }
 };
 
-const prisma = new PrismaClient();
+
+// Constantes de configuração
+const JWT_SECRET = process.env.JWT_SECRET || 'seu_segredo_secreto';
 
 interface TokenPayload {
   id: string;
@@ -125,7 +127,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     // Verificar o token
     try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'seu_segredo_secreto') as TokenPayload;
+      const decoded = jwt.verify(token, JWT_SECRET) as TokenPayload;
       
       // Buscar usuário
       const user = await prisma.usuario.findUnique({
@@ -177,8 +179,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       success: false,
       message: 'Erro interno do servidor' 
     });
-  } finally {
-    await prisma.$disconnect();
   }
 }
 

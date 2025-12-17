@@ -417,10 +417,9 @@ const AdicionarNotasContent: React.FC = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Cache': 'no-cache',
-          'credentials': 'include'
+          'Accept': 'application/json'
         },
+        credentials: 'include',
         body: JSON.stringify({ notas: notasParaEnviar })
       });
       

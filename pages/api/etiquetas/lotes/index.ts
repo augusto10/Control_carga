@@ -1,8 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { PrismaClient, Transportadora } from '@prisma/client';
+import { Transportadora } from '@prisma/client';
 import { getTokenFromCookies, verifyToken } from '../../../../lib/auth';
-
-const prisma = new PrismaClient();
+import prisma from '../../../../lib/prisma';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   console.log('🏷️ [Etiquetas] Iniciando handler de etiquetas');

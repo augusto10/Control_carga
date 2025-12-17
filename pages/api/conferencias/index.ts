@@ -1,8 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { PrismaClient, TipoUsuario } from '@prisma/client';
+import { TipoUsuario } from '@prisma/client';
 import { getToken } from 'next-auth/jwt';
-
-const prisma = new PrismaClient();
+import prisma from '../../../lib/prisma';
 
 // Tipos para os parâmetros de consulta
 type QueryParams = {

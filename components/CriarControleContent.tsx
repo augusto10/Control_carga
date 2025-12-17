@@ -121,7 +121,7 @@ const CriarControleContent: React.FC = () => {
     return encontrada;
   };
 
-  type Transportadora = 'ACERT' | 'EXPRESSO_GOIAS' | 'TERCEIRIZADA' | 'DETAFRA_TRANSPORTES' | 'RETIRA_VENDEDOR';
+  type Transportadora = 'ACCERT' | 'EXPRESSO_GOIAS' | 'TERCEIRIZADA' | 'DETAFRA_TRANSPORTES' | 'RETIRA_VENDEDOR' | 'RETIRA_CLIENTE' | 'VLOG';
   
   interface FormData {
     motorista: string;
@@ -269,7 +269,7 @@ const CriarControleContent: React.FC = () => {
         motorista: (formData.motorista || 'PENDENTE').trim(),
         cpfMotorista: formData.cpfMotorista ? formData.cpfMotorista.replace(/[^\d]/g, '') : 'PENDENTE',
         responsavel: (formData.responsavel || 'PENDENTE').trim(),
-        transportadora: (['ACCERT', 'EXPRESSO_GOIAS', 'TERCEIRIZADA', 'DETAFRA_TRANSPORTES', 'RETIRA_VENDEDOR', 'RETIRA_CLIENTE'].includes(formData.transportadora)) 
+        transportadora: (['ACCERT', 'EXPRESSO_GOIAS', 'TERCEIRIZADA', 'DETAFRA_TRANSPORTES', 'RETIRA_VENDEDOR', 'RETIRA_CLIENTE', 'VLOG'].includes(formData.transportadora)) 
           ? formData.transportadora 
           : 'ACCERT',
         qtdPalletsLevados: Number(formData.qtdPalletsLevados) || 0,
@@ -419,7 +419,8 @@ const CriarControleContent: React.FC = () => {
                     'TERCEIRIZADA': 'Terceirizada',
                     'DETAFRA_TRANSPORTES': 'Detafra Transportes',
                     'RETIRA_VENDEDOR': 'Retira Vendedor',
-                    'RETIRA_CLIENTE': 'Retira Cliente'
+                    'RETIRA_CLIENTE': 'Retira Cliente',
+                    'VLOG': 'VLOG Transportes'
                   };
                   
                   const transportadoraNome = transportadoraMap[option.transportadoraId] || option.transportadoraId;

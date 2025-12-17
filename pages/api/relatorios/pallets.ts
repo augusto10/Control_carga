@@ -126,7 +126,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const agrupamento = new Map<string, RelatorioPallets>();
 
     controles.forEach(controle => {
-      const chave = `${controle.motorista}|${controle.transportadora}`;
+      // Verificar se o motorista é VLOG e corrigir a transportadora na exibição
+      let transportadoraParaExibir = controle.transportadora;
+      if (controle.motorista && controle.motorista.toLowerCase().includes('vlog')) {
+        transportadoraParaExibir = 'VLOG';
+      }
+      
+      const chave = `${controle.motorista}|${transportadoraParaExibir}`;
       
       if (agrupamento.has(chave)) {
         const item = agrupamento.get(chave)!;
@@ -140,7 +146,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         
         agrupamento.set(chave, {
           motorista: controle.motorista,
-          transportadora: controle.transportadora,
+          transportadora: transportadoraParaExibir,
           totalPalletsLevados: palletsLevados,
           totalPalletsDevolvidos: palletsDevolvidos,
           totalPalletsLiquido: palletsLevados - palletsDevolvidos,
@@ -152,7 +158,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Somar ajustes (devoluções avulsas) aos devolvidos
     ajustes.forEach((aj: AjusteRow) => {
       const motoristaKey = aj.motorista || 'DESCONHECIDO';
-      const transpKey = aj.transportadora || 'TERCEIRIZADA';
+      // Verificar se o motorista do ajuste é VLOG para usar a transportadora correta
+      let transpKey = aj.transportadora || 'TERCEIRIZADA';
+      if (aj.motorista && aj.motorista.toLowerCase().includes('vlog')) {
+        transpKey = 'VLOG';
+      }
       const chave = `${motoristaKey}|${transpKey}`;
       if (agrupamento.has(chave)) {
         const item = agrupamento.get(chave)!;

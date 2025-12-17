@@ -150,10 +150,13 @@ const RelatorioControlesCargaPage: React.FC = () => {
   const transportadoras = [
     { id: 'TODAS', nome: 'Todas as Transportadoras' },
     { id: 'ACERT', nome: 'ACCERT Transportes' },
+    { id: 'ACCERT', nome: 'ACCERT' },
     { id: 'EXPRESSO_GOIAS', nome: 'Expresso Goiás' },
     { id: 'TERCEIRIZADA', nome: 'Terceirizada' },
     { id: 'DETAFRA_TRANSPORTES', nome: 'Detafra Transportes' },
-    { id: 'RETIRA_VENDEDOR', nome: 'Retira Vendedor' }
+    { id: 'RETIRA_VENDEDOR', nome: 'Retira Vendedor' },
+    { id: 'RETIRA_CLIENTE', nome: 'Retira Cliente' },
+    { id: 'VLOG', nome: 'VLOG Transportes' }
   ];
 
   const statusOptions = [

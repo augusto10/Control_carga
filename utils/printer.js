@@ -76,41 +76,106 @@ async function listarImpressoras() {
 }
 
 /**
- * Imprime uma etiqueta na impressora especificada
+ * Imprime uma etiqueta diretamente na impressora ZPL (sem download de arquivo)
  * @param {Object} etiqueta Dados da etiqueta
  * @param {string} impressora Nome da impressora
  */
-async function imprimirEtiqueta(etiqueta, impressora) {
+async function imprimirEtiquetaZPL(etiqueta, impressora) {
   try {
-    // Gerar PDF
-    const pdfBytes = await gerarPDFEtiqueta(etiqueta);
+    // Gerar ZPL diretamente (sem PDF)
+    const zpl = gerarZPLEtiqueta(etiqueta);
     
-    // Salvar temporariamente
-    const tempFile = path.join(os.tmpdir(), `etiqueta-${etiqueta.codigoVolume}.pdf`);
-    await fs.writeFile(tempFile, pdfBytes);
+    // Enviar ZPL diretamente para a impressora
+    const { exec } = require('child_process');
+    const fs = require('fs').promises;
     
-    // Configurar opções de impressão
-    const options = {
-      printer: impressora,
-      scale: 'fit',
-      silent: true
-    };
+    // Criar arquivo ZPL temporário
+    const tempFile = path.join(os.tmpdir(), `etiqueta-${etiqueta.codigoVolume}.zpl`);
+    await fs.writeFile(tempFile, zpl, 'utf8');
     
-    // Imprimir
-    await printer.print(tempFile, options);
+    // Comando para enviar ZPL diretamente para impressora (Windows)
+    const command = `copy /b "${tempFile}" "\\\\localhost\\${impressora}"`;
     
-    // Limpar arquivo temporário
-    await fs.unlink(tempFile);
-    
-    return true;
+    return new Promise((resolve, reject) => {
+      exec(command, (error, stdout, stderr) => {
+        // Limpar arquivo temporário
+        fs.unlink(tempFile).catch(() => {});
+        
+        if (error) {
+          console.error('Erro ao imprimir ZPL:', error);
+          reject(error);
+        } else {
+          console.log('ZPL enviado para impressora:', impressora);
+          resolve(true);
+        }
+      });
+    });
   } catch (error) {
-    console.error('Erro ao imprimir etiqueta:', error);
+    console.error('Erro ao imprimir etiqueta ZPL:', error);
     throw error;
   }
+}
+
+/**
+ * Gera código ZPL da etiqueta (sem download de arquivo)
+ * @param {Object} etiqueta Dados da etiqueta
+ * @returns {string} Código ZPL
+ */
+function gerarZPLEtiqueta(etiqueta) {
+  let zpl = '';
+  
+  // Logo da empresa desenhado diretamente com comandos ZPL
+  zpl += '^FO650,20^GB30,30,2^FS\n'; // Quadrado principal
+  zpl += '^FO650,20^GB30,15,2^FS\n'; // Linha horizontal superior
+  zpl += '^FO650,25^GB15,30,2^FS\n'; // Linha vertical esquerda
+  zpl += '^FO650,35^GB30,15,2^FS\n'; // Linha horizontal inferior
+  zpl += '^FO665,35^GB15,30,2^FS\n'; // Linha vertical direita
+  zpl += '^FO640,60^A0N,12,12^FDESPLENDOR^FS\n'; // Texto do nome
+  
+  // Início da etiqueta
+  zpl += '^XA\n';
+  
+  // Configurações da etiqueta
+  zpl += '^PW812\n'; // Largura da etiqueta
+  zpl += '^LL609\n'; // Comprimento da etiqueta
+  
+  // Número do pedido em destaque
+  const numeroPedido = etiqueta.numeroPedido || etiqueta.numeroNota;
+  zpl += `^FO50,35^A0N,75,75^FD${numeroPedido}^FS\n`;
+  
+  // Código de barras
+  zpl += `^FO50,125^BCN,80,Y,N,N^FD${etiqueta.codigoVolume}^FS\n`;
+  
+  // Nome do cliente
+  zpl += `^FO50,225^A0N,28,28^FD${etiqueta.cliente.toUpperCase()}^FS\n`;
+  
+  // Volume
+  zpl += `^FO50,265^A0N,35,35^FD${etiqueta.indiceVolume}/${etiqueta.totalVolumes}^FS\n`;
+  
+  // Transportadora
+  if (etiqueta.transportadora !== 'RETIRA_CLIENTE') {
+    zpl += `^FO50,305^A0N,25,25^FD${etiqueta.transportadora}^FS\n`;
+  }
+  
+  // Data
+  const dataFormatada = new Date().toLocaleDateString('pt-BR');
+  zpl += `^FO50,345^A0N,20,20^FD${dataFormatada}^FS\n`;
+  
+  // Número da NF e Pedido
+  zpl += `^FO350,345^A0N,16,16^FDNF: ${etiqueta.numeroNota}^FS\n`;
+  if (etiqueta.numeroPedido && etiqueta.numeroPedido.trim()) {
+    zpl += `^FO350,365^A0N,16,16^FDPed: ${etiqueta.numeroPedido}^FS\n`;
+  }
+  
+  // Fim da etiqueta
+  zpl += '^XZ\n';
+  
+  return zpl;
 }
 
 module.exports = {
   gerarPDFEtiqueta,
   listarImpressoras,
-  imprimirEtiqueta
+  imprimirEtiquetaZPL,
+  gerarZPLEtiqueta
 };

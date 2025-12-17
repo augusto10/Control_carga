@@ -4,6 +4,9 @@ import { getTokenFromCookies, verifyToken } from '@/lib/auth';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'seu_segredo_secreto';
 
+// Definir tipo Transportadora que inclui VLOG
+type Transportadora = 'ACCERT' | 'EXPRESSO_GOIAS' | 'TERCEIRIZADA' | 'DETAFRA_TRANSPORTES' | 'RETIRA_VENDEDOR' | 'RETIRA_CLIENTE' | 'VLOG';
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Método não permitido' });
@@ -37,14 +40,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // INFERIR TIPO baseado nos dados existentes (SEM campo tipo no banco):
       let tipoInferido = 'MOTORISTA';
       let tipoLabel = 'Motorista';
+      let transportadoraId: Transportadora = pessoa.transportadoraId as Transportadora;
+      let nome = pessoa.nome;
+      
+      // Identificar RETIRA_VENDEDOR pelo marcador [RV]
+      if (pessoa.nome.includes('[RV]')) {
+        transportadoraId = 'RETIRA_VENDEDOR';
+        nome = pessoa.nome.replace(' [RV]', '');
+      }
+      
+      // Identificar VLOG pelo marcador [VLOG]
+      if (pessoa.nome.includes('[VLOG]')) {
+        transportadoraId = 'VLOG';
+        nome = pessoa.nome.replace(' [VLOG]', '');
+      }
       
       // Regra 1: Se transportadora é RETIRA_VENDEDOR = Funcionário
-      if (pessoa.transportadoraId === 'RETIRA_VENDEDOR') {
+      if (transportadoraId === 'RETIRA_VENDEDOR') {
         tipoInferido = 'FUNCIONARIO';
         tipoLabel = 'Funcionário';
       }
       // Regra 2: Se transportadora é RETIRA_CLIENTE = Cliente  
-      else if (pessoa.transportadoraId === 'RETIRA_CLIENTE') {
+      else if (transportadoraId === 'RETIRA_CLIENTE') {
         tipoInferido = 'CLIENTE';
         tipoLabel = 'Cliente';
       }
@@ -57,15 +74,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       return {
         id: pessoa.id,
-        nome: pessoa.nome,
+        nome: nome, // Nome corrigido sem marcadores
         cpf: pessoa.cpf,
         telefone: pessoa.telefone,
         cnh: pessoa.cnh,
-        transportadoraId: pessoa.transportadoraId,
+        transportadoraId: transportadoraId, // Transportadora corrigida
         tipo: tipoInferido, // Tipo inferido pela lógica
         tipoLabel: tipoLabel,
         // Formato para exibição no dropdown: "Nome (Tipo)"
-        displayName: `${pessoa.nome} (${tipoLabel})`
+        displayName: `${nome} (${tipoLabel})`
       };
     });
 

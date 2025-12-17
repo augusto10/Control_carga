@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { 
   Container, 
   Typography, 
@@ -41,12 +41,27 @@ const ConsultarNotas = () => {
   const [pagina, setPagina] = useState(0);
   const [linhasPorPagina, setLinhasPorPagina] = useState(10);
   const [carregando, setCarregando] = useState(true);
+  const debounceTimer = useRef<NodeJS.Timeout | null>(null);
   
   const { enqueueSnackbar } = useSnackbar();
   const { notas, fetchNotas, deleteNota } = useStore();
 
   useEffect(() => {
-    carregarNotas();
+    // Limpar timer anterior
+    if (debounceTimer.current) {
+      clearTimeout(debounceTimer.current);
+    }
+    
+    // Definir novo timer com debounce de 500ms
+    debounceTimer.current = setTimeout(() => {
+      carregarNotas();
+    }, 500);
+    
+    return () => {
+      if (debounceTimer.current) {
+        clearTimeout(debounceTimer.current);
+      }
+    };
   }, [filtros]);
 
   const carregarNotas = async () => {
@@ -54,7 +69,9 @@ const ConsultarNotas = () => {
     try {
       await fetchNotas(
         filtros.dataInicio,
-        filtros.dataFim
+        filtros.dataFim,
+        filtros.numeroNota,
+        filtros.codigo
       );
     } catch (error) {
       console.error('Erro ao carregar notas:', error);
@@ -74,15 +91,7 @@ const ConsultarNotas = () => {
 
   const filtrarNotas = () => {
     return notas.filter(nota => {
-      // Filtro por número da nota
-      if (filtros.numeroNota && !nota.numeroNota.includes(filtros.numeroNota)) {
-        return false;
-      }
-      // Filtro por código
-      if (filtros.codigo && !nota.codigo.includes(filtros.codigo)) {
-        return false;
-      }
-      // Filtro por status
+      // Filtro por status (os filtros de número da nota e código já são feitos no backend)
       if (filtros.status === 'DISPONIVEIS' && nota.controleId) {
         return false;
       }
@@ -146,7 +155,7 @@ const ConsultarNotas = () => {
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
       <Box sx={{ mb: 4 }}>
         <Typography variant="h4" component="h1" gutterBottom>
-          Consulta de Notas Fiscais
+          Listar Notas
         </Typography>
         <Typography variant="body1" color="text.secondary" gutterBottom>
           Consulte e filtre as notas fiscais cadastradas no sistema
@@ -154,20 +163,15 @@ const ConsultarNotas = () => {
       </Box>
 
       <Paper sx={{ p: 3, mb: 3 }} elevation={3}>
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 2 }}>
+        <Typography variant="h6" sx={{ mb: 2 }}>Filtros de Consulta</Typography>
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr 1fr' }, gap: 2, mb: 3 }}>
           <TextField
             label="Número da Nota"
             size="small"
+            placeholder="Digite o número"
             value={filtros.numeroNota || ''}
             onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFiltros({ ...filtros, numeroNota: e.target.value })}
-            sx={{ minWidth: 200 }}
-          />
-          <TextField
-            label="Código"
-            size="small"
-            value={filtros.codigo || ''}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFiltros({ ...filtros, codigo: e.target.value })}
-            sx={{ minWidth: 200 }}
+            fullWidth
           />
           <TextField
             label="Data Início"
@@ -176,6 +180,7 @@ const ConsultarNotas = () => {
             InputLabelProps={{ shrink: true }}
             value={filtros.dataInicio || ''}
             onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFiltros({ ...filtros, dataInicio: e.target.value })}
+            fullWidth
           />
           <TextField
             label="Data Fim"
@@ -184,6 +189,7 @@ const ConsultarNotas = () => {
             InputLabelProps={{ shrink: true }}
             value={filtros.dataFim || ''}
             onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFiltros({ ...filtros, dataFim: e.target.value })}
+            fullWidth
           />
           <TextField
             select
@@ -193,32 +199,47 @@ const ConsultarNotas = () => {
             onChange={(e: any) => {
               setFiltros({ ...filtros, status: e.target.value });
             }}
-            sx={{ minWidth: 150 }}
+            fullWidth
             SelectProps={{ native: true }}
           >
             <option value="TODAS">Todas</option>
             <option value="DISPONIVEIS">Disponíveis</option>
             <option value="VINCULADAS">Vinculadas</option>
           </TextField>
-          <Box sx={{ display: 'flex', gap: 1, ml: 'auto' }}>
-            <Tooltip title="Limpar filtros">
-              <IconButton 
-                onClick={() => setFiltros({ status: 'TODAS' })}
-                color="primary"
-              >
-                <FilterList />
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="Atualizar">
-              <IconButton 
-                onClick={carregarNotas}
-                color="primary"
-                disabled={carregando}
-              >
-                <Refresh />
-              </IconButton>
-            </Tooltip>
-          </Box>
+        </Box>
+
+        <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600 }}>Filtros Avançados</Typography>
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2, mb: 2 }}>
+          <TextField
+            label="Código"
+            size="small"
+            placeholder="Digite o código"
+            value={filtros.codigo || ''}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFiltros({ ...filtros, codigo: e.target.value })}
+            fullWidth
+          />
+        </Box>
+
+        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+          <Tooltip title="Limpar filtros">
+            <IconButton 
+              onClick={() => setFiltros({ status: 'TODAS' })}
+              color="primary"
+              size="small"
+            >
+              <FilterList />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Atualizar">
+            <IconButton 
+              onClick={carregarNotas}
+              color="primary"
+              disabled={carregando}
+              size="small"
+            >
+              <Refresh />
+            </IconButton>
+          </Tooltip>
         </Box>
       </Paper>
 

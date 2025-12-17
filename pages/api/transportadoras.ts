@@ -46,6 +46,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         nome: 'RETIRA_CLIENTE',
         descricao: 'Retira Cliente',
       },
+      {
+        id: 'VLOG',
+        nome: 'VLOG',
+        descricao: 'VLOG Transportes',
+      },
     ];
 
     return res.status(200).json(transportadoras);

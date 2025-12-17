@@ -1,7 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { PrismaClient, Transportadora } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { Transportadora } from '@prisma/client';
+import prisma from '../../../lib/prisma';
 
 interface CreateControleRequest {
   motorista: string;

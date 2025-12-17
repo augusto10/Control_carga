@@ -112,7 +112,7 @@ const allowCors = (fn: any) => async (req: NextApiRequest, res: NextApiResponse)
     console.error('Erro no handler:', error);
     return res.status(500).json({
       success: false,
-      message: 'Erro interno do servidor',
+      message: 'Internal server error',
       code: 'INTERNAL_SERVER_ERROR'
     });
   }
@@ -133,7 +133,7 @@ const handler = async (req: LoginRequest, res: NextApiResponse) => {
       res.setHeader('Allow', ['POST', 'OPTIONS']);
       return res.status(405).json({ 
         success: false, 
-        message: `Método ${req.method} não permitido`,
+        message: `Method ${req.method} not allowed`,
         code: 'METHOD_NOT_ALLOWED'
       });
     }
@@ -150,7 +150,7 @@ const handler = async (req: LoginRequest, res: NextApiResponse) => {
       console.log('5. Erro: Email ou senha ausentes');
       return res.status(400).json({ 
         success: false, 
-        message: 'Email e senha são obrigatórios',
+        message: 'Email and password are required',
         code: 'MISSING_CREDENTIALS'
       });
     }
@@ -160,7 +160,7 @@ const handler = async (req: LoginRequest, res: NextApiResponse) => {
       console.log('5. Erro: Formato de email inválido');
       return res.status(400).json({ 
         success: false, 
-        message: 'Formato de email inválido',
+        message: 'Invalid email format',
         code: 'INVALID_EMAIL_FORMAT'
       });
     }
@@ -169,7 +169,7 @@ const handler = async (req: LoginRequest, res: NextApiResponse) => {
       console.log('5. Erro: Senha muito curta');
       return res.status(400).json({ 
         success: false, 
-        message: `A senha deve ter no mínimo ${MIN_PASSWORD_LENGTH} caracteres`,
+        message: `Password must be at least ${MIN_PASSWORD_LENGTH} characters`,
         code: 'PASSWORD_TOO_SHORT'
       });
     }
@@ -194,7 +194,7 @@ const handler = async (req: LoginRequest, res: NextApiResponse) => {
       console.log('7. Erro: Usuário não encontrado');
       return res.status(401).json({ 
         success: false, 
-        message: 'Credenciais inválidas',
+        message: 'Invalid credentials',
         code: 'INVALID_CREDENTIALS'
       });
     }
@@ -204,7 +204,7 @@ const handler = async (req: LoginRequest, res: NextApiResponse) => {
       console.log('7. Erro: Usuário inativo');
       return res.status(403).json({ 
         success: false, 
-        message: 'Este usuário está inativo e não pode fazer login',
+        message: 'This user is inactive and cannot login',
         code: 'USER_INACTIVE'
       });
     }
@@ -217,7 +217,7 @@ const handler = async (req: LoginRequest, res: NextApiResponse) => {
       console.log('9. Erro: Senha inválida');
       return res.status(401).json({ 
         success: false, 
-        message: 'Credenciais inválidas',
+        message: 'Invalid credentials',
         code: 'INVALID_CREDENTIALS'
       });
     }
@@ -266,7 +266,7 @@ const handler = async (req: LoginRequest, res: NextApiResponse) => {
     console.log('13. Preparando resposta de sucesso');
     const responseData = {
       success: true,
-      message: 'Login realizado com sucesso',
+      message: 'Login successful',
       data: {
         id: usuario.id,
         nome: usuario.nome,
@@ -317,11 +317,11 @@ const handler = async (req: LoginRequest, res: NextApiResponse) => {
       console.error('Erro desconhecido:', error);
     }
     
-    const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     
     return res.status(500).json({
       success: false,
-      message: 'Erro interno do servidor',
+      message: 'Internal server error',
       code: 'INTERNAL_SERVER_ERROR',
       error: process.env.NODE_ENV === 'development' ? errorMessage : undefined
     });

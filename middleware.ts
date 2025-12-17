@@ -52,7 +52,7 @@ const CORS_HEADERS = {
 
 // Função para verificar se a origem é permitida
 function isOriginAllowed(origin: string | null): boolean {
-  if (!origin) return false;
+  if (!origin) return true; // Permitir requisições sem origem (como do mesmo domínio)
   
   // Permite qualquer origem em desenvolvimento
   if (process.env.NODE_ENV !== 'production') {
@@ -65,9 +65,13 @@ function isOriginAllowed(origin: string | null): boolean {
           originUrl.hostname.endsWith('.vercel.app')) { // Permite subdomínios da Vercel
         return true;
       }
+      // Em desenvolvimento, permitir qualquer origem local
+      if (originUrl.hostname === '0.0.0.0' || originUrl.hostname.startsWith('192.168.') || originUrl.hostname.startsWith('10.')) {
+        return true;
+      }
     } catch (e) {
       console.error('Erro ao analisar URL:', e);
-      return false;
+      return true; // Em desenvolvimento, permitir mesmo se houver erro
     }
   }
   
@@ -208,7 +212,10 @@ export function middleware(request: NextRequest) {
   });
   
   // Adicionar os headers CORS à resposta - aplicar para todas as origens permitidas
-  if (isAllowed || isDeleteMethod) {
+  // Em desenvolvimento, permitir todas as requisições para facilitar o debug
+  const shouldAllow = isAllowed || isDeleteMethod || (process.env.NODE_ENV !== 'production' && request.method === 'POST');
+  
+  if (shouldAllow) {
     // Define os headers CORS
     response.headers.set('Access-Control-Allow-Origin', origin || '*');
     response.headers.set('Access-Control-Allow-Credentials', 'true');

@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import prisma from '../../lib/prisma';
+import prisma from '../../../lib/prisma';
 import { getTokenFromCookies, verifyToken } from '../../lib/auth';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'seu_segredo_secreto';
@@ -96,7 +96,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.log('Controle excluído com sucesso:', deleted.id);
 
     return res.status(200).json({ 
-      message: 'Controle excluído com sucesso',
+      message: 'Control deleted successfully',
       controle: deleted
     });
 
@@ -104,7 +104,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.error('Erro detalhado ao excluir controle:', error);
     return res.status(500).json({ 
       error: 'Erro interno do servidor',
-      message: error instanceof Error ? error.message : 'Erro desconhecido',
+      message: error instanceof Error ? error.message : 'Unknown error',
       stack: process.env.NODE_ENV === 'development' ? error instanceof Error ? error.stack : undefined : undefined
     });
   }

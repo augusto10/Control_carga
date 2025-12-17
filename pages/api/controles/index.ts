@@ -1,10 +1,10 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { Prisma, PrismaClient } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { gerarProximoNumeroManifesto } from '../../../lib/gerarNumeroManifesto';
+import prisma from '../../../lib/prisma';
 
-const prisma = new PrismaClient();
 
-type Transportadora = 'ACCERT' | 'EXPRESSO_GOIAS' | 'TERCEIRIZADA' | 'DETAFRA_TRANSPORTES' | 'RETIRA_VENDEDOR' | 'RETIRA_CLIENTE';
+type Transportadora = 'ACCERT' | 'EXPRESSO_GOIAS' | 'TERCEIRIZADA' | 'DETAFRA_TRANSPORTES' | 'RETIRA_VENDEDOR' | 'RETIRA_CLIENTE' | 'VLOG';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   switch (req.method) {
@@ -102,7 +102,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           },
         });
         
-        // Processar controles para identificar RETIRA_VENDEDOR pelo marcador [RV]
+        // Processar controles para identificar RETIRA_VENDEDOR e VLOG pelos marcadores
         const controlesProcessados = controles.map((controle: any) => {
           let transportadora = controle.transportadora;
           let motorista = controle.motorista;
@@ -111,6 +111,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           if (controle.motorista.includes('[RV]')) {
             transportadora = 'RETIRA_VENDEDOR' as any;
             motorista = controle.motorista.replace(' [RV]', '');
+          }
+          
+          // Se o motorista tem marcador [VLOG], é VLOG
+          if (controle.motorista.includes('[VLOG]')) {
+            transportadora = 'VLOG' as any;
+            motorista = controle.motorista.replace(' [VLOG]', '');
           }
           
           return {
@@ -214,25 +220,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
 
         // Garantir que a transportadora tenha um valor válido
-        const transportadoraValida = (['ACCERT', 'EXPRESSO_GOIAS', 'TERCEIRIZADA', 'DETAFRA_TRANSPORTES', 'RETIRA_VENDEDOR', 'RETIRA_CLIENTE'].includes(transportadora)) 
+        const transportadoraValida = (['ACCERT', 'EXPRESSO_GOIAS', 'TERCEIRIZADA', 'DETAFRA_TRANSPORTES', 'RETIRA_VENDEDOR', 'RETIRA_CLIENTE', 'VLOG'].includes(transportadora)) 
           ? transportadora 
           : 'ACCERT';
 
-        // SOLUÇÃO TEMPORÁRIA: Mapear RETIRA_VENDEDOR para TERCEIRIZADA no banco (igual aos motoristas)
+        // SOLUÇÃO TEMPORÁRIA: Mapear transportadoras para valores existentes no banco (igual aos motoristas)
         let transportadoraParaBanco = transportadoraValida;
         let motoristaParaSalvar = motorista.trim();
         
         if (transportadoraValida === 'RETIRA_VENDEDOR') {
           transportadoraParaBanco = 'TERCEIRIZADA';
           // Adicionar marcador [RV] no nome do motorista para identificar depois
-          if (!motoristaParaSalvar.includes('[RV]')) {
-            motoristaParaSalvar = `${motoristaParaSalvar} [RV]`;
-          }
-          console.log('[Controle] Mapeando RETIRA_VENDEDOR -> TERCEIRIZADA para compatibilidade');
-        }
-        // ACCERT e RETIRA_CLIENTE já estão no enum, não precisam de mapeamento
-        else if (transportadoraValida === 'ACCERT' || transportadoraValida === 'RETIRA_CLIENTE') {
-          console.log(`[Controle] Usando ${transportadoraValida} diretamente (já no enum)`);
+          motoristaParaSalvar = `${motorista} [RV]`;
+        } else if (transportadoraValida === 'VLOG') {
+          transportadoraParaBanco = 'TERCEIRIZADA';
+          // Adicionar marcador [VLOG] no nome do motorista para identificar depois
+          motoristaParaSalvar = `${motorista} [VLOG]`;
         }
           
         // Gera o próximo número de manifesto automaticamente
@@ -273,9 +276,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           }
         });
         
-        // Se foi mapeado RETIRA_VENDEDOR, ajustar o retorno
+        // Se foi mapeado RETIRA_VENDEDOR ou VLOG, ajustar o retorno
         if (transportadoraValida === 'RETIRA_VENDEDOR') {
           (controle as any).transportadora = 'RETIRA_VENDEDOR';
+          (controle as any).motorista = motorista.trim(); // Retornar nome sem marcador
+        } else if (transportadoraValida === 'VLOG') {
+          (controle as any).transportadora = 'VLOG';
           (controle as any).motorista = motorista.trim(); // Retornar nome sem marcador
         }
         // ACCERT e RETIRA_CLIENTE já são salvos corretamente, não precisam ajuste

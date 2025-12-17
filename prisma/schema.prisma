@@ -200,6 +200,7 @@ enum Transportadora {
   DETAFRA_TRANSPORTES
   RETIRA_VENDEDOR
   RETIRA_CLIENTE
+  VLOG
 }
 
 enum AcaoPontuacao {

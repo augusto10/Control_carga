@@ -1,11 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { PrismaClient } from '@prisma/client';
 import { parseCookies } from 'nookies';
 import * as jwt from 'jsonwebtoken';
-
-const prisma = new PrismaClient({
-  log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error']
-});
+import prisma from '../../../lib/prisma';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'seu_segredo_secreto';
 

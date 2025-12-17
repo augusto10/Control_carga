@@ -36,7 +36,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         'TERCEIRIZADA': 'Terceirizada',
         'DETAFRA_TRANSPORTES': 'Detafra Transportes',
         'RETIRA_VENDEDOR': 'Retira Vendedor',
-        'RETIRA_CLIENTE': 'Retira Cliente'
+        'RETIRA_CLIENTE': 'Retira Cliente',
+        'VLOG': 'VLOG Transportes'
       };
 
       const motoristas = motoristasDb.map((m: any) => {
@@ -47,6 +48,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if (m.nome.includes('[RV]')) {
           transportadoraId = 'RETIRA_VENDEDOR';
           nome = m.nome.replace(' [RV]', '');
+        }
+        
+        // Identificar motoristas VLOG pelo marcador [VLOG] no nome
+        if (m.nome.includes('[VLOG]')) {
+          transportadoraId = 'VLOG';
+          nome = m.nome.replace(' [VLOG]', '');
         }
         
         // Mapear ACERT para ACCERT se necessário
@@ -144,20 +151,21 @@ async function criarMotorista(req: NextApiRequest, res: NextApiResponse) {
     return res.status(400).json({ error: 'Transportadora é obrigatória' });
 
   // Validar se a transportadora é válida
-  const transportadorasValidas = ['ACCERT', 'EXPRESSO_GOIAS', 'TERCEIRIZADA', 'DETAFRA_TRANSPORTES', 'RETIRA_VENDEDOR', 'RETIRA_CLIENTE'];
+  const transportadorasValidas = ['ACCERT', 'EXPRESSO_GOIAS', 'TERCEIRIZADA', 'DETAFRA_TRANSPORTES', 'RETIRA_VENDEDOR', 'RETIRA_CLIENTE', 'VLOG'];
   if (!transportadorasValidas.includes(transportadoraId)) {
     return res.status(400).json({ 
       error: `Transportadora inválida: ${transportadoraId}. Valores aceitos: ${transportadorasValidas.join(', ')}` 
     });
   }
 
-  // SOLUÇÃO TEMPORÁRIA: Mapear RETIRA_VENDEDOR para uma transportadora existente no banco
+  // SOLUÇÃO TEMPORÁRIA: Mapear transportadoras para valores existentes no banco
   // Isso permite que a funcionalidade funcione sem alterar o enum do banco
   let transportadoraParaBanco = transportadoraId as Transportadora;
   if ((transportadoraId as string) === 'RETIRA_VENDEDOR') {
     transportadoraParaBanco = 'TERCEIRIZADA' as Transportadora; // Usar TERCEIRIZADA como base no banco
     console.log('[Motorista] Mapeando RETIRA_VENDEDOR -> TERCEIRIZADA para compatibilidade com banco');
   }
+  // VLOG agora é suportado diretamente no banco, não precisa mais de mapeamento
 
   try {
     console.log('[Motorista] Verificando duplicidade por CPF:', cpf);
@@ -176,10 +184,12 @@ async function criarMotorista(req: NextApiRequest, res: NextApiResponse) {
     });
     
     // Criar motorista usando a transportadora mapeada para o banco
-    // Se for RETIRA_VENDEDOR, adicionar um marcador no nome para identificar depois
+    // Se for RETIRA_VENDEDOR ou VLOG, adicionar um marcador no nome para identificar depois
     let nomeParaSalvar = nome;
     if ((transportadoraId as string) === 'RETIRA_VENDEDOR') {
       nomeParaSalvar = `${nome} [RV]`; // Adicionar marcador [RV] = Retira Vendedor
+    } else if ((transportadoraId as string) === 'VLOG') {
+      nomeParaSalvar = `${nome} [VLOG]`; // Adicionar marcador [VLOG] = VLOG
     }
     
     const novo = await prisma.motorista.create({
@@ -193,13 +203,48 @@ async function criarMotorista(req: NextApiRequest, res: NextApiResponse) {
       },
     });
     
-    // Se foi mapeado RETIRA_VENDEDOR, ajustar o retorno para mostrar a transportadora original e nome limpo
+    // Se foi mapeado RETIRA_VENDEDOR ou VLOG, ajustar o retorno para mostrar a transportadora original e nome limpo
     if ((transportadoraId as string) === 'RETIRA_VENDEDOR') {
       (novo as any).transportadoraId = 'RETIRA_VENDEDOR';
+      (novo as any).nome = nome; // Retornar nome sem o marcador
+    } else if ((transportadoraId as string) === 'VLOG') {
+      (novo as any).transportadoraId = 'VLOG';
       (novo as any).nome = nome; // Retornar nome sem o marcador
     }
     
     console.log('[Motorista] Motorista criado com sucesso:', novo);
+    
+    // Se for VLOG, atualizar automaticamente controles de carga existentes
+    if ((transportadoraId as string) === 'VLOG') {
+      try {
+        console.log('[Motorista] Atualizando controles de carga existentes para VLOG...');
+        const resultado = await prisma.$executeRaw`
+          UPDATE "ControleCarga" 
+          SET transportadora = 'VLOG'
+          WHERE motorista ILIKE ${`%${nome}%`}
+          AND transportadora = 'TERCEIRIZADA';
+        `;
+        
+        if (resultado > 0) {
+          console.log(`[Motorista] ${resultado} controles de carga atualizados para VLOG automaticamente`);
+        }
+        
+        // Também atualizar ajustes de pallet se existirem
+        const resultadoPallets = await prisma.$executeRaw`
+          UPDATE "PalletAjuste" 
+          SET transportadora = 'VLOG'
+          WHERE motorista ILIKE ${`%${nome}%`}
+          AND transportadora = 'TERCEIRIZADA';
+        `;
+        
+        if (resultadoPallets > 0) {
+          console.log(`[Motorista] ${resultadoPallets} ajustes de pallet atualizados para VLOG automaticamente`);
+        }
+      } catch (error) {
+        console.error('[Motorista] Erro ao atualizar controles existentes:', error);
+        // Não falhar a criação do motorista se a atualização dos controles falhar
+      }
+    }
     
     return res.status(201).json(novo);
   } catch (error: any) {

@@ -1,12 +1,10 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { PrismaClient } from '@prisma/client';
 import { getTokenFromCookies, verifyToken } from '../../../lib/auth';
 import formidable from 'formidable';
 import fs from 'fs';
 import path from 'path';
 import { optimizeImage } from '../../../lib/imageUtils';
-
-const prisma = new PrismaClient();
+import prisma from '../../../lib/prisma';
 
 // Configuração para upload de arquivos
 export const config = {

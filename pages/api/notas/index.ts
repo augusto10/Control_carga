@@ -14,9 +14,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (req.method === 'GET') {
     try {
-      const { start, end } = req.query;
+      const { start, end, numeroNota, codigo } = req.query;
       console.log('🔄 [TEMP] Listando notas com compatibilidade');
-      console.log('📅 [TEMP] Filtros recebidos:', { start, end });
+      console.log('📅 [TEMP] Filtros recebidos:', { start, end, numeroNota, codigo });
       
       // Construir filtros de data
       const where: any = {};
@@ -30,6 +30,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           where.dataCriacao.lte = new Date(`${end}T23:59:59`);
           console.log('📅 [TEMP] Data fim:', where.dataCriacao.lte);
         }
+      }
+      
+      // Filtro por número da nota
+      if (numeroNota) {
+        where.numeroNota = {
+          contains: numeroNota as string,
+          mode: 'insensitive'
+        };
+        console.log('📝 [TEMP] Filtro de número da nota:', numeroNota);
+      }
+      
+      // Filtro por código
+      if (codigo) {
+        where.codigo = {
+          contains: codigo as string,
+          mode: 'insensitive'
+        };
+        console.log('📝 [TEMP] Filtro de código:', codigo);
       }
       
       // Buscar notas com filtros aplicados

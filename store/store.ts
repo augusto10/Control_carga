@@ -33,7 +33,7 @@ export type ControleCarga = {
   motorista: string;
   cpfMotorista: string;
   responsavel: string;
-  transportadora: 'ACCERT' | 'EXPRESSO_GOIAS' | 'TERCEIRIZADA' | 'DETAFRA_TRANSPORTES' | 'RETIRA_VENDEDOR' | 'RETIRA_CLIENTE';
+  transportadora: 'ACCERT' | 'EXPRESSO_GOIAS' | 'TERCEIRIZADA' | 'DETAFRA_TRANSPORTES' | 'RETIRA_VENDEDOR' | 'RETIRA_CLIENTE' | 'VLOG';
   numeroManifesto: string | null;
   qtdPallets: number;
   observacao: string | null;
@@ -51,7 +51,7 @@ interface StoreState {
   transportadoras: Transportadora[];
   status: 'success' | 'error' | null;
   loading: boolean;
-  fetchNotas: (start?: string, end?: string) => Promise<void>;
+  fetchNotas: (start?: string, end?: string, numeroNota?: string, codigo?: string) => Promise<void>;
   fetchControles: (filters?: {
     start?: string;
     end?: string;
@@ -77,13 +77,15 @@ export const useStore = create<StoreState>((set) => ({
   status: null,
   loading: false,
 
-  fetchNotas: async (start?: string, end?: string) => {
+  fetchNotas: async (start?: string, end?: string, numeroNota?: string, codigo?: string) => {
     console.log('[fetchNotas] Iniciando busca de notas');
-    console.log('[fetchNotas] Parâmetros:', { start, end });
+    console.log('[fetchNotas] Parâmetros:', { start, end, numeroNota, codigo });
     
     const params = new URLSearchParams();
     if (start) params.append('start', start);
     if (end) params.append('end', end);
+    if (numeroNota) params.append('numeroNota', numeroNota);
+    if (codigo) params.append('codigo', codigo);
     
     const url = `/api/notas${params.toString() ? '?' + params.toString() : ''}`;
     console.log('[fetchNotas] URL da requisição:', url);
@@ -275,7 +277,7 @@ export const useStore = create<StoreState>((set) => ({
       
       console.log('[criarControle] Transportadora recebida:', controle.transportadora);
       
-      if (!['ACCERT', 'EXPRESSO_GOIAS', 'TERCEIRIZADA', 'DETAFRA_TRANSPORTES', 'RETIRA_VENDEDOR', 'RETIRA_CLIENTE'].includes(controle.transportadora)) {
+      if (!['ACCERT', 'EXPRESSO_GOIAS', 'TERCEIRIZADA', 'DETAFRA_TRANSPORTES', 'RETIRA_VENDEDOR', 'RETIRA_CLIENTE', 'VLOG'].includes(controle.transportadora)) {
         console.error('[criarControle] Transportadora inválida:', controle.transportadora);
         throw new Error('Transportadora inválida. Valor recebido: ' + controle.transportadora);
       }

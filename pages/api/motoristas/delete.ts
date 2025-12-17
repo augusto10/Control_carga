@@ -1,8 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import * as jwt from 'jsonwebtoken';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import prisma from '../../lib/prisma';
 
 const ALLOWED_ORIGINS = [
   'http://localhost:3000',
@@ -52,7 +50,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       return res.status(401).json({ error: 'Token não encontrado' });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any;
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'seu_segredo_secreto') as any;
     
     // Verificar permissões
     if (!['ADMIN', 'GERENTE'].includes(decoded.tipo)) {

@@ -166,19 +166,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.log(`Encontrados ${controles.length} controles`);
 
     // Processar dados para o relatório
-    const dadosRelatorio: RelatorioControle[] = controles.map(controle => ({
-      id: controle.id,
-      motorista: controle.motorista,
-      transportadora: controle.transportadora,
-      qtdPalletsLevados: controle.qtdPalletsLevados || 0,
-      qtdPalletsDevolvidos: controle.qtdPalletsDevolvidos || 0,
-      diferencaPallets: (controle.qtdPalletsLevados || 0) - (controle.qtdPalletsDevolvidos || 0),
-      totalNotas: controle.notas.length,
-      dataCriacao: controle.dataCriacao.toISOString().split('T')[0],
-      status: controle.finalizado ? 'FINALIZADO' : 'PENDENTE',
-      assinaturaMotorista: !!controle.assinaturaMotorista,
-      assinaturaResponsavel: !!controle.assinaturaResponsavel
-    }));
+    const dadosRelatorio: RelatorioControle[] = controles.map(controle => {
+      // Verificar se o motorista é VLOG e corrigir a transportadora na exibição
+      let transportadoraParaExibir = controle.transportadora;
+      if (controle.motorista && controle.motorista.toLowerCase().includes('vlog')) {
+        transportadoraParaExibir = 'VLOG';
+      }
+      
+      return {
+        id: controle.id,
+        motorista: controle.motorista,
+        transportadora: transportadoraParaExibir,
+        qtdPalletsLevados: controle.qtdPalletsLevados || 0,
+        qtdPalletsDevolvidos: controle.qtdPalletsDevolvidos || 0,
+        diferencaPallets: (controle.qtdPalletsLevados || 0) - (controle.qtdPalletsDevolvidos || 0),
+        totalNotas: controle.notas.length,
+        dataCriacao: controle.dataCriacao.toISOString().split('T')[0],
+        status: controle.finalizado ? 'FINALIZADO' : 'PENDENTE',
+        assinaturaMotorista: !!controle.assinaturaMotorista,
+        assinaturaResponsavel: !!controle.assinaturaResponsavel
+      };
+    });
 
     // Aplicar ajustes de pallets aos controles
     const controlesPorChave = new Map<string, RelatorioControle>();
@@ -190,7 +198,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Somar ajustes aos pallets devolvidos
     ajustes.forEach((ajuste: AjusteRow) => {
       const motoristaKey = ajuste.motorista || 'DESCONHECIDO';
-      const transpKey = ajuste.transportadora || 'TERCEIRIZADA';
+      // Verificar se o motorista do ajuste é VLOG para usar a transportadora correta
+      let transpKey = ajuste.transportadora || 'TERCEIRIZADA';
+      if (ajuste.motorista && ajuste.motorista.toLowerCase().includes('vlog')) {
+        transpKey = 'VLOG';
+      }
       const chave = `${motoristaKey}|${transpKey}`;
       
       const controle = controlesPorChave.get(chave);

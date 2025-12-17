@@ -39,6 +39,7 @@ import {
 } from '@mui/icons-material';
 import { useStore } from '../store/store';
 import BarcodeScanner from './BarcodeScanner';
+import PrinterSelectDialog from './PrinterSelectDialog';
 
 interface EtiquetaLote {
   id: string;
@@ -60,7 +61,8 @@ interface EtiquetaVolume {
   indiceVolume: number;
   totalVolumes: number;
   codigoVolume: string;
-  impressoEm?: string;
+  impressoEm?: string | null;
+  lote?: any;
 }
 
 const GerarEtiquetasContent: React.FC = () => {
@@ -73,7 +75,13 @@ const GerarEtiquetasContent: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [printerDialogOpen, setPrinterDialogOpen] = useState(false);
   const [currentLote, setCurrentLote] = useState<EtiquetaLote | null>(null);
+
+  // Debug: monitorar mudanças no estado saving
+  useEffect(() => {
+    console.log('🔍 [DEBUG] Estado saving mudou para:', saving);
+  }, [saving]);
 
   // Estado para notificações
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' | 'warning' | 'info' }>({
@@ -101,12 +109,31 @@ const GerarEtiquetasContent: React.FC = () => {
     const loadTransportadoras = async () => {
       try {
         const transportadorasData = await fetchTransportadoras();
-        if (transportadorasData && Array.isArray(transportadorasData)) {
+        if (Array.isArray(transportadorasData) && transportadorasData.length > 0) {
           setTransportadoras(transportadorasData);
+        } else {
+          // Fallback com transportadoras padrão se API falhar
+          console.warn('Usando transportadoras padrão como fallback');
+          setTransportadoras([
+            { id: 'ACCERT', descricao: 'ACCERT' },
+            { id: 'EXPRESSO_GOIAS', descricao: 'EXPRESSO GOIAS' },
+            { id: 'TERCEIRIZADA', descricao: 'TERCEIRIZADA' },
+            { id: 'DETAFRA_TRANSPORTES', descricao: 'DETAFRA TRANSPORTES' },
+            { id: 'RETIRA_VENDEDOR', descricao: 'RETIRA VENDEDOR' },
+            { id: 'RETIRA_CLIENTE', descricao: 'RETIRA CLIENTE' }
+          ]);
         }
       } catch (error) {
         console.error('Erro ao carregar transportadoras:', error);
-        setTransportadoras([]); // Fallback para array vazio
+        // Fallback com transportadoras padrão
+        setTransportadoras([
+          { id: 'ACCERT', descricao: 'ACCERT' },
+          { id: 'EXPRESSO_GOIAS', descricao: 'EXPRESSO GOIAS' },
+          { id: 'TERCEIRIZADA', descricao: 'TERCEIRIZADA' },
+          { id: 'DETAFRA_TRANSPORTES', descricao: 'DETAFRA TRANSPORTES' },
+          { id: 'RETIRA_VENDEDOR', descricao: 'RETIRA VENDEDOR' },
+          { id: 'RETIRA_CLIENTE', descricao: 'RETIRA CLIENTE' }
+        ]);
       }
     };
 
@@ -148,7 +175,15 @@ const GerarEtiquetasContent: React.FC = () => {
 
   // Função para gerar etiquetas diretamente (sem salvar no banco)
   const handleGerar = () => {
-    if (saving) return;
+    console.log('🔍 [DEBUG] handleGerar chamado');
+    console.log('🔍 [DEBUG] Estado saving:', saving);
+    console.log('🔍 [DEBUG] Dados do formulário:', notaData);
+    console.log('🔍 [DEBUG] Transportadoras disponíveis:', transportadoras);
+
+    if (saving) {
+      console.log('⚠️ [DEBUG] Salvamento em andamento, ignorando clique');
+      return;
+    }
 
     // Validações
     const camposObrigatorios = [];
@@ -158,13 +193,20 @@ const GerarEtiquetasContent: React.FC = () => {
     if (!notaData.numeroPedido.trim()) camposObrigatorios.push('Número do Pedido');
     if (!notaData.volumes || notaData.volumes < 1) camposObrigatorios.push('Volumes');
 
+    console.log('🔍 [DEBUG] Campos obrigatórios faltando:', camposObrigatorios);
+
     if (camposObrigatorios.length > 0) {
-      setSnackbar({ open: true, message: `Preencha os campos obrigatórios: ${camposObrigatorios.join(', ')}`, severity: 'warning' });
+      const mensagem = `Preencha os campos obrigatórios: ${camposObrigatorios.join(', ')}`;
+      console.log('⚠️ [DEBUG] Validação falhou:', mensagem);
+      setSnackbar({ open: true, message: mensagem, severity: 'warning' });
       return;
     }
 
+    console.log('✅ [DEBUG] Validações passaram, iniciando geração...');
+
     try {
       setSaving(true);
+      console.log('🔄 [DEBUG] Estado saving definido para true');
 
       console.log('🏷️ Gerando etiquetas diretamente:', notaData);
 
@@ -178,9 +220,8 @@ const GerarEtiquetasContent: React.FC = () => {
         transportadora: notaData.transportadora as any,
         numeroPedido: notaData.numeroPedido,
         volumes: notaData.volumes,
-        observacoes: notaData.observacoes || null,
+        observacoes: notaData.observacoes || undefined,
         criadoPor: 'temp-user',
-        criadoPorUser: null as any,
         volumesEtiquetas: []
       };
 
@@ -197,7 +238,7 @@ const GerarEtiquetasContent: React.FC = () => {
           indiceVolume: i,
           totalVolumes: notaData.volumes,
           codigoVolume,
-          impressoEm: null,
+          impressoEm: undefined,
           lote: loteTemporario
         });
       }
@@ -206,12 +247,17 @@ const GerarEtiquetasContent: React.FC = () => {
 
       console.log('✅ Lote temporário criado:', loteTemporario);
       
+      console.log('🔄 [DEBUG] Definindo currentLote...');
       setCurrentLote(loteTemporario);
+      
+      console.log('🔄 [DEBUG] Abrindo preview...');
       setPreviewOpen(true);
 
+      console.log('🔄 [DEBUG] Enviando notificação de sucesso...');
       setSnackbar({ open: true, message: 'Etiquetas geradas com sucesso! Pronto para imprimir.', severity: 'success' });
 
       // Limpar formulário
+      console.log('🔄 [DEBUG] Limpando formulário...');
       setNotaData({
         codigoBarras: '',
         numeroNota: '',
@@ -222,43 +268,54 @@ const GerarEtiquetasContent: React.FC = () => {
         observacoes: ''
       });
 
+      console.log('✅ [DEBUG] Processo concluído com sucesso');
+
     } catch (error: any) {
       console.error('💥 Erro ao gerar etiquetas:', error);
       setSnackbar({ open: true, message: 'Erro ao gerar etiquetas', severity: 'error' });
     } finally {
+      console.log('🔄 [DEBUG] Resetando estado saving para false');
       setSaving(false);
     }
   };
 
-  // Função para gerar ZPL das etiquetas no padrão das imagens
+  // Função para gerar ZPL das etiquetas com número do pedido em destaque e logo
   const gerarZPL = (lote: EtiquetaLote): string => {
     let zpl = '';
+
+    // Logo da empresa desenhado diretamente com comandos ZPL (sem download de arquivo)
+    // Desenho simplificado do logo ESPLENDOR usando comandos nativos
+    zpl += '^FO650,20^GB30,30,2^FS\n'; // Quadrado superior esquerdo
+    zpl += '^FO650,20^GB30,15,2^FS\n'; // Linha horizontal
+    zpl += '^FO650,25^GB15,30,2^FS\n'; // Linha vertical
+    zpl += '^FO650,35^GB30,15,2^FS\n'; // Linha horizontal inferior
+    zpl += '^FO665,35^GB15,30,2^FS\n'; // Linha vertical direita
+    // Texto "ESPLENDOR" abaixo do logo
+    zpl += '^FO640,60^A0N,12,12^FDESPLENDOR^FS\n';
+    console.log('🔍 [DEBUG] Logo drawn directly with ZPL commands');
 
     lote.volumesEtiquetas.forEach(volume => {
       // Início da etiqueta
       zpl += '^XA\n';
 
-      // Configurações da etiqueta (ajustar conforme impressora Zebra ZD-220)
+      // Configurações da etiqueta (ajustar conforme impressora)
       zpl += '^PW812\n'; // Largura da etiqueta (812 pontos = 3 polegadas)
-      zpl += '^LL609\n'; // Comprimento da etiqueta (609 pontos = 2.4 polegadas - mais compacta)
+      zpl += '^LL609\n'; // Comprimento da etiqueta (609 pontos = 2.4 polegadas)
 
-      // Gerar código principal no formato XXX.XXX baseado no número da nota
-      const codigoPrincipal = lote.numeroNota.replace(/\D/g, '').slice(0, 6);
-      const codigoFormatado = codigoPrincipal.length >= 6 
-        ? `${codigoPrincipal.slice(0, 3)}.${codigoPrincipal.slice(3, 6)}`
-        : lote.numeroNota.slice(0, 7);
+      // Logo da empresa já desenhado acima (canto superior direito)
 
-      // Código principal grande (estilo das imagens)
-      zpl += `^FO50,30^A0N,60,60^FD${codigoFormatado}^FS\n`;
+      // Número do pedido GRANDE em destaque no topo (conforme solicitado)
+      const numeroPedidoFormatado = lote.numeroPedido || lote.numeroNota;
+      zpl += `^FO50,35^A0N,75,75^FD${numeroPedidoFormatado}^FS\n`;
 
       // Código de barras Code 128 (baseado no código do volume)
-      zpl += `^FO50,100^BCN,80,Y,N,N^FD${volume.codigoVolume}^FS\n`;
+      zpl += `^FO50,125^BCN,80,Y,N,N^FD${volume.codigoVolume}^FS\n`;
 
       // Nome do cliente (centralizado, fonte menor)
-      zpl += `^FO50,200^A0N,28,28^FD${lote.cliente.toUpperCase()}^FS\n`;
+      zpl += `^FO50,225^A0N,28,28^FD${lote.cliente.toUpperCase()}^FS\n`;
 
       // Volume atual/total (formato X/Y como nas imagens)
-      zpl += `^FO50,240^A0N,35,35^FD${volume.indiceVolume}/${volume.totalVolumes}^FS\n`;
+      zpl += `^FO50,265^A0N,35,35^FD${volume.indiceVolume}/${volume.totalVolumes}^FS\n`;
 
       // Transportadora (se não for RETIRA_CLIENTE)
       if (lote.transportadora !== 'RETIRA_CLIENTE') {
@@ -267,17 +324,21 @@ const GerarEtiquetasContent: React.FC = () => {
                                   lote.transportadora === 'TERCEIRIZADA' ? 'TERCEIRIZADA' :
                                   lote.transportadora === 'DETAFRA_TRANSPORTES' ? 'DETAFRA' :
                                   lote.transportadora === 'RETIRA_VENDEDOR' ? 'RETIRA VENDEDOR' :
+                                  lote.transportadora === 'VLOG' ? 'VLOG' :
                                   lote.transportadora;
         
-        zpl += `^FO50,280^A0N,25,25^FD${transportadoraNome}^FS\n`;
+        zpl += `^FO50,305^A0N,25,25^FD${transportadoraNome}^FS\n`;
       }
 
       // Data no formato brasileiro (canto inferior)
       const dataFormatada = new Date().toLocaleDateString('pt-BR');
-      zpl += `^FO50,320^A0N,20,20^FD${dataFormatada}^FS\n`;
+      zpl += `^FO50,345^A0N,20,20^FD${dataFormatada}^FS\n`;
 
-      // Número da NF (pequeno, canto)
-      zpl += `^FO400,320^A0N,18,18^FDNF: ${lote.numeroNota}^FS\n`;
+      // Número da NF e Pedido (pequeno, canto direito) - mostrando ambos
+      zpl += `^FO350,345^A0N,16,16^FDNF: ${lote.numeroNota}^FS\n`;
+      if (lote.numeroPedido && lote.numeroPedido.trim()) {
+        zpl += `^FO350,365^A0N,16,16^FDPed: ${lote.numeroPedido}^FS\n`;
+      }
 
       // Fim da etiqueta
       zpl += '^XZ\n\n';
@@ -287,29 +348,275 @@ const GerarEtiquetasContent: React.FC = () => {
   };
 
   // Função para imprimir etiquetas
-  const handleImprimir = () => {
+  const handleImprimir = async () => {
     if (!currentLote) return;
 
+    console.log('[Print] Abrindo diálogo de seleção de impressora...');
+    setPrinterDialogOpen(true);
+  };
+
+  // Função para imprimir com impressora selecionada
+  const handlePrintWithPrinter = async (printerName: string) => {
+    if (!currentLote) return;
+
+    setSaving(true);
+    
     try {
-      const zpl = gerarZPL(currentLote);
+      console.log('[Print] Preparando impressão do navegador para:', printerName);
 
-      // Criar blob e fazer download do arquivo .zpl
-      const blob = new Blob([zpl], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `etiquetas-${currentLote.numeroPedido}-${Date.now()}.zpl`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      // Criar HTML para impressão
+      const printWindow = window.open('', '_blank');
+      if (!printWindow) {
+        throw new Error('Não foi possível abrir janela de impressão');
+      }
 
-      setSnackbar({ open: true, message: 'Arquivo ZPL gerado com sucesso! Use uma impressora Zebra para imprimir.', severity: 'success' });
-      setPreviewOpen(false);
+      // Gerar HTML das etiquetas
+      let htmlContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <title>Etiquetas de Transporte</title>
+          <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+          <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body { font-family: 'Courier New', monospace; background: white; }
+            @page { size: 4in 6in; margin: 0; }
+            @media print {
+              body { margin: 0; padding: 0; }
+              .etiqueta { page-break-after: always; }
+            }
+            .etiqueta {
+              width: 4in;
+              height: 6in;
+              padding: 0.15in;
+              display: flex;
+              flex-direction: column;
+              font-size: 10pt;
+              page-break-after: always;
+              border: 1px solid #000;
+            }
+            .header-info {
+              display: flex;
+              justify-content: space-between;
+              font-size: 8pt;
+              margin-bottom: 0.1in;
+              border-bottom: 1px solid #000;
+              padding-bottom: 0.05in;
+            }
+            .barcode-section {
+              display: flex;
+              gap: 0.1in;
+              margin-bottom: 0.1in;
+            }
+            .barcode {
+              flex: 0 0 1.2in;
+              text-align: center;
+              border: 1px solid #000;
+              padding: 0.05in;
+              display: flex;
+              flex-direction: column;
+              justify-content: center;
+              align-items: center;
+            }
+            .barcode svg {
+              max-width: 100%;
+              height: auto;
+              margin: 0 auto;
+            }
+            .barcode-text {
+              font-size: 7pt;
+              margin-top: 0.02in;
+              font-weight: bold;
+            }
+            .info-box {
+              flex: 1;
+              display: flex;
+              flex-direction: column;
+              justify-content: space-between;
+              border: 1px solid #000;
+              padding: 0.05in;
+            }
+            .info-row {
+              display: flex;
+              justify-content: space-between;
+              font-size: 9pt;
+              margin-bottom: 0.03in;
+            }
+            .info-label {
+              font-weight: bold;
+              font-size: 8pt;
+            }
+            .info-value {
+              font-size: 8pt;
+            }
+            .main-content {
+              flex: 1;
+              display: flex;
+              flex-direction: column;
+              justify-content: space-around;
+              margin: 0.1in 0;
+              text-align: center;
+            }
+            .numero-pedido {
+              font-size: 32pt;
+              font-weight: bold;
+              line-height: 1;
+            }
+            .cliente {
+              font-size: 11pt;
+              font-weight: bold;
+              margin: 0.05in 0;
+            }
+            .volume-info {
+              display: flex;
+              justify-content: space-around;
+              align-items: center;
+              margin: 0.05in 0;
+              border: 1px solid #000;
+              padding: 0.05in;
+            }
+            .volume-number {
+              font-size: 18pt;
+              font-weight: bold;
+            }
+            .box-number {
+              font-size: 14pt;
+              font-weight: bold;
+              border: 2px solid #000;
+              padding: 0.05in 0.1in;
+            }
+            .footer-info {
+              display: flex;
+              justify-content: space-between;
+              font-size: 8pt;
+              border-top: 1px solid #000;
+              padding-top: 0.05in;
+              margin-top: 0.05in;
+            }
+          </style>
+        </head>
+        <body>
+      `;
+
+      // Adicionar cada etiqueta
+      currentLote.volumesEtiquetas.forEach((volume, index) => {
+        const transportadoraNome = currentLote.transportadora === 'ACCERT' ? 'ACCERT' :
+                                  currentLote.transportadora === 'EXPRESSO_GOIAS' ? 'EXPRESSO GOIAS' :
+                                  currentLote.transportadora === 'TERCEIRIZADA' ? 'TERCEIRIZADA' :
+                                  currentLote.transportadora === 'DETAFRA_TRANSPORTES' ? 'DETAFRA' :
+                                  currentLote.transportadora === 'RETIRA_VENDEDOR' ? 'RETIRA VENDEDOR' :
+                                  currentLote.transportadora === 'VLOG' ? 'VLOG' :
+                                  currentLote.transportadora;
+
+        const dataAtual = new Date();
+        const dataFormatada = dataAtual.toLocaleDateString('pt-BR');
+        const horaFormatada = dataAtual.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+        // Usar apenas números para o código de barras (Code128 requer formato específico)
+        const codigoBarrasNumerico = volume.codigoVolume.replace(/[^0-9]/g, '').substring(0, 12) || volume.indiceVolume.toString().padStart(12, '0');
+
+        htmlContent += `
+          <div class="etiqueta">
+            <div class="header-info">
+              <span>NF: ${currentLote.numeroNota}</span>
+              <span>${dataFormatada} ${horaFormatada}</span>
+              <span style="font-weight: bold;">${volume.indiceVolume}</span>
+            </div>
+            
+            <div class="barcode-section">
+              <div class="barcode">
+                <svg id="barcode-${index}"></svg>
+                <div class="barcode-text">${codigoBarrasNumerico}</div>
+              </div>
+              <div class="info-box">
+                <div class="info-row">
+                  <span class="info-label">PEDIDO:</span>
+                  <span class="info-value">${currentLote.numeroPedido}</span>
+                </div>
+                <div class="info-row">
+                  <span class="info-label">CLIENTE:</span>
+                  <span class="info-value">${currentLote.cliente.substring(0, 15)}</span>
+                </div>
+                <div class="info-row">
+                  <span class="info-label">TRANSP:</span>
+                  <span class="info-value">${transportadoraNome.substring(0, 12)}</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="main-content">
+              <div class="numero-pedido">${currentLote.numeroPedido}</div>
+              <div class="cliente">${currentLote.cliente.toUpperCase().substring(0, 25)}</div>
+              <div class="volume-info">
+                <div class="volume-number">${volume.indiceVolume}/${volume.totalVolumes}</div>
+                <div class="box-number">BOX<br>${volume.indiceVolume}</div>
+              </div>
+            </div>
+
+            <div class="footer-info">
+              <span>Vol: ${volume.indiceVolume}/${volume.totalVolumes}</span>
+              <span>${dataFormatada}</span>
+              <span>Seq: ${volume.indiceVolume}</span>
+            </div>
+          </div>
+        `;
+      });
+
+      htmlContent += `
+        <script>
+          // Gerar códigos de barras após carregamento
+          window.addEventListener('load', function() {
+            console.log('Gerando códigos de barras...');
+      `;
+
+      // Adicionar script para cada código de barras
+      currentLote.volumesEtiquetas.forEach((volume, index) => {
+        const codigoBarrasNumerico = volume.codigoVolume.replace(/[^0-9]/g, '').substring(0, 12) || volume.indiceVolume.toString().padStart(12, '0');
+        htmlContent += `
+            try {
+              JsBarcode("#barcode-${index}", "${codigoBarrasNumerico}", {
+                format: "CODE128",
+                width: 2,
+                height: 50,
+                displayValue: false,
+                margin: 2
+              });
+            } catch(e) {
+              console.error('Erro ao gerar código de barras ${index}:', e);
+            }
+        `;
+      });
+
+      htmlContent += `
+            console.log('Códigos de barras gerados com sucesso');
+            
+            // Aguardar um pouco para garantir que os códigos foram renderizados
+            setTimeout(function() {
+              window.print();
+              setTimeout(function() {
+                window.close();
+              }, 500);
+            }, 500);
+          });
+        </script>
+        </body>
+        </html>
+      `;
+
+      printWindow.document.write(htmlContent);
+      printWindow.document.close();
 
     } catch (error) {
-      console.error('Erro ao gerar arquivo ZPL:', error);
-      setSnackbar({ open: true, message: 'Erro ao gerar arquivo de impressão', severity: 'error' });
+      console.error('Erro ao imprimir:', error);
+      
+      setSnackbar({ 
+        open: true, 
+        message: `❌ Erro ao imprimir: ${error instanceof Error ? error.message : 'Erro desconhecido'}`, 
+        severity: 'error' 
+      });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -483,11 +790,8 @@ const GerarEtiquetasContent: React.FC = () => {
 
               <Grid container spacing={2}>
                 {currentLote.volumesEtiquetas.map((volume) => {
-                  // Gerar código principal no formato XXX.XXX
-                  const codigoPrincipal = currentLote.numeroNota.replace(/\D/g, '').slice(0, 6);
-                  const codigoFormatado = codigoPrincipal.length >= 6 
-                    ? `${codigoPrincipal.slice(0, 3)}.${codigoPrincipal.slice(3, 6)}`
-                    : currentLote.numeroNota.slice(0, 7);
+                  // Mostrar número do pedido em destaque (conforme solicitado)
+                  const numeroPedidoFormatado = currentLote.numeroPedido || currentLote.numeroNota;
 
                   return (
                     <Grid item xs={12} sm={6} md={4} key={volume.id}>
@@ -506,7 +810,7 @@ const GerarEtiquetasContent: React.FC = () => {
                             fontFamily: 'monospace',
                             mb: 1
                           }}>
-                            {codigoFormatado}
+                            {numeroPedidoFormatado}
                           </Typography>
 
                           {/* Simulação do código de barras */}
@@ -549,6 +853,7 @@ const GerarEtiquetasContent: React.FC = () => {
                                currentLote.transportadora === 'TERCEIRIZADA' ? 'TERCEIRIZADA' :
                                currentLote.transportadora === 'DETAFRA_TRANSPORTES' ? 'DETAFRA' :
                                currentLote.transportadora === 'RETIRA_VENDEDOR' ? 'RETIRA VENDEDOR' :
+                               currentLote.transportadora === 'VLOG' ? 'VLOG' :
                                currentLote.transportadora}
                             </Typography>
                           )}
@@ -583,6 +888,15 @@ const GerarEtiquetasContent: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Diálogo de seleção de impressora */}
+      <PrinterSelectDialog
+        open={printerDialogOpen}
+        onClose={() => setPrinterDialogOpen(false)}
+        onPrint={handlePrintWithPrinter}
+        loading={saving}
+        etiquetasData={currentLote}
+      />
 
       {/* Snackbar para notificações */}
       <Snackbar

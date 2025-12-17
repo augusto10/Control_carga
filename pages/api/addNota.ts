@@ -1,9 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { PrismaClient } from '@prisma/client';
 import * as jwt from 'jsonwebtoken';
 import { parseCookies } from 'nookies';
-
-const prisma = new PrismaClient();
+import prisma from '../../../lib/prisma';
 
 interface AddNotaRequest {
   codigo: string;

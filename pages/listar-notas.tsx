@@ -11,13 +11,14 @@ const ListarNotas = () => {
   const hoje = format(new Date(), 'yyyy-MM-dd');
   const [start, setStart] = useState(hoje);
   const [end, setEnd] = useState(hoje);
+  const [numeroNota, setNumeroNota] = useState('');
   const { notas, fetchNotas } = useStore();
 
   useEffect(() => {
     const loadNotas = async () => {
       setLoading(true);
       try {
-        await fetchNotas(start, end);
+        await fetchNotas(start, end, numeroNota);
       } catch (error) {
         console.error('Erro ao carregar notas:', error);
       } finally {
@@ -25,7 +26,7 @@ const ListarNotas = () => {
       }
     };
     loadNotas();
-  }, [fetchNotas]);
+  }, [fetchNotas, numeroNota]);
 
   const handleFiltrarHoje = async () => {
     const hoje = format(new Date(), 'yyyy-MM-dd');
@@ -33,7 +34,7 @@ const ListarNotas = () => {
     setEnd(hoje);
     setLoading(true);
     try {
-      await fetchNotas(hoje, hoje);
+      await fetchNotas(hoje, hoje, numeroNota);
     } catch (error) {
       console.error('Erro ao filtrar por hoje:', error);
     } finally {
@@ -44,9 +45,10 @@ const ListarNotas = () => {
   const handleLimparFiltros = async () => {
     setStart('');
     setEnd('');
+    setNumeroNota('');
     setLoading(true);
     try {
-      await fetchNotas('', '');
+      await fetchNotas('', '', '');
     } catch (error) {
       console.error('Erro ao limpar filtros:', error);
     } finally {
@@ -71,6 +73,16 @@ const ListarNotas = () => {
             <Grid item xs={12} sm={3}>
               <TextField
                 fullWidth
+                label="Número da Nota"
+                placeholder="Digite o número"
+                value={numeroNota}
+                onChange={(e) => setNumeroNota(e.target.value)}
+                size="small"
+              />
+            </Grid>
+            <Grid item xs={12} sm={3}>
+              <TextField
+                fullWidth
                 label="Data Início"
                 type="date"
                 InputLabelProps={{ shrink: true }}
@@ -90,7 +102,7 @@ const ListarNotas = () => {
                 size="small"
               />
             </Grid>
-            <Grid item xs={12} sm={6}>
+            <Grid item xs={12} sm={3}>
               <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                 <Button 
                   variant="contained" 
@@ -115,7 +127,7 @@ const ListarNotas = () => {
                   onClick={async () => {
                     setLoading(true);
                     try {
-                      await fetchNotas(start, end);
+                      await fetchNotas(start, end, numeroNota);
                     } catch (error) {
                       console.error('Erro ao buscar notas:', error);
                     } finally {

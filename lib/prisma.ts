@@ -1,26 +1,30 @@
-import { PrismaClient } from '@prisma/client/edge';
-import { withAccelerate } from '@prisma/extension-accelerate';
+import { PrismaClient } from '@prisma/client';
 
-// Configuração otimizada para trabalhar apenas com Prisma Accelerate
-// Não requer conexão direta com o banco de dados
+// Configuração para conexão direta com PostgreSQL
+// Sem Prisma Accelerate - usando conexão direta com o banco de dados
 
 const prismaClientSingleton = () => {
   // Log de inicialização
   console.log('=== PRISMA CLIENT INITIALIZATION ===');
   console.log('NODE_ENV:', process.env.NODE_ENV || 'development');
-  console.log('Using Prisma Accelerate:', !!process.env.DATABASE_URL?.includes('accelerate.prisma-data.net'));
+  console.log('DATABASE_URL:', process.env.DATABASE_URL ? '***CONFIGURADO***' : 'NÃO CONFIGURADO');
+  console.log('DIRECT_URL:', process.env.DIRECT_URL ? '***CONFIGURADO***' : 'NÃO CONFIGURADO');
   
-  // Configuração otimizada para o Prisma Accelerate
+  // Forçar URL do banco para desenvolvimento local
+  const databaseUrl = 'postgres://postgres:suporteadmin@localhost:5432/controle_carga_local?sslmode=disable';
+  
+  console.log(' Forçando URL do banco:', databaseUrl.split('://')[0] + '://***');
+  
   const prisma = new PrismaClient({
-    datasourceUrl: process.env.DATABASE_URL,
+    datasources: {
+      db: {
+        url: databaseUrl
+      }
+    },
     log: process.env.NODE_ENV === 'development' 
       ? ['query', 'error', 'warn'] 
       : ['error', 'warn'],
-  }).$extends(
-    withAccelerate({
-      // Configurações adicionais do Accelerate, se necessário
-    })
-  );
+  });
 
   // Adiciona um manipulador de erros personalizado
   prisma.$extends({

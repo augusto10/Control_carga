@@ -1,8 +1,8 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import * as jwt from 'jsonwebtoken';
-import { PrismaClient } from '@prisma/client';
+import prisma from '../../../lib/prisma';
+import { getTokenFromCookies, verifyToken } from '../../../lib/auth';
 
-const prisma = new PrismaClient();
+const JWT_SECRET = process.env.JWT_SECRET || 'seu_segredo_secreto';
 
 const ALLOWED_ORIGINS = [
   'http://localhost:3000',
@@ -31,9 +31,6 @@ const allowCors = (fn: any) => async (req: NextApiRequest, res: NextApiResponse)
   }
 };
 
-// Função para extrair token dos cookies
-import { getTokenFromCookies, verifyToken } from '../../../lib/auth';
-
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Método não permitido' });
@@ -46,16 +43,37 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       return res.status(400).json({ error: 'ID do controle é obrigatório' });
     }
 
-    // Extrair e verificar token JWT
+    // Extrair e verificar token JWT usando função utilitária
+    console.log('[Delete] Extraindo token dos cookies');
     const token = getTokenFromCookies(req);
     if (!token) {
+      console.log('[Delete] Token não encontrado');
       return res.status(401).json({ error: 'Token não encontrado' });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any;
+    console.log('[Delete] Verificando token');
+    const decoded = await verifyToken(token, JWT_SECRET);
+    if (!decoded) {
+      console.log('[Delete] Token inválido ou expirado');
+      return res.status(401).json({ error: 'Token inválido ou expirado' });
+    }
+    
+    console.log('[Delete] Token verificado, usuário:', decoded.id);
+    
+    // Buscar usuário para verificar permissões
+    const usuario = await prisma.usuario.findUnique({
+      where: { id: decoded.id },
+      select: { tipo: true }
+    });
+    
+    if (!usuario) {
+      console.log('[Delete] Usuário não encontrado');
+      return res.status(401).json({ error: 'Usuário não encontrado' });
+    }
     
     // Verificar permissões básicas
-    if (!['ADMIN', 'GERENTE'].includes(decoded.tipo)) {
+    if (!['ADMIN', 'GERENTE'].includes(usuario.tipo)) {
+      console.log('[Delete] Usuário sem permissão:', usuario.tipo);
       return res.status(403).json({ error: 'Permissão negada' });
     }
 
@@ -70,7 +88,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
 
     // Se o controle estiver finalizado, apenas ADMIN pode excluir
-    if (controle.finalizado && decoded.tipo !== 'ADMIN') {
+    if (controle.finalizado && usuario.tipo !== 'ADMIN') {
+      console.log('[Delete] Apenas administradores podem excluir controles finalizados');
       return res.status(403).json({ error: 'Apenas ADMIN pode excluir controle finalizado' });
     }
 
@@ -102,10 +121,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
   } catch (error) {
     console.error('Erro ao excluir controle:', error);
-    
-    if (error instanceof jwt.JsonWebTokenError) {
-      return res.status(401).json({ error: 'Token inválido' });
-    }
     
     return res.status(500).json({ 
       error: 'Erro ao excluir controle',
