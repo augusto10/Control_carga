@@ -65,9 +65,18 @@ export default function Login() {
       console.log('Chamando a função login...');
       await login(formData);
       enqueueSnackbar('Login efetuado com sucesso!', { variant: 'success' });
-    } catch (err: any) {
+    } catch (err: unknown) {
+      interface ApiError extends Error {
+        response?: {
+          data?: {
+            message?: string;
+          };
+        };
+        message: string;
+      }
       console.error('Erro durante o login:', err);
-      const rawMessage = err.response?.data?.message || err.message || 'Erro ao fazer login. Verifique suas credenciais.';
+      const error = err as ApiError;
+      const rawMessage = error.response?.data?.message || error.message || 'Erro ao fazer login. Verifique suas credenciais.';
       let friendlyMessage = rawMessage;
       const lower = rawMessage.toLowerCase();
       if (lower.includes('não encontrado')) {

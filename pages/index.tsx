@@ -1,5 +1,7 @@
-import { Container, Typography, Box, Card, CardContent, CardActionArea, Grid, CircularProgress } from '@mui/material';
+import { Container, Typography, Box, Card, CardContent, Grid, CircularProgress } from '@mui/material';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
+import { useEffect, useState } from 'react';
 import {
   Add as AddIcon,
   NoteAdd as NoteAddIcon,
@@ -8,8 +10,6 @@ import {
 import ListAltIcon from '@mui/icons-material/ListAlt';
 import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
 import { useAuth } from '../contexts/AuthContext';
-import { useRouter } from 'next/router';
-import { useEffect, useState } from 'react';
 
 type MenuCard = {
   title: string;

@@ -4,32 +4,34 @@ import {
   Typography, 
   Paper, 
   Table, 
-  TableBody, 
+  TableBody,
   TableCell, 
   TableContainer, 
   TableHead, 
   TableRow, 
   Button, 
-  IconButton,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  TextField,
-  Box,
-  CircularProgress,
-  Alert,
-  Snackbar,
+  IconButton, 
+  Dialog, 
+  DialogTitle, 
+  DialogContent, 
+  DialogActions, 
+  TextField, 
+  MenuItem, 
+  FormControl, 
+  InputLabel, 
+  Select, 
+  SelectChangeEvent, 
+  Box, 
+  CircularProgress, 
+  Alert, 
+  Snackbar, 
   Chip,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  SelectChangeEvent
+  Avatar,
+  Tooltip,
+  DialogContentText
 } from '@mui/material';
 import { 
   Edit as EditIcon, 
-  Delete as DeleteIcon, 
   CheckCircle as CheckCircleIcon,
   Pending as PendingIcon,
   Refresh as RefreshIcon
@@ -59,6 +61,7 @@ interface Controle {
 }
 
 function GerenciarControlesContent() {
+  // user mantido para uso futuro
   const { user } = useAuth();
   const [controles, setControles] = useState<Controle[]>([]);
   const [loading, setLoading] = useState(true);
@@ -197,7 +200,7 @@ function GerenciarControlesContent() {
     setSnackbar(prev => ({ ...prev, open: false }));
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: string): 'primary' | 'info' | 'success' | 'error' | 'default' => {
     switch (status) {
       case 'ABERTO':
         return 'primary';
@@ -397,7 +400,7 @@ function GerenciarControlesContent() {
           </DialogContent>
           <DialogActions>
             <Button onClick={handleCloseDialog} color="inherit">
-              Cancelar
+              Descartar
             </Button>
             <Button 
               type="submit" 

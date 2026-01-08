@@ -50,8 +50,9 @@ interface Usuario {
 }
 
 function GerenciarUsuariosContent() {
-  const { user, isAuthenticated, logout } = useAuth();
-  const router = useRouter();
+  const { user } = useAuth();
+  // Removidas variáveis não utilizadas: isAuthenticated, logout, router
+  // Elas foram mantidas no comentário para referência futura, caso sejam necessárias
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
