@@ -1,4 +1,4 @@
-import { AppBar, Toolbar, Button, Box, Container, useMediaQuery, useTheme, Menu, MenuItem, Divider } from '@mui/material';
+import { AppBar, Toolbar, Button, Box, Container, useMediaQuery, useTheme, Menu, MenuItem, Divider, alpha } from '@mui/material';
 import Link from 'next/link';
 import { useAuth } from '../contexts/AuthContext';
 import UserMenu from './UserMenu';
@@ -19,8 +19,29 @@ export default function Navbar() {
   const [checklistMenuAnchor, setChecklistMenuAnchor] = useState<null | HTMLElement>(null);
   const [relatoriosMenuAnchor, setRelatoriosMenuAnchor] = useState<null | HTMLElement>(null);
   const [scrolled, setScrolled] = useState(false);
+  const menuButtonSx = {
+    fontWeight: 700,
+    textTransform: 'none',
+    minWidth: isMobile ? 48 : 'auto',
+    px: isMobile ? 1.5 : 2.5,
+    py: 1,
+    borderRadius: 2,
+    color: 'white',
+    fontSize: '0.95rem',
+    letterSpacing: '0.02em',
+    textShadow: '0px 1px 2px rgba(0,0,0,0.2)',
+    '&:hover': {
+      bgcolor: alpha(theme.palette.common.white, 0.25),
+      transform: 'translateY(-2px)',
+      boxShadow: `0 4px 12px ${alpha(theme.palette.common.black, 0.15)}`,
+    },
+    '&:active': {
+      transform: 'translateY(0)'
+    },
+    transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)'
+  };
 
-  // Add shadow to navbar on scroll
+  // Add shadow and styling to navbar on scroll
   if (typeof window !== 'undefined') {
     window.addEventListener('scroll', () => {
       if (window.scrollY > 10) {
@@ -31,23 +52,21 @@ export default function Navbar() {
     });
   }
 
-  const handleLogout = async () => {
-    try {
-      await fetch('/api/auth/logout', { method: 'POST' });
-      router.push('/login');
-    } catch (error) {
-      console.error('Erro ao fazer logout:', error);
-    }
-  };
-
   return (
     <AppBar 
       position="sticky"
-      elevation={scrolled ? 4 : 0}
+      elevation={scrolled ? 8 : 2}
       sx={{
-        backdropFilter: 'blur(10px)',
-        bgcolor: scrolled ? 'rgba(25, 118, 210, 0.95)' : 'primary.main',
-        transition: 'all 0.3s ease'
+        backdropFilter: 'blur(20px)',
+        background: scrolled
+          ? `linear-gradient(135deg, ${alpha('#1a237e', 0.95)} 0%, ${alpha('#0d47a1', 0.95)} 100%)`
+          : `linear-gradient(135deg, #1565c0 0%, #1976d2 100%)`,
+        borderBottom: `2px solid ${alpha(theme.palette.common.white, 0.2)}`,
+        boxShadow: scrolled
+          ? `0 12px 40px ${alpha('#000', 0.4)}`
+          : `0 4px 20px ${alpha('#000', 0.2)}`,
+        transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+        zIndex: theme.zIndex.appBar + 1
       }}
     >
       <Container maxWidth="xl">
@@ -71,17 +90,9 @@ export default function Navbar() {
               <Button 
                 color="inherit" 
                 sx={{ 
-                  fontWeight: 600, 
+                  ...menuButtonSx,
                   display: 'flex', 
-                  alignItems: 'center',
-                  minWidth: isMobile ? 48 : 'auto',
-                  px: isMobile ? 1 : 2,
-                  borderRadius: 2,
-                  '&:hover': {
-                    bgcolor: 'rgba(255,255,255,0.1)',
-                    transform: 'translateY(-1px)'
-                  },
-                  transition: 'all 0.2s ease'
+                  alignItems: 'center'
                 }}
               >
                 <Box component="span" sx={{ mr: isMobile ? 0 : 1, fontSize: isMobile ? 18 : 16 }}>🏠</Box>
@@ -94,17 +105,7 @@ export default function Navbar() {
                 <Link href="/separacao-conferencia/separadores" passHref>
                   <Button 
                     color="inherit" 
-                    sx={{ 
-                      fontWeight: 600,
-                      minWidth: isMobile ? 48 : 'auto',
-                      px: isMobile ? 1 : 2,
-                      borderRadius: 2,
-                      '&:hover': {
-                        bgcolor: 'rgba(255,255,255,0.1)',
-                        transform: 'translateY(-1px)'
-                      },
-                      transition: 'all 0.2s ease'
-                    }}
+                    sx={menuButtonSx}
                   >
                     {isMobile ? (
                     <>
@@ -117,17 +118,7 @@ export default function Navbar() {
                 <Link href="/separacao-conferencia/conferentes" passHref>
                   <Button 
                     color="inherit" 
-                    sx={{ 
-                      fontWeight: 600,
-                      minWidth: isMobile ? 48 : 'auto',
-                      px: isMobile ? 1 : 2,
-                      borderRadius: 2,
-                      '&:hover': {
-                        bgcolor: 'rgba(255,255,255,0.1)',
-                        transform: 'translateY(-1px)'
-                      },
-                      transition: 'all 0.2s ease'
-                    }}
+                    sx={menuButtonSx}
                   >
                     {isMobile ? (
                     <>
@@ -140,17 +131,7 @@ export default function Navbar() {
                 <Link href="/conferencias" passHref>
                   <Button 
                     color="inherit" 
-                    sx={{ 
-                      fontWeight: 600,
-                      minWidth: isMobile ? 48 : 'auto',
-                      px: isMobile ? 1 : 2,
-                      borderRadius: 2,
-                      '&:hover': {
-                        bgcolor: 'rgba(255,255,255,0.1)',
-                        transform: 'translateY(-1px)'
-                      },
-                      transition: 'all 0.2s ease'
-                    }}
+                    sx={menuButtonSx}
                   >
                     {isMobile ? (
                     <>
@@ -164,17 +145,11 @@ export default function Navbar() {
                 <Button 
                   color="inherit" 
                   sx={{ 
-                    fontWeight: 600, 
+                    ...menuButtonSx,
                     display: 'flex', 
                     alignItems: 'center',
                     minWidth: isMobile ? 'auto' : 120,
-                    px: isMobile ? 1.5 : 2,
-                    borderRadius: 2,
-                    '&:hover': {
-                      bgcolor: 'rgba(255,255,255,0.1)',
-                      transform: 'translateY(-1px)'
-                    },
-                    transition: 'all 0.2s ease'
+                    px: isMobile ? 1.5 : 2
                   }}
                   onClick={(e) => setChecklistMenuAnchor(e.currentTarget)}
                   endIcon={<ExpandMoreIcon sx={{ fontSize: isMobile ? 20 : 16 }} />}
@@ -200,7 +175,10 @@ export default function Navbar() {
                       minWidth: isMobile ? '90vw' : 200,
                       maxWidth: '95vw',
                       borderRadius: 2,
-                      boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
+                      boxShadow: `0 16px 40px ${alpha(theme.palette.common.black, 0.18)}`,
+                      border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
+                      backdropFilter: 'blur(10px)',
+                      backgroundColor: alpha(theme.palette.background.paper, 0.98),
                       '& .MuiMenuItem-root': {
                         minHeight: isMobile ? 56 : 42,
                         borderRadius: 1,
@@ -272,17 +250,11 @@ export default function Navbar() {
                 <Button 
                   color="inherit" 
                   sx={{ 
-                    fontWeight: 600, 
+                    ...menuButtonSx,
                     display: 'flex', 
                     alignItems: 'center',
                     minWidth: isMobile ? 'auto' : 120,
-                    px: isMobile ? 1.5 : 2,
-                    borderRadius: 2,
-                    '&:hover': {
-                      bgcolor: 'rgba(255,255,255,0.1)',
-                      transform: 'translateY(-1px)'
-                    },
-                    transition: 'all 0.2s ease'
+                    px: isMobile ? 1.5 : 2
                   }}
                   onClick={(e) => setRelatoriosMenuAnchor(e.currentTarget)}
                   endIcon={<ExpandMoreIcon sx={{ fontSize: isMobile ? 20 : 16 }} />}
@@ -306,7 +278,10 @@ export default function Navbar() {
                       mt: 1,
                       minWidth: 200,
                       borderRadius: 2,
-                      boxShadow: '0 8px 32px rgba(0,0,0,0.12)'
+                      boxShadow: `0 16px 40px ${alpha(theme.palette.common.black, 0.18)}`,
+                      border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
+                      backdropFilter: 'blur(10px)',
+                      backgroundColor: alpha(theme.palette.background.paper, 0.98)
                     }
                   }}
                 >
@@ -328,17 +303,7 @@ export default function Navbar() {
                 <Link href="/gerar-etiquetas" passHref>
                   <Button 
                     color="inherit" 
-                    sx={{ 
-                      fontWeight: 600,
-                      minWidth: isMobile ? 48 : 'auto',
-                      px: isMobile ? 1 : 2,
-                      borderRadius: 2,
-                      '&:hover': {
-                        bgcolor: 'rgba(255,255,255,0.1)',
-                        transform: 'translateY(-1px)'
-                      },
-                      transition: 'all 0.2s ease'
-                    }}
+                    sx={menuButtonSx}
                   >
                     {isMobile ? (
                     <>
@@ -351,7 +316,23 @@ export default function Navbar() {
                 
                 {user?.tipo === 'ADMIN' && (
                   <Link href="/admin" passHref>
-                    <Button color="secondary" variant="outlined" size="small" sx={{ ml: 1, fontWeight: 600 }}>
+                    <Button
+                      color="inherit"
+                      variant="outlined"
+                      size="small"
+                      sx={{
+                        ml: 1,
+                        fontWeight: 600,
+                        borderColor: alpha(theme.palette.common.white, 0.4),
+                        color: 'white',
+                        textTransform: 'none',
+                        borderRadius: 999,
+                        '&:hover': {
+                          borderColor: alpha(theme.palette.common.white, 0.8),
+                          bgcolor: alpha(theme.palette.common.white, 0.12)
+                        }
+                      }}
+                    >
                       {isMobile ? '👑' : 'Admin'}
                     </Button>
                   </Link>

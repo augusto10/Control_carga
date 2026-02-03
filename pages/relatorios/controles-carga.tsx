@@ -23,11 +23,14 @@ import {
   Chip,
   Tabs,
   Tab,
-  Divider
+  Divider,
+  Stack
 } from '@mui/material';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRouter } from 'next/router';
+import ResponsiveContainer from '../../components/ResponsiveContainer';
+import ProtectedRoute from '../../components/ProtectedRoute';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -293,10 +296,17 @@ const RelatorioControlesCargaPage: React.FC = () => {
   }
 
   return (
-    <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
-      <Typography variant="h4" component="h1" gutterBottom>
-        Relatório de Controles de Carga
-      </Typography>
+    <ProtectedRoute>
+      <ResponsiveContainer
+        breadcrumb={[
+          { label: 'Dashboard', path: '/' },
+          { label: 'Relatórios', path: '/relatorios' },
+          { label: 'Controles de Carga' }
+        ]}
+      >
+        <Typography variant="h4" component="h1" gutterBottom>
+          Relatório de Controles de Carga
+        </Typography>
 
       {/* Filtros */}
       <Paper sx={{ p: 3, mb: 3 }}>
@@ -686,7 +696,8 @@ const RelatorioControlesCargaPage: React.FC = () => {
           </Box>
         )}
       </Paper>
-    </Container>
+      </ResponsiveContainer>
+    </ProtectedRoute>
   );
 };
 

@@ -12,7 +12,9 @@ import {
   Divider,
   Alert,
   Stack,
-  Chip
+  Chip,
+  alpha,
+  useTheme
 } from '@mui/material';
 import Layout from '../components/Layout';
 import SignaturePadPro, { SignaturePadProHandles } from '../components/SignaturePadPro';
@@ -23,6 +25,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 
 const TesteAssinatura: React.FC = () => {
+  const theme = useTheme();
   const [savedSignature, setSavedSignature] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [modalType, setModalType] = useState<'motorista' | 'responsavel'>('motorista');
@@ -102,12 +105,26 @@ const TesteAssinatura: React.FC = () => {
                   {savedSignature && (
                     <Alert 
                       severity="success" 
-                      sx={{ mt: 2 }}
+                      variant="standard"
+                      sx={{ 
+                        mt: 2,
+                        borderRadius: '16px',
+                        backdropFilter: 'blur(12px)',
+                        backgroundColor: alpha(theme.palette.success.main, 0.15),
+                        color: theme.palette.success.dark,
+                        border: `1px solid ${alpha(theme.palette.success.main, 0.3)}`,
+                        '& .MuiAlert-icon': {
+                          color: theme.palette.success.main,
+                        },
+                        boxShadow: `0 8px 32px 0 ${alpha(theme.palette.common.black, 0.1)}`,
+                        fontWeight: 600,
+                      }}
                       action={
                         <Button 
                           color="inherit" 
                           size="small"
                           onClick={handleClearSaved}
+                          sx={{ fontWeight: 600 }}
                         >
                           Limpar
                         </Button>
@@ -125,9 +142,10 @@ const TesteAssinatura: React.FC = () => {
                           maxHeight: 60,
                           mt: 1,
                           border: '1px solid',
-                          borderColor: 'divider',
-                          borderRadius: 1,
-                          backgroundColor: 'white'
+                          borderColor: alpha(theme.palette.success.main, 0.3),
+                          borderRadius: 2,
+                          backgroundColor: alpha(theme.palette.common.white, 0.5),
+                          p: 0.5
                         }}
                       />
                     </Alert>

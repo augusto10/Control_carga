@@ -22,7 +22,9 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogActions
+  DialogActions,
+  useTheme,
+  alpha
 } from '@mui/material';
 import {
   Warning as WarningIcon,
@@ -77,6 +79,7 @@ interface AlertaValidadeItem {
 }
 
 const RelatorioValidadePage = () => {
+  const theme = useTheme();
   const [alertas, setAlertas] = useState<AlertaValidadeItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedAlerta, setSelectedAlerta] = useState<AlertaValidadeItem | null>(null);
@@ -408,8 +411,24 @@ const RelatorioValidadePage = () => {
                   </TableRow>
                 ) : alertas.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} align="center">
-                      <Alert severity="info">
+                    <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
+                      <Alert 
+                        severity="info"
+                        variant="standard"
+                        sx={{ 
+                          borderRadius: '16px',
+                          backdropFilter: 'blur(12px)',
+                          backgroundColor: alpha(theme.palette.info.main, 0.15),
+                          color: theme.palette.info.dark,
+                          border: `1px solid ${alpha(theme.palette.info.main, 0.3)}`,
+                          '& .MuiAlert-icon': {
+                            color: theme.palette.info.main,
+                          },
+                          boxShadow: `0 8px 32px 0 ${alpha(theme.palette.common.black, 0.1)}`,
+                          fontWeight: 600,
+                          justifyContent: 'center'
+                        }}
+                      >
                         Nenhum alerta de validade encontrado
                       </Alert>
                     </TableCell>
@@ -478,7 +497,23 @@ const RelatorioValidadePage = () => {
           <DialogContent>
             {selectedAlerta && (
               <Box sx={{ mt: 2 }}>
-                <Alert severity="warning" sx={{ mb: 3 }}>
+                <Alert 
+                  severity="warning" 
+                  variant="standard"
+                  sx={{ 
+                    mb: 3,
+                    borderRadius: '16px',
+                    backdropFilter: 'blur(12px)',
+                    backgroundColor: alpha(theme.palette.warning.main, 0.15),
+                    color: theme.palette.warning.dark,
+                    border: `1px solid ${alpha(theme.palette.warning.main, 0.3)}`,
+                    '& .MuiAlert-icon': {
+                      color: theme.palette.warning.main,
+                    },
+                    boxShadow: `0 8px 32px 0 ${alpha(theme.palette.common.black, 0.1)}`,
+                    fontWeight: 600,
+                  }}
+                >
                   <Typography variant="body1" gutterBottom>
                     <strong>Produtos com validade inferior a 8 meses foram autorizados para prosseguir.</strong>
                   </Typography>

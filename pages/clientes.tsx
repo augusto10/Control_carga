@@ -22,17 +22,35 @@ import {
   Chip,
   IconButton,
   Alert,
-  CircularProgress
+  CircularProgress,
+  alpha,
+  Stack,
+  Avatar,
+  useTheme,
+  Tooltip,
+  InputAdornment
 } from '@mui/material';
 import {
   Add as AddIcon,
   Business as BusinessIcon,
   Edit as EditIcon,
-  Delete as DeleteIcon
+  Delete as DeleteIcon,
+  Search as SearchIcon,
+  Refresh as RefreshIcon,
+  Person as PersonIcon,
+  Phone as PhoneIcon,
+  Badge as BadgeIcon,
+  LocalShipping as ShippingIcon
 } from '@mui/icons-material';
 import { useSnackbar } from 'notistack';
-import Layout from '../components/Layout';
 import InputMask from '../components/InputMask';
+import { motion, AnimatePresence } from 'framer-motion';
+import ProtectedRoute from '@/components/ProtectedRoute';
+import ResponsiveContainer from '@/components/ResponsiveContainer';
+
+const MotionBox = motion(Box);
+const MotionPaper = motion(Paper);
+const MotionTableRow = motion(TableRow);
 
 interface Cliente {
   id: string;
@@ -53,6 +71,7 @@ interface Transportadora {
 }
 
 const ClientesPage: React.FC = () => {
+  const theme = useTheme();
   const { user } = useAuth();
   const router = useRouter();
   const { enqueueSnackbar } = useSnackbar();
@@ -62,6 +81,7 @@ const ClientesPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [openDialog, setOpenDialog] = useState(false);
   const [editando, setEditando] = useState<Cliente | null>(null);
+  const [search, setSearch] = useState('');
   const [formData, setFormData] = useState({
     nome: '',
     telefone: '',
@@ -203,169 +223,372 @@ const ClientesPage: React.FC = () => {
     }
   };
 
+  const clientesFiltrados = clientes.filter(c => 
+    c.nome.toLowerCase().includes(search.toLowerCase()) ||
+    c.cpf.includes(search) ||
+    c.telefone.includes(search)
+  );
+
   if (!user) return null;
 
   return (
-    <Layout>
-      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <BusinessIcon sx={{ fontSize: 32, color: 'primary.main' }} />
-            <Typography variant="h4" component="h1" sx={{ fontWeight: 600 }}>
-              Clientes
-            </Typography>
-          </Box>
-          
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => handleOpenDialog()}
+    <ProtectedRoute>
+      <ResponsiveContainer
+        breadcrumb={[
+          { label: 'Dashboard', path: '/' },
+          { label: 'Clientes' }
+        ]}
+      >
+        <MotionBox
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          sx={{ mb: 4 }}
+        >
+            <Stack 
+              direction={{ xs: 'column', md: 'row' }} 
+              justifyContent="space-between" 
+              alignItems={{ xs: 'flex-start', md: 'center' }}
+              spacing={2}
+            >
+              <Stack direction="row" alignItems="center" spacing={2}>
+                <Avatar sx={{ 
+                  bgcolor: 'primary.main', 
+                  width: 56, 
+                  height: 56, 
+                  boxShadow: '0 8px 16px rgba(37, 99, 235, 0.2)',
+                  background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)'
+                }}>
+                  <BusinessIcon sx={{ fontSize: 32 }} />
+                </Avatar>
+                <Box>
+                  <Typography variant="h4" fontWeight="800" color="#1e293b" sx={{ fontSize: { xs: '1.5rem', md: '2.125rem' } }}>
+                    Clientes
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" fontWeight="500">
+                    Gerencie o cadastro de clientes e parceiros
+                  </Typography>
+                </Box>
+              </Stack>
+
+              <Button
+                variant="contained"
+                startIcon={<AddIcon />}
+                onClick={() => handleOpenDialog()}
+                sx={{
+                  borderRadius: '12px',
+                  px: 3,
+                  py: 1.5,
+                  textTransform: 'none',
+                  fontWeight: 700,
+                  background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                  boxShadow: '0 4px 12px rgba(37, 99, 235, 0.2)',
+                  '&:hover': {
+                    background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                  }
+                }}
+              >
+                Novo Cliente
+              </Button>
+            </Stack>
+          </MotionBox>
+
+          <MotionPaper
+            elevation={0}
             sx={{
-              borderRadius: '8px',
-              textTransform: 'none',
-              fontWeight: 500,
-              background: 'linear-gradient(135deg, #1976d2 0%, #42a5f5 100%)',
-              '&:hover': {
-                background: 'linear-gradient(135deg, #1565c0 0%, #1976d2 100%)',
-              }
+              p: { xs: 2, md: 3 },
+              mb: 3,
+              borderRadius: '24px',
+              border: '1px solid',
+              borderColor: alpha('#e2e8f0', 0.6),
+              bgcolor: 'rgba(255, 255, 255, 0.8)',
+              backdropFilter: 'blur(10px)',
+              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.03)'
             }}
           >
-            Novo Cliente
-          </Button>
-        </Box>
-
-        {loading ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
-            <CircularProgress />
-          </Box>
-        ) : (
-          <TableContainer component={Paper} sx={{ borderRadius: '12px', overflow: 'hidden' }}>
-            <Table>
-              <TableHead sx={{ bgcolor: 'grey.50' }}>
-                <TableRow>
-                  <TableCell sx={{ fontWeight: 600 }}>Nome</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Telefone</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>CPF</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Transportadora</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Data Cadastro</TableCell>
-                  <TableCell sx={{ fontWeight: 600, textAlign: 'center' }}>Ações</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {clientes.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} sx={{ textAlign: 'center', py: 4 }}>
-                      <Typography variant="body1" color="text.secondary">
-                        Nenhum cliente cadastrado
-                      </Typography>
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  clientes.map((cliente) => (
-                    <TableRow key={cliente.id} hover>
-                      <TableCell sx={{ fontWeight: 500 }}>{cliente.nome}</TableCell>
-                      <TableCell>{cliente.telefone}</TableCell>
-                      <TableCell>{cliente.cpf}</TableCell>
-                      <TableCell>
-                        <Chip 
-                          label={cliente.transportadoraId} 
-                          size="small"
-                          color="secondary"
-                          variant="outlined"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        {new Date(cliente.dataCriacao).toLocaleDateString('pt-BR')}
-                      </TableCell>
-                      <TableCell sx={{ textAlign: 'center' }}>
-                        <IconButton
-                          size="small"
-                          onClick={() => handleOpenDialog(cliente)}
-                          sx={{ mr: 1 }}
-                        >
-                          <EditIcon />
-                        </IconButton>
-                        <IconButton
-                          size="small"
-                          onClick={() => handleDelete(cliente)}
-                          color="error"
-                        >
-                          <DeleteIcon />
-                        </IconButton>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        )}
-
-        {/* Dialog para adicionar/editar cliente */}
-        <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
-          <DialogTitle>
-            {editando ? 'Editar Cliente' : 'Novo Cliente'}
-          </DialogTitle>
-          <DialogContent>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems="center">
               <TextField
-                label="Nome"
-                value={formData.nome}
-                onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
                 fullWidth
-                required
+                placeholder="Buscar por nome, CPF ou telefone..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon sx={{ color: 'text.secondary' }} />
+                    </InputAdornment>
+                  ),
+                  sx: { borderRadius: '14px', bgcolor: 'white' }
+                }}
               />
-              
-              <InputMask
-                label="Telefone"
-                mask="telefone"
-                value={formData.telefone}
-                onChange={(value) => setFormData({ ...formData, telefone: value })}
-                fullWidth
-                required
-              />
-              
-              <InputMask
-                label="CPF"
-                mask="cpf"
-                value={formData.cpf}
-                onChange={(value) => setFormData({ ...formData, cpf: value })}
-                fullWidth
-                required
-                disabled={!!editando}
-              />
-              
-              <TextField
-                select
-                label="Transportadora"
-                value={formData.transportadoraId}
-                onChange={(e) => setFormData({ ...formData, transportadoraId: e.target.value })}
-                fullWidth
-                required
-                helperText="Clientes usam 'Retira Cliente' por padrão"
-              >
-                <MenuItem value="RETIRA_CLIENTE">Retira Cliente</MenuItem>
-                {transportadoras.map((transportadora) => (
-                  <MenuItem key={transportadora.id} value={transportadora.id}>
-                    {transportadora.nome}
-                  </MenuItem>
-                ))}
-              </TextField>
+              <Tooltip title="Atualizar">
+                <IconButton 
+                  onClick={buscarDados} 
+                  disabled={loading}
+                  sx={{ 
+                    bgcolor: 'white', 
+                    borderRadius: '12px',
+                    border: '1px solid',
+                    borderColor: '#e2e8f0',
+                    width: 56,
+                    height: 56
+                  }}
+                >
+                  <RefreshIcon className={loading ? 'spin-animation' : ''} />
+                </IconButton>
+              </Tooltip>
+            </Stack>
+          </MotionPaper>
+
+          {loading && clientes.length === 0 ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+              <CircularProgress />
             </Box>
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={handleCloseDialog}>Cancelar</Button>
-            <Button 
-              onClick={handleSubmit} 
-              variant="contained"
-              disabled={!formData.nome || !formData.telefone || !formData.cpf || !formData.transportadoraId}
+          ) : (
+            <TableContainer 
+              component={MotionPaper}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              elevation={0}
+              sx={{ 
+                borderRadius: '24px', 
+                border: '1px solid',
+                borderColor: alpha('#e2e8f0', 0.6),
+                overflow: 'hidden',
+                bgcolor: 'rgba(255, 255, 255, 0.9)'
+              }}
             >
-              {editando ? 'Atualizar' : 'Cadastrar'}
-            </Button>
-          </DialogActions>
-        </Dialog>
-      </Container>
-    </Layout>
+              <Table>
+                <TableHead>
+                  <TableRow sx={{ bgcolor: alpha('#f8fafc', 0.8) }}>
+                    <TableCell sx={{ fontWeight: 700, color: '#475569', py: 2.5 }}>Nome</TableCell>
+                    <TableCell sx={{ fontWeight: 700, color: '#475569' }}>Contato</TableCell>
+                    <TableCell sx={{ fontWeight: 700, color: '#475569' }}>Documento</TableCell>
+                    <TableCell sx={{ fontWeight: 700, color: '#475569' }}>Transportadora</TableCell>
+                    <TableCell sx={{ fontWeight: 700, color: '#475569', textAlign: 'center' }}>Ações</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  <AnimatePresence mode="popLayout">
+                    {clientesFiltrados.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={5} sx={{ textAlign: 'center', py: 8 }}>
+                          <Box sx={{ opacity: 0.5 }}>
+                            <PersonIcon sx={{ fontSize: 48, mb: 1 }} />
+                            <Typography variant="h6" fontWeight="600">
+                              Nenhum cliente encontrado
+                            </Typography>
+                          </Box>
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      clientesFiltrados.map((cliente, index) => (
+                        <MotionTableRow 
+                          key={cliente.id}
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          exit={{ opacity: 0, x: 10 }}
+                          transition={{ delay: index * 0.03 }}
+                          hover
+                          sx={{ '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.02) } }}
+                        >
+                          <TableCell sx={{ py: 2 }}>
+                            <Stack direction="row" alignItems="center" spacing={1.5}>
+                              <Avatar sx={{ bgcolor: alpha(theme.palette.primary.main, 0.1), color: 'primary.main', fontWeight: 700, fontSize: '0.875rem' }}>
+                                {cliente.nome.charAt(0)}
+                              </Avatar>
+                              <Box>
+                                <Typography variant="subtitle2" fontWeight="700" color="#1e293b">
+                                  {cliente.nome}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                  Cadastrado em {new Date(cliente.dataCriacao).toLocaleDateString('pt-BR')}
+                                </Typography>
+                              </Box>
+                            </Stack>
+                          </TableCell>
+                          <TableCell>
+                            <Stack direction="row" alignItems="center" spacing={1}>
+                              <PhoneIcon sx={{ fontSize: 16, color: 'text.disabled' }} />
+                              <Typography variant="body2" fontWeight="600" color="#475569">
+                                {cliente.telefone}
+                              </Typography>
+                            </Stack>
+                          </TableCell>
+                          <TableCell>
+                            <Stack direction="row" alignItems="center" spacing={1}>
+                              <BadgeIcon sx={{ fontSize: 16, color: 'text.disabled' }} />
+                              <Typography variant="body2" fontWeight="600" color="#475569">
+                                {cliente.cpf}
+                              </Typography>
+                            </Stack>
+                          </TableCell>
+                          <TableCell>
+                            <Chip 
+                              label={cliente.transportadoraId === 'RETIRA_CLIENTE' ? 'Retira Cliente' : cliente.transportadoraId} 
+                              size="small"
+                              sx={{ 
+                                fontWeight: 700, 
+                                borderRadius: '8px',
+                                bgcolor: cliente.transportadoraId === 'RETIRA_CLIENTE' ? alpha('#10b981', 0.1) : alpha('#3b82f6', 0.1),
+                                color: cliente.transportadoraId === 'RETIRA_CLIENTE' ? '#059669' : '#2563eb',
+                                border: 'none'
+                              }}
+                            />
+                          </TableCell>
+                          <TableCell sx={{ textAlign: 'center' }}>
+                            <Tooltip title="Editar">
+                              <IconButton
+                                size="small"
+                                onClick={() => handleOpenDialog(cliente)}
+                                sx={{ color: 'primary.main', bgcolor: alpha(theme.palette.primary.main, 0.05), mr: 1 }}
+                              >
+                                <EditIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Excluir">
+                              <IconButton
+                                size="small"
+                                onClick={() => handleDelete(cliente)}
+                                sx={{ color: 'error.main', bgcolor: alpha(theme.palette.error.main, 0.05) }}
+                              >
+                                <DeleteIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          </TableCell>
+                        </MotionTableRow>
+                      ))
+                    )}
+                  </AnimatePresence>
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
+
+          {/* Dialog para adicionar/editar cliente */}
+          <Dialog 
+            open={openDialog} 
+            onClose={handleCloseDialog} 
+            maxWidth="sm" 
+            fullWidth
+            PaperProps={{
+              sx: { borderRadius: '24px', p: 1 }
+            }}
+          >
+            <DialogTitle sx={{ fontWeight: 800, color: '#1e293b' }}>
+              {editando ? 'Editar Cliente' : 'Novo Cliente'}
+            </DialogTitle>
+            <DialogContent>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, mt: 2 }}>
+                <TextField
+                  label="Nome Completo"
+                  value={formData.nome}
+                  onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
+                  fullWidth
+                  required
+                  placeholder="Ex: João da Silva"
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <PersonIcon sx={{ color: 'text.secondary' }} />
+                      </InputAdornment>
+                    ),
+                    sx: { borderRadius: '14px' }
+                  }}
+                />
+                
+                <InputMask
+                  label="Telefone de Contato"
+                  mask="telefone"
+                  value={formData.telefone}
+                  onChange={(value) => setFormData({ ...formData, telefone: value })}
+                  fullWidth
+                  required
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <PhoneIcon sx={{ color: 'text.secondary' }} />
+                      </InputAdornment>
+                    ),
+                    sx: { borderRadius: '14px' }
+                  }}
+                />
+                
+                <InputMask
+                  label="CPF"
+                  mask="cpf"
+                  value={formData.cpf}
+                  onChange={(value) => setFormData({ ...formData, cpf: value })}
+                  fullWidth
+                  required
+                  disabled={!!editando}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <BadgeIcon sx={{ color: 'text.secondary' }} />
+                      </InputAdornment>
+                    ),
+                    sx: { borderRadius: '14px' }
+                  }}
+                />
+                
+                <TextField
+                  select
+                  label="Transportadora Vinculada"
+                  value={formData.transportadoraId}
+                  onChange={(e) => setFormData({ ...formData, transportadoraId: e.target.value })}
+                  fullWidth
+                  required
+                  helperText="Clientes usam 'Retira Cliente' por padrão"
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <ShippingIcon sx={{ color: 'text.secondary' }} />
+                      </InputAdornment>
+                    ),
+                    sx: { borderRadius: '14px' }
+                  }}
+                >
+                  <MenuItem value="RETIRA_CLIENTE">Retira Cliente</MenuItem>
+                  {transportadoras.map((transportadora) => (
+                    <MenuItem key={transportadora.id} value={transportadora.id}>
+                      {transportadora.nome}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              </Box>
+            </DialogContent>
+            <DialogActions sx={{ p: 3, pt: 1 }}>
+              <Button onClick={handleCloseDialog} sx={{ fontWeight: 700, color: 'text.secondary' }}>
+                Cancelar
+              </Button>
+              <Button 
+                onClick={handleSubmit} 
+                variant="contained"
+                disabled={!formData.nome || !formData.telefone || !formData.cpf || !formData.transportadoraId}
+                sx={{ 
+                  borderRadius: '12px', 
+                  fontWeight: 700, 
+                  px: 4,
+                  background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                  boxShadow: '0 4px 12px rgba(37, 99, 235, 0.2)'
+                }}
+              >
+                {editando ? 'Salvar Alterações' : 'Cadastrar Cliente'}
+              </Button>
+            </DialogActions>
+          </Dialog>
+      </ResponsiveContainer>
+
+      <style jsx global>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        .spin-animation {
+          animation: spin 1s linear infinite;
+        }
+      `}</style>
+    </ProtectedRoute>
   );
 };
 

@@ -13,15 +13,38 @@ import {
   Divider, 
   Alert,
   Snackbar,
-  CircularProgress
+  CircularProgress,
+  Grid,
+  Card,
+  CardContent,
+  Stack,
+  InputAdornment,
+  Tooltip,
+  useTheme,
+  useMediaQuery
 } from '@mui/material';
-import { Edit as EditIcon, Save as SaveIcon, Cancel as CancelIcon, PhotoCamera as PhotoCameraIcon } from '@mui/icons-material';
+import { 
+  Edit as EditIcon, 
+  Save as SaveIcon, 
+  Cancel as CancelIcon, 
+  PhotoCamera as PhotoCameraIcon,
+  Person as PersonIcon,
+  Email as EmailIcon,
+  Lock as LockIcon,
+  Badge as BadgeIcon,
+  Close as CloseIcon
+} from '@mui/icons-material';
 import { AuthContext } from '../../contexts/AuthContext';
 import AdminLayout from '../../components/admin/AdminLayout';
 import AdminRoute from '../../components/admin/AdminRoute';
 import RankingComponent from '../../components/RankingComponent';
 import { obterMinhaPontuacao, PontuacaoResponse } from '../../services/gamificacaoService';
 import ImageCapture from '../../components/ImageCapture';
+import { motion, AnimatePresence } from 'framer-motion';
+
+const MotionBox = motion(Box);
+const MotionPaper = motion(Paper);
+const MotionCard = motion(Card);
 
 interface PerfilFormData {
   nome: string;
@@ -40,6 +63,8 @@ interface PerfilFormErrors {
 }
 
 function PerfilUsuarioContent() {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const auth = useContext(AuthContext);
   if (!auth) {
     throw new Error('useAuth must be used within an AuthProvider');
@@ -296,190 +321,389 @@ function PerfilUsuarioContent() {
 
   return (
     <AdminLayout title="Meu Perfil">
-      <Container maxWidth="md">
-        <Paper elevation={3} sx={{ p: 4 }}>
-          <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-            <Typography variant="h5" component="h1">
-              Meu Perfil
-            </Typography>
-            {!editing && (
-              <Button 
-                variant="contained" 
-                color="primary" 
-                startIcon={<EditIcon />}
-                onClick={handleEditClick}
-              >
-                Editar Perfil
-              </Button>
-            )}
-          </Box>
+      <AnimatePresence>
+        <MotionBox
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          sx={{ py: { xs: 2, md: 4 } }}
+        >
+          <Container maxWidth="lg">
+            <Grid container spacing={4}>
+              {/* Coluna da Esquerda: Perfil e Resumo */}
+              <Grid item xs={12} md={4}>
+                <Stack spacing={3}>
+                  <MotionCard
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.2 }}
+                    sx={{
+                      background: 'rgba(255, 255, 255, 0.8)',
+                      backdropFilter: 'blur(10px)',
+                      borderRadius: 4,
+                      border: '1px solid rgba(255, 255, 255, 0.3)',
+                      boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.07)',
+                      overflow: 'visible'
+                    }}
+                  >
+                    <CardContent sx={{ pt: 6, pb: 4, px: 3, textAlign: 'center' }}>
+                      <Box position="relative" display="inline-block" sx={{ mb: 3 }}>
+                        <Avatar 
+                          src={user?.foto || undefined} 
+                          sx={{ 
+                            width: 140, 
+                            height: 140, 
+                            fontSize: '3rem',
+                            boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                            border: '4px solid white'
+                          }}
+                        >
+                          {!user?.foto && user?.nome?.charAt(0).toUpperCase()}
+                        </Avatar>
+                        
+                        <input
+                          accept="image/*"
+                          type="file"
+                          id="photo-upload"
+                          onChange={handlePhotoUpload}
+                          style={{ display: 'none' }}
+                          disabled={uploadingPhoto}
+                        />
+                        
+                        {editing && (
+                          <Tooltip title="Alterar foto">
+                            <label htmlFor="photo-upload">
+                              <IconButton
+                                component="span"
+                                sx={{
+                                  position: 'absolute',
+                                  bottom: 5,
+                                  right: 5,
+                                  backgroundColor: 'primary.main',
+                                  color: 'white',
+                                  boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+                                  '&:hover': {
+                                    backgroundColor: 'primary.dark',
+                                    transform: 'scale(1.1)'
+                                  },
+                                  transition: 'all 0.2s',
+                                  width: 42,
+                                  height: 42,
+                                }}
+                                disabled={uploadingPhoto}
+                              >
+                                {uploadingPhoto ? <CircularProgress size={20} color="inherit" /> : <PhotoCameraIcon />}
+                              </IconButton>
+                            </label>
+                          </Tooltip>
+                        )}
+                      </Box>
 
-          <Box display="flex" flexDirection={{ xs: 'column', md: 'row' }} gap={4}>
-            <Box 
-              display="flex" 
-              flexDirection="column" 
-              alignItems="center" 
-              mb={{ xs: 3, md: 0 }}
-              minWidth={200}
-            >
-              <Box position="relative" display="inline-block">
-                <Avatar 
-                  src={user?.foto || undefined} 
-                  sx={{ width: 100, height: 100, mr: 3 }}
-                >
-                  {!user?.foto && user?.nome?.charAt(0).toUpperCase()}
-                </Avatar>
-                <input
-                  accept="image/*"
-                  type="file"
-                  id="photo-upload"
-                  onChange={handlePhotoUpload}
-                  style={{ display: 'none' }}
-                  disabled={uploadingPhoto}
-                />
-                {editing && (
-                  <label htmlFor="photo-upload">
-                    <IconButton
-                      color="primary"
-                      component="span"
-                      sx={{
-                        position: 'absolute',
-                        bottom: -5,
-                        right: 15,
-                        backgroundColor: 'primary.main',
-                        color: 'white',
-                        '&:hover': {
-                          backgroundColor: 'primary.dark',
-                        },
-                        width: 36,
-                        height: 36,
-                      }}
-                      disabled={uploadingPhoto}
-                    >
-                      {uploadingPhoto ? <CircularProgress size={20} color="inherit" /> : <PhotoCameraIcon />}
-                    </IconButton>
-                  </label>
-                )}
-              </Box>
-              {editing && (
-                <Box sx={{ mt: 1, display: 'flex', gap: 1 }}>
-                  <Button size="small" variant="outlined" onClick={openFilePicker} disabled={uploadingPhoto}>
-                    Anexar do dispositivo
-                  </Button>
-                  <Button size="small" variant="contained" onClick={() => setOpenCamera(true)} disabled={uploadingPhoto}>
-                    Tirar foto agora
-                  </Button>
-                </Box>
-              )}
-              <Box>
-                <Typography variant="h5" gutterBottom>
-                  {user?.nome}
-                </Typography>
-                <Typography variant="body1" color="textSecondary">
-                  {user?.email}
-                </Typography>
-                <Typography variant="body2" color="textSecondary">
-                  Tipo: {user?.tipo}
-                </Typography>
-              </Box>
-            </Box>
-
-            <Box flex={1}>
-              <form onSubmit={handleSubmit}>
-                <TextField
-                  label="Nome Completo"
-                  name="nome"
-                  value={formData.nome}
-                  onChange={handleInputChange}
-                  fullWidth
-                  margin="normal"
-                  required
-                  disabled={!editing || loading}
-                />
-                
-                <TextField
-                  label="E-mail"
-                  name="email"
-                  type="email"
-                  value={formData.email}
-                  onChange={handleInputChange}
-                  fullWidth
-                  margin="normal"
-                  required
-                  disabled={!editing || loading}
-                />
-
-                {editing && (
-                  <>
-                    <Divider sx={{ my: 3 }}>
-                      <Typography variant="body2" color="textSecondary">
-                        Alterar Senha (opcional)
+                      <Typography variant="h5" fontWeight={700} gutterBottom>
+                        {user?.nome}
                       </Typography>
-                    </Divider>
+                      <Typography variant="body1" color="text.secondary" sx={{ mb: 2 }}>
+                        {user?.email}
+                      </Typography>
+                      
+                      <Stack direction="row" spacing={1} justifyContent="center" sx={{ mb: 3 }}>
+                        <Chip 
+                          label={user?.tipo} 
+                          color="primary" 
+                          size="small" 
+                          variant="soft"
+                          sx={{ fontWeight: 600, borderRadius: 1.5 }} 
+                        />
+                        <Chip 
+                          label="Ativo" 
+                          color="success" 
+                          size="small" 
+                          variant="soft"
+                          sx={{ fontWeight: 600, borderRadius: 1.5 }} 
+                        />
+                      </Stack>
 
-                    <TextField
-                      label="Senha Atual"
-                      name="senhaAtual"
-                      type="password"
-                      value={formData.senhaAtual}
-                      onChange={handleInputChange}
-                      fullWidth
-                      margin="normal"
-                      disabled={loading}
-                    />
-                    
-                    <TextField
-                      label="Nova Senha"
-                      name="novaSenha"
-                      type="password"
-                      value={formData.novaSenha}
-                      onChange={handleInputChange}
-                      fullWidth
-                      margin="normal"
-                      disabled={loading}
-                      helperText="Deixe em branco para manter a senha atual"
-                    />
-                    
-                    <TextField
-                      label="Confirmar Nova Senha"
-                      name="confirmarSenha"
-                      type="password"
-                      value={formData.confirmarSenha}
-                      onChange={handleInputChange}
-                      fullWidth
-                      margin="normal"
-                      disabled={loading}
-                    />
-                  </>
-                )}
+                      {editing && (
+                        <MotionBox
+                          initial={{ opacity: 0, scale: 0.9 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          sx={{ 
+                            display: 'flex', 
+                            flexDirection: 'column', 
+                            gap: 1.5,
+                            mt: 2,
+                            p: 2,
+                            bgcolor: 'rgba(0,0,0,0.02)',
+                            borderRadius: 3
+                          }}
+                        >
+                          <Typography variant="caption" fontWeight={600} color="text.secondary" uppercase>
+                            Opções de Foto
+                          </Typography>
+                          <Button 
+                            fullWidth
+                            size="small" 
+                            variant="outlined" 
+                            onClick={openFilePicker} 
+                            disabled={uploadingPhoto}
+                            startIcon={<PhotoCameraIcon />}
+                            sx={{ borderRadius: 2 }}
+                          >
+                            Galeria
+                          </Button>
+                          <Button 
+                            fullWidth
+                            size="small" 
+                            variant="contained" 
+                            onClick={() => setOpenCamera(true)} 
+                            disabled={uploadingPhoto}
+                            startIcon={<PhotoCameraIcon />}
+                            sx={{ borderRadius: 2 }}
+                          >
+                            Câmera
+                          </Button>
+                        </MotionBox>
+                      )}
+                    </CardContent>
+                  </MotionCard>
 
-                {editing && (
-                  <Box mt={3} display="flex" justifyContent="flex-end" gap={2}>
-                    <Button
-                      variant="outlined"
-                      color="inherit"
-                      onClick={handleCancelEdit}
-                      disabled={loading}
-                      startIcon={<CancelIcon />}
+                  {/* Componente de Ranking ou Estatísticas Rápidas */}
+                  {!editing && (
+                    <MotionCard
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.3 }}
+                      sx={{
+                        background: 'rgba(255, 255, 255, 0.8)',
+                        backdropFilter: 'blur(10px)',
+                        borderRadius: 4,
+                        border: '1px solid rgba(255, 255, 255, 0.3)',
+                        boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.07)',
+                      }}
                     >
-                      Cancelar
-                    </Button>
-                    <Button
-                      type="submit"
-                      variant="contained"
-                      color="primary"
-                      disabled={loading}
-                      startIcon={loading ? <CircularProgress size={20} /> : <SaveIcon />}
-                    >
-                      {loading ? 'Salvando...' : 'Salvar Alterações'}
-                    </Button>
-                  </Box>
-                )}
-              </form>
-            </Box>
-          </Box>
-        </Paper>
-      </Container>
+                      <CardContent sx={{ p: 3 }}>
+                        <Typography variant="h6" fontWeight={700} gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          🏆 Conquistas
+                        </Typography>
+                        <Divider sx={{ my: 2, opacity: 0.5 }} />
+                        {/* Se houver componente de ranking específico, pode ser inserido aqui */}
+                        <Typography variant="body2" color="text.secondary" align="center" sx={{ py: 2 }}>
+                          Seu progresso e conquistas serão exibidos aqui.
+                        </Typography>
+                      </CardContent>
+                    </MotionCard>
+                  )}
+                </Stack>
+              </Grid>
+
+              {/* Coluna da Direita: Formulário de Edição */}
+              <Grid item xs={12} md={8}>
+                <MotionCard
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.2 }}
+                  sx={{
+                    height: '100%',
+                    background: 'rgba(255, 255, 255, 0.8)',
+                    backdropFilter: 'blur(10px)',
+                    borderRadius: 4,
+                    border: '1px solid rgba(255, 255, 255, 0.3)',
+                    boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.07)',
+                  }}
+                >
+                  <CardContent sx={{ p: { xs: 3, md: 4 } }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+                      <Box>
+                        <Typography variant="h5" fontWeight={700} color="primary.main">
+                          Informações do Perfil
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          Gerencie suas informações pessoais e de acesso
+                        </Typography>
+                      </Box>
+                      {!editing && (
+                        <Button 
+                          variant="contained" 
+                          color="primary" 
+                          startIcon={<EditIcon />}
+                          onClick={handleEditClick}
+                          sx={{ 
+                            borderRadius: 2,
+                            px: 3,
+                            boxShadow: '0 4px 12px rgba(0, 118, 255, 0.3)',
+                            '&:hover': {
+                              boxShadow: '0 6px 16px rgba(0, 118, 255, 0.4)',
+                            }
+                          }}
+                        >
+                          Editar
+                        </Button>
+                      )}
+                    </Box>
+
+                    <form onSubmit={handleSubmit}>
+                      <Grid container spacing={3}>
+                        <Grid item xs={12}>
+                          <TextField
+                            label="Nome Completo"
+                            name="nome"
+                            value={formData.nome}
+                            onChange={handleInputChange}
+                            fullWidth
+                            required
+                            disabled={!editing || loading}
+                            InputProps={{
+                              startAdornment: (
+                                <InputAdornment position="start">
+                                  <PersonIcon color="action" />
+                                </InputAdornment>
+                              ),
+                              sx: { borderRadius: 3 }
+                            }}
+                          />
+                        </Grid>
+                        
+                        <Grid item xs={12}>
+                          <TextField
+                            label="E-mail"
+                            name="email"
+                            type="email"
+                            value={formData.email}
+                            onChange={handleInputChange}
+                            fullWidth
+                            required
+                            disabled={!editing || loading}
+                            InputProps={{
+                              startAdornment: (
+                                <InputAdornment position="start">
+                                  <EmailIcon color="action" />
+                                </InputAdornment>
+                              ),
+                              sx: { borderRadius: 3 }
+                            }}
+                          />
+                        </Grid>
+
+                        {editing && (
+                          <Grid item xs={12}>
+                            <MotionBox
+                              initial={{ opacity: 0, height: 0 }}
+                              animate={{ opacity: 1, height: 'auto' }}
+                              exit={{ opacity: 0, height: 0 }}
+                            >
+                              <Divider sx={{ my: 4 }}>
+                                <Chip 
+                                  label="Alterar Senha" 
+                                  size="small" 
+                                  icon={<LockIcon />} 
+                                  sx={{ fontWeight: 600 }}
+                                />
+                              </Divider>
+
+                              <Stack spacing={3}>
+                                <TextField
+                                  label="Senha Atual"
+                                  name="senhaAtual"
+                                  type="password"
+                                  value={formData.senhaAtual}
+                                  onChange={handleInputChange}
+                                  fullWidth
+                                  disabled={loading}
+                                  InputProps={{
+                                    startAdornment: (
+                                      <InputAdornment position="start">
+                                        <LockIcon color="action" />
+                                      </InputAdornment>
+                                    ),
+                                    sx: { borderRadius: 3 }
+                                  }}
+                                  helperText="Necessário apenas se desejar alterar sua senha"
+                                />
+                                
+                                <Grid container spacing={2}>
+                                  <Grid item xs={12} sm={6}>
+                                    <TextField
+                                      label="Nova Senha"
+                                      name="novaSenha"
+                                      type="password"
+                                      value={formData.novaSenha}
+                                      onChange={handleInputChange}
+                                      fullWidth
+                                      disabled={loading}
+                                      InputProps={{
+                                        startAdornment: (
+                                          <InputAdornment position="start">
+                                            <LockIcon color="action" />
+                                          </InputAdornment>
+                                        ),
+                                        sx: { borderRadius: 3 }
+                                      }}
+                                    />
+                                  </Grid>
+                                  <Grid item xs={12} sm={6}>
+                                    <TextField
+                                      label="Confirmar Nova Senha"
+                                      name="confirmarSenha"
+                                      type="password"
+                                      value={formData.confirmarSenha}
+                                      onChange={handleInputChange}
+                                      fullWidth
+                                      disabled={loading}
+                                      InputProps={{
+                                        startAdornment: (
+                                          <InputAdornment position="start">
+                                            <LockIcon color="action" />
+                                          </InputAdornment>
+                                        ),
+                                        sx: { borderRadius: 3 }
+                                      }}
+                                    />
+                                  </Grid>
+                                </Grid>
+                              </Stack>
+                            </MotionBox>
+                          </Grid>
+                        )}
+
+                        {editing && (
+                          <Grid item xs={12}>
+                            <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
+                              <Button
+                                variant="outlined"
+                                color="inherit"
+                                onClick={handleCancelEdit}
+                                disabled={loading}
+                                startIcon={<CloseIcon />}
+                                sx={{ borderRadius: 2, px: 3 }}
+                              >
+                                Cancelar
+                              </Button>
+                              <Button
+                                type="submit"
+                                variant="contained"
+                                color="primary"
+                                disabled={loading}
+                                startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <SaveIcon />}
+                                sx={{ 
+                                  borderRadius: 2, 
+                                  px: 4,
+                                  boxShadow: '0 4px 12px rgba(0, 118, 255, 0.3)'
+                                }}
+                              >
+                                {loading ? 'Salvando...' : 'Salvar Alterações'}
+                              </Button>
+                            </Box>
+                          </Grid>
+                        )}
+                      </Grid>
+                    </form>
+                  </CardContent>
+                </MotionCard>
+              </Grid>
+            </Grid>
+          </Container>
+        </MotionBox>
+      </AnimatePresence>
 
       {/* Snackbar para mensagens de erro */}
       <Snackbar
@@ -488,7 +712,24 @@ function PerfilUsuarioContent() {
         onClose={() => setError(null)}
         anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
       >
-        <Alert onClose={() => setError(null)} severity="error" sx={{ width: '100%' }}>
+        <Alert 
+          onClose={() => setError(null)} 
+          severity="error" 
+          variant="standard"
+          sx={{ 
+            width: '100%', 
+            borderRadius: '16px',
+            backdropFilter: 'blur(12px)',
+            backgroundColor: alpha(theme.palette.error.main, 0.15),
+            color: theme.palette.error.dark,
+            border: `1px solid ${alpha(theme.palette.error.main, 0.3)}`,
+            '& .MuiAlert-icon': {
+              color: theme.palette.error.main,
+            },
+            boxShadow: `0 8px 32px 0 ${alpha(theme.palette.common.black, 0.1)}`,
+            fontWeight: 600,
+          }}
+        >
           {error}
         </Alert>
       </Snackbar>
@@ -500,7 +741,24 @@ function PerfilUsuarioContent() {
         onClose={() => setSuccessMessage(null)}
         anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
       >
-        <Alert onClose={() => setSuccessMessage(null)} severity="success" sx={{ width: '100%' }}>
+        <Alert 
+          onClose={() => setSuccessMessage(null)} 
+          severity="success" 
+          variant="standard"
+          sx={{ 
+            width: '100%', 
+            borderRadius: '16px',
+            backdropFilter: 'blur(12px)',
+            backgroundColor: alpha(theme.palette.success.main, 0.15),
+            color: theme.palette.success.dark,
+            border: `1px solid ${alpha(theme.palette.success.main, 0.3)}`,
+            '& .MuiAlert-icon': {
+              color: theme.palette.success.main,
+            },
+            boxShadow: `0 8px 32px 0 ${alpha(theme.palette.common.black, 0.1)}`,
+            fontWeight: 600,
+          }}
+        >
           {success}
         </Alert>
       </Snackbar>

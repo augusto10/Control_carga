@@ -18,13 +18,40 @@ import {
   AppBar,
   Toolbar,
   IconButton,
-  SelectChangeEvent
+  SelectChangeEvent,
+  alpha,
+  useTheme
 } from '@mui/material';
 import { ArrowBack as ArrowBackIcon, Add as AddIcon } from '@mui/icons-material';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '@/contexts/AuthContext';
 import api from '@/services/api';
+import { motion, AnimatePresence } from 'framer-motion';
+
+const MotionBox = motion(Box);
+const MotionPaper = motion(Paper);
+
+const glassStyles = {
+  background: 'rgba(255, 255, 255, 0.7)',
+  backdropFilter: 'blur(12px)',
+  border: '1px solid rgba(255, 255, 255, 0.3)',
+  boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.08)',
+};
+
+const buttonStyles = {
+  borderRadius: '16px',
+  padding: '12px 24px',
+  fontWeight: 800,
+  textTransform: 'none',
+  fontSize: '0.95rem',
+  letterSpacing: '0.3px',
+  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+  '&:hover': {
+    transform: 'translateY(-2px)',
+    boxShadow: '0 8px 20px rgba(0,0,0,0.1)'
+  }
+} as const;
 
 const MOTIVOS_INCONSISTENCIA = [
   'AVARIA',
@@ -68,6 +95,7 @@ interface FormData {
 }
 
 function ConfirmarAuditoria() {
+  const theme = useTheme();
   const { user } = useAuth();
   const router = useRouter();
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
@@ -188,66 +216,151 @@ function ConfirmarAuditoria() {
   const pedidoAtual = pedidos.find(p => p.id === pedidoSelecionado);
 
   return (
-    <Container maxWidth="md">
+    <Container maxWidth="md" sx={{ py: { xs: 2, md: 6 } }}>
       {/* Header */}
-      <AppBar 
-        position="static" 
-        sx={{ 
-          mb: 3, 
-          background: 'linear-gradient(135deg, #1976d2 0%, #42a5f5 100%)',
-          borderRadius: 2
-        }}
+      <MotionBox
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        sx={{ mb: 4 }}
       >
-        <Toolbar>
-          <IconButton
-            edge="start"
-            color="inherit"
-            onClick={handleVoltar}
-            sx={{ mr: 2 }}
-          >
-            <ArrowBackIcon />
-          </IconButton>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Box
-              component="img"
-              src="/logo-icon.png"
-              alt="Logo"
-              sx={{ height: 32, width: 32 }}
-            />
-            <Typography variant="h6" component="div" sx={{ fontWeight: 600 }}>
-              CONFIRMAR CONFERÊNCIA
-            </Typography>
-          </Box>
-        </Toolbar>
-      </AppBar>
+        <AppBar 
+          position="static" 
+          sx={{ 
+            ...glassStyles,
+            borderRadius: '24px',
+            color: 'text.primary',
+            overflow: 'hidden',
+            p: 1
+          }}
+        >
+          <Toolbar sx={{ justifyContent: 'space-between' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <IconButton
+                edge="start"
+                onClick={handleVoltar}
+                sx={{ 
+                  color: 'primary.main',
+                  bgcolor: alpha('#1976d2', 0.08),
+                  borderRadius: '16px',
+                  '&:hover': { 
+                    bgcolor: 'primary.main',
+                    color: 'white',
+                    transform: 'translateX(-4px)'
+                  },
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+                }}
+              >
+                <ArrowBackIcon />
+              </IconButton>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Box
+                  sx={{
+                    p: 1.2,
+                    borderRadius: '16px',
+                    bgcolor: alpha('#1976d2', 0.1),
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 4px 12px rgba(25, 118, 210, 0.15)'
+                  }}
+                >
+                  <AddIcon sx={{ color: 'primary.main', fontSize: 28 }} />
+                </Box>
+                <Box>
+                  <Typography variant="h5" sx={{ fontWeight: 900, color: 'text.primary', lineHeight: 1.1, letterSpacing: '-0.02em' }}>
+                    Confirmar Auditoria
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 800, letterSpacing: 1.5, textTransform: 'uppercase', opacity: 0.8 }}>
+                    Conferência de Pedidos
+                  </Typography>
+                </Box>
+              </Box>
+            </Box>
+          </Toolbar>
+        </AppBar>
+      </MotionBox>
 
       {carregando ? (
         <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
-          <CircularProgress />
+          <CircularProgress thickness={5} size={50} sx={{ color: 'primary.main', opacity: 0.8 }} />
         </Box>
       ) : (
-        <Card sx={{ boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.37)', borderRadius: 3 }}>
-          <CardContent sx={{ p: 4 }}>
-            <Grid container spacing={3}>
+        <MotionPaper
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.4 }}
+          sx={{ 
+            ...glassStyles,
+            borderRadius: '24px',
+            overflow: 'hidden'
+          }}
+        >
+          <Box sx={{ p: { xs: 3, md: 5 } }}>
+            <Grid container spacing={4}>
               {/* Seleção de Pedido */}
               <Grid item xs={12}>
+                <Typography variant="overline" sx={{ color: 'primary.main', fontWeight: 800, mb: 1.5, display: 'block', letterSpacing: 1.2 }}>
+                  SELEÇÃO DO PEDIDO
+                </Typography>
                 <FormControl fullWidth>
-                  <InputLabel>Selecionar Pedido *</InputLabel>
+                  <InputLabel sx={{ fontWeight: 600 }}>Selecione um pedido para auditar</InputLabel>
                   <Select
                     value={pedidoSelecionado}
-                    label="Selecionar Pedido *"
+                    label="Selecione um pedido para auditar"
                     onChange={handlePedidoChange}
                     disabled={salvando}
+                    sx={{ 
+                      borderRadius: '16px',
+                      bgcolor: 'rgba(255, 255, 255, 0.4)',
+                      fontWeight: 600,
+                      '& .MuiOutlinedInput-notchedOutline': {
+                        borderColor: 'rgba(255, 255, 255, 0.3)',
+                        borderWidth: '1px',
+                      },
+                      '&:hover .MuiOutlinedInput-notchedOutline': {
+                        borderColor: 'primary.main',
+                        borderWidth: '1px',
+                      },
+                      '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                        borderColor: 'primary.main',
+                        borderWidth: '2px',
+                      }
+                    }}
+                    MenuProps={{
+                      PaperProps: {
+                        sx: {
+                          ...glassStyles,
+                          borderRadius: '16px',
+                          mt: 1,
+                          boxShadow: '0 12px 40px rgba(0,0,0,0.15)'
+                        }
+                      }
+                    }}
                   >
                     {pedidos.map((pedido) => (
-                      <MenuItem key={pedido.id} value={pedido.id}>
-                        <Box>
-                          <Typography variant="body1">
-                            Pedido: {pedido.numeroPedido}
+                      <MenuItem 
+                        key={pedido.id} 
+                        value={pedido.id} 
+                        sx={{ 
+                          py: 1.5, 
+                          px: 2, 
+                          borderRadius: '12px', 
+                          mx: 1, 
+                          my: 0.5,
+                          '&.Mui-selected': {
+                            bgcolor: alpha('#1976d2', 0.1),
+                            color: 'primary.main',
+                            fontWeight: 700,
+                            '&:hover': { bgcolor: alpha('#1976d2', 0.15) }
+                          }
+                        }}
+                      >
+                        <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                          <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                            Pedido #{pedido.numeroPedido}
                           </Typography>
-                          <Typography variant="caption" color="textSecondary">
-                            Manifesto: {pedido.controle?.numeroManifesto || 'N/A'} | 
-                            Motorista: {pedido.controle?.motorista || 'N/A'}
+                          <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
+                            {pedido.controle?.transportadora || 'Sem transportadora'} • {pedido.controle?.numeroManifesto || 'N/A'}
                           </Typography>
                         </Box>
                       </MenuItem>
@@ -257,148 +370,245 @@ function ConfirmarAuditoria() {
               </Grid>
 
               {/* Informações do Pedido Selecionado */}
-              {pedidoAtual && (
-                <Grid item xs={12}>
-                  <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
-                    <Typography variant="subtitle2" gutterBottom>
-                      Informações do Pedido
-                    </Typography>
-                    <Grid container spacing={2}>
-                      <Grid item xs={6}>
-                        <Typography variant="body2">
-                          <strong>Número:</strong> {pedidoAtual.numeroPedido}
+              <AnimatePresence mode="wait">
+                {pedidoAtual && (
+                  <Grid item xs={12}>
+                    <MotionBox
+                      initial={{ opacity: 0, scale: 0.98 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.98 }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      <Paper 
+                        elevation={0}
+                        sx={{ 
+                          p: 3, 
+                          bgcolor: alpha('#1976d2', 0.04),
+                          borderRadius: '24px',
+                          border: '1px solid rgba(255, 255, 255, 0.4)',
+                          boxShadow: 'inset 0 2px 8px rgba(0,0,0,0.02)',
+                          backdropFilter: 'blur(5px)'
+                        }}
+                      >
+                        <Typography variant="overline" sx={{ color: 'primary.main', fontWeight: 900, mb: 2, display: 'flex', alignItems: 'center', gap: 1.5, letterSpacing: 1.2 }}>
+                          <Box sx={{ width: 4, height: 18, bgcolor: 'primary.main', borderRadius: '4px' }} />
+                          DETALHES DO PEDIDO
                         </Typography>
-                      </Grid>
-                      <Grid item xs={6}>
-                        <Typography variant="body2">
-                          <strong>Manifesto:</strong> {pedidoAtual.controle?.numeroManifesto || 'N/A'}
-                        </Typography>
-                      </Grid>
-                      <Grid item xs={6}>
-                        <Typography variant="body2">
-                          <strong>Motorista:</strong> {pedidoAtual.controle?.motorista || 'N/A'}
-                        </Typography>
-                      </Grid>
-                      <Grid item xs={6}>
-                        <Typography variant="body2">
-                          <strong>Transportadora:</strong> {pedidoAtual.controle?.transportadora || 'N/A'}
-                        </Typography>
-                      </Grid>
-                      <Grid item xs={6}>
-                        <Typography variant="body2">
-                          <strong>Separador:</strong> {pedidoAtual.controle?.separador?.nome || 'N/A'}
-                        </Typography>
-                      </Grid>
-                      <Grid item xs={6}>
-                        <Typography variant="body2">
-                          <strong>Responsável:</strong> {pedidoAtual.controle?.responsavel || 'N/A'}
-                        </Typography>
-                      </Grid>
-                    </Grid>
-                  </Paper>
-                </Grid>
-              )}
+                        <Grid container spacing={2}>
+                          {[
+                            { label: 'Número', value: pedidoAtual.numeroPedido },
+                            { label: 'Manifesto', value: pedidoAtual.controle?.numeroManifesto || 'N/A' },
+                            { label: 'Motorista', value: pedidoAtual.controle?.motorista || 'N/A' },
+                            { label: 'Transportadora', value: pedidoAtual.controle?.transportadora || 'N/A' },
+                            { label: 'Separador', value: pedidoAtual.controle?.separador?.nome || 'N/A' },
+                            { label: 'Responsável', value: pedidoAtual.controle?.responsavel || 'N/A' },
+                          ].map((item, idx) => (
+                            <Grid item xs={12} sm={6} md={4} key={idx}>
+                              <Box sx={{ 
+                                p: 2, 
+                                borderRadius: '16px', 
+                                bgcolor: 'rgba(255, 255, 255, 0.5)',
+                                border: '1px solid rgba(255, 255, 255, 0.6)',
+                                transition: 'all 0.2s',
+                                '&:hover': { transform: 'translateY(-2px)', bgcolor: 'rgba(255, 255, 255, 0.8)' }
+                              }}>
+                                <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, display: 'block', mb: 0.5 }}>
+                                  {item.label}
+                                </Typography>
+                                <Typography variant="body2" sx={{ fontWeight: 800, color: 'text.primary' }}>
+                                  {item.value}
+                                </Typography>
+                              </Box>
+                            </Grid>
+                          ))}
+                        </Grid>
+                      </Paper>
+                    </MotionBox>
+                  </Grid>
+                )}
+              </AnimatePresence>
 
               {/* Formulário de Auditoria */}
-              {pedidoSelecionado && (
-                <>
+              <AnimatePresence>
+                {pedidoSelecionado && (
                   <Grid item xs={12}>
-                    <FormControl fullWidth>
-                      <InputLabel>PEDIDO 100% *</InputLabel>
-                      <Select
-                        value={formData.pedido100}
-                        label="PEDIDO 100% *"
-                        onChange={(e) => handleInputChange('pedido100', e.target.value)}
-                        disabled={salvando}
-                      >
-                        <MenuItem value="sim">Sim</MenuItem>
-                        <MenuItem value="nao">Não</MenuItem>
-                      </Select>
-                    </FormControl>
-                  </Grid>
+                    <MotionBox
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.2 }}
+                    >
+                      <Grid container spacing={3}>
+                        <Grid item xs={12} sm={6}>
+                          <Typography variant="overline" sx={{ color: 'text.secondary', fontWeight: 800, mb: 1, display: 'block', letterSpacing: 1 }}>
+                            STATUS DA CONFERÊNCIA
+                          </Typography>
+                          <FormControl fullWidth>
+                            <InputLabel sx={{ fontWeight: 600 }}>Pedido 100%?</InputLabel>
+                            <Select
+                              value={formData.pedido100}
+                              label="Pedido 100%?"
+                              onChange={(e) => handleInputChange('pedido100', e.target.value)}
+                              disabled={salvando}
+                              sx={{ 
+                                borderRadius: '16px',
+                                bgcolor: 'rgba(255, 255, 255, 0.4)',
+                                fontWeight: 600,
+                                '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(0, 0, 0, 0.08)' }
+                              }}
+                              MenuProps={{
+                                PaperProps: { sx: { ...glassStyles, borderRadius: '16px', mt: 1 } }
+                              }}
+                            >
+                              <MenuItem value="sim" sx={{ py: 1.5, borderRadius: '12px', mx: 1, my: 0.5 }}>Sim</MenuItem>
+                              <MenuItem value="nao" sx={{ py: 1.5, borderRadius: '12px', mx: 1, my: 0.5 }}>Não</MenuItem>
+                            </Select>
+                          </FormControl>
+                        </Grid>
 
-                  <Grid item xs={12}>
-                    <FormControl fullWidth>
-                      <InputLabel>INCONSISTÊNCIA *</InputLabel>
-                      <Select
-                        value={formData.inconsistencia}
-                        label="INCONSISTÊNCIA *"
-                        onChange={(e) => handleInputChange('inconsistencia', e.target.value)}
-                        disabled={salvando}
-                      >
-                        <MenuItem value="sim">Sim</MenuItem>
-                        <MenuItem value="nao">Não</MenuItem>
-                      </Select>
-                    </FormControl>
-                  </Grid>
+                        <Grid item xs={12} sm={6}>
+                          <Typography variant="overline" sx={{ color: 'text.secondary', fontWeight: 800, mb: 1, display: 'block', letterSpacing: 1 }}>
+                            INCONSISTÊNCIA
+                          </Typography>
+                          <FormControl fullWidth>
+                            <InputLabel sx={{ fontWeight: 600 }}>Houve inconsistência?</InputLabel>
+                            <Select
+                              value={formData.inconsistencia}
+                              label="Houve inconsistência?"
+                              onChange={(e) => handleInputChange('inconsistencia', e.target.value)}
+                              disabled={salvando}
+                              sx={{ 
+                                borderRadius: '16px',
+                                bgcolor: 'rgba(255, 255, 255, 0.4)',
+                                fontWeight: 600,
+                                '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(0, 0, 0, 0.08)' }
+                              }}
+                              MenuProps={{
+                                PaperProps: { sx: { ...glassStyles, borderRadius: '16px', mt: 1 } }
+                              }}
+                            >
+                              <MenuItem value="sim" sx={{ py: 1.5, borderRadius: '12px', mx: 1, my: 0.5 }}>Sim</MenuItem>
+                              <MenuItem value="nao" sx={{ py: 1.5, borderRadius: '12px', mx: 1, my: 0.5 }}>Não</MenuItem>
+                            </Select>
+                          </FormControl>
+                        </Grid>
 
-                  {formData.inconsistencia === 'sim' && (
-                    <Grid item xs={12}>
-                      <FormControl fullWidth>
-                        <InputLabel>MOTIVO INCONSISTÊNCIA *</InputLabel>
-                        <Select
-                          value={formData.motivoInconsistencia}
-                          label="MOTIVO INCONSISTÊNCIA *"
-                          onChange={(e) => handleInputChange('motivoInconsistencia', e.target.value)}
+                        <AnimatePresence>
+                          {formData.inconsistencia === 'sim' && (
+                            <Grid item xs={12}>
+                              <MotionBox
+                                initial={{ opacity: 0, y: -10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -10 }}
+                              >
+                                <Typography variant="overline" sx={{ color: 'error.main', fontWeight: 800, mb: 1, display: 'block', letterSpacing: 1 }}>
+                                  MOTIVO DA INCONSISTÊNCIA
+                                </Typography>
+                                <FormControl fullWidth error>
+                                  <InputLabel sx={{ fontWeight: 600 }}>Selecione o motivo</InputLabel>
+                                  <Select
+                                    value={formData.motivoInconsistencia}
+                                    label="Selecione o motivo"
+                                    onChange={(e) => handleInputChange('motivoInconsistencia', e.target.value)}
+                                    disabled={salvando}
+                                    sx={{ 
+                                      borderRadius: '16px',
+                                      bgcolor: 'rgba(255, 255, 255, 0.4)',
+                                      fontWeight: 600,
+                                      '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(211, 47, 47, 0.3)' }
+                                    }}
+                                    MenuProps={{
+                                      PaperProps: { sx: { ...glassStyles, borderRadius: '16px', mt: 1 } }
+                                    }}
+                                  >
+                                    {MOTIVOS_INCONSISTENCIA.map((motivo) => (
+                                      <MenuItem key={motivo} value={motivo} sx={{ py: 1.5, borderRadius: '12px', mx: 1, my: 0.5 }}>
+                                        {motivo}
+                                      </MenuItem>
+                                    ))}
+                                  </Select>
+                                </FormControl>
+                              </MotionBox>
+                            </Grid>
+                          )}
+                        </AnimatePresence>
+
+                        <Grid item xs={12}>
+                          <Typography variant="overline" sx={{ color: 'text.secondary', fontWeight: 800, mb: 1, display: 'block', letterSpacing: 1 }}>
+                            OBSERVAÇÕES ADICIONAIS
+                          </Typography>
+                          <TextField
+                            fullWidth
+                            multiline
+                            rows={3}
+                            label="Detalhes importantes da auditoria"
+                            value={formData.observacoes}
+                            onChange={(e) => handleInputChange('observacoes', e.target.value)}
+                            disabled={salvando}
+                            placeholder="Descreva detalhes importantes da auditoria..."
+                            sx={{ 
+                              '& .MuiOutlinedInput-root': {
+                                borderRadius: '16px',
+                                bgcolor: 'rgba(255, 255, 255, 0.4)',
+                                fontWeight: 500,
+                                transition: 'all 0.2s',
+                                '& fieldset': {
+                                  borderColor: 'rgba(0, 0, 0, 0.08)',
+                                  borderWidth: '1px',
+                                },
+                                '&:hover fieldset': {
+                                  borderColor: 'primary.main',
+                                },
+                                '&.Mui-focused fieldset': {
+                                  borderWidth: '2px',
+                                }
+                              }
+                            }}
+                          />
+                        </Grid>
+                      </Grid>
+
+                      {/* Botões de Ação */}
+                      <Box sx={{ display: 'flex', gap: 2, mt: 6, justifyContent: 'flex-end' }}>
+                        <Button
+                          variant="text"
+                          onClick={handleVoltar}
                           disabled={salvando}
+                          sx={{ 
+                            ...buttonStyles,
+                            px: 4, 
+                            color: 'text.secondary',
+                            '&:hover': { bgcolor: 'rgba(0,0,0,0.04)', transform: 'translateY(-2px)' }
+                          }}
                         >
-                          {MOTIVOS_INCONSISTENCIA.map((motivo) => (
-                            <MenuItem key={motivo} value={motivo}>
-                              {motivo}
-                            </MenuItem>
-                          ))}
-                        </Select>
-                      </FormControl>
-                    </Grid>
-                  )}
-
-                  <Grid item xs={12}>
-                    <TextField
-                      fullWidth
-                      multiline
-                      rows={4}
-                      label="Observações"
-                      value={formData.observacoes}
-                      onChange={(e) => handleInputChange('observacoes', e.target.value)}
-                      disabled={salvando}
-                      placeholder="Digite observações adicionais sobre a auditoria..."
-                      InputProps={{
-                        endAdornment: (
-                          <IconButton size="small" disabled>
-                            <AddIcon />
-                          </IconButton>
-                        )
-                      }}
-                    />
+                          Cancelar
+                        </Button>
+                        <Button
+                          variant="contained"
+                          onClick={handleSalvar}
+                          disabled={salvando || !pedidoSelecionado}
+                          startIcon={salvando ? <CircularProgress size={20} color="inherit" /> : <AddIcon />}
+                          sx={{ 
+                            ...buttonStyles,
+                            px: 6,
+                            bgcolor: 'primary.main',
+                            boxShadow: '0 8px 20px rgba(25, 118, 210, 0.25)',
+                            '&:hover': {
+                              bgcolor: 'primary.dark',
+                              boxShadow: '0 12px 28px rgba(25, 118, 210, 0.35)',
+                              transform: 'translateY(-2px)'
+                            }
+                          }}
+                        >
+                          {salvando ? 'Salvando...' : 'Confirmar Auditoria'}
+                        </Button>
+                      </Box>
+                    </MotionBox>
                   </Grid>
-                </>
-              )}
+                )}
+              </AnimatePresence>
             </Grid>
-
-            {/* Botões de Ação */}
-            <Box sx={{ display: 'flex', gap: 2, mt: 4, justifyContent: 'center' }}>
-              <Button
-                variant="outlined"
-                onClick={handleVoltar}
-                disabled={salvando}
-                sx={{ minWidth: 120 }}
-              >
-                Cancelar
-              </Button>
-              <Button
-                variant="contained"
-                onClick={handleSalvar}
-                disabled={salvando || !pedidoSelecionado}
-                sx={{ 
-                  minWidth: 120,
-                  background: 'linear-gradient(135deg, #1976d2 0%, #42a5f5 100%)'
-                }}
-              >
-                {salvando ? <CircularProgress size={24} /> : 'Salvar'}
-              </Button>
-            </Box>
-          </CardContent>
-        </Card>
+          </Box>
+        </MotionPaper>
       )}
 
       {/* Notificações */}
@@ -408,7 +618,24 @@ function ConfirmarAuditoria() {
         onClose={handleFecharNotificacao}
         anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
       >
-        <Alert onClose={handleFecharNotificacao} severity="error" sx={{ width: '100%' }}>
+        <Alert 
+          onClose={handleFecharNotificacao} 
+          severity="error" 
+          variant="standard"
+          sx={{ 
+            width: '100%', 
+            borderRadius: '16px',
+            backdropFilter: 'blur(12px)',
+            backgroundColor: alpha(theme.palette.error.main, 0.15),
+            color: theme.palette.error.dark,
+            border: `1px solid ${alpha(theme.palette.error.main, 0.3)}`,
+            '& .MuiAlert-icon': {
+              color: theme.palette.error.main,
+            },
+            boxShadow: `0 8px 32px 0 ${alpha(theme.palette.common.black, 0.1)}`,
+            fontWeight: 600,
+          }}
+        >
           {erro}
         </Alert>
       </Snackbar>
@@ -419,7 +646,24 @@ function ConfirmarAuditoria() {
         onClose={handleFecharNotificacao}
         anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
       >
-        <Alert onClose={handleFecharNotificacao} severity="success" sx={{ width: '100%' }}>
+        <Alert 
+          onClose={handleFecharNotificacao} 
+          severity="success" 
+          variant="standard"
+          sx={{ 
+            width: '100%', 
+            borderRadius: '16px',
+            backdropFilter: 'blur(12px)',
+            backgroundColor: alpha(theme.palette.success.main, 0.15),
+            color: theme.palette.success.dark,
+            border: `1px solid ${alpha(theme.palette.success.main, 0.3)}`,
+            '& .MuiAlert-icon': {
+              color: theme.palette.success.main,
+            },
+            boxShadow: `0 8px 32px 0 ${alpha(theme.palette.common.black, 0.1)}`,
+            fontWeight: 600,
+          }}
+        >
           {sucesso}
         </Alert>
       </Snackbar>

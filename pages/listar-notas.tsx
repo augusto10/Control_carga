@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Button, Container, Typography, Box, CircularProgress, Chip, TextField, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, IconButton, Tooltip, Paper, Grid, Card, CardContent } from '@mui/material';
+import { Button, Container, Typography, Box, CircularProgress, Chip, TextField, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, IconButton, Tooltip, Paper, Grid, Card, CardContent, alpha, useTheme } from '@mui/material';
 import { DeleteRounded, Search as SearchIcon, Today as TodayIcon, CalendarMonth as CalendarIcon } from '@mui/icons-material';
 import { useStore } from '../store/store';
+import ResponsiveContainer from '../components/ResponsiveContainer';
+import ProtectedRoute from '../components/ProtectedRoute';
 import { enqueueSnackbar } from 'notistack';
 import { format } from 'date-fns';
 
@@ -57,10 +59,16 @@ const ListarNotas = () => {
   };
 
   return (
-    <Container maxWidth="xl">
-      <Typography variant="h4" component="h1" gutterBottom sx={{ mb: 3 }}>
-        Consultar Notas Fiscais
-      </Typography>
+    <ProtectedRoute>
+      <ResponsiveContainer
+        breadcrumb={[
+          { label: 'Dashboard', path: '/' },
+          { label: 'Notas Fiscais' }
+        ]}
+      >
+        <Typography variant="h4" component="h1" gutterBottom sx={{ mb: 3 }}>
+          Consultar Notas Fiscais
+        </Typography>
       
       {/* Filtros */}
       <Card sx={{ mb: 3, boxShadow: 2 }}>
@@ -250,7 +258,8 @@ const ListarNotas = () => {
           </Table>
         </TableContainer>
       )}
-    </Container>
+      </ResponsiveContainer>
+    </ProtectedRoute>
   );
 };
 

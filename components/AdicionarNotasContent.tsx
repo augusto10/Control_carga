@@ -12,7 +12,15 @@ import {
   useMediaQuery,
   keyframes,
   SxProps,
-  Theme
+  Theme,
+  Grid,
+  Card,
+  CardContent,
+  Divider,
+  Chip,
+  Tooltip,
+  Container,
+  Avatar
 } from '@mui/material';
 import { useSnackbar } from 'notistack';
 import { useStore } from '../store/store';
@@ -20,9 +28,25 @@ import {
   Add as AddIcon, 
   Delete as DeleteIcon, 
   Save as SaveIcon,
-  Close as CloseIcon
+  Close as CloseIcon,
+  QrCodeScanner as ScannerIcon,
+  Receipt as ReceiptIcon,
+  Inventory as InventoryIcon,
+  CheckCircle as CheckIcon,
+  Info as InfoIcon,
+  Edit as EditIcon,
+  History as HistoryIcon
 } from '@mui/icons-material';
 import { NumericFormat } from 'react-number-format';
+import { motion, AnimatePresence } from 'framer-motion';
+
+const MotionBox = motion(Box);
+const MotionGrid = motion(Grid);
+
+const entranceAnimation = keyframes`
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+`;
 
 interface NotaFiscal {
   id: string;
@@ -33,6 +57,12 @@ interface NotaFiscal {
   status: 'pendente' | 'processando' | 'concluido' | 'erro';
   dataHora: string;
   editando?: boolean;
+  valorPedido?: number;
+  razaoSocial?: string;
+  pesoBruto?: number;
+  dataEmissao?: string;
+  cnpj?: string;
+  chaveNFe?: string;
 }
 
 interface CurrencyInputProps {
@@ -162,6 +192,20 @@ const AdicionarNotasContent: React.FC = () => {
     // Se não se encaixar em nenhum formato conhecido, retorna os últimos 9 dígitos
     return codigoLimpo.slice(-9);
   };
+  
+  const extrairChaveNFe = (codigo: string): string | null => {
+    const somenteDigitos = codigo.replace(/[^\d]/g, '');
+    if (somenteDigitos.length === 44) return somenteDigitos;
+    if (somenteDigitos.length > 44) {
+      for (let i = 0; i <= somenteDigitos.length - 44; i++) {
+        const bloco = somenteDigitos.substring(i, i + 44);
+        if (/^\d{44}$/.test(bloco)) {
+          return bloco;
+        }
+      }
+    }
+    return null;
+  };
 
   // Função para atualizar os volumes de uma nota
   const atualizarVolumesNota = (id: string, volumes: string) => {
@@ -201,9 +245,11 @@ const AdicionarNotasContent: React.FC = () => {
       const codigoLimpo = codigo.trim();
       console.log('Código limpo:', codigoLimpo);
       
-      // Extrai o número da nota do código de barras
+      // Extrai o número da nota e possível chave NFe do código de barras
       const numeroNota = extrairNumeroNota(codigoLimpo);
       console.log('Número da nota extraído:', numeroNota);
+      const chaveNFe = extrairChaveNFe(codigoLimpo);
+      console.log('Chave NFe extraída:', chaveNFe);
       
       if (!numeroNota) {
         throw new Error('Não foi possível extrair o número da nota do código de barras');
@@ -226,17 +272,52 @@ const AdicionarNotasContent: React.FC = () => {
         });
         return;
       }
+
+      // Buscar dados na API externa
+      let volumesApi = '1';
+      let dadosExtras = null;
+
+      try {
+        // Notificar usuário que estamos buscando
+        enqueueSnackbar('Buscando dados na API externa...', { variant: 'info', autoHideDuration: 1000 });
+        
+        const urlApi = chaveNFe 
+          ? `/api/buscar-nota-externa?chave=${chaveNFe}`
+          : `/api/buscar-nota-externa?numero=${numeroNotaFormatado}&serie=1`;
+        const response = await fetch(urlApi);
+        if (response.ok) {
+          const dados = await response.json();
+          if (dados.volumes) {
+            volumesApi = dados.volumes.toString();
+          }
+          dadosExtras = dados;
+          
+          enqueueSnackbar(`Nota encontrada: ${dados.cliente || 'Cliente não identificado'}`, { 
+            variant: 'success', 
+            autoHideDuration: 3000 
+          });
+        }
+      } catch (err) {
+        console.warn('Erro ao buscar na API externa:', err);
+        // Não impede o fluxo, apenas segue com volume 1
+      }
       
       // Criar nova nota escaneada com volumes
       const novaNota: NotaFiscal = {
         id: Date.now().toString(),
         codigo: codigoLimpo,
         numeroNota: numeroNotaFormatado, // Usa o número formatado (sem zeros à esquerda)
-        volumes: '1', // Valor padrão de volumes
+        volumes: volumesApi, // Valor vindo da API ou padrão
         isScanned: true, // Marca como nota escaneada
         status: 'pendente',
         dataHora: new Date().toLocaleString('pt-BR'),
-        editando: true // Abre para edição dos volumes
+        editando: true, // Abre para edição dos volumes
+        chaveNFe: chaveNFe || undefined,
+        valorPedido: dadosExtras?.valorPedido ?? dadosExtras?.valor ?? undefined,
+        razaoSocial: dadosExtras?.razaoSocial ?? dadosExtras?.cliente ?? undefined,
+        pesoBruto: dadosExtras?.pesoBruto ?? dadosExtras?.peso ?? undefined,
+        dataEmissao: dadosExtras?.dataEmissao ?? undefined,
+        cnpj: dadosExtras?.cnpj ?? undefined
       };
       
       // Define esta nota como a que está sendo editada
@@ -326,16 +407,20 @@ const AdicionarNotasContent: React.FC = () => {
     enqueueSnackbar('Nota atualizada com sucesso!', { variant: 'success' });
   };
 
-  const handleAddManual = (e: React.FormEvent) => {
+  const handleAddManual = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!manualNumero.trim()) {
+    // Usa codigoBarras como fonte principal se manualNumero estiver vazio, 
+    // pois o input principal está ligado a codigoBarras
+    const numeroParaAdicionar = manualNumero.trim() || codigoBarras.trim();
+    
+    if (!numeroParaAdicionar) {
       enqueueSnackbar('Informe o número da nota', { variant: 'error' });
       return;
     }
     
     // Verifica se a nota já foi adicionada (verifica por número da nota)
-    const notaExistente = notas.find(n => n.numeroNota === manualNumero.trim());
+    const notaExistente = notas.find(n => n.numeroNota === numeroParaAdicionar);
     if (notaExistente) {
       enqueueSnackbar('Nota já escaneada anteriormente', { 
         variant: 'warning',
@@ -344,13 +429,35 @@ const AdicionarNotasContent: React.FC = () => {
       });
       return;
     }
+
+    // Buscar dados na API externa
+    let volumesApi = '1';
+    let dadosExtras = null;
+    try {
+      enqueueSnackbar('Buscando dados na API externa...', { variant: 'info', autoHideDuration: 1000 });
+      const response = await fetch(`/api/buscar-nota-externa?numero=${numeroParaAdicionar}&serie=1`);
+      
+      if (response.ok) {
+        const dados = await response.json();
+        if (dados.volumes) {
+          volumesApi = dados.volumes.toString();
+        }
+        dadosExtras = dados;
+        enqueueSnackbar(`Nota encontrada: ${dados.cliente || 'Cliente não identificado'}`, { 
+          variant: 'success', 
+          autoHideDuration: 3000 
+        });
+      }
+    } catch (err) {
+      console.warn('Erro ao buscar na API externa:', err);
+    }
     
     // Cria uma nova nota manual
     const novaNota: NotaFiscal = {
       id: Date.now().toString(),
       codigo: `MANUAL-${Date.now()}`,
-      numeroNota: manualNumero.trim(),
-      volumes: '1', // Valor padrão de volumes para notas manuais
+      numeroNota: numeroParaAdicionar,
+      volumes: volumesApi, // Valor vindo da API ou padrão
       isScanned: false, // Marca como nota manual
       status: 'pendente',
       dataHora: new Date().toLocaleString('pt-BR'),
@@ -363,8 +470,11 @@ const AdicionarNotasContent: React.FC = () => {
     
     // Limpa o formulário
     setManualNumero('');
+    setCodigoBarras(''); // Limpa também o código de barras pois usamos ele
     
-    enqueueSnackbar(`Nota ${manualNumero} adicionada com sucesso!`, { variant: 'success' });
+    if (!dadosExtras) {
+      enqueueSnackbar(`Nota ${numeroParaAdicionar} adicionada manualmente`, { variant: 'info' });
+    }
     
     // Rola até a nota recém-adicionada
     setTimeout(() => {
@@ -545,296 +655,361 @@ const AdicionarNotasContent: React.FC = () => {
   // Renderização
   const renderListaNotas = () => {
     return (
-      <Paper sx={{ p: 3, mb: 3 }}>
-        <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-          <Typography variant="h6">
-            Notas a serem salvas <small>({notas.length})</small>
-          </Typography>
-          {notas.length > 0 && (
-            <Box display="flex" gap={2} alignItems="center">
-              <Typography variant="subtitle1" color="primary" fontWeight="bold">
-                Total de Volumes: {totalVolumes}
-              </Typography>
-              <Button 
-                color="error" 
-                size="small" 
-                variant="outlined"
-                onClick={() => {
-                  if (window.confirm('Tem certeza que deseja remover todas as notas?')) {
-                    setNotas([]);
-                    enqueueSnackbar('Todas as notas foram removidas', { 
-                      variant: 'info',
-                      autoHideDuration: 3000
-                    });
-                  }
-                }}
-                disabled={loading || isSaving}
-                startIcon={<DeleteIcon />}
-              >
-                Limpar Tudo
-              </Button>
-              <Box sx={{ position: 'relative' }}>
-                <Button
-                  variant="contained"
-                  color="primary"
-                  onClick={handleSalvarTodasNotas}
-                  disabled={loading || isSaving || notas.length === 0}
-                  startIcon={isSaving ? undefined : <SaveIcon />}
-                  sx={{
-                    minWidth: 180,
-                    '&.Mui-disabled': {
-                      bgcolor: 'action.disabledBackground',
-                      color: 'action.disabled',
-                    },
-                  }}
-                >
-                  {isSaving ? 'Salvando...' : `Salvar ${notas.length} Nota${notas.length !== 1 ? 's' : ''}`}
-                </Button>
-                {isSaving && (
-                  <CircularProgress 
-                    size={24}
-                    sx={{
-                      color: 'primary.main',
-                      position: 'absolute',
-                      top: '50%',
-                      left: '50%',
-                      marginTop: '-12px',
-                      marginLeft: '-12px',
-                    }}
-                  />
-                )}
-              </Box>
-            </Box>
-          )}
-        </Box>
-        
-        {notas.length === 0 ? (
-          <Typography variant="body2" color="textSecondary" align="center" sx={{ py: 4 }}>
-            Nenhuma nota adicionada ainda. Use o scanner para adicionar notas.
-          </Typography>
-        ) : (
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            {notas.map((nota, index) => (
-              <Paper 
-                key={nota.id}
-                elevation={1}
-                data-status={nota.status}
-                data-nota-id={nota.id}
-                sx={{
-                  p: 2,
-                  borderLeft: '4px solid',
-                  borderColor: nota.status === 'erro' ? 'error.main' : 
-                              nota.status === 'processando' ? 'warning.main' :
-                              nota.status === 'concluido' ? 'success.main' : 'primary.main',
-                  borderRadius: 1,
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  backgroundColor: 'background.paper',
-                  position: 'relative',
-                  overflow: 'hidden',
-                  '&:hover': {
-                    boxShadow: 2,
-                  },
-                  ...(nota.status === 'processando' ? {
-                    '&::before': {
-                      content: '""',
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      backgroundColor: 'warning.light',
-                      opacity: 0.1,
-                      animation: `${pulseAnimation} 1.5s ease-in-out infinite`,
-                      zIndex: 0
-                    }
-                  } : {})
-                } as SxProps<Theme>}
-              >
-                <Box sx={{ flex: 1 }}>
-                  <Box display="flex" alignItems="center" gap={1} mb={1}>
-                    <Typography variant="subtitle1" fontWeight="bold">
-                      NFE {nota.numeroNota}
-                    </Typography>
-                    <Box 
-                      component="span" 
-                      sx={{
-                        px: 1,
-                        py: 0.5,
-                        bgcolor: 'primary.light',
-                        color: 'primary.contrastText',
-                        borderRadius: 1,
-                        fontSize: '0.7rem',
-                        fontWeight: 'bold',
-                        textTransform: 'uppercase'
-                      }}
-                    >
-                      {nota.status}
-                    </Box>
-                  </Box>
-                  <Typography variant="body2" color="text.secondary">
-                    Código: {nota.codigo}
+      <AnimatePresence>
+        <MotionBox
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -20 }}
+        >
+          <Card sx={{ 
+            borderRadius: 4, 
+            boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
+            border: '1px solid rgba(226, 232, 240, 0.8)',
+            bgcolor: 'white',
+            overflow: 'visible'
+          }}>
+            <CardContent sx={{ p: 3 }}>
+              <Box display="flex" justifyContent="space-between" alignItems="center" mb={4} flexWrap="wrap" gap={2}>
+                <Box display="flex" alignItems="center" gap={1.5}>
+                  <Box sx={{ width: 4, height: 24, bgcolor: '#1976d2', borderRadius: 2 }} />
+                  <Typography variant="h6" sx={{ fontWeight: 700, color: '#1e293b' }}>
+                    Notas a serem salvas <Chip label={notas.length} size="small" sx={{ ml: 1, fontWeight: 700, bgcolor: '#f1f5f9' }} />
                   </Typography>
-                  {notaEditandoValor === nota.id ? (
-                    <Box mt={1} mb={1}>
-                      <Typography variant="subtitle2" gutterBottom>
-                        {nota.isScanned ? 'Digite a quantidade de volumes:' : 'Digite o valor da nota:'}
-                      </Typography>
-                      {nota.isScanned ? (
-                        <TextField
-                          label="Volumes"
-                          type="number"
-                          value={nota.volumes}
-                          onChange={(e) => {
-                            const valor = e.target.value;
-                            setNotas(prev => 
-                              prev.map(n => 
-                                n.id === nota.id ? { ...n, volumes: valor } : n
-                              )
-                            );
-                          }}
-                          autoFocus
-                          size="small"
-                          sx={{ maxWidth: '120px' }}
-                          inputProps={{
-                            min: 1,
-                            step: 1,
-                            inputMode: 'numeric',
-                            pattern: '[0-9]*',
-                            style: { textAlign: 'center' }
-                          }}
-                        />
-                      ) : (
-                        <TextField
-                          label="Volumes"
-                          type="number"
-                          value={nota.volumes}
-                          onChange={(e) => atualizarVolumesNota(nota.id, e.target.value)}
-                          autoFocus
-                          size="small"
-                          sx={{ maxWidth: '120px' }}
-                          inputProps={{
-                            min: 1,
-                            style: { textAlign: 'center' }
-                          }}
-                        />
-                      )}
-                      <Box mt={1} display="flex" gap={1}>
-                        <Button
-                          variant="contained"
-                          color="primary"
-                          size="small"
-                          onClick={() => handleSalvarNota(index)}
-                        >
-                          Salvar
-                        </Button>
-                        <Button
-                          variant="outlined"
-                          size="small"
-                          onClick={() => setNotaEditandoValor(null)}
-                        >
-                          Cancelar
-                        </Button>
-                      </Box>
-                    </Box>
-                  ) : (
-                    <Box>
-                      <Box 
-                        onClick={() => setNotaEditandoValor(nota.id)}
+                </Box>
+                
+                {notas.length > 0 && (
+                  <Box display="flex" gap={2} alignItems="center" flexWrap="wrap">
+                    <Tooltip title="Total de volumes somados">
+                      <Chip 
+                        icon={<InventoryIcon sx={{ fontSize: '18px !important' }} />}
+                        label={`Total de Volumes: ${totalVolumes}`}
+                        sx={{ 
+                          bgcolor: 'rgba(25, 118, 210, 0.08)', 
+                          color: '#1976d2', 
+                          fontWeight: 700,
+                          px: 1
+                        }}
+                      />
+                    </Tooltip>
+                    
+                    <Button 
+                      color="error" 
+                      size="small" 
+                      variant="text"
+                      onClick={() => {
+                        if (window.confirm('Tem certeza que deseja remover todas as notas?')) {
+                          setNotas([]);
+                          enqueueSnackbar('Todas as notas foram removidas', { 
+                            variant: 'info',
+                            autoHideDuration: 3000
+                          });
+                        }
+                      }}
+                      disabled={loading || isSaving}
+                      startIcon={<DeleteIcon />}
+                      sx={{ fontWeight: 600 }}
+                    >
+                      Limpar Tudo
+                    </Button>
+                    
+                    <Box sx={{ position: 'relative' }}>
+                      <Button
+                        variant="contained"
+                        onClick={handleSalvarTodasNotas}
+                        disabled={loading || isSaving || notas.length === 0}
+                        startIcon={isSaving ? <CircularProgress size={20} color="inherit" /> : <SaveIcon />}
                         sx={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 1,
-                          cursor: 'pointer',
-                          '&:hover': { textDecoration: 'underline' },
-                          color: nota.isScanned ? 'primary.main' : 'inherit'
+                          borderRadius: 2,
+                          px: 3,
+                          py: 1,
+                          fontWeight: 700,
+                          boxShadow: '0 4px 12px rgba(25, 118, 210, 0.2)',
+                          bgcolor: '#1976d2',
+                          '&:hover': {
+                            bgcolor: '#1565c0',
+                            boxShadow: '0 6px 16px rgba(25, 118, 210, 0.3)',
+                          }
                         }}
                       >
-                        <Typography variant="body2">
-                          {`${nota.volumes} ${parseInt(nota.volumes) === 1 ? 'volume' : 'volumes'}`}
-                        </Typography>
-                      </Box>
-                      <Typography variant="caption" color="text.secondary" display="block" mt={0.5}>
-                        {new Date(nota.dataHora).toLocaleString('pt-BR')}
-                      </Typography>
+                        {isSaving ? 'Salvando...' : `Salvar ${notas.length} Nota${notas.length !== 1 ? 's' : ''}`}
+                      </Button>
                     </Box>
-                  )}
+                  </Box>
+                )}
+              </Box>
+              
+              <Divider sx={{ mb: 4, opacity: 0.6 }} />
+              
+              {notas.length === 0 ? (
+                <Box sx={{ py: 8, textAlign: 'center' }}>
+                  <ReceiptIcon sx={{ fontSize: 64, color: '#cbd5e1', mb: 2, opacity: 0.5 }} />
+                  <Typography variant="body1" sx={{ color: '#64748b', fontWeight: 500 }}>
+                    Nenhuma nota adicionada ainda.
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: '#94a3b8' }}>
+                    Use o scanner ou digite o código para começar.
+                  </Typography>
                 </Box>
-                <Box>
-                  <IconButton 
-                    size="small" 
-                    color="error" 
-                    onClick={() => handleRemoverNota(index)}
-                    disabled={isSaving}
-                    title="Remover nota"
-                  >
-                    <DeleteIcon />
-                  </IconButton>
+              ) : (
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <AnimatePresence>
+                    {notas.map((nota, index) => (
+                      <MotionBox
+                        key={nota.id}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: 20 }}
+                        transition={{ delay: index * 0.05 }}
+                      >
+                        <Card 
+                          variant="outlined"
+                          sx={{
+                            borderRadius: 3,
+                            border: '1px solid rgba(226, 232, 240, 0.8)',
+                            transition: 'all 0.2s ease',
+                            '&:hover': {
+                              borderColor: '#1976d2',
+                              boxShadow: '0 4px 12px rgba(0,0,0,0.03)',
+                              bgcolor: 'rgba(25, 118, 210, 0.01)'
+                            },
+                            position: 'relative',
+                            overflow: 'hidden'
+                          }}
+                        >
+                          <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                            <Grid container alignItems="center" spacing={2}>
+                              <Grid item xs={12} sm={6} md={4}>
+                                <Box display="flex" alignItems="center" gap={1.5}>
+                                  <Avatar sx={{ bgcolor: 'rgba(25, 118, 210, 0.1)', color: '#1976d2', width: 40, height: 40 }}>
+                                    <ReceiptIcon fontSize="small" />
+                                  </Avatar>
+                                  <Box>
+                                    <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#1e293b', lineHeight: 1.2 }}>
+                                      NFE {nota.numeroNota}
+                                    </Typography>
+                                    <Typography variant="caption" sx={{ color: '#64748b', fontFamily: 'monospace' }}>
+                                      {nota.codigo.length > 20 ? `${nota.codigo.substring(0, 20)}...` : nota.codigo}
+                                    </Typography>
+                                  </Box>
+                                </Box>
+                              </Grid>
+
+                              <Grid item xs={12} sm={6} md={3}>
+                                {notaEditandoValor === nota.id ? (
+                                  <Box display="flex" alignItems="center" gap={1}>
+                                    <TextField
+                                      label="Volumes"
+                                      type="number"
+                                      value={nota.volumes}
+                                      onChange={(e) => {
+                                        const valor = e.target.value;
+                                        setNotas(prev => 
+                                          prev.map(n => 
+                                            n.id === nota.id ? { ...n, volumes: valor } : n
+                                          )
+                                        );
+                                      }}
+                                      autoFocus
+                                      size="small"
+                                      sx={{ maxWidth: '100px' }}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter') handleSalvarNota(index);
+                                        if (e.key === 'Escape') setNotaEditandoValor(null);
+                                      }}
+                                    />
+                                    <IconButton size="small" color="primary" onClick={() => handleSalvarNota(index)}>
+                                      <CheckIcon />
+                                    </IconButton>
+                                    <IconButton size="small" onClick={() => setNotaEditandoValor(null)}>
+                                      <CloseIcon />
+                                    </IconButton>
+                                  </Box>
+                                ) : (
+                                  <Tooltip title="Clique para editar volumes">
+                                    <Box 
+                                      onClick={() => setNotaEditandoValor(nota.id)}
+                                      sx={{ 
+                                        display: 'flex', 
+                                        alignItems: 'center', 
+                                        gap: 1, 
+                                        cursor: 'pointer',
+                                        bgcolor: '#f8fafc',
+                                        px: 2,
+                                        py: 0.8,
+                                        borderRadius: 2,
+                                        width: 'fit-content',
+                                        '&:hover': { bgcolor: '#f1f5f9' }
+                                      }}
+                                    >
+                                      <InventoryIcon sx={{ fontSize: 16, color: '#64748b' }} />
+                                      <Typography variant="body2" sx={{ fontWeight: 600, color: '#1e293b' }}>
+                                        {nota.volumes} {parseInt(nota.volumes) === 1 ? 'volume' : 'volumes'}
+                                      </Typography>
+                                      <EditIcon sx={{ fontSize: 14, color: '#94a3b8', ml: 0.5 }} />
+                                    </Box>
+                                  </Tooltip>
+                                )}
+                              </Grid>
+
+                              <Grid item xs={12} sm={6} md={3}>
+                                <Box display="flex" alignItems="center" gap={1}>
+                                  <HistoryIcon sx={{ fontSize: 16, color: '#94a3b8' }} />
+                                  <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 500 }}>
+                                    {new Date(nota.dataHora).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                  </Typography>
+                                  <Chip 
+                                    label={nota.status} 
+                                    size="small" 
+                                    sx={{ 
+                                      height: 20, 
+                                      fontSize: '0.65rem', 
+                                      fontWeight: 700,
+                                      textTransform: 'uppercase',
+                                      bgcolor: nota.status === 'concluido' ? '#dcfce7' : nota.status === 'erro' ? '#fee2e2' : '#f1f5f9',
+                                      color: nota.status === 'concluido' ? '#166534' : nota.status === 'erro' ? '#991b1b' : '#475569'
+                                    }} 
+                                  />
+                                </Box>
+                              </Grid>
+
+                              <Grid item xs={12} sm={6} md={2} sx={{ textAlign: 'right' }}>
+                                <IconButton 
+                                  size="small" 
+                                  onClick={() => handleRemoverNota(index)}
+                                  disabled={isSaving}
+                                  sx={{ color: '#94a3b8', '&:hover': { color: '#ef4444', bgcolor: '#fef2f2' } }}
+                                >
+                                  <DeleteIcon fontSize="small" />
+                                </IconButton>
+                              </Grid>
+                            </Grid>
+                          </CardContent>
+                        </Card>
+                      </MotionBox>
+                    ))}
+                  </AnimatePresence>
                 </Box>
-              </Paper>
-            ))}
-          </Box>
-        )}
-      </Paper>
+              )}
+            </CardContent>
+          </Card>
+        </MotionBox>
+      </AnimatePresence>
     );
   };
 
   return (
-    <Box>
-      {/* Campo para leitura do scanner óptico */}
-      <Paper component="form" onSubmit={handleAddManual} sx={{ p: 3, mb: 3 }}>
-        <Typography variant="h6" gutterBottom>
-          Leitor de Código de Barras
+    <Container maxWidth="lg" sx={{ py: 4 }}>
+      {/* Header da Página */}
+      <MotionBox 
+        initial={{ opacity: 0, x: -20 }}
+        animate={{ opacity: 1, x: 0 }}
+        sx={{ mb: 4 }}
+      >
+        <Typography variant="h4" sx={{ fontWeight: 800, color: '#1e293b', mb: 1 }}>
+          Adicionar Notas Fiscais
         </Typography>
-        <Box display="flex" gap={2} alignItems="flex-end">
-          <TextField
-            fullWidth
-            label="Aponte o scanner e leia o código"
-            variant="outlined"
-            value={codigoBarras}
-            onChange={(e) => setCodigoBarras(e.target.value)}
-            onKeyDown={handleKeyDown}
-            inputRef={inputRef}
-            disabled={loading || isSaving}
-            autoFocus
-            InputProps={{
-              endAdornment: (
-                <InputAdornment position="end">
-                  <IconButton
-                    onClick={() => {
-                      setCodigoBarras('');
-                      inputRef.current?.focus();
+        <Typography variant="body1" sx={{ color: '#64748b' }}>
+          Escaneie ou digite as notas para entrada no sistema.
+        </Typography>
+      </MotionBox>
+
+      {/* Seção de Entrada */}
+      <MotionBox 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+        sx={{ mb: 4 }}
+      >
+        <Card sx={{ 
+          borderRadius: 4, 
+          boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
+          border: '1px solid rgba(226, 232, 240, 0.8)',
+          bgcolor: 'white'
+        }}>
+          <CardContent sx={{ p: 3 }}>
+            <Box component="form" onSubmit={handleAddManual}>
+              <Grid container spacing={3} alignItems="flex-end">
+                <Grid item xs={12} md={8}>
+                  <Typography variant="subtitle2" sx={{ mb: 1.5, color: '#475569', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <ScannerIcon fontSize="small" />
+                    Leitura de Código de Barras
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    placeholder="Aponte o scanner e leia o código..."
+                    variant="outlined"
+                    value={codigoBarras}
+                    onChange={(e) => setCodigoBarras(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    inputRef={inputRef}
+                    disabled={loading || isSaving}
+                    autoFocus
+                    InputProps={{
+                      sx: { 
+                        borderRadius: 3,
+                        bgcolor: '#f8fafc',
+                        '& fieldset': { borderColor: 'rgba(226, 232, 240, 0.8)' },
+                        '&:hover fieldset': { borderColor: '#1976d2' },
+                        height: 56,
+                        fontSize: '1.1rem'
+                      },
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <ScannerIcon sx={{ color: '#94a3b8' }} />
+                        </InputAdornment>
+                      ),
+                      endAdornment: codigoBarras && (
+                        <InputAdornment position="end">
+                          <IconButton
+                            onClick={() => {
+                              setCodigoBarras('');
+                              inputRef.current?.focus();
+                            }}
+                            edge="end"
+                            size="small"
+                          >
+                            <CloseIcon fontSize="small" />
+                          </IconButton>
+                        </InputAdornment>
+                      ),
                     }}
-                    edge="end"
+                  />
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <Button 
+                    type="submit" 
+                    fullWidth
+                    variant="contained" 
+                    disabled={!codigoBarras.trim() || loading || isSaving}
+                    startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <AddIcon />}
+                    sx={{ 
+                      height: 56, 
+                      borderRadius: 3, 
+                      fontWeight: 700,
+                      fontSize: '1rem',
+                      boxShadow: '0 4px 12px rgba(25, 118, 210, 0.2)',
+                      bgcolor: '#1976d2',
+                      '&:hover': { bgcolor: '#1565c0' }
+                    }}
                   >
-                    <CloseIcon />
-                  </IconButton>
-                </InputAdornment>
-              ),
-            }}
-          />
-          <Button 
-            type="submit" 
-            variant="contained" 
-            color="primary" 
-            disabled={!codigoBarras.trim() || loading || isSaving}
-            startIcon={<AddIcon />}
-          >
-            Adicionar
-          </Button>
-        </Box>
-        <Typography variant="caption" color="textSecondary" display="block" mt={1}>
-          Posicione o cursor no campo acima e leia o código com o scanner
-        </Typography>
-      </Paper>
+                    {loading ? 'Processando...' : 'Adicionar Nota'}
+                  </Button>
+                </Grid>
+              </Grid>
+              <Box sx={{ mt: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <InfoIcon sx={{ fontSize: 16, color: '#94a3b8' }} />
+                <Typography variant="caption" sx={{ color: '#94a3b8', fontWeight: 500 }}>
+                  Dica: Posicione o cursor no campo e use o scanner óptico para maior agilidade.
+                </Typography>
+              </Box>
+            </Box>
+          </CardContent>
+        </Card>
+      </MotionBox>
 
       {/* Lista de Notas */}
       {renderListaNotas()}
-
-
-
-    </Box>
+    </Container>
   );
 };
 

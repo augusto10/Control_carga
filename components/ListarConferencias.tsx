@@ -27,13 +27,41 @@ import {
   TablePagination,
   FormControlLabel,
   Switch,
-  SelectChangeEvent
+  SelectChangeEvent,
+  Stack,
+  alpha,
+  Tooltip,
+  CircularProgress,
+  Grid,
+  Avatar,
+  InputAdornment
 } from '@mui/material';
-import { Edit as EditIcon, Save as SaveIcon, Cancel as CancelIcon } from '@mui/icons-material';
+import { 
+  Edit as EditIcon, 
+  Save as SaveIcon, 
+  Cancel as CancelIcon,
+  FilterList as FilterListIcon,
+  Search as SearchIcon,
+  History as HistoryIcon,
+  CheckCircle as CheckCircleIcon,
+  Error as ErrorIcon,
+  Description as DescriptionIcon,
+  Person as PersonIcon,
+  LocalShipping as LocalShippingIcon,
+  Assignment as AssignmentIcon,
+  DateRange as DateRangeIcon,
+  Refresh as RefreshIcon,
+  GridOn as GridIcon
+} from '@mui/icons-material';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import api from '@/services/api';
+
+const MotionBox = motion(Box);
+const MotionPaper = motion(Paper);
+const MotionTableRow = motion(TableRow);
 
 const MOTIVOS_INCONSISTENCIA = [
   'AVARIA',
@@ -85,6 +113,7 @@ export default function ListarConferencias() {
   const [filtroDataInicio, setFiltroDataInicio] = useState<string>('');
   const [filtroDataFim, setFiltroDataFim] = useState<string>('');
   const [filtroStatus, setFiltroStatus] = useState<'todos' | 'com-inconsistencia' | 'sem-inconsistencia'>('todos');
+  const [busca, setBusca] = useState('');
   
   // Estados para edição
   const [editando, setEditando] = useState<string | null>(null);
@@ -163,246 +192,570 @@ export default function ListarConferencias() {
     setEditMotivos(typeof value === 'string' ? value.split(',') : value);
   };
 
-  // Dados paginados
-  const conferenciasPaginadas = conferencias.slice(
+  // Dados filtrados e paginados
+  const conferenciasFiltradas = conferencias.filter(conf => {
+    const termoBusca = busca.toLowerCase();
+    return (
+      conf.pedido.numeroPedido.toLowerCase().includes(termoBusca) ||
+      (conf.pedido.controle?.motorista || '').toLowerCase().includes(termoBusca) ||
+      (conf.pedido.controle?.transportadora || '').toLowerCase().includes(termoBusca) ||
+      (conf.pedido.controle?.responsavel || '').toLowerCase().includes(termoBusca)
+    );
+  });
+
+  const conferenciasPaginadas = conferenciasFiltradas.slice(
     pagina * linhasPorPagina,
     (pagina + 1) * linhasPorPagina
   );
 
+  const glassStyles = {
+    background: alpha('#ffffff', 0.7),
+    backdropFilter: 'blur(12px)',
+    border: `1px solid ${alpha('#ffffff', 0.3)}`,
+    boxShadow: `0 8px 32px 0 ${alpha('#1e293b', 0.1)}`,
+  };
+
   return (
-    <div>
-      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Typography variant="h5" component="h2">
-          Lista de Conferências
-        </Typography>
-        <Box sx={{ display: 'flex', gap: 2 }}>
-          <TextField
-            label="Data Inicial"
-            type="date"
-            size="small"
-            InputLabelProps={{
-              shrink: true,
-            }}
-            value={filtroDataInicio}
-            onChange={(e) => setFiltroDataInicio(e.target.value)}
-          />
-          <TextField
-            label="Data Final"
-            type="date"
-            size="small"
-            InputLabelProps={{
-              shrink: true,
-            }}
-            value={filtroDataFim}
-            onChange={(e) => setFiltroDataFim(e.target.value)}
-          />
-          <FormControl size="small" sx={{ minWidth: 200 }}>
-            <InputLabel>Status</InputLabel>
-            <Select
-              value={filtroStatus}
-              label="Status"
-              onChange={(e) => setFiltroStatus(e.target.value as any)}
-            >
-              <MenuItem value="todos">Todos</MenuItem>
-              <MenuItem value="com-inconsistencia">Com Inconsistência</MenuItem>
-              <MenuItem value="sem-inconsistencia">Sem Inconsistência</MenuItem>
-            </Select>
-          </FormControl>
-        </Box>
-      </Box>
+    <Box>
+      <MotionBox
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        sx={{ mb: 4 }}
+      >
+        <MotionPaper
+          elevation={0}
+          sx={{
+            p: 3,
+            borderRadius: '24px',
+            ...glassStyles
+          }}
+        >
+          <Stack spacing={3}>
+            <Stack direction="row" alignItems="center" spacing={1.5}>
+              <Box sx={{ 
+                width: 40, 
+                height: 40, 
+                borderRadius: 2, 
+                bgcolor: alpha('#3b82f6', 0.1), 
+                color: 'primary.main',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <FilterListIcon />
+              </Box>
+              <Typography variant="h6" fontWeight="800" color="text.primary">
+                Filtros de Busca
+              </Typography>
+            </Stack>
+
+            <Grid container spacing={3}>
+              <Grid item xs={12} md={4}>
+                <TextField
+                  fullWidth
+                  placeholder="Buscar por pedido, motorista ou transportadora..."
+                  value={busca}
+                  onChange={(e) => setBusca(e.target.value)}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <SearchIcon sx={{ color: 'primary.main', opacity: 0.7 }} />
+                      </InputAdornment>
+                    ),
+                    sx: { 
+                      borderRadius: '12px',
+                      bgcolor: alpha('#fff', 0.5),
+                    }
+                  }}
+                  size="small"
+                />
+              </Grid>
+              <Grid item xs={12} sm={6} md={2.5}>
+                <TextField
+                  fullWidth
+                  label="Início"
+                  type="date"
+                  size="small"
+                  InputLabelProps={{ shrink: true }}
+                  value={filtroDataInicio}
+                  onChange={(e) => setFiltroDataInicio(e.target.value)}
+                  InputProps={{ sx: { borderRadius: '12px', bgcolor: alpha('#fff', 0.5) } }}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6} md={2.5}>
+                <TextField
+                  fullWidth
+                  label="Fim"
+                  type="date"
+                  size="small"
+                  InputLabelProps={{ shrink: true }}
+                  value={filtroDataFim}
+                  onChange={(e) => setFiltroDataFim(e.target.value)}
+                  InputProps={{ sx: { borderRadius: '12px', bgcolor: alpha('#fff', 0.5) } }}
+                />
+              </Grid>
+              <Grid item xs={12} md={3}>
+                <FormControl fullWidth size="small">
+                  <InputLabel sx={{ fontWeight: 600 }}>Status</InputLabel>
+                  <Select
+                    value={filtroStatus}
+                    label="Status"
+                    onChange={(e) => setFiltroStatus(e.target.value as any)}
+                    sx={{ 
+                      borderRadius: '12px',
+                      bgcolor: alpha('#fff', 0.5),
+                    }}
+                  >
+                    <MenuItem value="todos">Todos os registros</MenuItem>
+                    <MenuItem value="com-inconsistencia">Com Inconsistência</MenuItem>
+                    <MenuItem value="sem-inconsistencia">Sem Inconsistência</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+            </Grid>
+
+            <Stack direction="row" justifyContent="space-between" alignItems="center">
+              <Typography variant="caption" fontWeight="700" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                {conferenciasFiltradas.length} registro(s) encontrado(s)
+              </Typography>
+              <Button 
+                size="small" 
+                variant="text" 
+                startIcon={<RefreshIcon />}
+                onClick={carregarConferencias}
+                disabled={carregando}
+                sx={{ 
+                  borderRadius: '8px', 
+                  fontWeight: 700,
+                  textTransform: 'none',
+                  '&:hover': { bgcolor: alpha('#3b82f6', 0.05) }
+                }}
+              >
+                Atualizar
+              </Button>
+            </Stack>
+          </Stack>
+        </MotionPaper>
+      </MotionBox>
 
       {erro && (
-        <Typography color="error" sx={{ mb: 2 }}>
-          {erro}
-        </Typography>
+        <MotionBox
+          initial={{ opacity: 0, x: -10 }}
+          animate={{ opacity: 1, x: 0 }}
+          sx={{ 
+            p: 2, 
+            mb: 3, 
+            borderRadius: '12px', 
+            bgcolor: alpha('#ef4444', 0.1), 
+            border: `1px solid ${alpha('#ef4444', 0.2)}`,
+            color: '#ef4444',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1.5
+          }}
+        >
+          <ErrorIcon fontSize="small" />
+          <Typography variant="body2" fontWeight="700">{erro}</Typography>
+        </MotionBox>
       )}
 
-      <Paper sx={{ width: '100%', overflow: 'hidden', mb: 2 }}>
+      <MotionPaper
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+        elevation={0}
+        sx={{ 
+          width: '100%', 
+          overflow: 'hidden', 
+          borderRadius: '24px',
+          ...glassStyles
+        }}
+      >
         <TableContainer sx={{ maxHeight: 600 }}>
           <Table stickyHeader>
             <TableHead>
               <TableRow>
-                <TableCell>Data</TableCell>
-                <TableCell>Nº Pedido</TableCell>
-                <TableCell>Motorista</TableCell>
-                <TableCell>Responsável</TableCell>
-                <TableCell>Transportadora</TableCell>
-                <TableCell>100%</TableCell>
-                <TableCell>Inconsistência</TableCell>
-                <TableCell>Conferente</TableCell>
-                {podeEditar && <TableCell>Ações</TableCell>}
+                <TableCell sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em', bgcolor: 'transparent' }}>Data / Hora</TableCell>
+                <TableCell sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em', bgcolor: 'transparent' }}>Nº Pedido</TableCell>
+                <TableCell sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em', bgcolor: 'transparent' }}>Motorista</TableCell>
+                <TableCell sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em', bgcolor: 'transparent' }}>Responsável</TableCell>
+                <TableCell sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em', bgcolor: 'transparent' }}>Transportadora</TableCell>
+                <TableCell sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em', bgcolor: 'transparent' }} align="center">Pedido 100%</TableCell>
+                <TableCell sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em', bgcolor: 'transparent' }} align="center">Status</TableCell>
+                <TableCell sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em', bgcolor: 'transparent' }}>Conferente</TableCell>
+                {podeEditar && <TableCell sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em', bgcolor: 'transparent' }} align="right">Ações</TableCell>}
               </TableRow>
             </TableHead>
             <TableBody>
-              {carregando ? (
-                <TableRow>
-                  <TableCell colSpan={podeEditar ? 9 : 8} align="center">
-                    Carregando...
-                  </TableCell>
-                </TableRow>
-              ) : conferenciasPaginadas.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={podeEditar ? 9 : 8} align="center">
-                    Nenhuma conferência encontrada
-                  </TableCell>
-                </TableRow>
-              ) : (
-                conferenciasPaginadas.map((conferencia) => (
-                  <TableRow key={conferencia.id} hover>
-                    <TableCell>
-                      {format(new Date(conferencia.dataCriacao), 'dd/MM/yyyy HH:mm', { locale: ptBR })}
+              <AnimatePresence mode="wait">
+                {carregando ? (
+                  <MotionTableRow
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                  >
+                    <TableCell colSpan={podeEditar ? 9 : 8} align="center" sx={{ py: 12 }}>
+                      <Stack spacing={3} alignItems="center">
+                        <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <CircularProgress size={48} thickness={4} sx={{ color: 'primary.main', opacity: 0.2 }} />
+                          <CircularProgress 
+                            size={48} 
+                            thickness={4} 
+                            sx={{ 
+                              color: 'primary.main', 
+                              position: 'absolute',
+                              strokeLinecap: 'round'
+                            }} 
+                          />
+                        </Box>
+                        <Typography variant="body2" color="text.secondary" fontWeight="600">
+                          Sincronizando conferências...
+                        </Typography>
+                      </Stack>
                     </TableCell>
-                    <TableCell>{conferencia.pedido.numeroPedido}</TableCell>
-                    <TableCell>{conferencia.pedido.controle?.motorista || '-'}</TableCell>
-                    <TableCell>{conferencia.pedido.controle?.responsavel || '-'}</TableCell>
-                    <TableCell>{conferencia.pedido.controle?.transportadora || '-'}</TableCell>
-                    <TableCell>
-                      {editando === conferencia.id ? (
-                        <FormControlLabel
-                          control={
-                            <Switch
-                              checked={editPedido100}
-                              onChange={(e) => setEditPedido100(e.target.checked)}
-                            />
-                          }
-                          label={editPedido100 ? 'Sim' : 'Não'}
-                        />
-                      ) : (
-                        <Chip 
-                          label={conferencia.pedido100 ? 'Sim' : 'Não'} 
-                          color={conferencia.pedido100 ? 'success' : 'default'} 
-                          size="small" 
-                        />
-                      )}
+                  </MotionTableRow>
+                ) : conferenciasPaginadas.length === 0 ? (
+                  <MotionTableRow
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                  >
+                    <TableCell colSpan={podeEditar ? 9 : 8} align="center" sx={{ py: 12 }}>
+                      <Stack spacing={2} alignItems="center">
+                        <Box sx={{ 
+                          width: 64, 
+                          height: 64, 
+                          borderRadius: '50%', 
+                          bgcolor: alpha('#94a3b8', 0.1), 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'center',
+                          mb: 1
+                        }}>
+                          <SearchIcon sx={{ fontSize: 32, color: '#94a3b8' }} />
+                        </Box>
+                        <Typography variant="h6" fontWeight="800" color="text.primary">Nenhuma conferência</Typography>
+                        <Typography variant="body2" color="text.secondary" fontWeight="500">Tente ajustar os filtros de busca</Typography>
+                      </Stack>
                     </TableCell>
-                    <TableCell>
-                      {editando === conferencia.id ? (
-                        <FormControl fullWidth size="small">
-                          <InputLabel>Inconsistência</InputLabel>
-                          <Select
-                            value={editInconsistencia ? 'sim' : 'nao'}
-                            label="Inconsistência"
-                            onChange={(e) => setEditInconsistencia(e.target.value === 'sim')}
-                          >
-                            <MenuItem value="sim">Sim</MenuItem>
-                            <MenuItem value="nao">Não</MenuItem>
-                          </Select>
-                        </FormControl>
-                      ) : (
-                        <Chip 
-                          label={conferencia.inconsistencia ? 'Sim' : 'Não'} 
-                          color={conferencia.inconsistencia ? 'error' : 'success'} 
-                          size="small" 
-                        />
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {conferencia.conferente.nome}
-                    </TableCell>
-                    {podeEditar && (
+                  </MotionTableRow>
+                ) : (
+                  conferenciasPaginadas.map((conferencia, index) => (
+                    <MotionTableRow 
+                      key={conferencia.id} 
+                      hover
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: index * 0.05 }}
+                      sx={{ 
+                        '&:hover': { bgcolor: alpha('#f1f5f9', 0.5) },
+                        transition: 'background-color 0.2s'
+                      }}
+                    >
+                      <TableCell sx={{ fontWeight: 600 }}>
+                        <Stack direction="row" spacing={1} alignItems="center">
+                          <DateRangeIcon sx={{ fontSize: 18, color: 'primary.main', opacity: 0.7 }} />
+                          <Typography variant="body2" fontWeight="600">
+                            {format(new Date(conferencia.dataCriacao), 'dd/MM/yy HH:mm', { locale: ptBR })}
+                          </Typography>
+                        </Stack>
+                      </TableCell>
                       <TableCell>
+                        <Chip 
+                          label={conferencia.pedido.numeroPedido} 
+                          variant="filled" 
+                          size="small" 
+                          sx={{ 
+                            fontWeight: 800, 
+                            borderRadius: '6px', 
+                            bgcolor: alpha('#3b82f6', 0.1),
+                            color: '#2563eb'
+                          }} 
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" fontWeight="600" color="text.primary">
+                          {conferencia.pedido.controle?.motorista || '-'}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" fontWeight="500" color="text.secondary">
+                          {conferencia.pedido.controle?.responsavel || '-'}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" sx={{ maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500, color: 'text.secondary' }}>
+                          {conferencia.pedido.controle?.transportadora || '-'}
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="center">
                         {editando === conferencia.id ? (
-                          <Box sx={{ display: 'flex', gap: 1 }}>
-                            <IconButton 
-                              size="small" 
-                              color="primary"
-                              onClick={() => handleSalvarEdicao(conferencia.id)}
-                            >
-                              <SaveIcon fontSize="small" />
-                            </IconButton>
-                            <IconButton 
-                              size="small" 
-                              color="inherit"
-                              onClick={handleCancelarEdicao}
-                            >
-                              <CancelIcon fontSize="small" />
-                            </IconButton>
-                          </Box>
+                          <Switch
+                            checked={editPedido100}
+                            onChange={(e) => setEditPedido100(e.target.checked)}
+                            color="success"
+                          />
                         ) : (
-                          <IconButton 
-                            size="small" 
-                            onClick={() => handleIniciarEdicao(conferencia)}
-                          >
-                            <EditIcon fontSize="small" />
-                          </IconButton>
+                          <Tooltip title={conferencia.pedido100 ? 'Pedido completo' : 'Pedido incompleto'}>
+                            <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+                              {conferencia.pedido100 ? (
+                                <CheckCircleIcon sx={{ color: '#10b981' }} />
+                              ) : (
+                                <CancelIcon sx={{ color: alpha('#94a3b8', 0.3) }} />
+                              )}
+                            </Box>
+                          </Tooltip>
                         )}
                       </TableCell>
-                    )}
-                  </TableRow>
-                ))
-              )}
+                      <TableCell align="center">
+                        {editando === conferencia.id ? (
+                          <FormControl fullWidth size="small" sx={{ minWidth: 100 }}>
+                            <Select
+                              value={editInconsistencia ? 'sim' : 'nao'}
+                              onChange={(e) => setEditInconsistencia(e.target.value === 'sim')}
+                              sx={{ borderRadius: '8px' }}
+                            >
+                              <MenuItem value="sim">Sim</MenuItem>
+                              <MenuItem value="nao">Não</MenuItem>
+                            </Select>
+                          </FormControl>
+                        ) : (
+                          <Chip 
+                            label={conferencia.inconsistencia ? 'Inconsistente' : 'Ok'} 
+                            color={conferencia.inconsistencia ? 'error' : 'success'} 
+                            size="small" 
+                            sx={{ 
+                              fontWeight: 800,
+                              minWidth: 100,
+                              borderRadius: '8px',
+                              bgcolor: alpha(conferencia.inconsistencia ? '#ef4444' : '#10b981', 0.1),
+                              color: conferencia.inconsistencia ? '#dc2626' : '#059669',
+                              border: 'none'
+                            }}
+                          />
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Stack direction="row" spacing={1.5} alignItems="center">
+                          <Avatar sx={{ 
+                            width: 32, 
+                            height: 32, 
+                            fontSize: '0.85rem', 
+                            fontWeight: 700,
+                            bgcolor: alpha('#6366f1', 0.1), 
+                            color: '#6366f1',
+                            boxShadow: `0 2px 8px ${alpha('#6366f1', 0.2)}`
+                          }}>
+                            {conferencia.conferente.nome.charAt(0)}
+                          </Avatar>
+                          <Typography variant="body2" fontWeight="700" color="text.primary">
+                            {conferencia.conferente.nome.split(' ')[0]}
+                          </Typography>
+                        </Stack>
+                      </TableCell>
+                      {podeEditar && (
+                        <TableCell align="right">
+                          {editando === conferencia.id ? (
+                            <Stack direction="row" spacing={1} justifyContent="flex-end">
+                              <Tooltip title="Salvar">
+                                <IconButton 
+                                  size="small" 
+                                  sx={{ 
+                                    color: '#10b981', 
+                                    bgcolor: alpha('#10b981', 0.1), 
+                                    '&:hover': { bgcolor: alpha('#10b981', 0.2) },
+                                    borderRadius: '8px'
+                                  }}
+                                  onClick={() => handleSalvarEdicao(conferencia.id)}
+                                >
+                                  <SaveIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                              <Tooltip title="Cancelar">
+                                <IconButton 
+                                  size="small" 
+                                  sx={{ 
+                                    color: '#64748b', 
+                                    bgcolor: alpha('#64748b', 0.1), 
+                                    '&:hover': { bgcolor: alpha('#64748b', 0.2) },
+                                    borderRadius: '8px'
+                                  }}
+                                  onClick={handleCancelarEdicao}
+                                >
+                                  <CancelIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            </Stack>
+                          ) : (
+                            <Tooltip title="Editar conferência">
+                              <IconButton 
+                                size="small" 
+                                sx={{ 
+                                  color: 'primary.main', 
+                                  bgcolor: alpha('#3b82f6', 0.05), 
+                                  '&:hover': { bgcolor: alpha('#3b82f6', 0.1) },
+                                  borderRadius: '8px'
+                                }}
+                                onClick={() => handleIniciarEdicao(conferencia)}
+                              >
+                                <EditIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                        </TableCell>
+                      )}
+                    </MotionTableRow>
+                  ))
+                )}
+              </AnimatePresence>
             </TableBody>
           </Table>
         </TableContainer>
         <TablePagination
           rowsPerPageOptions={[5, 10, 25]}
           component="div"
-          count={conferencias.length}
+          count={conferenciasFiltradas.length}
           rowsPerPage={linhasPorPagina}
           page={pagina}
           onPageChange={handleMudarPagina}
           onRowsPerPageChange={handleMudarLinhasPorPagina}
           labelRowsPerPage="Linhas por página:"
           labelDisplayedRows={({ from, to, count }) => `${from}-${to} de ${count}`}
+          sx={{ borderTop: '1px solid', borderColor: alpha('#e2e8f0', 0.6) }}
         />
-      </Paper>
+      </MotionPaper>
 
       {/* Modal para editar motivos e observações */}
-      {editando && (
-        <Dialog 
-          open={!!editando} 
-          onClose={handleCancelarEdicao}
-          maxWidth="sm"
-          fullWidth
-        >
-          <DialogTitle>Editar Detalhes da Conferência</DialogTitle>
-          <DialogContent>
-            <Box sx={{ mt: 2 }}>
-              <FormControl fullWidth margin="normal">
-                <InputLabel>Motivos da Inconsistência</InputLabel>
-                <Select
-                  multiple
-                  value={editMotivos}
-                  onChange={handleMotivoChange}
-                  input={<OutlinedInput label="Motivos da Inconsistência" />}
-                  renderValue={(selected) => selected.join(', ')}
-                  disabled={!editInconsistencia}
-                >
-                  {MOTIVOS_INCONSISTENCIA.map((motivo) => (
-                    <MenuItem key={motivo} value={motivo}>
-                      <Checkbox checked={editMotivos.indexOf(motivo) > -1} />
-                      <ListItemText primary={motivo} />
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+      <AnimatePresence>
+        {editando && (
+          <Dialog 
+            open={!!editando} 
+            onClose={handleCancelarEdicao} 
+            maxWidth="sm" 
+            fullWidth
+            PaperProps={{
+              sx: {
+                borderRadius: '24px',
+                p: 1,
+                background: alpha('#ffffff', 0.9),
+                backdropFilter: 'blur(16px)',
+                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+                border: `1px solid ${alpha('#ffffff', 0.5)}`
+              }
+            }}
+          >
+            <DialogTitle sx={{ fontWeight: 800, fontSize: '1.5rem', color: '#1e293b', pb: 1, pt: 3, px: 3 }}>
+              <Stack direction="row" alignItems="center" spacing={2}>
+                <Box sx={{ 
+                  width: 48, 
+                  height: 48, 
+                  borderRadius: 2, 
+                  bgcolor: alpha('#3b82f6', 0.1), 
+                  color: 'primary.main',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <AssignmentIcon fontSize="large" />
+                </Box>
+                <Box>
+                  <Typography variant="h5" fontWeight="800">Editar Detalhes</Typography>
+                  <Typography variant="caption" color="text.secondary" fontWeight="600" sx={{ textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Conferência #{conferencias.find(c => c.id === editando)?.pedido.numeroPedido}
+                  </Typography>
+                </Box>
+              </Stack>
+            </DialogTitle>
+            <DialogContent sx={{ px: 3 }}>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 4, fontWeight: 500 }}>
+                Atualize as informações de inconsistência e observações deste pedido.
+              </Typography>
               
-              <TextField
-                fullWidth
-                multiline
-                rows={3}
-                label="Observações"
-                value={editObservacoes}
-                onChange={(e) => setEditObservacoes(e.target.value)}
-                margin="normal"
-              />
-            </Box>
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={handleCancelarEdicao} color="inherit">
-              Cancelar
-            </Button>
-            <Button 
-              onClick={() => editando && handleSalvarEdicao(editando)} 
-              variant="contained" 
-              color="primary"
-              disabled={editInconsistencia && editMotivos.length === 0}
-            >
-              Salvar
-            </Button>
-          </DialogActions>
-        </Dialog>
-      )}
-    </div>
+              <Stack spacing={3}>
+                <FormControl fullWidth>
+                  <InputLabel sx={{ fontWeight: 600 }}>Motivos da Inconsistência</InputLabel>
+                  <Select
+                    multiple
+                    value={editMotivos}
+                    onChange={handleMotivoChange}
+                    input={<OutlinedInput label="Motivos da Inconsistência" sx={{ borderRadius: '12px', bgcolor: alpha('#fff', 0.5) }} />}
+                    renderValue={(selected) => (
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                        {selected.map((value) => (
+                          <Chip 
+                            key={value} 
+                            label={value} 
+                            size="small" 
+                            sx={{ 
+                              borderRadius: '6px', 
+                              fontWeight: 700,
+                              bgcolor: alpha('#3b82f6', 0.1),
+                              color: 'primary.main'
+                            }} 
+                          />
+                        ))}
+                      </Box>
+                    )}
+                  >
+                    {MOTIVOS_INCONSISTENCIA.map((motivo) => (
+                      <MenuItem key={motivo} value={motivo}>
+                        <Checkbox checked={editMotivos.indexOf(motivo) > -1} />
+                        <ListItemText primary={motivo} />
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+
+                <TextField
+                  fullWidth
+                  label="Observações"
+                  multiline
+                  rows={4}
+                  placeholder="Adicione observações relevantes sobre esta conferência..."
+                  value={editObservacoes}
+                  onChange={(e) => setEditObservacoes(e.target.value)}
+                  InputProps={{ sx: { borderRadius: '12px', bgcolor: alpha('#fff', 0.5) } }}
+                />
+              </Stack>
+            </DialogContent>
+            <DialogActions sx={{ px: 3, pb: 4, pt: 2, gap: 1.5 }}>
+              <Button 
+                onClick={handleCancelarEdicao}
+                color="inherit"
+                sx={{ 
+                  borderRadius: '12px', 
+                  fontWeight: 700, 
+                  px: 3,
+                  textTransform: 'none',
+                  color: 'text.secondary',
+                  '&:hover': { bgcolor: alpha('#000000', 0.05) }
+                }}
+              >
+                Cancelar
+              </Button>
+              <Button 
+                onClick={() => editando && handleSalvarEdicao(editando)}
+                variant="contained"
+                sx={{ 
+                  borderRadius: '12px', 
+                  fontWeight: 800, 
+                  px: 4,
+                  textTransform: 'none',
+                  boxShadow: '0 8px 20px rgba(37, 99, 235, 0.3)',
+                  background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                  '&:hover': { 
+                    boxShadow: '0 10px 25px rgba(37, 99, 235, 0.4)',
+                    transform: 'translateY(-1px)'
+                  },
+                  transition: 'all 0.2s'
+                }}
+              >
+                Salvar Alterações
+              </Button>
+            </DialogActions>
+          </Dialog>
+        )}
+      </AnimatePresence>
+    </Box>
   );
 }

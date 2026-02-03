@@ -11,8 +11,14 @@ import {
   TableRow, 
   CircularProgress, 
   Alert,
-  Chip
+  Chip,
+  useTheme,
+  alpha,
+  Box,
+  Stack
 } from '@mui/material';
+import ResponsiveContainer from '../../components/ResponsiveContainer';
+import ProtectedRoute from '../../components/ProtectedRoute';
 import api from '../../services/api'; // Ajuste o caminho se necessário
 import { format } from 'date-fns';
 
@@ -38,6 +44,7 @@ interface Conferencia {
 }
 
 const RelatorioConferencias = () => {
+  const theme = useTheme();
   const [conferencias, setConferencias] = useState<Conferencia[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -61,14 +68,39 @@ const RelatorioConferencias = () => {
   }, []);
 
   return (
-    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-      <Typography variant="h4" component="h1" gutterBottom sx={{ fontWeight: 'bold' }}>
-        Relatório de Conferências
-      </Typography>
+    <ProtectedRoute>
+      <ResponsiveContainer
+        breadcrumb={[
+          { label: 'Dashboard', path: '/' },
+          { label: 'Relatórios', path: '/relatorios' },
+          { label: 'Conferências' }
+        ]}
+      >
+        <Typography variant="h4" component="h1" gutterBottom sx={{ fontWeight: 'bold' }}>
+          Relatório de Conferências
+        </Typography>
       {loading ? (
         <CircularProgress />
       ) : error ? (
-        <Alert severity="error">{error}</Alert>
+        <Alert 
+          severity="error"
+          variant="standard"
+          sx={{ 
+            borderRadius: '16px',
+            backdropFilter: 'blur(12px)',
+            backgroundColor: alpha(theme.palette.error.main, 0.15),
+            color: theme.palette.error.dark,
+            border: `1px solid ${alpha(theme.palette.error.main, 0.3)}`,
+            '& .MuiAlert-icon': {
+              color: theme.palette.error.main,
+            },
+            boxShadow: `0 8px 32px 0 ${alpha(theme.palette.common.black, 0.1)}`,
+            fontWeight: 600,
+            mb: 3
+          }}
+        >
+          {error}
+        </Alert>
       ) : (
         <TableContainer component={Paper} sx={{ boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.37)', borderRadius: '10px' }}>
           <Table sx={{ minWidth: 650 }} aria-label="simple table">
@@ -111,7 +143,8 @@ const RelatorioConferencias = () => {
           </Table>
         </TableContainer>
       )}
-    </Container>
+      </ResponsiveContainer>
+    </ProtectedRoute>
   );
 };
 

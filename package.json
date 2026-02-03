@@ -7,8 +7,8 @@
     "build": "prisma generate && next build",
     "start": "next start",
     "postinstall": "prisma generate",
-    "lint": "next lint --fix || true",
-    "type-check": "tsc --noEmit || true",
+    "lint": "next lint --fix || node -e \"process.exit(0)\"",
+    "type-check": "tsc --noEmit || node -e \"process.exit(0)\"",
     "correcao-temporaria": "ts-node scripts/aplicar-correcao-temporaria.ts",
     "reverter-correcao-temporaria": "ts-node scripts/aplicar-correcao-temporaria.ts reverter",
     "migration-producao": "ts-node scripts/executar-migration-producao.ts"
@@ -62,6 +62,7 @@
     "react-chartjs-2": "^5.3.0",
     "react-dom": "^18.2.0",
     "react-hook-form": "^7.49.3",
+    "react-input-mask": "^2.0.4",
     "react-number-format": "^5.4.4",
     "react-redux": "^9.2.0",
     "react-signature-canvas": "^1.0.7",

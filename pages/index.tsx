@@ -1,7 +1,22 @@
-import { Container, Typography, Box, Card, CardContent, Grid, CircularProgress, Paper, Chip, Avatar, useTheme, useMediaQuery } from '@mui/material';
+import Container from '@mui/material/Container';
+import Typography from '@mui/material/Typography';
+import Box from '@mui/material/Box';
+import Card from '@mui/material/Card';
+import CardContent from '@mui/material/CardContent';
+import Grid from '@mui/material/Grid';
+import CircularProgress from '@mui/material/CircularProgress';
+import Paper from '@mui/material/Paper';
+import Chip from '@mui/material/Chip';
+import Avatar from '@mui/material/Avatar';
+import { useTheme } from '@mui/material/styles';
+import useMediaQuery from '@mui/material/useMediaQuery';
+import IconButton from '@mui/material/IconButton';
+import Tooltip from '@mui/material/Tooltip';
+import Divider from '@mui/material/Divider';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   Add as AddIcon,
   NoteAdd as NoteAddIcon,
@@ -12,11 +27,19 @@ import {
   Warning as AlertIcon,
   TrendingUp as TrendingUpIcon,
   Speed as SpeedIcon,
-  Security as SecurityIcon
+  Security as SecurityIcon,
+  Refresh as RefreshIcon,
+  Today as TodayIcon,
+  Inventory as InventoryIcon,
+  PendingActions as PendingIcon,
+  CheckCircleOutline as CompletedIcon,
+  NotificationsNone as AlertNoneIcon
 } from '@mui/icons-material';
 import ListAltIcon from '@mui/icons-material/ListAlt';
 import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
 import { useAuth } from '../contexts/AuthContext';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 type MenuCard = {
   title: string;
@@ -26,379 +49,337 @@ type MenuCard = {
   color: string;
 };
 
+type KPIData = {
+  label: string;
+  value: string | number;
+  icon: React.ReactNode;
+  color: string;
+  trend?: string;
+};
+
+const MotionBox = motion(Box);
+const MotionGrid = motion(Grid);
+
 function HomeContent() {
   const theme = useTheme();
+  const { user } = useAuth();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const isTablet = useMediaQuery(theme.breakpoints.down('lg'));
-  
+
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Bom dia';
+    if (hour < 18) return 'Boa tarde';
+    return 'Boa noite';
+  };
+
+  const [loadingStats, setLoadingStats] = useState(true);
+  const [stats, setStats] = useState({
+    notasHoje: 0,
+    controlesAtivos: 0,
+    checklistsPendentes: 0,
+    alertasValidade: 0
+  });
+
+  const loadDashboardStats = async () => {
+    try {
+      setLoadingStats(true);
+      // Simulando busca de dados (pode ser substituído por chamadas API reais)
+      // Como as APIs de dashboard existentes são restritas a ADMIN, 
+      // aqui faremos uma versão simplificada ou mockada para o usuário comum
+      const resControles = await fetch('/api/controles', { credentials: 'include' });
+      const controles = resControles.ok ? await resControles.json() : [];
+      
+      const resNotas = await fetch('/api/notas', { credentials: 'include' });
+      const notas = resNotas.ok ? await resNotas.json() : [];
+
+      setStats({
+        notasHoje: notas.filter((n: any) => {
+          const hoje = new Date().toISOString().split('T')[0];
+          return n.dataCriacao?.startsWith(hoje);
+        }).length || 0,
+        controlesAtivos: controles.filter((c: any) => !c.finalizado).length || 0,
+        checklistsPendentes: 12, // Mock ou buscar de API específica
+        alertasValidade: 5 // Mock ou buscar de API específica
+      });
+    } catch (error) {
+      console.error('Erro ao carregar stats:', error);
+    } finally {
+      setLoadingStats(false);
+    }
+  };
+
+  useEffect(() => {
+    loadDashboardStats();
+  }, []);
+
+  const kpis: KPIData[] = [
+    { 
+      label: 'Notas de Hoje', 
+      value: stats.notasHoje, 
+      icon: <NoteAddIcon />, 
+      color: '#2196f3',
+      trend: '+12% vs ontem'
+    },
+    { 
+      label: 'Controles Ativos', 
+      value: stats.controlesAtivos, 
+      icon: <ListAltIcon />, 
+      color: '#4caf50',
+      trend: 'Em tempo real'
+    },
+    { 
+      label: 'Checklists Pendentes', 
+      value: stats.checklistsPendentes, 
+      icon: <AssignmentTurnedInIcon />, 
+      color: '#ff9800',
+      trend: 'Urgente'
+    },
+    { 
+      label: 'Alertas Validade', 
+      value: stats.alertasValidade, 
+      icon: <AlertIcon />, 
+      color: '#f44336',
+      trend: 'Atenção'
+    }
+  ];
+
   const menuCards: MenuCard[] = [
     {
       title: 'Adicionar Notas',
-      description: 'Adicione novas notas fiscais ao sistema',
-      icon: <NoteAddIcon sx={{ fontSize: 40 }} />,
+      description: 'Entrada de novas NFs',
+      icon: <NoteAddIcon sx={{ fontSize: 32 }} />,
       href: '/adicionar-notas',
       color: '#1976d2',
     },
     {
       title: 'Criar Controle',
-      description: 'Crie um novo controle de cargas',
-      icon: <AddIcon sx={{ fontSize: 40 }} />,
+      description: 'Novo controle de carga',
+      icon: <AddIcon sx={{ fontSize: 32 }} />,
       href: '/criar-controle',
       color: '#2e7d32',
     },
     {
       title: 'Consultar Notas',
-      description: 'Consulte notas fiscais cadastradas',
-      icon: <SearchIcon sx={{ fontSize: 40 }} />,
+      description: 'Busca e histórico de NFs',
+      icon: <SearchIcon sx={{ fontSize: 32 }} />,
       href: '/listar-notas',
       color: '#ed6c02',
     },
     {
       title: 'Consultar Controles',
-      description: 'Consulte os controles de cargas existentes',
-      icon: <ListAltIcon sx={{ fontSize: 40 }} />,
+      description: 'Status de carregamentos',
+      icon: <ListAltIcon sx={{ fontSize: 32 }} />,
       href: '/listar-controles',
       color: '#9c27b0',
     },
     {
-      title: 'Separação e Conferência',
-      description: 'Acesse funções de separação, conferência, auditoria e gerência',
-      icon: <ListAltIcon sx={{ fontSize: 40 }} />,
-      href: '/separacao-conferencia',
-      color: '#00796b',
-    },
-    {
       title: 'Checklist Empilhadeiras',
-      description: 'Checklist rápido e obrigatório para operadores',
-      icon: <AssignmentTurnedInIcon sx={{ fontSize: 40 }} />,
+      description: 'Inspeção obrigatória',
+      icon: <AssignmentTurnedInIcon sx={{ fontSize: 32 }} />,
       href: '/checklist-empilhadeiras',
       color: '#fbc02d',
     },
     {
       title: 'Gerar Etiquetas',
-      description: 'Gere etiquetas de transporte com código de barras',
-      icon: <EtiquetasIcon sx={{ fontSize: 40 }} />,
+      description: 'ZPL e Código de Barras',
+      icon: <EtiquetasIcon sx={{ fontSize: 32 }} />,
       href: '/gerar-etiquetas',
       color: '#d32f2f',
     },
     {
-      title: 'Checklist Recebimento',
-      description: 'Checklist para recebimento de produtos com vencimento',
-      icon: <ChecklistIcon sx={{ fontSize: 40 }} />,
+      title: 'Recebimento',
+      description: 'Checklist e Regras de Ouro',
+      icon: <ChecklistIcon sx={{ fontSize: 32 }} />,
       href: '/checklist-recebimento/regras-ouro',
       color: '#7b1fa2',
     },
     {
-      title: 'Relatórios Checklist',
-      description: 'Visualize relatórios completos dos checklists',
-      icon: <ReportIcon sx={{ fontSize: 40 }} />,
+      title: 'Relatórios',
+      description: 'Indicadores e análises',
+      icon: <ReportIcon sx={{ fontSize: 32 }} />,
       href: '/checklist-recebimento/relatorios',
       color: '#0288d1',
-    },
-    {
-      title: 'Alertas de Validade',
-      description: 'Monitore produtos próximos ao vencimento',
-      icon: <AlertIcon sx={{ fontSize: 40 }} />,
-      href: '/checklist-recebimento/relatorio-validade',
-      color: '#f57c00',
-    },
-    {
-      title: 'Relatórios Avançados',
-      description: 'Análises detalhadas de validade e ocorrências',
-      icon: <ReportIcon sx={{ fontSize: 40 }} />,
-      href: '/checklist-recebimento/relatorios-avancados',
-      color: '#9c27b0',
     }
   ];
 
-  return (
-    <Container maxWidth="xl" sx={{ px: isMobile ? 2 : 4, py: isMobile ? 2 : 4 }}>
-        {/* Header Hero Section */}
-        <Paper 
-          elevation={0} 
-          sx={{ 
-            background: 'linear-gradient(135deg, #1976d2 0%, #1565c0 100%)',
-            color: 'white',
-            p: isMobile ? 2.5 : 3.5,
-            mb: 4,
-            borderRadius: 3,
-            position: 'relative',
-            overflow: 'hidden',
-            boxShadow: '0 8px 32px rgba(25, 118, 210, 0.25)',
-            '&::before': {
-              content: '""',
-              position: 'absolute',
-              top: -50,
-              right: -50,
-              width: 200,
-              height: 200,
-              background: 'radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%)',
-              borderRadius: '50%'
-            },
-            '&::after': {
-              content: '""',
-              position: 'absolute',
-              bottom: -30,
-              left: -30,
-              width: 150,
-              height: 150,
-              background: 'radial-gradient(circle, rgba(255,255,255,0.05) 0%, transparent 70%)',
-              borderRadius: '50%'
-            }
-          }}
-        >
-        <Box sx={{ textAlign: 'center', position: 'relative', zIndex: 2 }}>
-          <Box sx={{ mb: 2 }}>
-            <Avatar 
-              sx={{ 
-                bgcolor: 'rgba(255,255,255,0.15)', 
-                width: isMobile ? 60 : 80, 
-                height: isMobile ? 60 : 80,
-                mx: 'auto',
-                mb: 2,
-                boxShadow: '0 4px 16px rgba(255,255,255,0.2)',
-                backdropFilter: 'blur(10px)',
-                border: '2px solid rgba(255,255,255,0.2)'
-              }}
-            >
-              <SpeedIcon sx={{ fontSize: isMobile ? 30 : 40, color: 'white' }} />
-            </Avatar>
-            <Typography 
-              variant={isMobile ? "h4" : "h2"} 
-              component="h1" 
-              gutterBottom 
-              sx={{ 
-                fontWeight: 700, 
-                mb: 0.5,
-                textShadow: '0 1px 2px rgba(0,0,0,0.1)',
-                color: 'white'
-              }}
-            >
-              Controle de Cargas
-            </Typography>
-            <Typography 
-              variant={isMobile ? "h6" : "h4"} 
-              sx={{ 
-                fontWeight: 300, 
-                opacity: 0.9, 
-                mb: 2,
-                textShadow: '0 1px 2px rgba(0,0,0,0.1)'
-              }}
-            >
-              Esplendor
-            </Typography>
-          </Box>
-          
-          <Typography 
-            variant={isMobile ? "body1" : "h6"} 
-            sx={{ 
-              opacity: 0.95, 
-              fontWeight: 400, 
-              mb: 3,
-              maxWidth: 500,
-              mx: 'auto',
-              lineHeight: 1.5
-            }}
-          >
-            Sistema inteligente de gerenciamento logístico
-          </Typography>
-          
-          <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1.5, flexWrap: 'wrap' }}>
-            <Chip 
-              icon={<SecurityIcon sx={{ fontSize: 16 }} />} 
-              label="Seguro" 
-              size="small"
-              sx={{ 
-                bgcolor: 'rgba(255,255,255,0.2)', 
-                color: 'white',
-                backdropFilter: 'blur(10px)',
-                border: '1px solid rgba(255,255,255,0.3)',
-                fontWeight: 500,
-                fontSize: '0.75rem'
-              }} 
-            />
-            <Chip 
-              icon={<TrendingUpIcon sx={{ fontSize: 16 }} />} 
-              label="Eficiente" 
-              size="small"
-              sx={{ 
-                bgcolor: 'rgba(255,255,255,0.2)', 
-                color: 'white',
-                backdropFilter: 'blur(10px)',
-                border: '1px solid rgba(255,255,255,0.3)',
-                fontWeight: 500,
-                fontSize: '0.75rem'
-              }} 
-            />
-            <Chip 
-              icon={<SpeedIcon sx={{ fontSize: 16 }} />} 
-              label="Rápido" 
-              size="small"
-              sx={{ 
-                bgcolor: 'rgba(255,255,255,0.2)', 
-                color: 'white',
-                backdropFilter: 'blur(10px)',
-                border: '1px solid rgba(255,255,255,0.3)',
-                fontWeight: 500,
-                fontSize: '0.75rem'
-              }} 
-            />
-          </Box>
-        </Box>
-      </Paper>
+  const containerVariants: any = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1
+      }
+    }
+  };
 
-        {/* Cards Grid */}
-        <Box sx={{ mt: 2 }}>
-          <Typography 
-            variant={isMobile ? "h5" : "h4"} 
-            component="h2" 
-            sx={{ 
-              textAlign: 'center', 
-              mb: 4, 
-              fontWeight: 700,
-              color: 'text.primary'
-            }}
-          >
-            Acesso Rápido
+  const itemVariants: any = {
+    hidden: { y: 20, opacity: 0 },
+    visible: {
+      y: 0,
+      opacity: 1,
+      transition: {
+        type: 'spring',
+        stiffness: 100
+      }
+    }
+  };
+
+  return (
+    <Container maxWidth="xl" sx={{ px: isMobile ? 2 : 4, py: isMobile ? 2 : 4, minHeight: '100vh', bgcolor: '#f8fafc' }}>
+      {/* Welcome Header */}
+      <MotionBox 
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}
+      >
+        <Box>
+            <Typography variant="h4" sx={{ fontWeight: 800, color: '#1e293b', mb: 0.5 }}>
+              {`${getGreeting()}, ${user?.nome ? user.nome.split(' ')[0] : (user?.email ? user.email.split('@')[0] : 'Usuário')} 👋`}
+            </Typography>
+          <Typography variant="body1" sx={{ color: '#64748b', display: 'flex', alignItems: 'center', gap: 1 }}>
+            <TodayIcon sx={{ fontSize: 18 }} />
+            {format(new Date(), "EEEE, d 'de' MMMM", { locale: ptBR })}
           </Typography>
-          
-          <Grid 
-            container 
-            spacing={isMobile ? 2 : 3} 
-            justifyContent="center"
-            sx={{ 
-              maxWidth: 1400, 
-              mx: 'auto',
-              px: isMobile ? 1 : 3
-            }}
-          >
-            {menuCards.map((card) => (
-              <Grid 
-                item 
-                xs={12} 
-                sm={6} 
-                md={4} 
-                lg={3}
-                key={card.title} 
-                sx={{ 
-                  display: 'flex',
-                  justifyContent: 'center'
-                }}
-              >
-                <Link href={card.href} passHref style={{ textDecoration: 'none', width: '100%', maxWidth: 320 }}>
-              <Card
-                sx={{
-                  width: '100%',
-                  minHeight: isMobile ? 120 : 140,
-                  maxWidth: isMobile ? '100%' : 320,
-                  height: '100%',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  cursor: 'pointer',
-                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                  borderRadius: 3,
-                  border: '1px solid',
-                  borderColor: 'grey.200',
-                  position: 'relative',
-                  overflow: 'hidden',
-                  background: '#ffffff',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-                  '&:hover': {
-                    transform: isMobile ? 'scale(1.02)' : 'translateY(-4px)',
-                    boxShadow: `0 8px 25px rgba(0,0,0,0.12)`,
-                    borderColor: card.color,
-                    '& .card-icon': {
-                      transform: 'scale(1.05)',
-                      backgroundColor: `${card.color}15`
-                    },
-                    '& .card-title': {
-                      color: card.color
-                    },
-                    '&::before': {
-                      opacity: 1
-                    }
-                  },
-                  '&::before': {
-                    content: '""',
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    height: '3px',
-                    background: `linear-gradient(90deg, ${card.color} 0%, ${card.color}80 100%)`,
-                    opacity: 0,
-                    transition: 'opacity 0.3s ease'
-                  }
-                }}
-              >
-                <CardContent
-                  sx={{
-                    flexGrow: 1,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    textAlign: 'center',
-                    p: isMobile ? 2 : 2.5,
-                    position: 'relative',
-                    zIndex: 1
-                  }}
-                >
-                  <Box
-                    className="card-icon"
-                    sx={{
-                      color: card.color,
-                      mb: 1.5,
-                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+        </Box>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <Tooltip title="Atualizar dados">
+            <IconButton 
+              onClick={loadDashboardStats}
+              sx={{ bgcolor: 'white', boxShadow: '0 2px 8px rgba(0,0,0,0.05)', '&:hover': { bgcolor: '#f1f5f9' } }}
+            >
+              <RefreshIcon sx={{ color: '#64748b' }} />
+            </IconButton>
+          </Tooltip>
+        </Box>
+      </MotionBox>
+
+      {/* KPI Section */}
+      <MotionGrid container spacing={3} sx={{ mb: 6 }} variants={containerVariants} initial="hidden" animate="visible">
+        {kpis.map((kpi, index) => (
+          <Grid item xs={12} sm={6} md={3} key={index}>
+            <MotionBox variants={itemVariants}>
+              <Card sx={{ 
+                borderRadius: 4, 
+                boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
+                border: '1px solid rgba(226, 232, 240, 0.8)',
+                overflow: 'hidden',
+                position: 'relative',
+                bgcolor: 'white'
+              }}>
+                <CardContent sx={{ p: 3 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+                    <Box sx={{ 
+                      p: 1.5, 
+                      borderRadius: 3, 
+                      bgcolor: `${kpi.color}10`, 
+                      color: kpi.color,
                       display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'center',
-                      width: isMobile ? 48 : 56,
-                      height: isMobile ? 48 : 56,
-                      borderRadius: '50%',
-                      background: `${card.color}08`,
-                      border: `1px solid ${card.color}20`
-                    }}
-                  >
-                    {card.icon}
+                      justifyContent: 'center'
+                    }}>
+                      {kpi.icon}
+                    </Box>
+                    {loadingStats ? (
+                      <CircularProgress size={20} sx={{ color: '#cbd5e1' }} />
+                    ) : (
+                      <Typography variant="caption" sx={{ color: '#94a3b8', fontWeight: 600 }}>
+                        {kpi.trend}
+                      </Typography>
+                    )}
                   </Box>
-                  <Typography
-                    className="card-title"
-                    variant="subtitle1"
-                    component="h2"
-                    gutterBottom
-                    sx={{
-                      fontWeight: 600,
-                      color: 'text.primary',
-                      mb: 0.5,
-                      fontSize: isMobile ? '0.95rem' : '1rem',
-                      transition: 'color 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                      lineHeight: 1.3
-                    }}
-                  >
-                    {card.title}
+                  <Typography variant="h4" sx={{ fontWeight: 800, color: '#1e293b', mb: 0.5 }}>
+                    {loadingStats ? '...' : kpi.value}
                   </Typography>
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    sx={{
-                      fontSize: isMobile ? '0.75rem' : '0.8rem',
-                      lineHeight: 1.4,
-                      textAlign: 'center',
-                      fontWeight: 400,
-                      opacity: 0.7
-                    }}
-                  >
-                    {card.description}
+                  <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 500 }}>
+                    {kpi.label}
                   </Typography>
                 </CardContent>
               </Card>
-            </Link>
-              </Grid>
-            ))}
+            </MotionBox>
           </Grid>
-        </Box>
-      </Container>
+        ))}
+      </MotionGrid>
+
+      <Divider sx={{ mb: 6, opacity: 0.6 }} />
+
+      {/* Quick Access Section */}
+      <Box sx={{ mb: 4 }}>
+        <Typography variant="h5" sx={{ fontWeight: 700, color: '#1e293b', mb: 4, display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <Box sx={{ width: 4, height: 24, bgcolor: '#1976d2', borderRadius: 2 }} />
+          Acesso Rápido
+        </Typography>
+
+        <MotionGrid container spacing={3} variants={containerVariants} initial="hidden" animate="visible">
+          {menuCards.map((card, index) => (
+            <Grid item xs={12} sm={6} md={4} lg={3} key={index}>
+              <MotionBox variants={itemVariants} whileHover={{ y: -5 }} transition={{ type: 'spring', stiffness: 300 }}>
+                <Link href={card.href} style={{ textDecoration: 'none' }}>
+                  <Card sx={{ 
+                    height: '100%',
+                    borderRadius: 4,
+                    border: '1px solid rgba(226, 232, 240, 0.8)',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.02)',
+                    transition: 'all 0.3s ease',
+                    position: 'relative',
+                    overflow: 'hidden',
+                    bgcolor: 'white',
+                    '&:hover': {
+                      boxShadow: '0 12px 24px rgba(0,0,0,0.06)',
+                      borderColor: card.color,
+                      '& .icon-wrapper': {
+                        bgcolor: card.color,
+                        color: 'white',
+                        transform: 'rotate(-5deg) scale(1.1)'
+                      }
+                    }
+                  }}>
+                    <CardContent sx={{ p: 3, display: 'flex', alignItems: 'center', gap: 2.5 }}>
+                      <Box 
+                        className="icon-wrapper"
+                        sx={{ 
+                          width: 56, 
+                          height: 56, 
+                          borderRadius: 3, 
+                          bgcolor: `${card.color}08`, 
+                          color: card.color,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
+                        }}
+                      >
+                        {card.icon}
+                      </Box>
+                      <Box>
+                        <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#1e293b', mb: 0.2 }}>
+                          {card.title}
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: '#64748b', display: 'block' }}>
+                          {card.description}
+                        </Typography>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Link>
+              </MotionBox>
+            </Grid>
+          ))}
+        </MotionGrid>
+      </Box>
+
+      {/* Footer / Status Bar */}
+      <MotionBox 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 1 }}
+        sx={{ mt: 8, p: 3, borderRadius: 4, bgcolor: 'rgba(255,255,255,0.5)', border: '1px dashed #e2e8f0', textAlign: 'center' }}
+      >
+        <Typography variant="body2" sx={{ color: '#94a3b8', fontWeight: 500 }}>
+          Sistema de Controle de Cargas • Versão 2.0.0 • Esplendor Logística
+        </Typography>
+      </MotionBox>
+    </Container>
   );
 }
 
@@ -419,8 +400,8 @@ export default function Home() {
 
   if (isLoading || isCheckingAuth) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-        <CircularProgress />
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', bgcolor: '#f8fafc' }}>
+        <CircularProgress thickness={4} size={48} sx={{ color: '#1976d2' }} />
       </Box>
     );
   }

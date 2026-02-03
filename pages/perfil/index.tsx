@@ -20,6 +20,8 @@ import {
   SelectChangeEvent,
   IconButton,
   InputAdornment,
+  useTheme,
+  alpha
 } from '@mui/material';
 import { Save, Edit, Visibility, VisibilityOff, PhotoCamera } from '@mui/icons-material';
 import { api } from '../../services/api';
@@ -43,6 +45,7 @@ type FormData = {
 };
 
 function PerfilContent() {
+  const theme = useTheme();
   const { user, updateUser } = useAuth();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -298,15 +301,45 @@ function PerfilContent() {
         <Divider sx={{ my: 3 }} />
 
         {error && (
-          <Alert severity="error" sx={{ mb: 3 }}>
-            <AlertTitle>Erro</AlertTitle>
+          <Alert 
+            severity="error"
+            variant="standard"
+            sx={{ 
+              mb: 3,
+              borderRadius: '16px',
+              backdropFilter: 'blur(12px)',
+              backgroundColor: alpha(theme.palette.error.main, 0.15),
+              color: theme.palette.error.dark,
+              border: `1px solid ${alpha(theme.palette.error.main, 0.3)}`,
+              '& .MuiAlert-icon': {
+                color: theme.palette.error.main,
+              },
+              boxShadow: `0 8px 32px 0 ${alpha(theme.palette.common.black, 0.1)}`,
+              fontWeight: 600,
+            }}
+          >
             {error}
           </Alert>
         )}
 
         {success && (
-          <Alert severity="success" sx={{ mb: 3 }}>
-            <AlertTitle>Sucesso</AlertTitle>
+          <Alert 
+            severity="success"
+            variant="standard"
+            sx={{ 
+              mb: 3,
+              borderRadius: '16px',
+              backdropFilter: 'blur(12px)',
+              backgroundColor: alpha(theme.palette.success.main, 0.15),
+              color: theme.palette.success.dark,
+              border: `1px solid ${alpha(theme.palette.success.main, 0.3)}`,
+              '& .MuiAlert-icon': {
+                color: theme.palette.success.main,
+              },
+              boxShadow: `0 8px 32px 0 ${alpha(theme.palette.common.black, 0.1)}`,
+              fontWeight: 600,
+            }}
+          >
             {success}
           </Alert>
         )}

@@ -28,7 +28,9 @@ import {
   Alert,
   CircularProgress,
   Tooltip,
-  InputAdornment
+  InputAdornment,
+  useTheme,
+  alpha
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -42,7 +44,8 @@ import {
 } from '@mui/icons-material';
 import { useSnackbar } from 'notistack';
 import { useAuth } from '../contexts/AuthContext';
-import Layout from '../components/Layout';
+import ResponsiveContainer from '../components/ResponsiveContainer';
+import ProtectedRoute from '../components/ProtectedRoute';
 import api from '../services/api';
 import InputMask from '../components/InputMask';
 
@@ -77,6 +80,7 @@ const tiposFuncionario = [
 ];
 
 const FuncionariosClientes: React.FC = () => {
+  const theme = useTheme();
   const { user } = useAuth();
   const { enqueueSnackbar } = useSnackbar();
 
@@ -293,7 +297,22 @@ const FuncionariosClientes: React.FC = () => {
     return (
       <Layout>
         <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-          <Alert severity="error">
+          <Alert 
+            severity="error"
+            variant="standard"
+            sx={{ 
+              borderRadius: '16px',
+              backdropFilter: 'blur(12px)',
+              backgroundColor: alpha(theme.palette.error.main, 0.15),
+              color: theme.palette.error.dark,
+              border: `1px solid ${alpha(theme.palette.error.main, 0.3)}`,
+              '& .MuiAlert-icon': {
+                color: theme.palette.error.main,
+              },
+              boxShadow: `0 8px 32px 0 ${alpha(theme.palette.common.black, 0.1)}`,
+              fontWeight: 600,
+            }}
+          >
             Você não tem permissão para acessar esta página.
           </Alert>
         </Container>
@@ -302,8 +321,13 @@ const FuncionariosClientes: React.FC = () => {
   }
 
   return (
-    <Layout>
-      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+    <ProtectedRoute>
+      <ResponsiveContainer
+        breadcrumb={[
+          { label: 'Dashboard', path: '/' },
+          { label: 'Funcionários e Clientes' }
+        ]}
+      >
         {/* Cabeçalho */}
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
           <Typography variant="h4" component="h1">
@@ -608,8 +632,8 @@ const FuncionariosClientes: React.FC = () => {
             </Button>
           </DialogActions>
         </Dialog>
-      </Container>
-    </Layout>
+      </ResponsiveContainer>
+    </ProtectedRoute>
   );
 };
 

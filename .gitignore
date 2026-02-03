@@ -35,6 +35,10 @@ components/*Test*.tsx
 pages/teste-*.tsx
 prisma/test-*.sql
 
+# Exceções para integração API externa
+!services/api-externa*.ts
+!services/api-externa*.js
+
 # Outros
 *.swp
 *.swo

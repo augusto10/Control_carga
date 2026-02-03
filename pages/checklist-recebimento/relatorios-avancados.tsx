@@ -26,7 +26,9 @@ import {
   AccordionDetails,
   FormControl,
   InputLabel,
-  Select
+  Select,
+  alpha,
+  useTheme
 } from '@mui/material';
 import {
   Assessment as AssessmentIcon,
@@ -80,6 +82,7 @@ interface ConferenteEstatistica {
 }
 
 const RelatoriosAvancados = () => {
+  const theme = useTheme();
   const { user } = useAuth();
   const router = useRouter();
   
@@ -554,12 +557,25 @@ const RelatoriosAvancados = () => {
         {estatisticas.percentualComProblemas > 0 && (
           <Alert 
             severity={estatisticas.percentualComProblemas > 50 ? 'error' : 'warning'} 
-            sx={{ mb: 4 }}
+            variant="standard"
+            sx={{ 
+              mb: 4,
+              borderRadius: '16px',
+              backdropFilter: 'blur(12px)',
+              backgroundColor: alpha(theme.palette[estatisticas.percentualComProblemas > 50 ? 'error' : 'warning'].main, 0.15),
+              color: theme.palette[estatisticas.percentualComProblemas > 50 ? 'error' : 'warning'].dark,
+              border: `1px solid ${alpha(theme.palette[estatisticas.percentualComProblemas > 50 ? 'error' : 'warning'].main, 0.3)}`,
+              '& .MuiAlert-icon': {
+                color: theme.palette[estatisticas.percentualComProblemas > 50 ? 'error' : 'warning'].main,
+              },
+              boxShadow: `0 8px 32px 0 ${alpha(theme.palette.common.black, 0.1)}`,
+              fontWeight: 600,
+            }}
           >
-            <Typography variant="h6" gutterBottom>
+            <Typography variant="h6" fontWeight="800">
               Atenção: {estatisticas.percentualComProblemas}% dos produtos têm problemas de validade
             </Typography>
-            <Typography variant="body2">
+            <Typography variant="body2" fontWeight="500">
               {estatisticas.produtosVencidos > 0 && `${estatisticas.produtosVencidos} produtos vencidos, `}
               {estatisticas.produtosCriticos > 0 && `${estatisticas.produtosCriticos} produtos críticos, `}
               {estatisticas.produtosAlerta > 0 && `${estatisticas.produtosAlerta} produtos em alerta`}

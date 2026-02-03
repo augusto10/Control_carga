@@ -3,7 +3,7 @@ import { Transportadora, NotaFiscal, Motorista } from '@prisma/client';
 export interface CriarControleDTO {
   motorista: string;
   cpfMotorista: string;
-  transportadora: 'ACERT' | 'EXPRESSO_GOIAS' | 'TERCEIRIZADA';
+  transportadora: 'ACCERT' | 'EXPRESSO_GOIAS' | 'TERCEIRIZADA';
   responsavel: string;
   observacao: string | null;
   qtdPallets: number;
@@ -15,7 +15,7 @@ export interface ControleCarga {
   dataCriacao: Date;
   motorista: string;
   responsavel: string;
-  transportadora: 'ACERT' | 'EXPRESSO_GOIAS' | 'TERCEIRIZADA';
+  transportadora: 'ACCERT' | 'EXPRESSO_GOIAS' | 'TERCEIRIZADA';
   numeroManifesto: string | null;
   qtdPallets: number;
   observacao: string | null;

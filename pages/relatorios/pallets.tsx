@@ -24,11 +24,14 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogActions
+  DialogActions,
+  Stack
 } from '@mui/material';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRouter } from 'next/router';
+import ResponsiveContainer from '../../components/ResponsiveContainer';
+import ProtectedRoute from '../../components/ProtectedRoute';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 
 interface RelatorioPallets {
@@ -178,8 +181,8 @@ const RelatorioPalletsPage: React.FC = () => {
       // Usar o mesmo template do listar controles
       const existingBytes = await fetch('/templates/modelo-romaneio.pdf').then(res => res.arrayBuffer());
       const doc = await PDFDocument.load(existingBytes);
-      let page = doc.getPage(0);
-      let { width, height } = page.getSize();
+      const page = doc.getPage(0);
+      const { width, height } = page.getSize();
       const font = await doc.embedFont(StandardFonts.Helvetica);
       const boldFont = await doc.embedFont(StandardFonts.HelveticaBold);
       
@@ -436,10 +439,17 @@ const RelatorioPalletsPage: React.FC = () => {
   }
 
   return (
-    <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
-      <Typography variant="h4" component="h1" gutterBottom>
-        Relatório de Pallets por Motorista e Transportadora
-      </Typography>
+    <ProtectedRoute>
+      <ResponsiveContainer
+        breadcrumb={[
+          { label: 'Dashboard', path: '/' },
+          { label: 'Relatórios', path: '/relatorios' },
+          { label: 'Pallets' }
+        ]}
+      >
+        <Typography variant="h4" component="h1" gutterBottom>
+          Relatório de Pallets por Motorista e Transportadora
+        </Typography>
 
       {/* Filtros e Ações */}
       <Paper sx={{ p: 3, mb: 3 }}>
@@ -687,7 +697,8 @@ const RelatorioPalletsPage: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
-    </Container>
+      </ResponsiveContainer>
+    </ProtectedRoute>
   );
 };
 

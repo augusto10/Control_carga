@@ -14,6 +14,8 @@ const os = require('os');
  * @param {string} etiqueta.numeroPedido Número do pedido
  * @param {number} etiqueta.indiceVolume Número do volume atual
  * @param {number} etiqueta.totalVolumes Total de volumes
+ * @param {string} etiqueta.rota Nome da rota (opcional)
+ * @param {string} etiqueta.box Número do box (opcional)
  */
 async function gerarPDFEtiqueta(etiqueta) {
   // Criar novo documento PDF
@@ -51,6 +53,8 @@ async function gerarPDFEtiqueta(etiqueta) {
     ['Cliente:', etiqueta.cliente],
     ['Transportadora:', etiqueta.transportadora],
     ['Pedido:', etiqueta.numeroPedido],
+    ...(etiqueta.rota ? [['Rota:', etiqueta.rota]] : []),
+    ...(etiqueta.box ? [['Box:', etiqueta.box]] : []),
     [`Volume: ${etiqueta.indiceVolume}/${etiqueta.totalVolumes}`, ''],
     ['Código:', etiqueta.codigoVolume]
   ];
@@ -157,14 +161,23 @@ function gerarZPLEtiqueta(etiqueta) {
     zpl += `^FO50,305^A0N,25,25^FD${etiqueta.transportadora}^FS\n`;
   }
   
+  // Rota e Box (se disponíveis)
+  if (etiqueta.rota) {
+    zpl += `^FO350,305^A0N,20,20^FDRota: ${etiqueta.rota}^FS\n`;
+  }
+  if (etiqueta.box) {
+    zpl += `^FO350,325^A0N,20,20^FDBox: ${etiqueta.box}^FS\n`;
+  }
+  
   // Data
   const dataFormatada = new Date().toLocaleDateString('pt-BR');
   zpl += `^FO50,345^A0N,20,20^FD${dataFormatada}^FS\n`;
   
   // Número da NF e Pedido
-  zpl += `^FO350,345^A0N,16,16^FDNF: ${etiqueta.numeroNota}^FS\n`;
+  const yPosNF = etiqueta.rota || etiqueta.box ? 385 : 345;
+  zpl += `^FO350,${yPosNF}^A0N,16,16^FDNF: ${etiqueta.numeroNota}^FS\n`;
   if (etiqueta.numeroPedido && etiqueta.numeroPedido.trim()) {
-    zpl += `^FO350,365^A0N,16,16^FDPed: ${etiqueta.numeroPedido}^FS\n`;
+    zpl += `^FO350,${yPosNF + 20}^A0N,16,16^FDPed: ${etiqueta.numeroPedido}^FS\n`;
   }
   
   // Fim da etiqueta

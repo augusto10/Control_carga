@@ -125,8 +125,7 @@ const ListarControlesContent: React.FC = () => {
     { id: 'TERCEIRIZADA', nome: 'TERCEIRIZADA', descricao: 'Terceirizada' },
     { id: 'DETAFRA_TRANSPORTES', nome: 'DETAFRA_TRANSPORTES', descricao: 'Detafra Transportes' },
     { id: 'RETIRA_VENDEDOR', nome: 'RETIRA_VENDEDOR', descricao: 'Retira Vendedor' },
-    { id: 'RETIRA_CLIENTE', nome: 'RETIRA_CLIENTE', descricao: 'Retira Cliente' },
-    { id: 'VLOG', nome: 'VLOG', descricao: 'VLOG Transportes' }
+    { id: 'RETIRA_CLIENTE', nome: 'RETIRA_CLIENTE', descricao: 'Retira Cliente' }
   ];
 
   // Função para obter o objeto da transportadora pelo ID
@@ -569,6 +568,103 @@ const ListarControlesContent: React.FC = () => {
         dataAssinaturaResponsavel: 'dataAssinaturaResponsavel' in controle ? controle.dataAssinaturaResponsavel || null : null,
         notas: 'notas' in controle ? (controle.notas || []) : []
       };
+      const extrairChaveNFe = (codigo: string): string | null => {
+        if (!codigo) return null;
+        const codigoLimpo = String(codigo).replace(/[^\d]/g, '');
+        if (codigoLimpo.length === 44) return codigoLimpo;
+        if (codigoLimpo.length > 44) {
+          for (let i = 0; i <= codigoLimpo.length - 44; i++) {
+            const bloco = codigoLimpo.substring(i, i + 44);
+            if (/^\d{44}$/.test(bloco)) return bloco;
+          }
+        }
+        return null;
+      };
+      const notasParaPdf = await Promise.all(
+        (controleCompleto.notas || []).map(async (nota) => {
+          const base = { ...nota };
+          try {
+            const chave = extrairChaveNFe(base.codigo || '');
+            if (chave) {
+              const resp = await api.get('/api/buscar-nota-externa', { params: { chave } });
+              const d = resp.data || {};
+              const toNumber = (x: any) => {
+                if (x === null || x === undefined) return undefined;
+                let s = String(x).trim().replace(/R\$\s*/g, '');
+                if (s === '') return undefined;
+                const hasComma = s.includes(',');
+                if (hasComma) {
+                  s = s.replace(/\./g, '').replace(',', '.');
+                }
+                const n = Number(s);
+                return isNaN(n) ? undefined : n;
+              };
+              const valorFromD = toNumber(d.valorPedido ?? d.valor ?? d.VALOR_TOTAL_NOTA ?? d.VALOR_TOTAL ?? (d as any).TOTAL ?? (d as any).total);
+              const pesoFromD = toNumber(
+                (d as any).TOTAL_PESO ?? (d as any).PESO_TOTAL ?? (d as any).PESO_NOTA ??
+                d.pesoBruto ?? d.peso ??
+                (d as any).PESO_BRUTO ?? (d as any).PESO ?? (d as any).PESO_LIQUIDO ?? (d as any).peso_liquido
+              );
+              const valorFromBase = toNumber((base as any).valorPedido ?? (base as any).valor ?? (base as any).VALOR_TOTAL ?? (base as any).TOTAL ?? (base as any).valor_total);
+              const pesoFromBase = toNumber(
+                (base as any).pesoBruto ?? (base as any).peso ??
+                (base as any).PESO_BRUTO ?? (base as any).PESO ?? (base as any).PESO_LIQUIDO ?? (base as any).peso_liquido ??
+                (base as any).PESO_TOTAL ?? (base as any).PESO_NOTA ?? (base as any).TOTAL_PESO
+              );
+              const valorFinal = (valorFromBase !== undefined) ? valorFromBase : valorFromD;
+              const pesoFinal = (pesoFromBase !== undefined && pesoFromBase > 0) ? pesoFromBase : pesoFromD;
+              return {
+                ...base,
+                volumes: String(base.volumes ?? d.volumes ?? '1'),
+                valorPedido: valorFinal,
+                razaoSocial: (base as any).razaoSocial ?? d.razaoSocial,
+                pesoBruto: pesoFinal,
+                dataEmissao: (base as any).dataEmissao ?? d.dataEmissao,
+                cnpj: (base as any).cnpj ?? d.cnpj,
+              };
+            }
+            if (base.numeroNota) {
+              const resp = await api.get('/api/buscar-nota-externa', { params: { numero: base.numeroNota, serie: '1' } });
+              const d = resp.data || {};
+              const toNumber = (x: any) => {
+                if (x === null || x === undefined) return undefined;
+                let s = String(x).trim().replace(/R\$\s*/g, '');
+                if (s === '') return undefined;
+                const hasComma = s.includes(',');
+                if (hasComma) {
+                  s = s.replace(/\./g, '').replace(',', '.');
+                }
+                const n = Number(s);
+                return isNaN(n) ? undefined : n;
+              };
+              const valorFromD = toNumber(d.valorPedido ?? d.valor ?? d.VALOR_TOTAL_NOTA ?? d.VALOR_TOTAL ?? (d as any).TOTAL ?? (d as any).total);
+              const pesoFromD = toNumber(
+                (d as any).TOTAL_PESO ?? (d as any).PESO_TOTAL ?? (d as any).PESO_NOTA ??
+                d.pesoBruto ?? d.peso ??
+                (d as any).PESO_BRUTO ?? (d as any).PESO ?? (d as any).PESO_LIQUIDO ?? (d as any).peso_liquido
+              );
+              const valorFromBase = toNumber((base as any).valorPedido ?? (base as any).valor ?? (base as any).VALOR_TOTAL ?? (base as any).TOTAL ?? (base as any).valor_total);
+              const pesoFromBase = toNumber(
+                (base as any).pesoBruto ?? (base as any).peso ??
+                (base as any).PESO_BRUTO ?? (base as any).PESO ?? (base as any).PESO_LIQUIDO ?? (base as any).peso_liquido ??
+                (base as any).PESO_TOTAL ?? (base as any).PESO_NOTA ?? (base as any).TOTAL_PESO
+              );
+              const valorFinal = (valorFromBase !== undefined) ? valorFromBase : valorFromD;
+              const pesoFinal = (pesoFromBase !== undefined && pesoFromBase > 0) ? pesoFromBase : pesoFromD;
+              return {
+                ...base,
+                volumes: String(base.volumes ?? d.volumes ?? '1'),
+                valorPedido: valorFinal,
+                razaoSocial: (base as any).razaoSocial ?? d.razaoSocial,
+                pesoBruto: pesoFinal,
+                dataEmissao: (base as any).dataEmissao ?? d.dataEmissao,
+                cnpj: (base as any).cnpj ?? d.cnpj,
+              };
+            }
+          } catch (_) {}
+          return base;
+        })
+      );
       const existingBytes = await fetch('/templates/modelo-romaneio.pdf').then(res => res.arrayBuffer());
       const doc = await PDFDocument.load(existingBytes);
       let page = doc.getPage(0);
@@ -777,8 +873,9 @@ const ListarControlesContent: React.FC = () => {
       
       // Calcular quantas linhas cabem no espaço restante
       const espacoRestante = yPos - (bottomMargin + minSpaceForSignatures);
-      const maxRowsPossivel = Math.floor(espacoRestante / lineHeight) - 4; // -4 para cabeçalho e totais
-      const maxRowsPerColumn = Math.max(8, Math.min(15, Math.floor(maxRowsPossivel / 2))); // Entre 8 e 15 linhas por coluna
+      const rowSpacing = lineHeight * 2; // cada nota consome duas linhas (principal + detalhes)
+      const maxRowsPossivel = Math.floor(espacoRestante / rowSpacing) - 2; // reserva espaço para totais
+      const maxRowsPerColumn = Math.max(6, Math.min(12, Math.floor(maxRowsPossivel / 2))); // ajuste para duas colunas
       
       // Cabeçalho para ambas as colunas na mesma linha
       const leftHeader = drawTableHeaderForColumn(leftBaseX, yPos);
@@ -800,12 +897,57 @@ const ListarControlesContent: React.FC = () => {
         page.drawText(nota.numeroNota || '-', { x: cols.col2, y, size: fontSize, font });
         page.drawText(dataNota, { x: cols.col3, y, size: fontSize, font });
         page.drawText(String(volumes), { x: cols.col4, y, size: fontSize, font });
+        
+        // Detalhes adicionais (valor, razão social, peso, emissão, CNPJ)
+        const nf: any = nota || {};
+        const rawValor = nf.valorPedido ?? nf.valor ?? nf.VALOR_TOTAL ?? nf.valor_total ?? undefined;
+        let valorNum: number | undefined;
+        if (typeof rawValor === 'number') {
+          valorNum = rawValor;
+        } else if (typeof rawValor === 'string') {
+          const parsed = Number(rawValor.replace(',', '.'));
+          valorNum = isNaN(parsed) ? undefined : parsed;
+        }
+        const valorFmt = (valorNum !== undefined)
+          ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valorNum)
+          : '-';
+        const razao = nf.razaoSocial ?? nf.cliente?.nome ?? nf.emitente?.razaoSocial ?? '-';
+        const rawPeso = nf.pesoBruto ?? nf.peso ?? undefined;
+        let pesoNum: number | undefined;
+        if (typeof rawPeso === 'number') {
+          pesoNum = rawPeso;
+        } else if (typeof rawPeso === 'string') {
+          const parsedPeso = Number(rawPeso.replace(',', '.'));
+          pesoNum = isNaN(parsedPeso) ? undefined : parsedPeso;
+        }
+        const pesoFmt = (pesoNum !== undefined)
+          ? `${new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(pesoNum)} kg`
+          : '-';
+        const emRaw = nf.dataEmissao ?? nf.DATA_EMISSAO ?? undefined;
+        const emFmt = emRaw ? new Intl.DateTimeFormat('pt-BR', {
+          timeZone: 'America/Sao_Paulo',
+          day: '2-digit', month: '2-digit', year: 'numeric',
+        }).format(new Date(emRaw)) : '-';
+        const cnpj = nf.cnpj ?? nf.cliente?.cnpj ?? nf.emitente?.cnpj ?? '-';
+        
+        const detalhes = `Valor: ${valorFmt} • Razão: ${String(razao).slice(0, 28)} • Peso: ${pesoFmt} • Emissão: ${emFmt} • CNPJ: ${cnpj}`;
+        page.drawText(detalhes, { x: cols.col2, y: y - (lineHeight - 2), size: fontSize - 2, font, color: rgb(0.35, 0.35, 0.35) });
       };
 
       let totalVolumes = 0;
-      controleCompleto.notas.forEach((nota, index) => {
+      let totalValor = 0;
+      let totalPeso = 0;
+      notasParaPdf.forEach((nota, index) => {
         const volumes = parseInt(nota.volumes) || 1;
         totalVolumes += volumes;
+        const valorItem = (typeof (nota as any).valorPedido === 'number')
+          ? (nota as any).valorPedido
+          : (typeof (nota as any).valor === 'number' ? (nota as any).valor : undefined);
+        if (typeof valorItem === 'number') totalValor += valorItem;
+        const pesoItem = (typeof (nota as any).pesoBruto === 'number')
+          ? (nota as any).pesoBruto
+          : (typeof (nota as any).peso === 'number' ? (nota as any).peso : undefined);
+        if (typeof pesoItem === 'number') totalPeso += pesoItem;
 
         // Verifica se precisamos de nova página (sem espaço para mais linhas + assinaturas)
         const noSpaceLeft = (rowsLeft >= maxRowsPerColumn) || (yLeft < bottomMargin + minSpaceForSignatures + lineHeight);
@@ -825,11 +967,11 @@ const ListarControlesContent: React.FC = () => {
         // Preenche coluna esquerda até 15 linhas, senão a direita
         if (!noSpaceLeft && rowsLeft < maxRowsPerColumn) {
           drawNota(index, nota, leftHeader, yLeft);
-          yLeft -= lineHeight;
+          yLeft -= rowSpacing;
           rowsLeft += 1;
         } else if (!noSpaceRight && rowsRight < maxRowsPerColumn) {
           drawNota(index, nota, rightHeader, yRight);
-          yRight -= lineHeight;
+          yRight -= rowSpacing;
           rowsRight += 1;
         } else {
           // caso limite atingido em ambas após checks, força nova página e desenha na esquerda
@@ -842,7 +984,7 @@ const ListarControlesContent: React.FC = () => {
           rowsLeft = 0;
           rowsRight = 0;
           drawNota(index, nota, newLeft, yLeft);
-          yLeft -= lineHeight;
+          yLeft -= rowSpacing;
           rowsLeft += 1;
         }
       });
@@ -867,13 +1009,18 @@ const ListarControlesContent: React.FC = () => {
       yPos -= lineHeight;
       // Totais alinhados na coluna esquerda
       page.drawText('TOTAL:', { x: leftBaseX + 80, y: yPos, size: fontSize, font, color: rgb(0, 0, 0) });
-      page.drawText(controleCompleto.notas.length.toString(), { x: leftBaseX, y: yPos, size: fontSize, font, color: rgb(0, 0, 0) });
+      page.drawText(notasParaPdf.length.toString(), { x: leftBaseX, y: yPos, size: fontSize, font, color: rgb(0, 0, 0) });
       page.drawText(totalVolumes.toString(), { x: leftBaseX + 200, y: yPos, size: fontSize, font, color: rgb(0, 0, 0) });
       
       // Rodapé
       yPos -= lineHeight * 2;
+      const totalValorFmt = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalValor);
+      const totalPesoFmt = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(totalPeso);
       page.drawText(`Nº Controle: ${controleCompleto.numeroManifesto || '-'}`, { x: 50, y: yPos, size: fontSize - 1, font });
       page.drawText(`Total de Volumes: ${totalVolumes}`, { x: 250, y: yPos, size: fontSize - 1, font });
+      page.drawText(`Total de Valor: ${totalValorFmt}`, { x: 420, y: yPos, size: fontSize - 1, font });
+      yPos -= lineHeight;
+      page.drawText(`Total de Peso: ${totalPesoFmt} kg`, { x: 250, y: yPos, size: fontSize - 1, font });
 
       // Seção de Assinaturas
       // Garante espaço suficiente; se não houver, cria nova página para as assinaturas
@@ -1297,12 +1444,86 @@ const ListarControlesContent: React.FC = () => {
     });
   }, []);
 
-  const handleAbrirDetalhes = useCallback((controle: ControleComNotas) => {
+  const extrairChaveNFeDetalhes = (codigo?: string): string | null => {
+    if (!codigo) return null;
+    const apenasDigitos = String(codigo).replace(/[^\d]/g, '');
+    if (apenasDigitos.length === 44) return apenasDigitos;
+    if (apenasDigitos.length > 44) {
+      for (let i = 0; i <= apenasDigitos.length - 44; i++) {
+        const bloco = apenasDigitos.substring(i, i + 44);
+        if (/^\d{44}$/.test(bloco)) return bloco;
+      }
+    }
+    return null;
+  };
+
+  const enriquecerNotasDoControle = async (controle: ControleComNotas): Promise<ControleComNotas> => {
+    const notas = controle.notas || [];
+    const enriquecidas = await Promise.all(notas.map(async (nota: any) => {
+      const base = { ...nota };
+      try {
+        const chave = extrairChaveNFeDetalhes(base.codigo);
+        let resp;
+        if (chave) {
+          resp = await api.get('/api/buscar-nota-externa', { params: { chave } });
+        } else if (base.numeroNota) {
+          resp = await api.get('/api/buscar-nota-externa', { params: { numero: base.numeroNota, serie: '1' } });
+        }
+        const d = resp?.data || null;
+        if (d) {
+          const toNumber = (x: any) => {
+            if (x === null || x === undefined) return undefined;
+            let s = String(x).trim().replace(/R\$\s*/g, '');
+            if (s === '') return undefined;
+            const hasComma = s.includes(',');
+            if (hasComma) {
+              s = s.replace(/\./g, '').replace(',', '.');
+            }
+            const n = Number(s);
+            return isNaN(n) ? undefined : n;
+          };
+          base.volumes = String(base.volumes ?? d.volumes ?? '1');
+          const valorFromD = toNumber(d.valorPedido ?? d.valor ?? d.VALOR_TOTAL_NOTA ?? d.VALOR_TOTAL ?? (d as any).TOTAL ?? (d as any).total);
+          const valorFromBase = toNumber((base as any).valorPedido ?? (base as any).valor ?? (base as any).VALOR_TOTAL_NOTA ?? (base as any).VALOR_TOTAL ?? (base as any).TOTAL ?? (base as any).valor_total);
+          base.valorPedido = (valorFromBase !== undefined) ? valorFromBase : valorFromD;
+          base.razaoSocial = (base as any).razaoSocial ?? d.razaoSocial ?? d.NOME_RAZAO_SOCIAL;
+          const pesoFromD = toNumber(
+            (d as any).TOTAL_PESO ?? (d as any).PESO_TOTAL ?? (d as any).PESO_NOTA ??
+            d.pesoBruto ?? d.peso ??
+            (d as any).PESO_BRUTO ?? (d as any).PESO ?? (d as any).PESO_LIQUIDO ?? (d as any).peso_liquido
+          );
+          const pesoFromBase = toNumber(
+            (base as any).pesoBruto ?? (base as any).peso ??
+            (base as any).PESO_BRUTO ?? (base as any).PESO ?? (base as any).PESO_LIQUIDO ?? (base as any).peso_liquido ??
+            (base as any).PESO_TOTAL ?? (base as any).PESO_NOTA ?? (base as any).TOTAL_PESO
+          );
+          base.pesoBruto = (pesoFromBase !== undefined && pesoFromBase > 0) ? pesoFromBase : pesoFromD;
+          base.dataEmissao = (base as any).dataEmissao ?? d.dataEmissao ?? d.DATA_EMISSAO;
+          base.cnpj = (base as any).cnpj ?? d.cnpj ?? d.CNPJ;
+        }
+      } catch (e) {
+        // silencioso: mantém dados existentes
+      }
+      return base;
+    }));
+    return { ...controle, notas: enriquecidas };
+  };
+
+  const handleAbrirDetalhes = useCallback(async (controle: ControleComNotas) => {
     console.log('[Modal Detalhes] Abrindo modal para controle:', controle.id);
     setDetalhesModal({
       aberto: true,
       controle
     });
+    try {
+      const controleEnriquecido = await enriquecerNotasDoControle(controle);
+      setDetalhesModal({
+        aberto: true,
+        controle: controleEnriquecido
+      });
+    } catch (error) {
+      console.warn('Falha ao enriquecer notas para detalhes:', error);
+    }
   }, []);
 
   const handleFecharDetalhes = useCallback(() => {
@@ -2459,6 +2680,11 @@ const ListarControlesContent: React.FC = () => {
                       <TableRow>
                         <TableCell sx={{ fontWeight: 600 }}>Número da Nota</TableCell>
                         <TableCell sx={{ fontWeight: 600 }}>Código</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>Valor do Pedido</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>Razão Social</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>Peso Bruto</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>Data da Emissão</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>CNPJ</TableCell>
                         <TableCell sx={{ fontWeight: 600 }}>Volumes</TableCell>
                         <TableCell sx={{ fontWeight: 600 }}>Data de Criação</TableCell>
                       </TableRow>
@@ -2476,6 +2702,29 @@ const ListarControlesContent: React.FC = () => {
                               {nota.codigo}
                             </Typography>
                           </TableCell>
+                          <TableCell>
+                            {typeof nota.valorPedido === 'number' || typeof nota.valor === 'number'
+                              ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+                                  (typeof nota.valorPedido === 'number' ? nota.valorPedido : nota.valor) as number
+                                )
+                              : '-'}
+                          </TableCell>
+                          <TableCell>{nota.razaoSocial || nota?.cliente?.nome || nota?.emitente?.razaoSocial || '-'}</TableCell>
+                          <TableCell>
+                            {typeof nota.pesoBruto === 'number' || typeof nota.peso === 'number'
+                              ? `${new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(
+                                  (typeof nota.pesoBruto === 'number' ? nota.pesoBruto : nota.peso) as number
+                                )} kg`
+                              : '-'}
+                          </TableCell>
+                          <TableCell>
+                            {nota.dataEmissao 
+                              ? format(new Date(nota.dataEmissao), "dd/MM/yyyy", { locale: ptBR })
+                              : nota.DATA_EMISSAO
+                                ? format(new Date(nota.DATA_EMISSAO), "dd/MM/yyyy", { locale: ptBR })
+                                : '-'}
+                          </TableCell>
+                          <TableCell>{nota.cnpj || nota?.cliente?.cnpj || nota?.emitente?.cnpj || '-'}</TableCell>
                           <TableCell>{nota.volumes}</TableCell>
                           <TableCell>
                             {nota.dataCriacao ? 

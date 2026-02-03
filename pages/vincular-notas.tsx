@@ -59,7 +59,9 @@ const VincularNotasPage = () => {
   const [motorista, setMotorista] = useState('');
   const [cpfMotorista, setCpfMotorista] = useState('');
   const [responsavel, setResponsavel] = useState('');
-  const [transportadora, setTransportadora] = useState<'ACERT' | 'EXPRESSO_GOIAS' | 'TERCEIRIZADA' | 'DETAFRA_TRANSPORTES' | 'RETIRA_VENDEDOR'>('ACERT');
+  const [transportadora, setTransportadora] = useState<
+    'ACCERT' | 'EXPRESSO_GOIAS' | 'TERCEIRIZADA' | 'DETAFRA_TRANSPORTES' | 'RETIRA_VENDEDOR' | 'RETIRA_CLIENTE' | 'VLOG'
+  >('ACCERT');
   const [numeroManifesto, setNumeroManifesto] = useState('');
   const [qtdPallets, setQtdPallets] = useState<number>(0);
   const [observacao, setObservacao] = useState('');
@@ -100,7 +102,7 @@ const VincularNotasPage = () => {
         setMotorista(controle.motorista || '');
         setCpfMotorista(controle.cpfMotorista || '');
         setResponsavel(controle.responsavel || '');
-        setTransportadora(controle.transportadora || 'ACERT');
+        setTransportadora(controle.transportadora || 'ACCERT');
         setNumeroManifesto(controle.numeroManifesto || '');
         setQtdPallets(controle.qtdPallets || 0);
         setObservacao(controle.observacao || '');
@@ -414,17 +416,28 @@ const VincularNotasPage = () => {
               select
               label="Transportadora"
               value={transportadora}
-              onChange={(e: React.ChangeEvent<{ value: unknown }>) => 
-                setTransportadora(e.target.value as 'ACERT' | 'EXPRESSO_GOIAS' | 'TERCEIRIZADA' | 'DETAFRA_TRANSPORTES' | 'RETIRA_VENDEDOR')
+              onChange={(e: React.ChangeEvent<{ value: unknown }>) =>
+                setTransportadora(
+                  e.target.value as
+                    | 'ACCERT'
+                    | 'EXPRESSO_GOIAS'
+                    | 'TERCEIRIZADA'
+                    | 'DETAFRA_TRANSPORTES'
+                    | 'RETIRA_VENDEDOR'
+                    | 'RETIRA_CLIENTE'
+                    | 'VLOG'
+                )
               }
               fullWidth
               margin="normal"
             >
-              <MenuItem value="ACERT">ACERT</MenuItem>
+              <MenuItem value="ACCERT">ACCERT</MenuItem>
               <MenuItem value="EXPRESSO_GOIAS">Expresso Goiás</MenuItem>
               <MenuItem value="TERCEIRIZADA">TERCEIRIZADA</MenuItem>
               <MenuItem value="DETAFRA_TRANSPORTES">Detafra Transportes</MenuItem>
               <MenuItem value="RETIRA_VENDEDOR">Retira Vendedor</MenuItem>
+              <MenuItem value="RETIRA_CLIENTE">Retira Cliente</MenuItem>
+              <MenuItem value="VLOG">VLOG Transportes</MenuItem>
             </TextField>
             
             <TextField

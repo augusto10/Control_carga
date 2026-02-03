@@ -260,7 +260,7 @@ async function createChecklist(req: NextApiRequest, res: NextApiResponse, userId
     // Processar dados de alerta de validade
     const alertaValidadeAutorizado = getBooleanValue('alertaValidadeAutorizado');
     const nomeAutorizadorLider = getFieldValue('nomeAutorizadorLider') || null;
-    let produtosComAlertaValidadeRaw = getFieldValue('produtosComAlertaValidade') || null;
+    const produtosComAlertaValidadeRaw = getFieldValue('produtosComAlertaValidade') || null;
     let produtosComAlertaValidade: string | null = null;
     try {
       if (produtosComAlertaValidadeRaw) {

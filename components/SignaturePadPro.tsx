@@ -10,7 +10,8 @@ import {
   useTheme,
   useMediaQuery,
   Stack,
-  Alert
+  Alert,
+  alpha
 } from '@mui/material';
 import SaveIcon from '@mui/icons-material/Save';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -423,7 +424,23 @@ const SignaturePadPro = forwardRef<SignaturePadProHandles, SignaturePadProProps>
           
           {/* Mensagem de erro */}
           {error && (
-            <Alert severity="error" onClose={() => setError(null)}>
+            <Alert 
+              severity="error" 
+              variant="standard"
+              onClose={() => setError(null)}
+              sx={{ 
+                borderRadius: '16px',
+                backdropFilter: 'blur(12px)',
+                backgroundColor: alpha(theme.palette.error.main, 0.15),
+                color: theme.palette.error.dark,
+                border: `1px solid ${alpha(theme.palette.error.main, 0.3)}`,
+                '& .MuiAlert-icon': {
+                  color: theme.palette.error.main,
+                },
+                boxShadow: `0 8px 32px 0 ${alpha(theme.palette.common.black, 0.1)}`,
+                fontWeight: 600,
+              }}
+            >
               {error}
             </Alert>
           )}

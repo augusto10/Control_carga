@@ -12,7 +12,9 @@ import {
   ListItemIcon,
   ListItemText,
   Divider,
-  Alert
+  Alert,
+  alpha,
+  useTheme
 } from '@mui/material';
 import {
   CheckCircle as CheckCircleIcon,
@@ -24,6 +26,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import ProtectedRoute from '../../components/ProtectedRoute';
 
 const RegrasOuroPage = () => {
+  const theme = useTheme();
   const [aceitouTermos, setAceitouTermos] = useState(false);
   const router = useRouter();
   const { user } = useAuth();
@@ -70,7 +73,23 @@ const RegrasOuroPage = () => {
           <Divider sx={{ mb: 3 }} />
 
           {/* Alerta de importância */}
-          <Alert severity="warning" sx={{ mb: 3 }}>
+          <Alert 
+            severity="warning" 
+            variant="standard"
+            sx={{ 
+              mb: 3,
+              borderRadius: '16px',
+              backdropFilter: 'blur(12px)',
+              backgroundColor: alpha(theme.palette.warning.main, 0.15),
+              color: theme.palette.warning.dark,
+              border: `1px solid ${alpha(theme.palette.warning.main, 0.3)}`,
+              '& .MuiAlert-icon': {
+                color: theme.palette.warning.main,
+              },
+              boxShadow: `0 8px 32px 0 ${alpha(theme.palette.common.black, 0.1)}`,
+              fontWeight: 600,
+            }}
+          >
             <Typography variant="body1" sx={{ fontWeight: 'bold' }}>
               ⚠️ ATENÇÃO: É obrigatório ler e aceitar todas as regras antes de prosseguir com o checklist de recebimento.
             </Typography>

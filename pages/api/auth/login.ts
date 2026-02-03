@@ -66,6 +66,7 @@ interface Usuario {
   ativo: boolean;
   dataCriacao: Date;
   ultimoAcesso: Date;
+  foto?: string | null;
 }
 
 // Middleware para habilitar CORS
@@ -187,6 +188,7 @@ const handler = async (req: LoginRequest, res: NextApiResponse) => {
         ativo: true,
         dataCriacao: true,
         ultimoAcesso: true,
+        foto: true,
       },
     }) as Usuario | null;
 

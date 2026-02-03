@@ -18,7 +18,9 @@ import {
   Step,
   StepLabel,
   CircularProgress,
-  Snackbar
+  Snackbar,
+  useTheme,
+  alpha
 } from '@mui/material';
 import {
   Assignment as AssignmentIcon,
@@ -78,6 +80,7 @@ interface ChecklistData {
 }
 
 const ChecklistRecebimentoPage = () => {
+  const theme = useTheme();
   const [activeStep, setActiveStep] = useState(0);
   const [saving, setSaving] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
@@ -712,8 +715,26 @@ const ChecklistRecebimentoPage = () => {
           open={snackbar.open}
           autoHideDuration={6000}
           onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
+          anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
         >
-          <Alert severity={snackbar.severity} onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}>
+          <Alert 
+            onClose={() => setSnackbar(prev => ({ ...prev, open: false }))} 
+            severity={snackbar.severity} 
+            variant="standard"
+            sx={{ 
+              width: '100%', 
+              borderRadius: '16px',
+              backdropFilter: 'blur(12px)',
+              backgroundColor: alpha(theme.palette[snackbar.severity].main, 0.15),
+              color: theme.palette[snackbar.severity].dark,
+              border: `1px solid ${alpha(theme.palette[snackbar.severity].main, 0.3)}`,
+              '& .MuiAlert-icon': {
+                color: theme.palette[snackbar.severity].main,
+              },
+              boxShadow: `0 8px 32px 0 ${alpha(theme.palette.common.black, 0.1)}`,
+              fontWeight: 600,
+            }}
+          >
             {snackbar.message}
           </Alert>
         </Snackbar>

@@ -21,6 +21,12 @@ import {
   ListItemText,
   ListItemIcon,
   Divider,
+  Stack,
+  Chip,
+  Fade,
+  useTheme,
+  alpha,
+  Grid
 } from '@mui/material';
 import {
   Print as PrintIcon,
@@ -28,7 +34,14 @@ import {
   CheckCircle as CheckCircleIcon,
   Error as ErrorIcon,
   Info as InfoIcon,
+  Close as CloseIcon,
+  Devices as DevicesIcon,
+  History as HistoryIcon,
 } from '@mui/icons-material';
+import { motion, AnimatePresence } from 'framer-motion';
+
+const MotionPaper = motion(Paper);
+const MotionBox = motion(Box);
 
 interface Printer {
   name: string;
@@ -52,6 +65,7 @@ const PrinterSelectDialog: React.FC<PrinterSelectDialogProps> = ({
   loading = false,
   etiquetasData,
 }) => {
+  const theme = useTheme();
   const [printers, setPrinters] = useState<Printer[]>([]);
   const [selectedPrinter, setSelectedPrinter] = useState<string>('');
   const [loadingPrinters, setLoadingPrinters] = useState(false);
@@ -135,13 +149,13 @@ const PrinterSelectDialog: React.FC<PrinterSelectDialogProps> = ({
   const getStatusIcon = (status: Printer['status']) => {
     switch (status) {
       case 'online':
-        return <CheckCircleIcon sx={{ color: 'success.main' }} />;
+        return <CheckCircleIcon sx={{ color: 'success.main', fontSize: 20 }} />;
       case 'offline':
-        return <ErrorIcon sx={{ color: 'warning.main' }} />;
+        return <ErrorIcon sx={{ color: 'warning.main', fontSize: 20 }} />;
       case 'error':
-        return <ErrorIcon sx={{ color: 'error.main' }} />;
+        return <ErrorIcon sx={{ color: 'error.main', fontSize: 20 }} />;
       default:
-        return <InfoIcon sx={{ color: 'grey.500' }} />;
+        return <InfoIcon sx={{ color: 'grey.500', fontSize: 20 }} />;
     }
   };
 
@@ -159,68 +173,135 @@ const PrinterSelectDialog: React.FC<PrinterSelectDialogProps> = ({
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-      <DialogTitle>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <PrintIcon />
-          <Typography variant="h6">Selecionar Impressora</Typography>
-          <Box sx={{ ml: 'auto' }}>
-            <Tooltip title="Atualizar lista">
-              <IconButton onClick={loadPrinters} disabled={loadingPrinters}>
-                <RefreshIcon />
-              </IconButton>
-            </Tooltip>
-          </Box>
+    <Dialog 
+      open={open} 
+      onClose={onClose} 
+      maxWidth="sm" 
+      fullWidth
+      PaperProps={{
+        sx: {
+          borderRadius: 4,
+          background: 'rgba(255, 255, 255, 0.95)',
+          backdropFilter: 'blur(10px)',
+          boxShadow: '0 24px 48px rgba(0,0,0,0.1)'
+        }
+      }}
+    >
+      <DialogTitle sx={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'space-between',
+        borderBottom: '1px solid rgba(0,0,0,0.08)',
+        px: 3,
+        py: 2
+      }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <PrintIcon color="primary" />
+          <Typography variant="h6" fontWeight={700}>Selecionar Impressora</Typography>
+        </Box>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <Tooltip title="Atualizar lista">
+            <IconButton onClick={loadPrinters} disabled={loadingPrinters} size="small">
+              <RefreshIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          <IconButton onClick={onClose} size="small">
+            <CloseIcon fontSize="small" />
+          </IconButton>
         </Box>
       </DialogTitle>
       
-      <DialogContent>
+      <DialogContent sx={{ p: 3 }}>
         {error && (
-          <Alert severity="error" sx={{ mb: 2 }}>
-            {error}
-          </Alert>
+          <Fade in={!!error}>
+            <Alert 
+              severity="error" 
+              variant="standard"
+              sx={{ 
+                mb: 3,
+                borderRadius: '16px',
+                backdropFilter: 'blur(12px)',
+                backgroundColor: alpha(theme.palette.error.main, 0.15),
+                color: theme.palette.error.dark,
+                border: `1px solid ${alpha(theme.palette.error.main, 0.3)}`,
+                '& .MuiAlert-icon': {
+                  color: theme.palette.error.main,
+                },
+                boxShadow: `0 8px 32px 0 ${alpha(theme.palette.common.black, 0.1)}`,
+                fontWeight: 600,
+              }}
+            >
+              {error}
+            </Alert>
+          </Fade>
         )}
 
         {loadingPrinters ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-            <CircularProgress />
+          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 8, gap: 2 }}>
+            <CircularProgress size={40} thickness={4} />
+            <Typography variant="body2" color="text.secondary">Detectando impressoras...</Typography>
           </Box>
         ) : (
           <Box>
             {/* Informações das etiquetas */}
             {etiquetasData && (
-              <Paper sx={{ p: 2, mb: 3, bgcolor: 'grey.50' }}>
-                <Typography variant="subtitle2" gutterBottom>
+              <MotionPaper
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                sx={{ 
+                  p: 2.5, 
+                  mb: 4, 
+                  bgcolor: 'rgba(0, 118, 255, 0.03)',
+                  border: '1px solid rgba(0, 118, 255, 0.1)',
+                  borderRadius: 3
+                }}
+              >
+                <Typography variant="subtitle2" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 700, color: 'primary.main' }}>
+                  <HistoryIcon fontSize="small" />
                   Resumo da Impressão
                 </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  • Nota: {etiquetasData.numeroNota || 'N/A'}<br />
-                  • Cliente: {etiquetasData.cliente || 'N/A'}<br />
-                  • Volumes: {etiquetasData.volumes || 1}<br />
-                  • Transportadora: {etiquetasData.transportadora || 'N/A'}
-                </Typography>
-              </Paper>
+                <Grid container spacing={1}>
+                  <Grid item xs={6}>
+                    <Typography variant="caption" color="text.secondary" display="block">Nota Fiscal</Typography>
+                    <Typography variant="body2" fontWeight={600}>{etiquetasData.numeroNota || '---'}</Typography>
+                  </Grid>
+                  <Grid item xs={6}>
+                    <Typography variant="caption" color="text.secondary" display="block">Volumes</Typography>
+                    <Typography variant="body2" fontWeight={600}>{etiquetasData.volumes || 1} un</Typography>
+                  </Grid>
+                  <Grid item xs={12}>
+                    <Typography variant="caption" color="text.secondary" display="block">Cliente</Typography>
+                    <Typography variant="body2" fontWeight={600} noWrap>{etiquetasData.cliente || '---'}</Typography>
+                  </Grid>
+                </Grid>
+              </MotionPaper>
             )}
 
             {/* Lista de impressoras */}
-            <FormControl fullWidth sx={{ mb: 2 }}>
-              <InputLabel>Impressora</InputLabel>
+            <Typography variant="subtitle2" sx={{ mb: 1.5, fontWeight: 700, color: 'text.secondary', display: 'flex', alignItems: 'center', gap: 1 }}>
+              <DevicesIcon fontSize="small" />
+              Impressoras Disponíveis
+            </Typography>
+            
+            <FormControl fullWidth sx={{ mb: 4 }}>
+              <InputLabel>Escolha uma impressora</InputLabel>
               <Select
                 value={selectedPrinter}
-                label="Impressora"
+                label="Escolha uma impressora"
                 onChange={(e) => setSelectedPrinter(e.target.value)}
                 disabled={loadingPrinters}
+                sx={{ borderRadius: 3 }}
               >
                 {printers
                   .filter(printer => printer.status === 'online')
                   .map((printer) => (
-                    <MenuItem key={printer.name} value={printer.name}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+                    <MenuItem key={printer.name} value={printer.name} sx={{ py: 1.5 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', width: '100%', gap: 2 }}>
                         {getStatusIcon(printer.status)}
-                        <Box sx={{ ml: 1, flex: 1 }}>
-                          <Typography variant="body2">{printer.name}</Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {printer.driver} - {printer.port}
+                        <Box sx={{ flex: 1 }}>
+                          <Typography variant="body2" fontWeight={600}>{printer.name}</Typography>
+                          <Typography variant="caption" color="text.secondary" display="block">
+                            {printer.driver} • {printer.port}
                           </Typography>
                         </Box>
                       </Box>
@@ -229,63 +310,62 @@ const PrinterSelectDialog: React.FC<PrinterSelectDialogProps> = ({
               </Select>
             </FormControl>
 
-            {/* Detalhes da impressora selecionada */}
-            {selectedPrinter && (
-              <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
-                <Typography variant="subtitle2" gutterBottom>
-                  Detalhes da Impressora
-                </Typography>
-                {printers
-                  .filter(p => p.name === selectedPrinter)
-                  .map(printer => (
-                    <Box key={printer.name}>
-                      <Typography variant="body2">
-                        <strong>Modelo:</strong> {printer.name}<br />
-                        <strong>Status:</strong> {getStatusText(printer.status)}<br />
-                        <strong>Driver:</strong> {printer.driver}<br />
-                        <strong>Porta:</strong> {printer.port}
-                      </Typography>
-                    </Box>
-                  ))}
-              </Paper>
-            )}
-
             {/* Impressoras offline */}
             {printers.filter(p => p.status !== 'online').length > 0 && (
-              <Box sx={{ mt: 2 }}>
-                <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                  Impressoras Indisponíveis
+              <Box>
+                <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1, fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  Não Disponíveis
                 </Typography>
-                <List dense>
+                <Stack spacing={1}>
                   {printers
                     .filter(p => p.status !== 'online')
                     .map((printer) => (
-                      <ListItem key={printer.name}>
-                        <ListItemIcon>
-                          {getStatusIcon(printer.status)}
-                        </ListItemIcon>
-                        <ListItemText
-                          primary={printer.name}
-                          secondary={`${getStatusText(printer.status)} - ${printer.driver}`}
-                        />
-                      </ListItem>
+                      <Paper 
+                        key={printer.name} 
+                        variant="outlined" 
+                        sx={{ 
+                          p: 1.5, 
+                          borderRadius: 2, 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: 2,
+                          bgcolor: 'rgba(0,0,0,0.02)',
+                          borderColor: 'rgba(0,0,0,0.05)'
+                        }}
+                      >
+                        {getStatusIcon(printer.status)}
+                        <Box sx={{ flex: 1 }}>
+                          <Typography variant="body2" color="text.secondary" fontWeight={500}>{printer.name}</Typography>
+                          <Typography variant="caption" color="text.disabled">
+                            {getStatusText(printer.status)} • {printer.driver}
+                          </Typography>
+                        </Box>
+                      </Paper>
                     ))}
-                </List>
+                </Stack>
               </Box>
             )}
           </Box>
         )}
       </DialogContent>
       
-      <DialogActions sx={{ p: 3 }}>
-        <Button onClick={onClose} disabled={loading}>
+      <DialogActions sx={{ p: 3, pt: 1, borderTop: '1px solid rgba(0,0,0,0.05)' }}>
+        <Button onClick={onClose} disabled={loading} sx={{ borderRadius: 2 }}>
           Cancelar
         </Button>
         <Button
           onClick={handlePrint}
           variant="contained"
           disabled={!selectedPrinter || loading}
-          startIcon={loading ? <CircularProgress size={20} /> : <PrintIcon />}
+          startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <PrintIcon />}
+          sx={{ 
+            borderRadius: 2, 
+            px: 4,
+            boxShadow: '0 4px 12px rgba(0, 118, 255, 0.2)',
+            '&:hover': {
+              boxShadow: '0 6px 16px rgba(0, 118, 255, 0.3)',
+            }
+          }}
         >
           {loading ? 'Imprimindo...' : 'Imprimir Etiquetas'}
         </Button>

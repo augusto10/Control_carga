@@ -45,7 +45,7 @@ function MyApp({ Component, pageProps }: AppProps) {
       <CssBaseline />
       <SnackbarProvider 
         maxSnack={3}
-        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
         autoHideDuration={3000}
       >
         <AuthProvider>

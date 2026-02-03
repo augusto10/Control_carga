@@ -85,7 +85,7 @@ import {
 import Link from 'next/link';
 import Image from 'next/image';
 
-const drawerWidth = 260;
+const drawerWidth = 240;
 
 // Estilos para o menu expandido
 const openedMixin = (theme: Theme): CSSObject => ({
@@ -95,9 +95,10 @@ const openedMixin = (theme: Theme): CSSObject => ({
     duration: theme.transitions.duration.enteringScreen,
   }),
   overflowX: 'hidden',
-  backgroundColor: '#ffffff',
-  boxShadow: '4px 0 20px rgba(0,0,0,0.08)',
-  borderRight: '1px solid rgba(255, 107, 53, 0.15)',
+  backgroundColor: 'rgba(255, 255, 255, 0.9)',
+  backdropFilter: 'blur(12px)',
+  boxShadow: '4px 0 20px rgba(0,0,0,0.04)',
+  borderRight: '1px solid rgba(226, 232, 240, 0.8)',
 });
 
 // Estilos para o menu recolhido
@@ -111,31 +112,22 @@ const closedMixin = (theme: Theme): CSSObject => ({
   [theme.breakpoints.up('sm')]: {
     width: `calc(${theme.spacing(8)} + 1px)`,
   },
-  backgroundColor: '#ffffff',
-  boxShadow: '4px 0 20px rgba(0,0,0,0.08)',
-  borderRight: '1px solid rgba(255, 107, 53, 0.15)',
+  backgroundColor: 'rgba(255, 255, 255, 0.9)',
+  backdropFilter: 'blur(12px)',
+  boxShadow: '4px 0 20px rgba(0,0,0,0.04)',
+  borderRight: '1px solid rgba(226, 232, 240, 0.8)',
 });
 
 const DrawerHeader = styled('div')(({ theme }) => ({
   display: 'flex',
   alignItems: 'center',
-  justifyContent: 'space-between',
-  padding: theme.spacing(0, 2),
+  justifyContent: 'center',
+  padding: theme.spacing(0, 1),
   ...theme.mixins.toolbar,
-  borderBottom: '1px solid rgba(25, 118, 210, 0.2)',
-  background: 'linear-gradient(135deg, #1976d2 0%, #1565c0 100%)',
-  color: '#ffffff',
-  boxShadow: '0 4px 20px rgba(25, 118, 210, 0.3)',
+  background: 'transparent',
+  color: '#1e293b',
   position: 'relative',
-  '&::after': {
-    content: '""',
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: '1px',
-    background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.3) 50%, transparent 100%)',
-  }
+  marginBottom: theme.spacing(2),
 }));
 
 interface AppBarPropsExtended extends AppBarProps {
@@ -150,11 +142,11 @@ const AppBar = styled(MuiAppBar, {
     easing: theme.transitions.easing.sharp,
     duration: theme.transitions.duration.leavingScreen,
   }),
-  background: 'linear-gradient(135deg, #1976d2 0%, #1976d2 100%)',
-  color: '#ffffff',
-  boxShadow: '0 4px 20px rgba(25, 118, 210, 0.3)',
-  backdropFilter: 'blur(10px)',
-  borderBottom: '1px solid rgba(25, 118, 210, 0.2)',
+  background: 'rgba(255, 255, 255, 0.8)',
+  color: '#1e293b',
+  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.03)',
+  backdropFilter: 'blur(12px)',
+  borderBottom: '1px solid rgba(226, 232, 240, 0.8)',
   [theme.breakpoints.up('md')]: {
     ...(open && {
       marginLeft: drawerWidth,
@@ -190,18 +182,18 @@ const StyledDrawer = styled(Drawer, {
 }));
 
 const MenuItemButton = styled(ListItemButton)(({ theme }) => ({
-  minHeight: 52,
-  borderRadius: '12px',
-  margin: theme.spacing(0.5, 1.5),
-  paddingLeft: theme.spacing(2.5),
+  minHeight: 56,
+  borderRadius: '10px',
+  margin: theme.spacing(0.4, 1.25),
+  paddingLeft: theme.spacing(3),
   paddingRight: theme.spacing(2),
-  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+  transition: 'box-shadow 0.25s ease, background 0.25s ease, transform 0.18s ease',
   position: 'relative',
   overflow: 'hidden',
   // Mobile-first adjustments
   [theme.breakpoints.down('sm')]: {
     minHeight: 56,
-    padding: theme.spacing(1.5, 2),
+    padding: theme.spacing(1.25, 2),
     margin: theme.spacing(0.3, 1),
   },
   '&::before': {
@@ -212,68 +204,79 @@ const MenuItemButton = styled(ListItemButton)(({ theme }) => ({
     bottom: 0,
     width: '4px',
     background: 'transparent',
-    transition: 'all 0.3s ease',
+    transition: 'all 0.25s ease',
   },
   '&.active': {
-    background: 'linear-gradient(135deg, rgba(25, 118, 210, 0.15) 0%, rgba(66, 165, 245, 0.1) 100%)',
-    boxShadow: '0 4px 20px rgba(25, 118, 210, 0.2), inset 0 1px 0 rgba(255,255,255,0.1)',
-    border: '1px solid rgba(25, 118, 210, 0.3)',
-    '&::before': {
-      background: 'linear-gradient(180deg, #1976d2 0%, #1976d2 100%)',
-    },
-    '& .MuiListItemIcon-root': {
-      color: '#1976d2',
-      transform: 'scale(1.1)',
-    },
-    '& .MuiListItemText-primary': {
-      color: '#1e293b',
-      fontWeight: 600,
-    },
-  },
-  '&:hover': {
-    background: 'linear-gradient(135deg, rgba(25, 118, 210, 0.08) 0%, rgba(66, 165, 245, 0.05) 100%)',
-    transform: 'translateX(4px)',
-    boxShadow: '0 6px 25px rgba(25, 118, 210, 0.15)',
-    // Desabilita efeitos hover em touchscreen
-    '@media (hover: none)': {
-      transform: 'none',
-    },
-    '&::before': {
-      background: 'linear-gradient(180deg, #1976d2 0%, #1976d2 100%)',
-      width: '3px',
-    },
-    '& .MuiListItemIcon-root': {
-      color: '#1976d2',
-      transform: 'scale(1.05)',
-    },
-    '& .MuiListItemText-primary': {
-      color: '#1e293b', fontWeight: 500,
-    },
-  },
-}));
-
-const SubMenuItemButton = styled(MenuItemButton)(({ theme }) => ({
-  paddingLeft: theme.spacing(4.5),
-  minHeight: 44,
-  margin: theme.spacing(0.3, 2),
-  borderRadius: '10px',
-  '&::before': {
-    width: '2px',
-  },
-  '&.active': {
-    background: 'linear-gradient(135deg, rgba(25, 118, 210, 0.12) 0%, rgba(66, 165, 245, 0.08) 100%)',
+    background: 'linear-gradient(135deg, rgba(25, 118, 210, 0.06) 0%, rgba(25, 118, 210, 0.03) 100%)',
+    boxShadow: '0 6px 18px rgba(25, 118, 210, 0.06)',
+    border: '1px solid rgba(25, 118, 210, 0.12)',
     '&::before': {
       background: '#1976d2',
     },
     '& .MuiListItemIcon-root': {
       color: '#1976d2',
+      transform: 'scale(1.06)',
+    },
+  '& .MuiListItemText-primary': {
+    color: '#1e293b',
+    fontWeight: 700,
+  },
+  // Ensure full word visibility
+  '& .MuiListItemText-root': {
+    margin: 0,
+    '& .MuiTypography-root': {
+      whiteSpace: 'normal',
+      lineHeight: 1.2,
+      display: '-webkit-box',
+      WebkitLineClamp: 2,
+      WebkitBoxOrient: 'vertical',
+      overflow: 'hidden',
+    }
+  },
+},
+'&:hover': {
+  background: 'rgba(25, 118, 210, 0.03)',
+  transform: 'translateX(2px)',
+  '&::before': {
+    background: '#1976d2',
+    width: '3px',
+  },
+  '& .MuiListItemIcon-root': {
+    color: '#1976d2',
+  },
+  '& .MuiListItemText-primary': {
+    color: '#1e293b', 
+    fontWeight: 600,
+  },
+},
+}));
+
+const SubMenuItemButton = styled(MenuItemButton)(({ theme }) => ({
+  paddingLeft: theme.spacing(4),
+  minHeight: 44,
+  margin: theme.spacing(0.25, 1.75),
+  borderRadius: '10px',
+  '&::before': {
+    width: '2px',
+  },
+  '&.active': {
+    background: 'rgba(25, 118, 210, 0.04)',
+    border: '1px solid rgba(25, 118, 210, 0.08)',
+    '&::before': {
+      background: '#1976d2',
+    },
+    '& .MuiListItemIcon-root': {
+      color: '#1976d2',
+      transform: 'scale(1.03)'
     },
     '& .MuiListItemText-primary': {
-      color: '#1e293b', fontWeight: 500,
+      color: '#1e293b', 
+      fontWeight: 600,
     },
   },
   '&:hover': {
-    transform: 'translateX(2px)',
+    transform: 'translateX(1px)',
+    background: 'rgba(25, 118, 210, 0.02)',
     '& .MuiListItemText-primary': {
       color: '#1e293b',
     },
@@ -282,7 +285,7 @@ const SubMenuItemButton = styled(MenuItemButton)(({ theme }) => ({
 
 const menuItems = [
   { 
-    text: 'Dashboard', 
+    text: 'Início', 
     icon: <HomeIcon sx={{ fontSize: 22 }} />, 
     path: '/',
     exact: true
@@ -293,6 +296,23 @@ const menuItems = [
     path: '/painel-gerencial',
     adminOnly: true
   },
+  {
+    text: 'Pedidos',
+    icon: <ReceiptModernIcon sx={{ fontSize: 22 }} />,
+    adminOnly: true,
+    subItems: [
+      {
+        text: 'Ciclo do Pedido',
+        icon: <ReceiptModernIcon sx={{ fontSize: 20 }} />,
+        path: '/admin/pedidos'
+      },
+      {
+        text: 'Status do Pedido',
+        icon: <TimelineModernIcon sx={{ fontSize: 20 }} />,
+        path: '/admin/pedidos/status'
+      }
+    ]
+  },
   { 
     text: 'Gestão de Notas', 
     icon: <ReceiptModernIcon sx={{ fontSize: 22 }} />,
@@ -301,11 +321,6 @@ const menuItems = [
         text: 'Adicionar Notas', 
         icon: <AddIcon sx={{ fontSize: 20 }} />, 
         path: '/adicionar-notas' 
-      },
-      { 
-        text: 'Gerar Etiquetas', 
-        icon: <QrIcon sx={{ fontSize: 20 }} />, 
-        path: '/gerar-etiquetas' 
       },
       { 
         text: 'Consultar Notas', 
@@ -356,8 +371,8 @@ const menuItems = [
       }
     ]
   },
-  {
-    text: 'Separação e Conferência',
+  /* {
+    text: 'Separação',
     icon: <VerifiedIcon sx={{ fontSize: 22 }} />,
     subItems: [
       {
@@ -391,8 +406,8 @@ const menuItems = [
         path: '/separacao-conferencia/gerentes'
       }
     ]
-  },
-  {
+  }, */
+  /* {
     text: 'Separation Pro',
     icon: <TrophyModernIcon sx={{ fontSize: 22, color: '#ffd700' }} />,
     subItems: [
@@ -407,16 +422,11 @@ const menuItems = [
         path: '/gamificacao/historico'
       }
     ]
-  },
+  }, */
   {
-    text: 'Operações',
+    text: 'Cadastros',
     icon: <WorkspaceIcon sx={{ fontSize: 22 }} />,
     subItems: [
-      {
-        text: 'Checklist Empilhadeiras',
-        icon: <ChecklistModernIcon sx={{ fontSize: 20 }} />,
-        path: '/checklist-empilhadeiras'
-      },
       {
         text: 'Motoristas',
         icon: <SpeedIcon sx={{ fontSize: 20 }} />,
@@ -538,11 +548,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         }
       }
     });
-    // Garantir que o submenu 'Checklist Recebimento' esteja visível por padrão
-    // Assim os subitens ficam acessíveis sem necessidade de click adicional.
-    if (!initialSubmenus['Checklist Recebimento']) {
-      initialSubmenus['Checklist Recebimento'] = true;
-    }
     setOpenSubmenus(initialSubmenus);
   }, [router.pathname]);
 
@@ -598,24 +603,27 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         <ListItemIcon 
           sx={{ 
             minWidth: 0, 
-            mr: open || isMobile ? 2 : 'auto',
-            color: active ? '#1976d2' : '#64748b',
-            fontSize: isMobile ? '1.3rem' : '1.1rem',
-            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+            mr: open || isMobile ? 2.5 : 'auto',
+            color: active ? '#0d47a1' : '#64748b',
+            fontSize: isMobile ? '1.35rem' : '1.2rem',
+            transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            width: 40,
-            height: 40,
-            borderRadius: '10px',
+            width: 44,
+            height: 44,
+            borderRadius: '12px',
             background: active 
-              ? 'linear-gradient(135deg, rgba(25, 118, 210, 0.1) 0%, rgba(66, 165, 245, 0.05) 100%)'
+              ? 'linear-gradient(135deg, rgba(13, 71, 161, 0.08) 0%, rgba(25, 118, 210, 0.03) 100%)'
               : 'transparent',
-            border: active ? '1px solid rgba(25, 118, 210, 0.2)' : '1px solid transparent',
+            border: active ? '1px solid rgba(13, 71, 161, 0.12)' : '1px solid transparent',
+            boxShadow: active ? '0 6px 12px rgba(13,71,161,0.04)' : 'none',
             '&:hover': {
-              background: 'linear-gradient(135deg, rgba(25, 118, 210, 0.08) 0%, rgba(66, 165, 245, 0.04) 100%)',
-              transform: 'scale(1.05)',
-              border: '1px solid rgba(25, 118, 210, 0.15)'
+              background: active 
+                ? 'linear-gradient(135deg, rgba(13,71,161,0.10) 0%, rgba(25,118,210,0.04) 100%)'
+                : 'linear-gradient(135deg, rgba(25,118,210,0.04) 0%, rgba(25,118,210,0.02) 100%)',
+              transform: 'scale(1.03)',
+              border: '1px solid rgba(25, 118, 210, 0.12)'
             }
           }}
         >
@@ -631,10 +639,10 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           }} 
           sx={{ 
             opacity: open || isMobile ? 1 : 0,
+            transition: 'opacity 0.2s ease',
             '& .MuiTypography-root': {
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
+              whiteSpace: 'normal',
+              lineHeight: 1.2,
             }
           }} 
         />
@@ -663,8 +671,8 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                     return subItem.roles.includes(user.tipo);
                   }
                   
-                  // Lógica específica para 'Separação e Conferência'
-                  if (item.text === 'Separação e Conferência') {
+                  // Lógica específica para 'Separação'
+                    if (item.text === 'Separação') {
                     const userRole = user.tipo;
                     if (userRole === 'ADMIN' || userRole === 'GERENTE') return true;
 
@@ -788,7 +796,11 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               aria-haspopup="true"
               aria-expanded={menuOpen ? 'true' : undefined}
               startIcon={
-                <Avatar sx={{ width: 32, height: 32, bgcolor: 'primary.main' }} src={user?.foto || undefined}>
+                <Avatar sx={{ 
+                  width: 32, 
+                  height: 32, 
+                  bgcolor: user?.foto ? 'transparent' : 'primary.main' 
+                }} src={user?.foto || undefined}>
                   {!user?.foto && (user?.nome?.charAt(0).toUpperCase() || <PersonIcon />)}
                 </Avatar>
               }
@@ -922,17 +934,17 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                   }
 
                   // CONFERENTE e SEPARADOR têm acesso apenas aos menus específicos
-                  if (user?.tipo === 'CONFERENTE' || user?.tipo === 'SEPARADOR') {
-                    // Permitir acesso também ao menu 'Checklist Recebimento' para todos os perfis
-                    const allowedMenus = [
-                      'Separação e Conferência',
-                      'Controle de Materiais',
-                      'Separation Pro',
-                      'Checklist Recebimento',
-                      'Meu Perfil'
-                    ];
-                    return allowedMenus.includes(item.text);
-                  }
+                    if (user?.tipo === 'CONFERENTE' || user?.tipo === 'SEPARADOR') {
+                      // Permitir acesso também ao menu 'Checklist Recebimento' para todos os perfis
+                      const allowedMenus = [
+                        'Separação',
+                        'Controle de Materiais',
+                        'Separation Pro',
+                        'Checklist Recebimento',
+                        'Meu Perfil'
+                      ];
+                      return allowedMenus.includes(item.text);
+                    }
 
                   return true;
                 })
@@ -955,7 +967,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 <Avatar sx={{ 
                   width: 36, 
                   height: 36, 
-                  background: 'linear-gradient(135deg, #1976d2 0%, #1976d2 100%)',
+                  background: user?.foto ? 'transparent' : 'linear-gradient(135deg, #1976d2 0%, #1976d2 100%)',
                   fontWeight: 600,
                   fontSize: '1.1rem'
                 }} src={user?.foto || undefined}>
@@ -1022,7 +1034,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                   if (user?.tipo === 'CONFERENTE' || user?.tipo === 'SEPARADOR') {
                     // Permitir acesso também ao menu 'Checklist Recebimento' para todos os perfis
                     const allowedMenus = [
-                      'Separação e Conferência',
+                      'Separação',
                       'Controle de Materiais',
                       'Separation Pro',
                       'Checklist Recebimento',
@@ -1054,7 +1066,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 <Avatar sx={{ 
                   width: 36, 
                   height: 36, 
-                  background: 'linear-gradient(135deg, #1976d2 0%, #1976d2 100%)',
+                  background: user?.foto ? 'transparent' : 'linear-gradient(135deg, #1976d2 0%, #1976d2 100%)',
                   fontWeight: 600,
                   fontSize: '1.1rem'
                 }} src={user?.foto || undefined}>

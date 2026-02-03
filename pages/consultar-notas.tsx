@@ -16,15 +16,43 @@ import {
   Chip,
   CircularProgress,
   IconButton,
-  Tooltip
+  Tooltip,
+  Card,
+  CardContent,
+  Grid,
+  InputAdornment,
+  Divider,
+  Stack,
+  useTheme,
+  useMediaQuery,
+  Avatar,
+  alpha
 } from '@mui/material';
-import { Search, FilterList, Refresh, Delete as DeleteIcon } from '@mui/icons-material';
+import { 
+  Search, 
+  FilterList, 
+  Refresh, 
+  Delete as DeleteIcon,
+  Description as NoteIcon,
+  Event as EventIcon,
+  QrCode as QrCodeIcon,
+  LocalShipping as ShippingIcon,
+  Info as InfoIcon,
+  Close as CloseIcon
+} from '@mui/icons-material';
 import { useStore } from '../store/store';
 import { useSnackbar } from 'notistack';
+import ResponsiveContainer from '../components/ResponsiveContainer';
+import ProtectedRoute from '../components/ProtectedRoute';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import formatISO9075 from 'date-fns/formatISO9075';
+import { motion, AnimatePresence } from 'framer-motion';
 
+const MotionBox = motion(Box);
+const MotionPaper = motion(Paper);
+const MotionCard = motion(Card);
+const MotionTableRow = motion(TableRow);
 
 interface FiltrosNotas {
   numeroNota?: string;
@@ -42,17 +70,17 @@ const ConsultarNotas = () => {
   const [linhasPorPagina, setLinhasPorPagina] = useState(10);
   const [carregando, setCarregando] = useState(true);
   const debounceTimer = useRef<NodeJS.Timeout | null>(null);
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   
   const { enqueueSnackbar } = useSnackbar();
   const { notas, fetchNotas, deleteNota } = useStore();
 
   useEffect(() => {
-    // Limpar timer anterior
     if (debounceTimer.current) {
       clearTimeout(debounceTimer.current);
     }
     
-    // Definir novo timer com debounce de 500ms
     debounceTimer.current = setTimeout(() => {
       carregarNotas();
     }, 500);
@@ -91,7 +119,6 @@ const ConsultarNotas = () => {
 
   const filtrarNotas = () => {
     return notas.filter(nota => {
-      // Filtro por status (os filtros de número da nota e código já são feitos no backend)
       if (filtros.status === 'DISPONIVEIS' && nota.controleId) {
         return false;
       }
@@ -109,243 +136,318 @@ const ConsultarNotas = () => {
   );
 
   const handleExcluirNota = async (id: string) => {
-    console.log(`[handleExcluirNota] Iniciando exclusão da nota ${id}`);
-    
     if (!confirm('Tem certeza que deseja excluir esta nota? Esta ação não pode ser desfeita.')) {
-      console.log('[handleExcluirNota] Usuário cancelou a exclusão');
       return;
     }
 
     try {
-      console.log(`[handleExcluirNota] Chamando deleteNota para a nota ${id}`);
       await deleteNota(id);
-      console.log(`[handleExcluirNota] Nota ${id} excluída com sucesso`);
-      
-      enqueueSnackbar('Nota excluída com sucesso!', { 
-        variant: 'success',
-        autoHideDuration: 3000 
-      });
-      
-      console.log(`[handleExcluirNota] Recarregando lista de notas...`);
+      enqueueSnackbar('Nota excluída com sucesso!', { variant: 'success' });
       await carregarNotas();
-      console.log(`[handleExcluirNota] Lista de notas recarregada`);
-      
     } catch (error) {
-      console.error('[handleExcluirNota] Erro ao excluir nota:', error);
-      
-      let errorMessage = 'Erro ao excluir nota. Tente novamente.';
-      
-      if (error instanceof Error) {
-        console.error('[handleExcluirNota] Mensagem de erro:', error.message);
-        errorMessage = error.message;
-      }
-      
-      enqueueSnackbar(errorMessage, { 
-        variant: 'error',
-        autoHideDuration: 5000,
-        anchorOrigin: {
-          vertical: 'top',
-          horizontal: 'center',
-        }
-      });
+      console.error('Erro ao excluir nota:', error);
+      enqueueSnackbar(error instanceof Error ? error.message : 'Erro ao excluir nota', { variant: 'error' });
     }
   };
 
   return (
-    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" component="h1" gutterBottom>
-          Listar Notas
-        </Typography>
-        <Typography variant="body1" color="text.secondary" gutterBottom>
-          Consulte e filtre as notas fiscais cadastradas no sistema
-        </Typography>
-      </Box>
-
-      <Paper sx={{ p: 3, mb: 3 }} elevation={3}>
-        <Typography variant="h6" sx={{ mb: 2 }}>Filtros de Consulta</Typography>
-        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr 1fr' }, gap: 2, mb: 3 }}>
-          <TextField
-            label="Número da Nota"
-            size="small"
-            placeholder="Digite o número"
-            value={filtros.numeroNota || ''}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFiltros({ ...filtros, numeroNota: e.target.value })}
-            fullWidth
-          />
-          <TextField
-            label="Data Início"
-            type="date"
-            size="small"
-            InputLabelProps={{ shrink: true }}
-            value={filtros.dataInicio || ''}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFiltros({ ...filtros, dataInicio: e.target.value })}
-            fullWidth
-          />
-          <TextField
-            label="Data Fim"
-            type="date"
-            size="small"
-            InputLabelProps={{ shrink: true }}
-            value={filtros.dataFim || ''}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFiltros({ ...filtros, dataFim: e.target.value })}
-            fullWidth
-          />
-          <TextField
-            select
-            label="Status"
-            size="small"
-            value={filtros.status || 'TODAS'}
-            onChange={(e: any) => {
-              setFiltros({ ...filtros, status: e.target.value });
+    <ProtectedRoute>
+      <ResponsiveContainer
+        breadcrumb={[
+          { label: 'Dashboard', path: '/' },
+          { label: 'Consultar Notas' }
+        ]}
+      >
+        {/* Header */}
+        <MotionBox
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          mb={4}
+        >
+        <Box display="flex" alignItems="center" gap={2} mb={1}>
+          <Box 
+            sx={{ 
+              p: 1.5, 
+              borderRadius: 3, 
+              background: 'linear-gradient(135deg, #ed6c02 0%, #e65100 100%)',
+              color: 'white',
+              boxShadow: '0 8px 16px rgba(237, 108, 2, 0.25)',
+              display: 'flex'
             }}
-            fullWidth
-            SelectProps={{ native: true }}
           >
-            <option value="TODAS">Todas</option>
-            <option value="DISPONIVEIS">Disponíveis</option>
-            <option value="VINCULADAS">Vinculadas</option>
-          </TextField>
+            <NoteIcon fontSize="large" />
+          </Box>
+          <Box>
+            <Typography variant="h4" component="h1" fontWeight="800" sx={{ color: '#1a1a1a', letterSpacing: '-0.02em' }}>
+              Consultar Notas
+            </Typography>
+            <Typography variant="body1" color="text.secondary" fontWeight="500">
+              Gerencie e acompanhe as Notas Fiscais cadastradas
+            </Typography>
+          </Box>
+        </Box>
+      </MotionBox>
+
+      {/* Filters Section */}
+      <MotionPaper
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.1 }}
+        sx={{ 
+          p: 3, 
+          mb: 4, 
+          borderRadius: 4,
+          background: 'rgba(255, 255, 255, 0.8)',
+          backdropFilter: 'blur(10px)',
+          border: '1px solid rgba(255, 255, 255, 0.3)',
+          boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.07)',
+        }}
+      >
+        <Box display="flex" alignItems="center" gap={1} mb={3}>
+          <FilterList color="primary" />
+          <Typography variant="h6" fontWeight="700">Filtros de Busca</Typography>
         </Box>
 
-        <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600 }}>Filtros Avançados</Typography>
-        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2, mb: 2 }}>
-          <TextField
-            label="Código"
-            size="small"
-            placeholder="Digite o código"
-            value={filtros.codigo || ''}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFiltros({ ...filtros, codigo: e.target.value })}
-            fullWidth
-          />
-        </Box>
-
-        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-          <Tooltip title="Limpar filtros">
-            <IconButton 
-              onClick={() => setFiltros({ status: 'TODAS' })}
-              color="primary"
-              size="small"
+        <Grid container spacing={2}>
+          <Grid item xs={12} sm={6} md={3}>
+            <TextField
+              fullWidth
+              label="Número da Nota"
+              placeholder="Ex: 12345"
+              value={filtros.numeroNota || ''}
+              onChange={(e) => setFiltros({ ...filtros, numeroNota: e.target.value })}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <QrCodeIcon fontSize="small" color="action" />
+                  </InputAdornment>
+                ),
+                sx: { borderRadius: 2.5 }
+              }}
+            />
+          </Grid>
+          <Grid item xs={12} sm={6} md={2.5}>
+            <TextField
+              fullWidth
+              label="Data Início"
+              type="date"
+              InputLabelProps={{ shrink: true }}
+              value={filtros.dataInicio || ''}
+              onChange={(e) => setFiltros({ ...filtros, dataInicio: e.target.value })}
+              InputProps={{
+                sx: { borderRadius: 2.5 }
+              }}
+            />
+          </Grid>
+          <Grid item xs={12} sm={6} md={2.5}>
+            <TextField
+              fullWidth
+              label="Data Fim"
+              type="date"
+              InputLabelProps={{ shrink: true }}
+              value={filtros.dataFim || ''}
+              onChange={(e) => setFiltros({ ...filtros, dataFim: e.target.value })}
+              InputProps={{
+                sx: { borderRadius: 2.5 }
+              }}
+            />
+          </Grid>
+          <Grid item xs={12} sm={6} md={2}>
+            <TextField
+              fullWidth
+              select
+              label="Status"
+              value={filtros.status || 'TODAS'}
+              onChange={(e) => setFiltros({ ...filtros, status: e.target.value as any })}
+              SelectProps={{ native: true }}
+              InputProps={{
+                sx: { borderRadius: 2.5 }
+              }}
             >
-              <FilterList />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Atualizar">
-            <IconButton 
-              onClick={carregarNotas}
-              color="primary"
-              disabled={carregando}
-              size="small"
-            >
-              <Refresh />
-            </IconButton>
-          </Tooltip>
-        </Box>
-      </Paper>
+              <option value="TODAS">Todas</option>
+              <option value="DISPONIVEIS">Disponíveis</option>
+              <option value="VINCULADAS">Vinculadas</option>
+            </TextField>
+          </Grid>
+          <Grid item xs={12} sm={6} md={2}>
+            <Stack direction="row" spacing={1} sx={{ height: '100%', alignItems: 'center', pt: 1 }}>
+              <Tooltip title="Limpar Filtros">
+                <Button 
+                  onClick={() => setFiltros({ status: 'TODAS' })}
+                  variant="outlined"
+                  sx={{ borderRadius: 2.5, minWidth: 48, p: 1 }}
+                >
+                  <CloseIcon />
+                </Button>
+              </Tooltip>
+              <Button 
+                fullWidth
+                onClick={carregarNotas}
+                variant="contained"
+                disabled={carregando}
+                startIcon={carregando ? <CircularProgress size={20} color="inherit" /> : <Refresh />}
+                sx={{ 
+                  borderRadius: 2.5, 
+                  height: 48,
+                  textTransform: 'none',
+                  fontWeight: '700'
+                }}
+              >
+                Atualizar
+              </Button>
+            </Stack>
+          </Grid>
+        </Grid>
+      </MotionPaper>
 
-      <Paper sx={{ width: '100%', mb: 2 }} elevation={3}>
-        <TableContainer>
-          <Table size="small">
-            <TableHead>
-  <TableRow>
-    <TableCell>Número da Nota</TableCell>
-    <TableCell>Código</TableCell>
-    <TableCell align="right">Volumes</TableCell>
-    <TableCell>Data de Criação</TableCell>
-    <TableCell>Status</TableCell>
-    <TableCell>Controle</TableCell>
-    <TableCell>Ações</TableCell>
-  </TableRow>
-</TableHead>
-            <TableBody>
+      {/* Table Section */}
+      <TableContainer 
+        component={MotionPaper}
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.2 }}
+        sx={{ 
+          borderRadius: 4,
+          overflow: 'hidden',
+          background: 'rgba(255, 255, 255, 0.9)',
+          backdropFilter: 'blur(10px)',
+          border: '1px solid rgba(255, 255, 255, 0.3)',
+          boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.07)',
+        }}
+      >
+        <Table stickyHeader>
+          <TableHead>
+            <TableRow>
+              <TableCell sx={{ fontWeight: 'bold', bgcolor: 'rgba(248, 250, 252, 0.5)' }}>Nota Fiscal</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', bgcolor: 'rgba(248, 250, 252, 0.5)' }}>Código</TableCell>
+              <TableCell align="right" sx={{ fontWeight: 'bold', bgcolor: 'rgba(248, 250, 252, 0.5)' }}>Volumes</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', bgcolor: 'rgba(248, 250, 252, 0.5)' }}>Data Cadastro</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', bgcolor: 'rgba(248, 250, 252, 0.5)' }}>Status</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', bgcolor: 'rgba(248, 250, 252, 0.5)' }}>Vínculo</TableCell>
+              <TableCell align="right" sx={{ fontWeight: 'bold', bgcolor: 'rgba(248, 250, 252, 0.5)' }}>Ações</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            <AnimatePresence>
               {carregando ? (
                 <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
-                    <CircularProgress />
+                  <TableCell colSpan={7} align="center" sx={{ py: 8 }}>
+                    <CircularProgress thickness={4} size={40} />
+                    <Typography variant="body2" color="text.secondary" mt={2}>Buscando notas...</Typography>
                   </TableCell>
                 </TableRow>
               ) : notasPaginadas.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
-                    Nenhuma nota encontrada com os filtros atuais.
+                  <TableCell colSpan={7} align="center" sx={{ py: 8 }}>
+                    <Box sx={{ opacity: 0.3, mb: 2 }}>
+                      <NoteIcon sx={{ fontSize: 60 }} />
+                    </Box>
+                    <Typography variant="h6" color="text.secondary">Nenhuma nota encontrada</Typography>
+                    <Typography variant="body2" color="text.disabled">Tente ajustar seus filtros de busca</Typography>
                   </TableCell>
                 </TableRow>
               ) : (
-                notasPaginadas.map((nota) => (
-                  <TableRow key={nota.id} hover>
-                    <TableCell>{nota.numeroNota}</TableCell>
-                    <TableCell>{nota.codigo}</TableCell>
-                    <TableCell align="right">{nota.volumes || '1'}</TableCell>
-                    <TableCell>{formatISO9075(new Date(nota.dataCriacao))}</TableCell>
+                notasPaginadas.map((nota, index) => (
+                  <MotionTableRow 
+                    key={nota.id}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.3 + (index * 0.05) }}
+                    hover
+                    sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
+                  >
                     <TableCell>
-                      {nota.controleId ? (
-                        <Chip label="Em Carga" color="success" size="small" sx={{ backgroundColor: '#4caf50', color: 'white' }} />
-                      ) : (
-                        <Chip label="Disponível" color="warning" size="small" variant="outlined" />
-                      )}
+                      <Typography variant="subtitle2" fontWeight="700" color="primary.main">
+                        {nota.numeroNota}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2" color="text.secondary" sx={{ fontFamily: 'monospace' }}>
+                        {nota.codigo}
+                      </Typography>
+                    </TableCell>
+                    <TableCell align="right">
+                      <Chip 
+                        label={nota.volumes || '1'} 
+                        size="small" 
+                        sx={{ fontWeight: '600', bgcolor: 'grey.100' }} 
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2" color="text.secondary">
+                        {formatISO9075(new Date(nota.dataCriacao))}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Chip 
+                        label={nota.controleId ? "Vinculada" : "Disponível"} 
+                        color={nota.controleId ? "success" : "warning"}
+                        size="small"
+                        variant={nota.controleId ? "filled" : "outlined"}
+                        sx={{ fontWeight: '600', borderRadius: 1.5 }}
+                      />
                     </TableCell>
                     <TableCell>
                       {nota.controle ? (
                         <Tooltip 
                           title={
-                            <>
-                              <div>Nº: {nota.controle.numeroManifesto || 'N/A'}</div>
-                              <div>Motorista: {nota.controle.motorista}</div>
-                              <div>Responsável: {nota.controle.responsavel}</div>
-                              <div>Transportadora: {nota.controle.transportadora}</div>
-                              <div>Data: {new Date(nota.controle.dataCriacao).toLocaleString()}</div>
-                            </>
+                            <Box sx={{ p: 1 }}>
+                              <Typography variant="caption" display="block">Manifesto: {nota.controle.numeroManifesto || 'N/A'}</Typography>
+                              <Typography variant="caption" display="block">Motorista: {nota.controle.motorista}</Typography>
+                              <Typography variant="caption" display="block">Transportadora: {nota.controle.transportadora}</Typography>
+                            </Box>
                           }
                           arrow
                         >
                           <Chip 
-                            label={`${nota.controle.numeroManifesto || nota.controle.id.substring(0, 8)}`} 
+                            icon={<ShippingIcon sx={{ fontSize: '14px !important' }} />}
+                            label={nota.controle.numeroManifesto || nota.controle.id.substring(0, 8)} 
                             size="small"
                             variant="outlined"
-                            sx={{ cursor: 'pointer' }}
+                            sx={{ cursor: 'pointer', fontWeight: '500' }}
                           />
                         </Tooltip>
-                      ) : '-'}
+                      ) : (
+                        <Typography variant="caption" color="text.disabled">Sem vínculo</Typography>
+                      )}
                     </TableCell>
                     <TableCell align="right">
                       <Tooltip title={nota.controleId ? "Não é possível excluir nota vinculada" : "Excluir nota"}>
                         <IconButton 
                           size="small" 
                           color="error" 
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            console.log('[UI] Botão de exclusão clicado para nota:', nota.id);
-                            console.log('[UI] Nota está vinculada?', !!nota.controleId);
-                            handleExcluirNota(nota.id);
-                          }}
+                          onClick={() => handleExcluirNota(nota.id)}
                           disabled={!!nota.controleId}
+                          sx={{ 
+                            '&:hover': { bgcolor: 'error.lighter' }
+                          }}
                         >
                           <DeleteIcon />
                         </IconButton>
                       </Tooltip>
                     </TableCell>
-                  </TableRow>
+                  </MotionTableRow>
                 ))
               )}
-            </TableBody>
-          </Table>
-        </TableContainer>
-        <TablePagination
-          rowsPerPageOptions={[5, 10, 25]}
-          component="div"
-          count={notasFiltradas.length}
-          rowsPerPage={linhasPorPagina}
-          page={pagina}
-          onPageChange={handleMudarPagina}
-          onRowsPerPageChange={handleMudarLinhasPorPagina}
-          labelRowsPerPage="Linhas por página:"
-          labelDisplayedRows={({ from, to, count }) => 
-            `${from}-${to} de ${count !== -1 ? count : `mais de ${to}`}`
-          }
-        />
-      </Paper>
-    </Container>
+            </AnimatePresence>
+          </TableBody>
+        </Table>
+      </TableContainer>
+
+      <TablePagination
+        rowsPerPageOptions={[5, 10, 25, 50]}
+        component="div"
+        count={notasFiltradas.length}
+        rowsPerPage={linhasPorPagina}
+        page={pagina}
+        onPageChange={handleMudarPagina}
+        onRowsPerPageChange={handleMudarLinhasPorPagina}
+        labelRowsPerPage="Notas por página:"
+        sx={{ mt: 1 }}
+      />
+      </ResponsiveContainer>
+    </ProtectedRoute>
   );
 };
 

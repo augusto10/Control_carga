@@ -21,6 +21,9 @@ import {
   Save as SaveIcon,
   Close as CloseIcon
 } from '@mui/icons-material';
+import axios from 'axios';
+import Cookies from 'js-cookie';
+import api from '../services/api';
 
 interface NotaFiscal {
   id: string;
@@ -31,6 +34,11 @@ interface NotaFiscal {
   status: 'pendente' | 'processando' | 'concluido' | 'erro';
   dataHora: string;
   editando?: boolean;
+  valorPedido?: number;
+  razaoSocial?: string;
+  pesoBruto?: number;
+  dataEmissao?: string;
+  cnpj?: string;
 }
 
 interface AdicionarNotasParaControleProps {
@@ -127,6 +135,19 @@ const AdicionarNotasParaControle: React.FC<AdicionarNotasParaControleProps> = ({
     // Se não se encaixar em nenhum formato conhecido, retorna os últimos 9 dígitos
     return codigoLimpo.slice(-9);
   };
+  
+  const extrairChaveNFe = (codigo: string): string | null => {
+    if (!codigo) return null;
+    const apenasDigitos = String(codigo).replace(/[^\d]/g, '');
+    if (apenasDigitos.length === 44) return apenasDigitos;
+    if (apenasDigitos.length > 44) {
+      for (let i = 0; i <= apenasDigitos.length - 44; i++) {
+        const bloco = apenasDigitos.substring(i, i + 44);
+        if (/^\d{44}$/.test(bloco)) return bloco;
+      }
+    }
+    return null;
+  };
 
   // Função para processar código de barras (baseada no AdicionarNotasContent original)
   const processarCodigoBarras = useCallback(async (codigo: string) => {
@@ -206,6 +227,49 @@ const AdicionarNotasParaControle: React.FC<AdicionarNotasParaControleProps> = ({
         console.log('Lista de notas atualizada:', novasNotas);
         return novasNotas;
       });
+      
+      // Atualiza status para processando
+      setNotas(prev => prev.map(n => n.id === novaNota.id ? { ...n, status: 'processando' } : n));
+      
+      // Buscar dados adicionais na API interna (sem persistir no banco)
+      try {
+        const chave = extrairChaveNFe(codigoLimpo);
+        let resp;
+        if (chave) {
+          resp = await api.get('/api/buscar-nota-externa', { params: { chave } });
+        } else {
+          resp = await api.get('/api/buscar-nota-externa', { params: { numero: numeroNotaFormatado, serie: '1' } });
+        }
+        const data: any = resp.data || {};
+        const valorPedidoRaw = data?.valorPedido ?? data?.VALOR_TOTAL ?? data?.valor ?? data?.total ?? null;
+        const valorPedido = valorPedidoRaw != null ? Number(String(valorPedidoRaw).toString().replace(',', '.')) : undefined;
+        const razaoSocial = data?.razaoSocial ?? data?.NOME_RAZAO_SOCIAL ?? data?.cliente ?? data?.emitente?.razaoSocial ?? undefined;
+        const pesoBrutoRaw = data?.pesoBruto ?? data?.peso ?? null;
+        const pesoBruto = pesoBrutoRaw != null ? Number(String(pesoBrutoRaw).toString().replace(',', '.')) : undefined;
+        const dataEmissaoRaw = data?.dataEmissao ?? data?.DATA_EMISSAO ?? data?.emissao ?? data?.data ?? null;
+        const dataEmissao = dataEmissaoRaw ? new Date(dataEmissaoRaw).toISOString() : undefined;
+        const cnpj = data?.cnpj ?? data?.CNPJ ?? data?.cliente?.cnpj ?? data?.emitente?.cnpj ?? undefined;
+        const volumesStr = (data?.volumes != null) ? String(data.volumes) : undefined;
+        
+        // Atualiza a nota recém adicionada com os novos dados e marca como concluído
+        setNotas(prev => prev.map(n => 
+          n.id === novaNota.id 
+            ? { 
+                ...n, 
+                valorPedido, 
+                razaoSocial, 
+                pesoBruto, 
+                dataEmissao, 
+                cnpj,
+                volumes: volumesStr ?? n.volumes,
+                status: 'concluido'
+              } 
+            : n
+        ));
+      } catch (apiError) {
+        console.warn('Falha ao buscar dados externos da nota fiscal:', apiError);
+        setNotas(prev => prev.map(n => n.id === novaNota.id ? { ...n, status: 'erro' } : n));
+      }
       
       // Mostrar mensagem de sucesso com o número da nota formatado
       enqueueSnackbar(`Nota ${numeroNotaFormatado} adicionada com sucesso!`, { 
@@ -463,6 +527,31 @@ const AdicionarNotasParaControle: React.FC<AdicionarNotasParaControleProps> = ({
                   <Typography variant="body2" color="text.secondary">
                     Código: {nota.codigo}
                   </Typography>
+                  {!!nota.razaoSocial && (
+                    <Typography variant="caption" sx={{ display: 'block', mt: 0.5, color: 'text.secondary' }}>
+                      Razão Social: {nota.razaoSocial}
+                    </Typography>
+                  )}
+                  {!!nota.valorPedido && (
+                    <Typography variant="caption" sx={{ display: 'block', mt: 0.25, color: 'text.secondary' }}>
+                      Valor: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(nota.valorPedido)}
+                    </Typography>
+                  )}
+                  {!!nota.pesoBruto && (
+                    <Typography variant="caption" sx={{ display: 'block', mt: 0.25, color: 'text.secondary' }}>
+                      Peso: {nota.pesoBruto.toFixed(2)} kg
+                    </Typography>
+                  )}
+                  {!!nota.dataEmissao && (
+                    <Typography variant="caption" sx={{ display: 'block', mt: 0.25, color: 'text.secondary' }}>
+                      Emissão: {new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(nota.dataEmissao))}
+                    </Typography>
+                  )}
+                  {!!nota.cnpj && (
+                    <Typography variant="caption" sx={{ display: 'block', mt: 0.25, color: 'text.secondary' }}>
+                      CNPJ: {nota.cnpj}
+                    </Typography>
+                  )}
                   {notaEditandoValor === nota.id ? (
                     <Box mt={1} mb={1}>
                       <Typography variant="subtitle2" gutterBottom>

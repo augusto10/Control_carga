@@ -79,6 +79,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'seu_segredo_secreto';
 interface TokenPayload {
   id: string;
   email: string;
+  nome: string;
   tipo: string;
   iat: number;
   exp: number;
@@ -129,8 +130,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     try {
       const decoded = jwt.verify(token, JWT_SECRET) as TokenPayload;
       
-      // Buscar usuário
-      const user = await prisma.usuario.findUnique({
+      // Buscar usuário no banco de dados para obter dados atualizados (incluindo foto)
+      const usuario = await prisma.usuario.findUnique({
         where: { id: decoded.id },
         select: {
           id: true,
@@ -144,25 +145,16 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         }
       });
 
-      if (!user) {
-        return res.status(404).json({ 
+      if (!usuario) {
+        return res.status(404).json({
           success: false,
-          message: 'Usuário não encontrado' 
+          message: 'Usuário não encontrado'
         });
       }
 
-      // Atualizar último acesso (limitando campos retornados para evitar colunas inexistentes)
-      await prisma.usuario.update({
-        where: { id: user.id },
-        data: { ultimoAcesso: new Date() },
-        select: {
-          id: true,
-        }
-      });
-
       return res.status(200).json({ 
-        success: true,
-        user 
+        success: true, 
+        user: usuario
       });
       
     } catch (error) {

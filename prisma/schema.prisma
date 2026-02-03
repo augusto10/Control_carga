@@ -76,6 +76,7 @@ model Usuario {
   historicosEstoque    HistoricoEstoque[]
   etiquetasLotes       EtiquetaLote[]         // Etiquetas de transporte criadas
   checklistsRecebimento ChecklistRecebimento[] // Checklists de recebimento criados
+  roteirizacoes       Roteirizacao[]         // Roteirizações criadas
 }
 
 model AuditoriaAcesso {
@@ -412,6 +413,22 @@ model ChecklistRecebimento {
   @@index([nomeFabricante])
   @@index([alertaValidadeAutorizado])
   @@index([nomeAutorizadorLider])
+}
+
+model Roteirizacao {
+  id            String   @id @default(uuid())
+  dataCriacao   DateTime @default(now())
+  notasIds      String[] // Array de IDs das notas fiscais
+  estrategia    String   // 'cidade', 'bairro', 'logradouro'
+  capacidadeBox Int      @default(10)
+  rotas         String   // JSON com as rotas geradas
+  boxes         String   // JSON com os boxes criados
+  relatorio     String   // Relatório em texto
+  criadoPor     String
+  criadoPorUser Usuario  @relation(fields: [criadoPor], references: [id])
+  
+  @@index([dataCriacao])
+  @@index([criadoPor])
 }
 
 enum CondicaoEmbalagem {

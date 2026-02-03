@@ -20,7 +20,18 @@ import {
   Checkbox,
   FormControlLabel,
   CircularProgress,
-  Autocomplete
+  Autocomplete,
+  Grid,
+  Card,
+  CardContent,
+  Divider,
+  Chip,
+  Tooltip,
+  IconButton,
+  InputAdornment,
+  Avatar,
+  LinearProgress,
+  alpha
 } from '@mui/material';
 import { useRouter } from 'next/router';
 import { useSnackbar } from 'notistack';
@@ -29,6 +40,25 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '@/services/api';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  LocalShipping as ShippingIcon,
+  Person as PersonIcon,
+  Badge as BadgeIcon,
+  Phone as PhoneIcon,
+  DirectionsCar as CarIcon,
+  Inventory as PalletIcon,
+  Receipt as ReceiptIcon,
+  Notes as NoteIcon,
+  Save as SaveIcon,
+  ArrowBack as BackIcon,
+  CheckCircle as CheckIcon,
+  Info as InfoIcon
+} from '@mui/icons-material';
+
+const MotionBox = motion(Box);
+const MotionGrid = motion(Grid);
+const MotionCard = motion(Card);
 
 interface Pessoa {
   id: string;
@@ -346,325 +376,528 @@ const CriarControleContent: React.FC = () => {
   }
 
   return (
-    <Container maxWidth="md" sx={{ mt: 4, mb: 4 }}>
-      <Paper elevation={3} sx={{ p: 4 }}>
-        <Typography variant="h5" component="h1" gutterBottom>
-          Criar Novo Controle de Carga
-        </Typography>
-        
-        <Box component="form" onSubmit={handleSubmit} sx={{ mt: 3 }}>
-          <Typography variant="h6" gutterBottom sx={{ mt: 2, mb: 2 }}>
-            Dados do Motorista
-          </Typography>
-          
-          <Box display="grid" gridTemplateColumns="repeat(auto-fill, minmax(300px, 1fr))" gap={2}>
-            <TextField
-              fullWidth
-              label="Responsável"
-              name="responsavel"
-              value={formData.responsavel}
-              onChange={handleChange}
-              error={!!errors.responsavel}
-              helperText={errors.responsavel}
-              margin="normal"
-              required
-            />
-                        <FormControl fullWidth margin="normal" error={!!errors.motorista}>
-              <Autocomplete
-                options={pessoas}
-                getOptionLabel={(option) => {
-                  if (typeof option === 'string') return option;
-                  const tipoIcon = option.tipo === 'MOTORISTA' ? '🚛' : 
-                                  option.tipo === 'FUNCIONARIO' ? '👨‍💼' : '🏢';
-                  return `${tipoIcon} ${option.nome} (${option.tipoLabel})`;
-                }}
-                value={pessoas.find(p => p.nome === formData.motorista) || null}
-                onChange={(_, newValue) => {
-                  if (typeof newValue === 'string') {
-                    setFormData(prev => ({
-                      ...prev,
-                      motorista: newValue,
-                      cpfMotorista: '',
-                      telefoneMotorista: ''
-                    }));
-                  } else if (newValue) {
-                    // Atualiza todos os campos da pessoa selecionada
-                    setFormData(prev => ({
-                      ...prev,
-                      motorista: newValue.nome,
-                      cpfMotorista: newValue.cpf,
-                      telefoneMotorista: newValue.telefone || '',
-                      transportadora: newValue.transportadoraId as Transportadora
-                    }));
-                  } else {
-                    setFormData(prev => ({
-                      ...prev,
-                      motorista: '',
-                      cpfMotorista: '',
-                      telefoneMotorista: ''
-                    }));
-                  }
-                }}
-                freeSolo
-                groupBy={(option) => {
-                  if (option.tipo === 'MOTORISTA') return '🚛 Motoristas';
-                  if (option.tipo === 'FUNCIONARIO') return '👨‍💼 Funcionários';
-                  return '🏢 Clientes';
-                }}
-                renderOption={(props, option) => {
-                  const transportadoraMap: Record<string, string> = {
-                    'ACCERT': 'ACCERT Transportes',
-                    'ACERT': 'ACCERT Transportes', // Compatibilidade
-                    'EXPRESSO_GOIAS': 'Expresso Goiás',
-                    'TERCEIRIZADA': 'Terceirizada',
-                    'DETAFRA_TRANSPORTES': 'Detafra Transportes',
-                    'RETIRA_VENDEDOR': 'Retira Vendedor',
-                    'RETIRA_CLIENTE': 'Retira Cliente',
-                    'VLOG': 'VLOG Transportes'
-                  };
-                  
-                  const transportadoraNome = transportadoraMap[option.transportadoraId] || option.transportadoraId;
-                  const tipoColor = option.tipo === 'MOTORISTA' ? '#1976d2' : 
-                                   option.tipo === 'FUNCIONARIO' ? '#ed6c02' : '#2e7d32';
-                  
-                  return (
-                    <li {...props}>
-                      <div style={{ width: '100%', padding: '8px 0' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                          <strong style={{ color: tipoColor }}>{option.nome}</strong>
-                          <span style={{ 
-                            backgroundColor: tipoColor, 
-                            color: 'white', 
-                            padding: '2px 6px', 
-                            borderRadius: '4px', 
-                            fontSize: '10px',
-                            fontWeight: 'bold'
-                          }}>
-                            {option.tipoLabel.toUpperCase()}
-                          </span>
-                        </div>
-                        <div style={{ fontSize: '12px', color: '#666', marginBottom: '2px' }}>
-                          CPF: {option.cpf}
-                        </div>
-                        <div style={{ fontSize: '12px', color: '#666', marginBottom: '2px' }}>
-                          Telefone: {option.telefone || 'Não informado'}
-                        </div>
-                        <div style={{ fontSize: '12px', color: '#666' }}>
-                          Transportadora: <strong>{transportadoraNome}</strong>
-                        </div>
-                        {option.cnh && (
-                          <div style={{ fontSize: '12px', color: '#666' }}>
-                            CNH: {option.cnh}
-                          </div>
-                        )}
-                      </div>
-                    </li>
-                  );
-                }}
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    label="Pessoa Responsável (Motorista/Funcionário/Cliente)"
-                    name="motorista"
-                    required
-                    error={!!errors.motorista}
-                    helperText={errors.motorista}
-                  />
-                )}
-                loading={isLoading.pessoas}
-              />
-            </FormControl>
-            
-            <TextField
-              fullWidth
-              label="CPF do Motorista"
-              name="cpfMotorista"
-              value={formData.cpfMotorista}
-              onChange={handleChange}
-              error={!!errors.cpfMotorista}
-              helperText={errors.cpfMotorista || "Apenas números"}
-              margin="normal"
-              required
-            />
-            
-            <TextField
-              fullWidth
-              label="Telefone do Motorista"
-              name="telefoneMotorista"
-              value={formData.telefoneMotorista}
-              onChange={handleChange}
-              margin="normal"
-              placeholder="(00) 00000-0000"
-              inputProps={{
-                maxLength: 15
-              }}
-            />
-            <FormControl fullWidth error={!!errors.transportadora} margin="normal">
-              <InputLabel id="transportadora-label">Transportadora</InputLabel>
-              <Select
-                labelId="transportadora-label"
-                id="transportadora"
-                name="transportadora"
-                value={formData.transportadora}
-                onChange={handleChange}
-                label="Transportadora"
-              >
-                {transportadoras.map((t) => (
-                  <MenuItem key={t.id} value={t.id}>
-                    {t.descricao}
-                  </MenuItem>
-                ))}
-              </Select>
-              {errors.transportadora && (
-                <FormHelperText>{errors.transportadora}</FormHelperText>
-              )}
-            </FormControl>
-            
-            <TextField
-              fullWidth
-              label="Pallets Levados"
-              name="qtdPalletsLevados"
-              type="number"
-              value={formData.qtdPalletsLevados}
-              onChange={handleChange}
-              error={!!errors.qtdPalletsLevados}
-              helperText={errors.qtdPalletsLevados}
-              margin="normal"
-              inputProps={{ min: 0 }}
-            />
-
-            <TextField
-              fullWidth
-              label="Pallets Devolvidos"
-              name="qtdPalletsDevolvidos"
-              type="number"
-              value={formData.qtdPalletsDevolvidos}
-              onChange={handleChange}
-              error={!!errors.qtdPalletsDevolvidos}
-              helperText={errors.qtdPalletsDevolvidos}
-              margin="normal"
-              inputProps={{ min: 0 }}
-            />
-
-            <TextField
-              fullWidth
-              label="Placa do Veículo"
-              name="placaVeiculo"
-              value={formData.placaVeiculo}
-              onChange={handleChange}
-              error={!!errors.placaVeiculo}
-              helperText={errors.placaVeiculo}
-              margin="normal"
-              required
-            />
-            
-            <TextField
-              fullWidth
-              label="Observações"
-              name="observacao"
-              value={formData.observacao}
-              onChange={handleChange}
-              margin="normal"
-              multiline
-              rows={4}
-            />
-          </Box>
-          <Typography variant="h6" gutterBottom sx={{ mt: 2, mb: 2 }}>
-            Notas Fiscais
-          </Typography>
-          {notasDisponiveis.length > 0 && (
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    checked={selectedNotas.length === notasNaoVinculadas.length && notasNaoVinculadas.length > 0}
-                    indeterminate={selectedNotas.length > 0 && selectedNotas.length < notasNaoVinculadas.length}
-                    onChange={(e) => {
-                      const checked = e.target.checked;
-                      if (checked) {
-                        const allIds = notasNaoVinculadas.map(n => n.id);
-                        setSelectedNotas(allIds);
-                      } else {
-                        setSelectedNotas([]);
-                      }
-                    }}
-                  />
+    <Container maxWidth="lg">
+      <AnimatePresence>
+        <MotionBox
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+        >
+          {storeLoading && (
+            <LinearProgress 
+              sx={{ 
+                position: 'fixed', 
+                top: 0, 
+                left: 0, 
+                right: 0, 
+                zIndex: 2000,
+                height: 3,
+                bgcolor: alpha('#3b82f6', 0.1),
+                '& .MuiLinearProgress-bar': {
+                  bgcolor: '#3b82f6',
+                  borderRadius: '0 4px 4px 0'
                 }
-                label="Selecionar todas"
-              />
-              {selectedNotas.length > 0 && (
-                <Typography variant="body2" color="textSecondary">
-                  {selectedNotas.length} selecionada(s)
-                </Typography>
-              )}
-            </Box>
+              }} 
+            />
           )}
-          {notasDisponiveis.length === 0 ? (
-            <Typography variant="body2" color="textSecondary" sx={{ fontStyle: 'italic' }}>
-              Nenhuma nota fiscal disponível para vincular.
-            </Typography>
-          ) : (
-            <List dense sx={{ maxHeight: 300, overflow: 'auto' }}>
-              {notasNaoVinculadas.map((nota) => (
-                <ListItem 
-                  key={nota.id}
-                  button 
-                  onClick={() => {
-                    setSelectedNotas(prev => 
-                      prev.includes(nota.id)
-                        ? prev.filter(id => id !== nota.id)
-                        : [...prev, nota.id]
-                    );
-                  }}
-                  sx={{
-                    '&:hover': { backgroundColor: 'action.hover' },
-                    backgroundColor: selectedNotas.includes(nota.id) ? 'action.selected' : 'transparent',
-                    borderRadius: 1,
-                    mb: 0.5
-                  }}
-                >
-                  <Checkbox
-                    edge="start"
-                    checked={selectedNotas.includes(nota.id)}
-                    tabIndex={-1}
-                    disableRipple
-                    inputProps={{ 'aria-labelledby': `nota-${nota.id}` }}
-                  />
-                  <ListItemText 
-                    id={`nota-${nota.id}`}
-                    primary={`Nota ${nota.numeroNota} - ${nota.volumes} volume${parseInt(nota.volumes) !== 1 ? 's' : ''}`}
-                    secondary={`Código: ${nota.codigo} • Data: ${format(new Date(nota.dataCriacao), "dd/MM/yyyy HH:mm", { locale: ptBR })}`}
-                  />
-                </ListItem>
-              ))}
-            </List>
-          )}
-            
-          {selectedNotas.length > 0 && (
-            <Typography variant="body2" color="textSecondary" sx={{ mt: 1, fontStyle: 'italic' }}>
-              {selectedNotas.length} nota(s) selecionada(s)
-            </Typography>
-          )}
-          <Box sx={{ mt: 4, display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
-            <Button 
-              variant="outlined" 
-              onClick={() => router.push('/')}
-              disabled={isLoading.transportadoras || isLoading.notas}
-            >
-              Cancelar
-            </Button>
-            <Button
-              type="submit"
-              variant="contained"
-              color="primary"
-              disabled={isLoading.submit}
-              startIcon={isLoading.submit ? <CircularProgress size={20} /> : null}
-            >
-              {isLoading.submit ? 'Salvando...' : 'Criar Controle'}
-            </Button>
-          </Box>
-        </Box>
-      </Paper>
+          <MotionCard 
+            elevation={0}
+            sx={{ 
+              borderRadius: '24px', 
+              bgcolor: 'rgba(255, 255, 255, 0.7)',
+              backdropFilter: 'blur(20px)',
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.05)',
+              border: '1px solid',
+              borderColor: alpha('#e2e8f0', 0.6),
+              overflow: 'visible'
+            }}
+          >
+            <CardContent sx={{ p: { xs: 3, md: 5 } }}>
+              <Box sx={{ mb: 5, display: 'flex', alignItems: 'center', gap: 2.5 }}>
+                <Box sx={{ 
+                  bgcolor: 'primary.main', 
+                  p: 1.5, 
+                  borderRadius: 3, 
+                  boxShadow: '0 8px 16px rgba(37, 99, 235, 0.2)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <ShippingIcon sx={{ color: 'white', fontSize: 32 }} />
+                </Box>
+                <Box>
+                  <Typography variant="h4" fontWeight="800" color="#1e293b" sx={{ fontSize: { xs: '1.5rem', md: '2.125rem' } }}>
+                    Criar Novo Controle
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" fontWeight="500">
+                    Inicie um novo processo de carregamento de carga
+                  </Typography>
+                </Box>
+              </Box>
+
+              <Box component="form" onSubmit={handleSubmit}>
+                <Grid container spacing={4}>
+                  {/* Seção: Dados do Responsável */}
+                  <Grid item xs={12}>
+                    <MotionBox
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.2 }}
+                    >
+                      <Typography variant="h6" fontWeight="700" color="primary" sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+                        <PersonIcon /> Responsável e Motorista
+                      </Typography>
+                      <Divider sx={{ mb: 3, opacity: 0.6 }} />
+                    </MotionBox>
+                  </Grid>
+
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      fullWidth
+                      label="Responsável pelo Lançamento"
+                      name="responsavel"
+                      value={formData.responsavel}
+                      onChange={handleChange}
+                      error={!!errors.responsavel}
+                      helperText={errors.responsavel}
+                      required
+                      sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <PersonIcon color="primary" fontSize="small" />
+                          </InputAdornment>
+                        ),
+                      }}
+                    />
+                  </Grid>
+
+                  <Grid item xs={12} md={6}>
+                    <FormControl fullWidth error={!!errors.motorista}>
+                      <Autocomplete
+                        options={pessoas}
+                        getOptionLabel={(option) => {
+                          if (typeof option === 'string') return option;
+                          return `${option.nome}`;
+                        }}
+                        value={pessoas.find(p => p.nome === formData.motorista) || null}
+                        onChange={(_, newValue) => {
+                          if (typeof newValue === 'string') {
+                            setFormData(prev => ({
+                              ...prev,
+                              motorista: newValue,
+                              cpfMotorista: '',
+                              telefoneMotorista: ''
+                            }));
+                          } else if (newValue) {
+                            setFormData(prev => ({
+                              ...prev,
+                              motorista: newValue.nome,
+                              cpfMotorista: newValue.cpf,
+                              telefoneMotorista: newValue.telefone || '',
+                              transportadora: newValue.transportadoraId as Transportadora
+                            }));
+                          } else {
+                            setFormData(prev => ({
+                              ...prev,
+                              motorista: '',
+                              cpfMotorista: '',
+                              telefoneMotorista: ''
+                            }));
+                          }
+                        }}
+                        freeSolo
+                        groupBy={(option) => {
+                          if (option.tipo === 'MOTORISTA') return '🚛 Motoristas';
+                          if (option.tipo === 'FUNCIONARIO') return '👨‍💼 Funcionários';
+                          return '🏢 Clientes';
+                        }}
+                        renderOption={(props, option) => {
+                          const transportadoraMap: Record<string, string> = {
+                            'ACCERT': 'ACCERT Transportes',
+                            'EXPRESSO_GOIAS': 'Expresso Goiás',
+                            'TERCEIRIZADA': 'Terceirizada',
+                            'DETAFRA_TRANSPORTES': 'Detafra Transportes',
+                            'RETIRA_VENDEDOR': 'Retira Vendedor',
+                            'RETIRA_CLIENTE': 'Retira Cliente',
+                            'VLOG': 'VLOG Transportes'
+                          };
+                          
+                          const transportadoraNome = transportadoraMap[option.transportadoraId] || option.transportadoraId;
+                          const tipoColor = option.tipo === 'MOTORISTA' ? '#1976d2' : 
+                                           option.tipo === 'FUNCIONARIO' ? '#ed6c02' : '#2e7d32';
+                          
+                          return (
+                            <li {...props}>
+                              <Box sx={{ width: '100%', py: 1.5 }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 0.5 }}>
+                                  <Typography variant="body1" fontWeight="700" sx={{ color: tipoColor }}>
+                                    {option.nome}
+                                  </Typography>
+                                  <Chip 
+                                    label={option.tipoLabel} 
+                                    size="small" 
+                                    sx={{ 
+                                      height: 20, 
+                                      fontSize: '0.7rem', 
+                                      bgcolor: tipoColor, 
+                                      color: 'white',
+                                      fontWeight: '800',
+                                      borderRadius: 1
+                                    }} 
+                                  />
+                                </Box>
+                                <Box sx={{ display: 'flex', gap: 2 }}>
+                                  <Typography variant="caption" color="text.secondary">
+                                    <strong>CPF:</strong> {option.cpf}
+                                  </Typography>
+                                  <Typography variant="caption" color="text.secondary">
+                                    <strong>Tel:</strong> {option.telefone || 'N/A'}
+                                  </Typography>
+                                </Box>
+                                <Typography variant="caption" color="text.primary" sx={{ mt: 0.5, display: 'block' }}>
+                                  Transportadora: <strong>{transportadoraNome}</strong>
+                                </Typography>
+                              </Box>
+                            </li>
+                          );
+                        }}
+                        renderInput={(params) => (
+                          <TextField
+                            {...params}
+                            label="Pessoa Responsável (Motorista/Cli/Func)"
+                            name="motorista"
+                            required
+                            error={!!errors.motorista}
+                            helperText={errors.motorista}
+                            sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
+                            InputProps={{
+                              ...params.InputProps,
+                              startAdornment: (
+                                <InputAdornment position="start">
+                                  <ShippingIcon color="primary" fontSize="small" />
+                                </InputAdornment>
+                              ),
+                            }}
+                          />
+                        )}
+                        loading={isLoading.pessoas}
+                      />
+                    </FormControl>
+                  </Grid>
+
+                  <Grid item xs={12} md={4}>
+                    <TextField
+                      fullWidth
+                      label="CPF do Motorista"
+                      name="cpfMotorista"
+                      value={formData.cpfMotorista}
+                      onChange={handleChange}
+                      error={!!errors.cpfMotorista}
+                      helperText={errors.cpfMotorista || "Apenas números"}
+                      required
+                      sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <BadgeIcon color="primary" fontSize="small" />
+                          </InputAdornment>
+                        ),
+                      }}
+                    />
+                  </Grid>
+
+                  <Grid item xs={12} md={4}>
+                    <TextField
+                      fullWidth
+                      label="Telefone"
+                      name="telefoneMotorista"
+                      value={formData.telefoneMotorista}
+                      onChange={handleChange}
+                      placeholder="(00) 00000-0000"
+                      sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <PhoneIcon color="primary" fontSize="small" />
+                          </InputAdornment>
+                        ),
+                      }}
+                    />
+                  </Grid>
+
+                  <Grid item xs={12} md={4}>
+                    <FormControl fullWidth error={!!errors.transportadora} required>
+                      <InputLabel>Transportadora</InputLabel>
+                      <Select
+                        name="transportadora"
+                        value={formData.transportadora}
+                        onChange={handleChange}
+                        label="Transportadora"
+                        sx={{ borderRadius: 3 }}
+                        startAdornment={
+                          <InputAdornment position="start" sx={{ ml: 1, mr: -0.5 }}>
+                            <ShippingIcon color="primary" fontSize="small" />
+                          </InputAdornment>
+                        }
+                      >
+                        {transportadoras.map((t) => (
+                          <MenuItem key={t.id} value={t.id}>
+                            {t.descricao}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                      {errors.transportadora && <FormHelperText>{errors.transportadora}</FormHelperText>}
+                    </FormControl>
+                  </Grid>
+
+                  {/* Seção: Dados do Veículo e Carga */}
+                  <Grid item xs={12} sx={{ mt: 2 }}>
+                    <MotionBox
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.3 }}
+                    >
+                      <Typography variant="subtitle1" fontWeight="700" color="#1e293b" sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+                        <Box sx={{ display: 'flex', p: 0.5, bgcolor: alpha('#3b82f6', 0.1), borderRadius: 1, color: 'primary.main' }}>
+                          <CarIcon fontSize="small" />
+                        </Box>
+                        Veículo e Carga
+                      </Typography>
+                      <Divider sx={{ mb: 3, opacity: 0.6 }} />
+                    </MotionBox>
+                  </Grid>
+
+                  <Grid item xs={12} md={4}>
+                    <TextField
+                      fullWidth
+                      label="Placa do Veículo"
+                      name="placaVeiculo"
+                      value={formData.placaVeiculo}
+                      onChange={handleChange}
+                      error={!!errors.placaVeiculo}
+                      helperText={errors.placaVeiculo}
+                      required
+                      placeholder="ABC1D23"
+                      sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <CarIcon color="primary" fontSize="small" />
+                          </InputAdornment>
+                        ),
+                      }}
+                    />
+                  </Grid>
+
+                  <Grid item xs={12} md={4}>
+                    <TextField
+                      fullWidth
+                      label="Pallets Levados"
+                      name="qtdPalletsLevados"
+                      type="number"
+                      value={formData.qtdPalletsLevados}
+                      onChange={handleChange}
+                      error={!!errors.qtdPalletsLevados}
+                      helperText={errors.qtdPalletsLevados}
+                      sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <PalletIcon color="primary" fontSize="small" />
+                          </InputAdornment>
+                        ),
+                      }}
+                    />
+                  </Grid>
+
+                  <Grid item xs={12} md={4}>
+                    <TextField
+                      fullWidth
+                      label="Pallets Devolvidos"
+                      name="qtdPalletsDevolvidos"
+                      type="number"
+                      value={formData.qtdPalletsDevolvidos}
+                      onChange={handleChange}
+                      error={!!errors.qtdPalletsDevolvidos}
+                      helperText={errors.qtdPalletsDevolvidos}
+                      sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <PalletIcon color="primary" fontSize="small" />
+                          </InputAdornment>
+                        ),
+                      }}
+                    />
+                  </Grid>
+
+                  {/* Seção: Notas Fiscais */}
+                  <Grid item xs={12} sx={{ mt: 2 }}>
+                    <MotionBox
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.4 }}
+                    >
+                      <Typography variant="h6" fontWeight="700" color="primary" sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+                        <ReceiptIcon /> Vincular Notas Fiscais
+                      </Typography>
+                      <Divider sx={{ mb: 2, opacity: 0.6 }} />
+                    </MotionBox>
+                  </Grid>
+
+                  <Grid item xs={12}>
+                    <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
+                      <Typography variant="body2" color="text.secondary">
+                        {notasNaoVinculadas.length} notas disponíveis • {selectedNotas.length} selecionadas
+                      </Typography>
+                      <Box sx={{ display: 'flex', gap: 1 }}>
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          onClick={() => {
+                            if (selectedNotas.length === notasNaoVinculadas.length) {
+                              // Se todas já estão selecionadas, limpa a seleção
+                              setSelectedNotas([]);
+                            } else {
+                              // Seleciona todas as notas disponíveis
+                              setSelectedNotas(notasNaoVinculadas.map(n => n.id));
+                            }
+                          }}
+                          sx={{ 
+                            borderRadius: 2,
+                            textTransform: 'none',
+                            fontWeight: 500,
+                            fontSize: '0.75rem'
+                          }}
+                        >
+                          {selectedNotas.length === notasNaoVinculadas.length ? 'Limpar Seleção' : 'Selecionar Todas'}
+                        </Button>
+                        {selectedNotas.length > 0 && (
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            color="error"
+                            onClick={() => setSelectedNotas([])}
+                            sx={{ 
+                              borderRadius: 2,
+                              textTransform: 'none',
+                              fontWeight: 500,
+                              fontSize: '0.75rem'
+                            }}
+                          >
+                            Desmarcar Todas
+                          </Button>
+                        )}
+                      </Box>
+                    </Box>
+                    
+                    <FormControl fullWidth>
+                      <Autocomplete
+                        multiple
+                        options={notasNaoVinculadas}
+                        getOptionLabel={(option) => `NF: ${option.numeroNota} - ${option.codigo}`}
+                        value={notasNaoVinculadas.filter(n => selectedNotas.includes(n.id))}
+                        onChange={(_, newValue) => {
+                          setSelectedNotas(newValue.map(n => n.id));
+                        }}
+                        renderInput={(params) => (
+                          <TextField
+                            {...params}
+                            label="Selecionar Notas Fiscais"
+                            placeholder="Pesquisar por número ou cliente..."
+                            sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
+                          />
+                        )}
+                        renderTags={(value, getTagProps) =>
+                          value.map((option, index) => (
+                            <Chip
+                              variant="outlined"
+                              label={`${option.numeroNota}`}
+                              size="small"
+                              {...getTagProps({ index })}
+                              sx={{ borderRadius: 1.5, fontWeight: '700', bgcolor: 'rgba(25, 118, 210, 0.05)' }}
+                            />
+                          ))
+                        }
+                        sx={{ mb: 1 }}
+                      />
+                      <FormHelperText>
+                        {selectedNotas.length} notas selecionadas. Somente notas sem vínculo aparecem aqui.
+                      </FormHelperText>
+                    </FormControl>
+                  </Grid>
+
+                  {/* Seção: Observações */}
+                  <Grid item xs={12} sx={{ mt: 2 }}>
+                    <TextField
+                      fullWidth
+                      label="Observações Adicionais"
+                      name="observacao"
+                      multiline
+                      rows={3}
+                      value={formData.observacao}
+                      onChange={handleChange}
+                      placeholder="Alguma informação extra sobre este carregamento..."
+                      sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start" sx={{ alignSelf: 'flex-start', mt: 1.5 }}>
+                            <NoteIcon color="primary" fontSize="small" />
+                          </InputAdornment>
+                        ),
+                      }}
+                    />
+                  </Grid>
+
+                  {/* Botões de Ação */}
+                  <Grid item xs={12} sx={{ mt: 4 }}>
+                    <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 2, justifyContent: 'flex-end' }}>
+                      <Button
+                        variant="outlined"
+                        onClick={() => router.back()}
+                        startIcon={<BackIcon />}
+                        sx={{ 
+                          borderRadius: 3, 
+                          px: 4, 
+                          py: 1.5,
+                          textTransform: 'none',
+                          fontWeight: '700',
+                          borderWidth: '2px',
+                          '&:hover': { borderWidth: '2px' }
+                        }}
+                      >
+                        Cancelar
+                      </Button>
+                      <Button
+                        type="submit"
+                        variant="contained"
+                        disabled={isLoading.submit}
+                        startIcon={isLoading.submit ? <CircularProgress size={20} color="inherit" /> : <SaveIcon />}
+                        sx={{ 
+                          borderRadius: 3, 
+                          px: 6, 
+                          py: 1.5,
+                          textTransform: 'none',
+                          fontWeight: '700',
+                          boxShadow: '0 8px 16px rgba(25, 118, 210, 0.25)',
+                          '&:hover': {
+                            boxShadow: '0 12px 20px rgba(25, 118, 210, 0.35)',
+                            transform: 'translateY(-2px)'
+                          },
+                          transition: 'all 0.3s'
+                        }}
+                      >
+                        {isLoading.submit ? 'Criando...' : 'Criar Controle'}
+                      </Button>
+                    </Box>
+                  </Grid>
+                </Grid>
+              </Box>
+            </CardContent>
+          </MotionCard>
+        </MotionBox>
+      </AnimatePresence>
     </Container>
   );
 };
