@@ -1,0 +1,172 @@
+functionsDirectory = "C:\\Users\\suporteEsplendor50\\CascadeProjects\\controle-carga-web\\netlify\\functions"
+functionsDirectoryOrigin = "config"
+headersOrigin = "inline"
+redirectsOrigin = "inline"
+
+[build]
+publish = "C:\\Users\\suporteEsplendor50\\CascadeProjects\\controle-carga-web\\.next"
+publishOrigin = "config"
+commandOrigin = "config"
+command = "npm run build"
+functions = "C:\\Users\\suporteEsplendor50\\CascadeProjects\\controle-carga-web\\netlify\\functions"
+
+[build.environment]
+NODE_VERSION = "20.x"
+NPM_FLAGS = "--legacy-peer-deps"
+NEXT_TELEMETRY_DISABLED = "1"
+
+[build.processing]
+
+[build.processing.css]
+
+[build.processing.html]
+
+[build.processing.images]
+
+[build.processing.js]
+
+[build.services]
+
+[images]
+remote_images = ["^(?:http(?:s)?:\\/\\/localhost(?:\\/(?!\\.)(?:(?:(?!(?:^|\\/)\\.).)*?)|$))$", "^(?:http(?:s)?:\\/\\/gestaologistica\\.netlify\\.app(?:\\/(?!\\.)(?:(?:(?!(?:^|\\/)\\.).)*?)|$))$", "^(?:http(?:s)?:\\/\\/api\\.controle-carga\\.com(?:\\/(?!\\.)(?:(?:(?!(?:^|\\/)\\.).)*?)|$))$"]
+
+[functions]
+
+[functions."*"]
+included_files = ["prisma/**/*.prisma", ".env.netlify", ".env", ".env.production", ".env.local", ".env.production.local"]
+external_node_modules = ["@prisma/client", "@prisma/adapter-pg"]
+node_bundler = "esbuild"
+
+[[plugins]]
+origin = "config"
+package = "@netlify/plugin-nextjs"
+pinned_version = "5"
+
+[plugins.inputs]
+
+[[headers]]
+for = "/.netlify/functions/api/*"
+
+[headers.values]
+Access-Control-Allow-Origin = "*"
+Access-Control-Allow-Credentials = "true"
+Access-Control-Allow-Methods = "GET, POST, PUT, DELETE, OPTIONS"
+Access-Control-Allow-Headers = "Content-Type, Authorization, X-Requested-With"
+
+[[headers]]
+for = "/*"
+
+[headers.values]
+X-Frame-Options = "DENY"
+X-Content-Type-Options = "nosniff"
+X-XSS-Protection = "1; mode=block"
+Referrer-Policy = "strict-origin-when-cross-origin"
+Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+for = "/_next/static/*"
+
+[headers.values]
+Cache-Control = "public, max-age=31536000, immutable"
+
+[[redirects]]
+from = "/api/auth/*"
+to = "/.netlify/functions/api/auth/:splat"
+status = 200.0
+force = true
+
+[redirects.query]
+
+[redirects.conditions]
+
+[redirects.headers]
+
+[[redirects]]
+from = "/api/configuracoes/*"
+to = "/.netlify/functions/api/configuracoes/:splat"
+status = 200.0
+force = true
+
+[redirects.query]
+
+[redirects.conditions]
+
+[redirects.headers]
+
+[[redirects]]
+from = "/api/controles/*"
+to = "/.netlify/functions/api/controles/:splat"
+status = 200.0
+force = true
+
+[redirects.query]
+
+[redirects.conditions]
+
+[redirects.headers]
+
+[[redirects]]
+from = "/api/usuarios/*"
+to = "/.netlify/functions/api/usuarios/:splat"
+status = 200.0
+force = true
+
+[redirects.query]
+
+[redirects.conditions]
+
+[redirects.headers]
+
+[[redirects]]
+from = "/api/*"
+to = "/.netlify/functions/api/:splat"
+status = 200.0
+force = true
+
+[redirects.query]
+
+[redirects.conditions]
+
+[redirects.headers]
+
+[[redirects]]
+from = "/*"
+to = "/index.html"
+status = 200.0
+force = false
+
+[redirects.query]
+
+[redirects.conditions]
+
+[redirects.headers]
+
+[[redirects]]
+from = "/_next/image"
+to = "/.netlify/images?url=:url&w=:width&q=:quality"
+status = 200.0
+force = false
+
+[redirects.query]
+url = ":url"
+w = ":width"
+q = ":quality"
+
+[redirects.conditions]
+
+[redirects.headers]
+
+[[redirects]]
+from = "/_ipx/*"
+to = "/.netlify/images?url=:url&w=:width&q=:quality"
+status = 200.0
+force = false
+
+[redirects.query]
+url = ":url"
+w = ":width"
+q = ":quality"
+
+[redirects.conditions]
+
+[redirects.headers]
