@@ -15,7 +15,7 @@ console.log('⚠️  Este script NÃO modificará o banco de dados existente');
 try {
   // 1. Gerar Prisma Client (sem modificar banco)
   console.log('\n📦 Gerando Prisma Client...');
-  execSync('node scripts/prisma/generate.js', { stdio: 'inherit' });
+  execSync('npx prisma generate', { stdio: 'inherit' });
   
   // 2. Verificar se .env existe
   const envPath = path.join(__dirname, '.env');
