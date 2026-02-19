@@ -1,5 +1,6 @@
 import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
+import '../styles/globals.css';
 import Alert from '@mui/material/Alert';
 import { alpha } from '@mui/material/styles';
 import { useTheme } from '@mui/material/styles';
@@ -54,11 +55,11 @@ const StyledMaterialDesignContent = styled(MaterialDesignContent)(({ theme }) =>
     },
   },
 }));
-import Layout from '../components/Layout';
 import VisualPageLayout from '../components/VisualPageLayout';
 import { AuthProvider } from '../contexts/AuthContext';
 import { ConfiguracaoProvider } from '../contexts/ConfiguracaoContext';
 import ProtectedRoute from '../components/ProtectedRoute';
+import { AppLayout } from '../components/layout/AppLayout';
 
 // Lista de rotas públicas que não requerem autenticação
 const publicRoutes = ['/login', '/esqueci-senha', '/cadastro'];
@@ -89,16 +90,14 @@ function MyApp({ Component, pageProps }: AppProps) {
 
     const Comp: any = Component as any;
 
-    // Se a página optar por desabilitar o layout visual global, mantém o comportamento antigo
-    if (Comp.disableVisualLayout) {
+    if (Comp.usesAppLayout) {
       return (
         <ProtectedRoute>
-          <Layout>{page}</Layout>
+          {page}
         </ProtectedRoute>
       );
     }
 
-    // Derivar título simples a partir da rota (ex: /materiais/cadastro -> Materiais / Cadastro)
     const path = router.pathname === '/'
       ? 'Início'
       : router.pathname
@@ -111,11 +110,9 @@ function MyApp({ Component, pageProps }: AppProps) {
 
     return (
       <ProtectedRoute>
-        <Layout>
-          <VisualPageLayout title={path}>
-            {page}
-          </VisualPageLayout>
-        </Layout>
+        <AppLayout title={path}>
+          {page}
+        </AppLayout>
       </ProtectedRoute>
     );
   };

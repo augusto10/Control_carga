@@ -7,7 +7,6 @@ import {
   Paper,
   Alert
 } from '@mui/material';
-import Layout from '../components/Layout';
 import AssinaturaSimples from '../components/AssinaturaSimples';
 import ModalAssinaturaSimplesAlternativo from '../components/ModalAssinaturaSimplesAlternativo';
 
@@ -28,8 +27,7 @@ const TesteAssinaturaSimples: React.FC = () => {
   };
 
   return (
-    <Layout>
-      <Container maxWidth="md" sx={{ mt: 4, mb: 4 }}>
+    <Container maxWidth="md" sx={{ mt: 4, mb: 4 }}>
         <Typography variant="h4" component="h1" gutterBottom>
           Teste de Assinatura Digital
         </Typography>
@@ -102,7 +100,6 @@ const TesteAssinaturaSimples: React.FC = () => {
           onAssinaturaSalva={handleModalSave}
         />
       </Container>
-    </Layout>
   );
 };
 

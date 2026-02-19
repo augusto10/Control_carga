@@ -43,9 +43,9 @@ const CriarControlePage = () => {
 
   return (
     <ResponsiveContainer
-      breadcrumb={[
-        { label: 'Dashboard', path: '/' },
-        { label: 'Controles de Carga', path: '/listar-controles' },
+      breadcrumbs={[
+        { label: 'Dashboard', href: '/' },
+        { label: 'Controles de Carga', href: '/controles' },
         { label: 'Criar Controle' }
       ]}
     >

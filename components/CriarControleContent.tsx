@@ -10,7 +10,6 @@ import {
   FormControl,
   InputLabel,
   Select,
-  SelectChangeEvent,
   MenuItem,
   FormHelperText,
   Paper,
@@ -33,6 +32,7 @@ import {
   LinearProgress,
   alpha
 } from '@mui/material';
+import type { SelectChangeEvent } from '@mui/material';
 import { useRouter } from 'next/router';
 import { useSnackbar } from 'notistack';
 import { Transportadora, NotaFiscal } from '@prisma/client';

@@ -1,9 +1,9 @@
 import React, { useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { useSession } from 'next-auth/react';
 import { Box, CircularProgress, alpha, useTheme } from '@mui/material';
 import dynamic from 'next/dynamic';
-import ResponsiveContainer from '../components/ResponsiveContainer';
+import { AppLayout } from '@/components/layout/AppLayout';
+import { useAuth } from '@/contexts/AuthContext';
 
 // Carrega o componente de forma dinâmica para evitar problemas de SSR
 const ListarControlesContent = dynamic(
@@ -12,22 +12,21 @@ const ListarControlesContent = dynamic(
 );
 
 const ControlesPage = () => {
-  const { status, data: session } = useSession();
+  const { isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
   const [isCheckingAuth, setIsCheckingAuth] = React.useState(true);
   const theme = useTheme();
 
   useEffect(() => {
-    if (status === 'loading') return;
-    
-    if (status !== 'authenticated') {
+    if (isLoading) return;
+    if (!isAuthenticated) {
       router.push('/login');
-    } else {
-      setIsCheckingAuth(false);
+      return;
     }
-  }, [status, router]);
+    setIsCheckingAuth(false);
+  }, [isLoading, isAuthenticated, router]);
 
-  if (status === 'loading' || isCheckingAuth) {
+  if (isLoading || isCheckingAuth) {
     return (
       <Box sx={{ 
         display: 'flex', 
@@ -42,15 +41,15 @@ const ControlesPage = () => {
   }
 
   return (
-    <ResponsiveContainer
-      breadcrumb={[
-        { label: 'Dashboard', path: '/' },
-        { label: 'Controles de Carga' }
-      ]}
+    <AppLayout
+      title="Controles de Carga"
+      subtitle="Gerencie e visualize os controles de carga"
     >
       <ListarControlesContent />
-    </ResponsiveContainer>
+    </AppLayout>
   );
 };
+
+(ControlesPage as any).usesAppLayout = true;
 
 export default ControlesPage;

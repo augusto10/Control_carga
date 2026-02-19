@@ -1,84 +1,45 @@
 import { NextPage } from 'next';
 import Head from 'next/head';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { 
-  Container, 
-  Typography, 
-  Paper, 
-  Table, 
-  TableBody,
-  TableCell, 
-  TableContainer, 
-  TableHead, 
-  TableRow, 
-  Button, 
-  IconButton, 
-  TextField, 
-  Box, 
-  CircularProgress, 
-  Chip,
-  Avatar,
-  Tooltip,
-  Stack,
-  InputAdornment,
-  alpha,
-  useTheme,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  SelectChangeEvent,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  RadioGroup,
-  FormControlLabel,
-  Radio,
-  Alert,
-  Grid,
-  Card,
-  CardContent,
-  LinearProgress,
-  ToggleButton,
-  ToggleButtonGroup
-} from '@mui/material';
-import { 
-  Search as SearchIcon,
-  FilterList as FilterListIcon,
-  Refresh as RefreshIcon,
-  FirstPage as FirstPageIcon,
-  ChevronLeft as ChevronLeftIcon,
-  ChevronRight as ChevronRightIcon,
-  LastPage as LastPageIcon,
-  CalendarToday as CalendarTodayIcon,
-  LocalShipping as LocalShippingIcon,
-  Person as PersonIcon,
-  Business as BusinessIcon,
-  Receipt as ReceiptIcon,
-  CheckCircle as CheckCircleIcon,
-  Cancel as CancelIcon,
-  Download as DownloadIcon,
-  Pending as PendingIcon,
-  PictureAsPdf as PdfIcon,
-  Description as ExcelIcon,
-  TrendingUp as TrendingUpIcon,
-  CalendarMonth as CalendarMonthIcon,
-  Article as ArticleIcon
-} from '@mui/icons-material';
-import { motion } from 'framer-motion';
-import { useAuth } from '../../../contexts/AuthContext';
+  Search, 
+  Filter, 
+  RefreshCw, 
+  ChevronLeft, 
+  ChevronRight, 
+  ChevronsLeft, 
+  ChevronsRight,
+  Calendar,
+  Truck,
+  User,
+  Building2,
+  Receipt,
+  TrendingUp,
+  Download,
+  FileSpreadsheet,
+  FileText,
+  Clock,
+  MapPin,
+  CheckCircle2,
+  XCircle,
+  AlertCircle,
+  ShoppingCart
+} from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 import { format, parse, parseISO, subDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import * as XLSX from 'xlsx';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
-import VisualPageLayout from '../../../components/VisualPageLayout';
-import AdminRoute from '../../../components/AdminRoute';
-import { useSnackbar } from 'notistack';
-
-const MotionPaper = motion(Paper);
-const MotionTableRow = motion(TableRow);
-const MotionCard = motion(Card);
+import { AppLayout } from '@/components/layout/AppLayout';
+import { Card, CardHeader } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { Badge } from '@/components/ui/Badge';
+import { SearchInput } from '@/components/ui/SearchInput';
+import { Modal } from '@/components/ui/Modal';
+import { cn } from '@/utils/cn';
+import { Label } from '@/components/ui/Label';
+import { Input } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Select';
 
 interface Pedido {
   ORCAMENTO_ID: number;
@@ -87,9 +48,11 @@ interface Pedido {
   DATA_HORA_CADASTRO: string;
   DATA_HORA_RECEBIMENTO: string | null;
   LOGRADOURO_ENTREGA: string | null;
+  COMPLEMENTO_ENTREGA: string | null;
   BAIRRO_ENTREGA_ID: number | null;
   CEP_ENTREGA: string | null;
   CEP_CONS_FINAL: string | null;
+  CEP?: string | null;
   VALOR_PEDIDO: number;
   TIPO_ENTREGA: string;
   VENDEDOR_NOME: string;
@@ -100,14 +63,15 @@ interface Pedido {
   SEPARADO_PARA_RECEBIMENTO: string | null;
   ENTREGA_POR_TRANSPORTADORA: string | null;
   NUMERO_NOTA?: string | null;
-  // Campos possíveis da API externa que podem conter datas
-  DATA_PEDIDO?: string;
-  DATA_CADASTRO?: string;
-  DATA_RECEBIMENTO?: string;
-  DATA?: string;
+  IDENTIFICACAO_NFE?: string | null;
+  NOME_BAIRRO_NOTA?: string | null;
+  NOME_CIDADE?: string | null;
+  ESTADO_DESTINO?: string | null;
+  EMPRESA_ID?: number | string;
   [key: string]: any;
 }
 
+(CicloPedidoPage as any).usesAppLayout = true;
 interface PedidosResponse {
   total: number;
   limit: number;
@@ -120,6 +84,15 @@ interface ApuracaoItem {
   NUMERO_NOTA?: string;
   DATA_EMISSAO?: string;
   IDENTIFICACAO_NFE?: string;
+  NOME_BAIRRO_NOTA?: string;
+  NOME_CIDADE?: string;
+  ESTADO_DESTINO?: string;
+  LOGRADOURO?: string;
+  COMPLEMENTO?: string;
+  CEP?: string;
+  BAIRRO?: string;
+  CIDADE?: string;
+  UF?: string;
   [key: string]: any;
 }
 
@@ -130,397 +103,521 @@ interface ApuracoesResponse {
   data: ApuracaoItem[];
 }
 
+const parseValorNumero = (v: any) => {
+  if (typeof v === 'number') return v;
+  if (typeof v === 'string') {
+    const s = v.replace(/\./g, '').replace(',', '.');
+    const n = Number(s);
+    return Number.isNaN(n) ? 0 : n;
+  }
+  return 0;
+};
+
+const pickString = (...values: Array<unknown>) => {
+  for (const value of values) {
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (trimmed) return trimmed;
+    }
+  }
+  return null;
+};
+
+const getNumeroNota = (p: Pedido) => {
+  const pAny = p as any;
+  return pickString(
+    p.NUMERO_NOTA,
+    pAny.NUMERO_NOTA_FISCAL,
+    pAny.NOTA_FISCAL_NUMERO,
+    pAny.NOTAFISCAL_NUMERO,
+    pAny.NF_NUMERO,
+    pAny.NF,
+    pAny.NUMERO_NF,
+    pAny.NUMERO_NOTA_FISCAL,
+    pAny.NOTA_FISCAL,
+    pAny.NF_NUMERO,
+    pAny.NUMERO_NF,
+    p.IDENTIFICACAO_NFE,
+    pAny.CHAVE_NFE,
+    pAny.IDENTIFICACAO,
+    pAny.NUMERO,
+    pAny.NUMERO_NOTA
+  );
+};
+
+const getEnderecoResumo = (p: Pedido) => {
+  const pAny = p as any;
+  const logradouro = pickString(
+    p.LOGRADOURO_ENTREGA,
+    pAny.LOGRADOURO,
+    pAny.RUA,
+    pAny.ENDERECO,
+    pAny.ENDERECO_ENTREGA,
+    pAny.ENDERECO_COMPLETO
+  );
+  const numero = pickString(
+    pAny.NUMERO,
+    pAny.NUMERO_ENDERECO,
+    pAny.NUMERO_ENTREGA
+  );
+  const complemento = pickString(
+    p.COMPLEMENTO_ENTREGA,
+    pAny.COMPLEMENTO,
+    pAny.COMPLEMENTO_ENTREGA
+  );
+  const bairro = pickString(
+    p.NOME_BAIRRO_NOTA,
+    pAny.BAIRRO,
+    pAny.NOME_BAIRRO,
+    pAny.BAIRRO_ENTREGA
+  );
+  const cidade = pickString(
+    p.NOME_CIDADE,
+    pAny.CIDADE,
+    pAny.CIDADE_ENTREGA,
+    pAny.MUNICIPIO
+  );
+  const uf = pickString(
+    p.ESTADO_DESTINO,
+    pAny.UF,
+    pAny.UF_ENTREGA,
+    pAny.ESTADO
+  );
+  const cep = pickString(
+    (p as any).CEP,
+    p.CEP_ENTREGA,
+    p.CEP_CONS_FINAL,
+    pAny.CEP_ENTREGA
+  );
+  const cidadeUf = [cidade, uf].filter(Boolean).join('/');
+  return [logradouro, numero, complemento, bairro, cep, cidadeUf].filter(Boolean).join(', ');
+};
+
+const parsePedidoDate = (value?: string | null) => {
+  if (!value) return null;
+  const raw = String(value).trim();
+  if (!raw) return null;
+
+  if (/^\d+$/.test(raw)) {
+    const numericDate = new Date(Number(raw));
+    if (!Number.isNaN(numericDate.getTime())) return numericDate;
+  }
+
+  if (raw.includes('T')) {
+    const isoDate = parseISO(raw);
+    if (!Number.isNaN(isoDate.getTime())) return isoDate;
+  }
+
+  const nativeDate = new Date(raw);
+  if (!Number.isNaN(nativeDate.getTime())) return nativeDate;
+
+  const formatos = [
+    'dd/MM/yyyy HH:mm:ss',
+    'dd/MM/yyyy HH:mm',
+    'dd/MM/yyyy',
+    'dd-MM-yyyy HH:mm:ss',
+    'dd-MM-yyyy HH:mm',
+    'dd-MM-yyyy',
+    'yyyy-MM-dd HH:mm:ss',
+    'yyyy-MM-dd HH:mm',
+    'yyyy-MM-dd',
+    'yyyy/MM/dd HH:mm:ss',
+    'yyyy/MM/dd HH:mm',
+    'yyyy/MM/dd'
+  ];
+
+  for (const formato of formatos) {
+    const parsedDate = parse(raw, formato, new Date());
+    if (!Number.isNaN(parsedDate.getTime())) return parsedDate;
+  }
+
+  return null;
+};
+
+const getDataReferenciaPedido = (p: Pedido, tipoData?: 'recebimento' | 'entrega') => {
+  if (tipoData === 'entrega') {
+    return parsePedidoDate(p.DATA_ENTREGA) || parsePedidoDate((p as any).data_entrega);
+  }
+
+  // Padrão ou recebimento
+  const dRec = getDataRecebimento(p);
+  if (dRec) return dRec;
+
+  // Se não tiver tipoData ou for recebimento mas não achou nada, tenta outros como fallback
+  if (!tipoData) {
+    return (
+      parsePedidoDate(p.DATA_ENTREGA) ||
+      parsePedidoDate((p as any).DATA_HORA_PEDIDO) ||
+      parsePedidoDate(p.DATA_PEDIDO as any) ||
+      parsePedidoDate(p.DATA_HORA_CADASTRO)
+    );
+  }
+
+  return null;
+};
+
+const getDataRecebimento = (p: Pedido) => {
+  const pAny = p as any;
+  return (
+    parsePedidoDate(p.DATA_HORA_RECEBIMENTO) ||
+    parsePedidoDate(pAny.data_hora_recebimento) ||
+    parsePedidoDate(p.DATA_RECEBIMENTO as any) ||
+    parsePedidoDate(pAny.data_recebimento) ||
+    parsePedidoDate(pAny.RECEBIMENTO) ||
+    parsePedidoDate(pAny.recebimento) ||
+    parsePedidoDate(pAny.DATA_HORA_RECEBIDO) ||
+    parsePedidoDate(pAny.data_hora_recebido) ||
+    parsePedidoDate(pAny.DATA_RECEBIDO) ||
+    parsePedidoDate(pAny.data_recebido) ||
+    parsePedidoDate(pAny.DATA_RECEB) ||
+    parsePedidoDate(pAny.data_receb) ||
+    parsePedidoDate(pAny.HORA_RECEBIMENTO) ||
+    parsePedidoDate(pAny.HORA_RECEB) ||
+    parsePedidoDate(pAny.DATA_HORA_ENTREGA) ||
+    parsePedidoDate(pAny.data_hora_entrega)
+  );
+};
+
+const sameDay = (d: Date, ref: Date) => {
+  return d.getFullYear() === ref.getFullYear() &&
+    d.getMonth() === ref.getMonth() &&
+    d.getDate() === ref.getDate();
+};
+
 const parseApuracaoId = (value: unknown) => {
-  if (typeof value === 'number' && !Number.isNaN(value)) {
-    return value;
-  }
+  if (typeof value === 'number' && !Number.isNaN(value)) return value;
   if (typeof value === 'string') {
     const trimmed = value.trim();
-    if (trimmed && !Number.isNaN(Number(trimmed))) {
-      return Number(trimmed);
-    }
+    if (trimmed && !Number.isNaN(Number(trimmed))) return Number(trimmed);
   }
   return null;
 };
 
-const getApuracaoId = (apuracao: ApuracaoItem) => {
-  const data = apuracao as Record<string, unknown>;
+const getApuracaoId = (a: ApuracaoItem) => {
   return (
-    parseApuracaoId(data.ORCAMENTO_BASE_ID) ??
-    parseApuracaoId(data.ORCAMENTO_ID) ??
-    parseApuracaoId(data.ORCAMENTO) ??
-    parseApuracaoId(data.ORCAMENTOBASEID) ??
-    parseApuracaoId(data.ORCAMENTO_BASE) ??
-    parseApuracaoId(data.ORCAMENTOBASE)
+    parseApuracaoId((a as any).ORCAMENTO_BASE_ID) ??
+    parseApuracaoId((a as any).ORCAMENTO_ID) ??
+    parseApuracaoId((a as any).ORCAMENTO) ??
+    parseApuracaoId((a as any).ORCAMENTOBASEID) ??
+    parseApuracaoId((a as any).ORCAMENTO_BASE) ??
+    parseApuracaoId((a as any).ORCAMENTOBASE)
   );
 };
 
-const buildApuracoesMap = (items: ApuracaoItem[]) =>
-  new Map(
-    items
-      .map((a) => {
-        const id = getApuracaoId(a);
-        return id !== null ? [id, a] : null;
-      })
-      .filter((entry): entry is [number, ApuracaoItem] => entry !== null)
-  );
-
-const parseCadastroId = (value: unknown) => {
-  if (typeof value === 'number' && !Number.isNaN(value)) {
-    return value;
-  }
-  if (typeof value === 'string') {
-    const trimmed = value.trim();
-    if (trimmed && !Number.isNaN(Number(trimmed))) {
-      return Number(trimmed);
-    }
-  }
-  return null;
-};
-
-const getCadastroIdFromApuracao = (apuracao: ApuracaoItem) => {
-  const data = apuracao as Record<string, unknown>;
-  return (
-    parseCadastroId(data.CADASTRO_ID) ??
-    parseCadastroId((data as any)?.CADASTROID) ??
-    parseCadastroId((data as any)?.CADASTRO)
-  );
-};
-
-function CicloPedidosContent() {
-  const theme = useTheme();
+export default function CicloPedidoPage() {
   const { user } = useAuth();
-  const { enqueueSnackbar } = useSnackbar();
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
-
-  const StatCard = ({ 
-    title, 
-    value, 
-    icon, 
-    color = 'primary',
-    loading: isLoading,
-    delay = 0 
-  }: { 
-    title: string; 
-    value: string | number; 
-    icon: React.ReactNode;
-    color?: 'primary' | 'secondary' | 'error' | 'info' | 'success' | 'warning';
-    loading?: boolean;
-    delay?: number;
-  }) => (
-    <MotionCard
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay, duration: 0.5 }}
-      whileHover={{ y: -5, transition: { duration: 0.2 } }}
-      sx={{
-        height: '100%',
-        borderRadius: 4,
-        background: 'rgba(255, 255, 255, 0.8)',
-        backdropFilter: 'blur(10px)',
-        border: '1px solid rgba(255, 255, 255, 0.3)',
-        boxShadow: '0 8px 32px rgba(0,0,0,0.05)',
-        overflow: 'hidden',
-        position: 'relative'
-      }}
-    >
-      <Box sx={{ 
-        position: 'absolute', 
-        top: 0, 
-        left: 0, 
-        width: '4px', 
-        height: '100%', 
-        bgcolor: `${color}.main` 
-      }} />
-      <CardContent sx={{ p: 3 }}>
-        {isLoading ? (
-          <Box sx={{ width: '100%', mt: 2 }}>
-            <LinearProgress sx={{ borderRadius: 1 }} />
-          </Box>
-        ) : (
-          <Stack spacing={2}>
-            <Box display="flex" justifyContent="space-between" alignItems="flex-start">
-              <Box>
-                <Typography variant="overline" color="text.secondary" fontWeight="700" sx={{ letterSpacing: 1 }}>
-                  {title}
-                </Typography>
-                <Typography variant="h3" component="div" fontWeight="800" sx={{ color: '#1e293b', mt: 0.5 }}>
-                  {value}
-                </Typography>
-              </Box>
-              <Avatar 
-                sx={{ 
-                  backgroundColor: alpha(theme.palette[color].main, 0.1), 
-                  color: `${color}.main`,
-                  width: 56,
-                  height: 56,
-                  borderRadius: 3
-                }}
-              >
-                {icon}
-              </Avatar>
-            </Box>
-            <Box display="flex" alignItems="center" gap={0.5}>
-              <TrendingUpIcon sx={{ fontSize: 16, color: 'success.main' }} />
-              <Typography variant="caption" color="success.main" fontWeight="600">
-                Acompanhamento em tempo real
-              </Typography>
-            </Box>
-          </Stack>
-        )}
-      </CardContent>
-    </MotionCard>
-  );
-
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const pedidosRequestId = useRef(0);
+  const statsRequestId = useRef(0);
   
   // Filtros
   const [filtroPeriodo, setFiltroPeriodo] = useState('hoje');
   const [filtroEntrega, setFiltroEntrega] = useState('entrega_fechados');
-  const [openFiltros, setOpenFiltros] = useState(false);
+  const [tipoData, setTipoData] = useState<'recebimento' | 'entrega'>('recebimento');
   const [dataInicio, setDataInicio] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [dataFim, setDataFim] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const anoAtual = new Date().getFullYear();
+  const [anoSelecionado, setAnoSelecionado] = useState(String(anoAtual));
+  const anosDisponiveis = useMemo(() => {
+    return Array.from({ length: 6 }, (_, i) => anoAtual - i);
+  }, [anoAtual]);
   
+  // Resumo
   // Resumo
   const [stats, setStats] = useState({
     hoje: 0,
     mes: 0,
     valorHoje: 0,
     valorMes: 0,
+    notasHoje: 0,
+    controlesHoje: 0,
     loading: false
   });
 
-  const parseValorNumero = (v: any) => {
-    if (typeof v === 'number') return v;
-    if (typeof v === 'string') {
-      const s = v.replace(/\./g, '').replace(',', '.');
-      const n = Number(s);
-      return Number.isNaN(n) ? 0 : n;
-    }
-    return 0;
-  };
-  
   // Paginação
   const [paginaAtual, setPaginaAtual] = useState(1);
   const [totalPedidos, setTotalPedidos] = useState(0);
-  const [totalPaginas, setTotalPaginas] = useState(0);
-  const pedidosPorPagina = 100;
-  
-  // Exportação
-  const [openExportDialog, setOpenExportDialog] = useState(false);
-  const [exportType, setExportType] = useState<'pdf' | 'excel'>('pdf');
-  const [exportScope, setExportScope] = useState<'current' | 'all'>('current');
+  const pedidosPorPagina = 50;
+  const totalPaginas = Math.ceil(totalPedidos / pedidosPorPagina) || 1;
 
-  // Detalhes do pedido (bairro e cidade)
-  const [detalhesPedido, setDetalhesPedido] = useState<Record<string, { bairro: string; cidade: string; estado?: string }>>({});
-  const [carregandoDetalhes, setCarregandoDetalhes] = useState<Record<string, boolean>>({});
-  
-  // Modal de detalhes do pedido
-  const [openDetalhesModal, setOpenDetalhesModal] = useState(false);
+  const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({ show: false, message: '', type: 'success' });
   const [pedidoSelecionado, setPedidoSelecionado] = useState<Pedido | null>(null);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ show: true, message, type });
+    setTimeout(() => setToast(prev => ({ ...prev, show: false })), 3000);
+  };
 
   const getPeriodoConfig = () => {
+    const hoje = new Date();
     if (filtroPeriodo === 'hoje') {
-      const hoje = new Date();
       const dataFormatada = format(hoje, 'yyyy-MM-dd');
-      return {
-        label: 'Hoje',
-        inicio: dataFormatada,
-        fim: dataFormatada
-      };
+      return { label: 'Hoje', inicio: dataFormatada, fim: dataFormatada };
     }
     if (filtroPeriodo === 'ontem') {
-      const ontem = subDays(new Date(), 1);
+      const ontem = subDays(hoje, 1);
       const dataFormatada = format(ontem, 'yyyy-MM-dd');
-      return {
-        label: 'Ontem',
-        inicio: dataFormatada,
-        fim: dataFormatada
-      };
+      return { label: 'Ontem', inicio: dataFormatada, fim: dataFormatada };
     }
     if (filtroPeriodo === 'semana') {
-      const inicioSemana = subDays(new Date(), 7);
-      const inicioFormatada = format(inicioSemana, 'yyyy-MM-dd');
-      const fimFormatada = format(new Date(), 'yyyy-MM-dd');
-      return {
-        label: 'Última semana',
-        inicio: inicioFormatada,
-        fim: fimFormatada
-      };
+      const inicioSemana = subDays(hoje, 7);
+      return { label: 'Última semana', inicio: format(inicioSemana, 'yyyy-MM-dd'), fim: format(hoje, 'yyyy-MM-dd') };
     }
     if (filtroPeriodo === 'mes') {
-      const primeiroDiaMes = format(new Date(new Date().getFullYear(), new Date().getMonth(), 1), 'yyyy-MM-dd');
-      const fimFormatada = format(new Date(), 'yyyy-MM-dd');
-      return {
-        label: 'Este mês',
-        inicio: primeiroDiaMes,
-        fim: fimFormatada
-      };
+      const primeiroDiaMes = format(new Date(hoje.getFullYear(), hoje.getMonth(), 1), 'yyyy-MM-dd');
+      const ultimoDiaMes = format(new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0), 'yyyy-MM-dd');
+      return { label: 'Este mês', inicio: primeiroDiaMes, fim: ultimoDiaMes };
     }
-    return {
-      label: 'Personalizado',
-      inicio: dataInicio,
-      fim: dataFim
-    };
+    if (filtroPeriodo === 'ano') {
+      const ano = Number(anoSelecionado) || hoje.getFullYear();
+      const inicioAno = format(new Date(ano, 0, 1), 'yyyy-MM-dd');
+      const fimAno = format(new Date(ano, 11, 31), 'yyyy-MM-dd');
+      return { label: `Ano ${ano}`, inicio: inicioAno, fim: fimAno };
+    }
+    if (filtroPeriodo === 'personalizado') {
+      return { label: 'Personalizado', inicio: dataInicio, fim: dataFim };
+    }
+    return { label: 'Tudo', inicio: '', fim: '' };
   };
 
-  const getEntregaLabel = () => {
-    if (filtroEntrega === 'entrega_fechados') {
-      return 'Entrega e fechados (Padrão)';
-    }
-    if (filtroEntrega === 'entrega') {
-      return 'Somente entrega';
-    }
-    if (filtroEntrega === 'nao_entrega') {
-      return 'Não entrega';
-    }
-    return 'Todos';
-  };
-
-  const parsePedidoDate = (value?: string | null) => {
-    if (!value) return null;
-    const raw = String(value).trim();
-    if (!raw) return null;
-
-    if (/^\d+$/.test(raw)) {
-      const numericDate = new Date(Number(raw));
-      if (!Number.isNaN(numericDate.getTime())) return numericDate;
-    }
-
-    if (raw.includes('T')) {
-      const isoDate = parseISO(raw);
-      if (!Number.isNaN(isoDate.getTime())) return isoDate;
-    }
-
-    const nativeDate = new Date(raw);
-    if (!Number.isNaN(nativeDate.getTime())) return nativeDate;
-
-    const formatos = [
-      'dd/MM/yyyy HH:mm:ss',
-      'dd/MM/yyyy HH:mm',
-      'dd/MM/yyyy',
-      'yyyy-MM-dd HH:mm:ss',
-      'yyyy-MM-dd HH:mm',
-      'yyyy-MM-dd'
-    ];
-
-    for (const formato of formatos) {
-      const parsedDate = parse(raw, formato, new Date());
-      if (!Number.isNaN(parsedDate.getTime())) return parsedDate;
-    }
-
-    return null;
-  };
-
-  const getDataReferenciaPedido = (p: Pedido) => {
-    return (
-      parsePedidoDate(p.DATA_HORA_RECEBIMENTO) ||
-      parsePedidoDate(p.DATA_RECEBIMENTO as any) ||
-      parsePedidoDate(p.DATA_HORA_CADASTRO) ||
-      parsePedidoDate(p.DATA_CADASTRO as any) ||
-      parsePedidoDate(p.DATA_ENTREGA) ||
-      parsePedidoDate(p.DATA_PEDIDO as any) ||
-      parsePedidoDate(p.DATA as any)
-    );
-  };
-
-  const periodoAtual = getPeriodoConfig();
-  const inicioPeriodo = periodoAtual.inicio
-    ? new Date(`${periodoAtual.inicio}T00:00:00`)
-    : null;
-  const fimPeriodo = periodoAtual.fim
-    ? new Date(`${periodoAtual.fim}T23:59:59`)
-    : null;
-
-  const filteredPedidos = pedidos.filter(p => {
-    // Filtro de busca
-    const searchMatch = 
-      (p.CLIENTE_NOME || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (p.NOME_FANTASIA || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (p.VENDEDOR_NOME || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.ORCAMENTO_ID.toString().includes(searchTerm);
-
-    // Filtro de entrega e status
-    let entregaMatch = true;
-    if (filtroEntrega === 'entrega_fechados') {
-      entregaMatch = p.TIPO_ENTREGA !== 'NDF' && p.TIPO_ENTREGA !== 'ATO' && p.PEDIDO_FECHADO === 'S';
-    } else if (filtroEntrega === 'entrega') {
-      entregaMatch = p.TIPO_ENTREGA !== 'NDF' && p.TIPO_ENTREGA !== 'ATO';
-    } else if (filtroEntrega === 'nao_entrega') {
-      entregaMatch = p.TIPO_ENTREGA === 'NDF' || p.TIPO_ENTREGA === 'ATO';
-    } else if (filtroEntrega === 'todos') {
-      entregaMatch = true;
-    }
-
-    const dataReferencia = getDataReferenciaPedido(p);
-    const dataMatch =
-      !inicioPeriodo || !fimPeriodo
-        ? true
-        : !!dataReferencia && dataReferencia >= inicioPeriodo && dataReferencia <= fimPeriodo;
-
-    return searchMatch && entregaMatch && dataMatch;
-  });
-
-  // Carregar pedidos na inicialização (apenas uma vez)
-  useEffect(() => {
-    // Carregar pedidos do dia atual quando o componente for montado
-    if (pedidos.length === 0) {
-      carregarPedidos();
-    }
-  }, []);
-
-  // Carregar pedidos quando filtros/pagina mudam
-  useEffect(() => {
-    // Só carregar automaticamente se o diálogo de filtros estiver fechado
-    // ou se a mudança for de página ou tipo de entrega (que não estão no diálogo)
-    if (!openFiltros && pedidos.length > 0) {
-      carregarPedidos();
-    }
-  }, [filtroPeriodo, filtroEntrega, paginaAtual, dataInicio, dataFim, openFiltros, pedidos.length]);
-
-  useEffect(() => {
+  const fetchAllFilteredPedidos = async () => {
     try {
-      setStats(prev => ({ ...prev, loading: true }));
-      const filtrados = filteredPedidos.filter(p => {
-        const isEntrega = p.TIPO_ENTREGA !== 'NDF' && p.TIPO_ENTREGA !== 'ATO';
-        return isEntrega;
-      });
-      const count = filtrados.length;
-      const valor = filtrados.reduce((sum, p) => {
-        const v = (p as any).VALOR_PEDIDO ?? (p as any).VALOR_TOTAL ?? (p as any).VALOR ?? 0;
-        return sum + parseValorNumero(v);
-      }, 0);
-      setStats({
-        hoje: count,
-        mes: count,
-        valorHoje: valor,
-        valorMes: valor,
-        loading: false
-      });
-    } catch {
-      setStats(prev => ({ ...prev, loading: false }));
-    }
-  }, [filteredPedidos]);
-
-  const carregarPedidos = async () => {
-    try {
-      setLoading(true);
-      
-      // Construir URL da API interna com filtros
-      const offset = (paginaAtual - 1) * pedidosPorPagina;
-      let url = `/api/pedidos/externos?limit=${pedidosPorPagina}&offset=${offset}`;
       const periodo = getPeriodoConfig();
-      
-      console.log('[CicloPedidos] Carregando pedidos com período:', periodo);
-      
-      if (periodo.inicio && periodo.fim) {
-        url += `&data_inicio=${periodo.inicio}&data_fim=${periodo.fim}`;
-        console.log('[CicloPedidos] URL com datas:', url);
+      let allData: Pedido[] = [];
+      let offset = 0;
+      const limit = 100;
+      let hasMore = true;
+
+      while (hasMore) {
+        let url = `/api/pedidos/externos?limit=${limit}&offset=${offset}`;
+        
+        if (periodo.inicio) {
+          url += `&data_inicio=${periodo.inicio}`;
+        }
+        if (periodo.fim) {
+          url += `&data_fim=${periodo.fim}`;
+        }
+
+        if (filtroEntrega === 'entrega') {
+          url += '&tipo_entrega=EPG,ENT';
+        } else if (filtroEntrega === 'entrega_fechados') {
+          url += '&tipo_entrega=EPG,ENT&status=FECHADO';
+        } else if (filtroEntrega === 'nao_entrega') {
+          url += '&tipo_entrega=NDF,ATO';
+        }
+
+        if (searchTerm.trim()) {
+          url += `&search=${encodeURIComponent(searchTerm.trim())}`;
+        }
+
+        const response = await fetch(url);
+        if (!response.ok) throw new Error('Erro ao carregar dados para exportação');
+        const data: PedidosResponse = await response.json();
+        
+        if (data.data && data.data.length > 0) {
+          allData = [...allData, ...data.data];
+          offset += limit;
+          hasMore = allData.length < data.total;
+        } else {
+          hasMore = false;
+        }
+
+        // Safety break to prevent infinite loops if API is misbehaving
+        if (allData.length >= 10000) {
+          console.warn('Limite de segurança de 10.000 registros atingido na exportação.');
+          hasMore = false;
+        }
       }
 
-      // Adicionar filtro de tipo de entrega
+      // Buscar apurações para enriquecer os dados
+      // Usar um range de datas amplo para pegar todas as apurações relevantes
+      // IMPORTANTE: A API externa tem limite de ~100 registros por vez
+      const apuracoesUrl = new URL('/api/apuracoes', window.location.origin);
+      apuracoesUrl.searchParams.set('limit', '1000'); // Reduzido de 10000 para 1000
+      apuracoesUrl.searchParams.set('offset', '0');
+      // Usar um range de 5 anos para trás até hoje
+      const hoje = new Date();
+      const cincoAnosAtras = new Date();
+      cincoAnosAtras.setFullYear(hoje.getFullYear() - 5);
+      apuracoesUrl.searchParams.set('data_inicio', format(cincoAnosAtras, 'yyyy-MM-dd'));
+      apuracoesUrl.searchParams.set('data_fim', format(hoje, 'yyyy-MM-dd'));
+
+      const apResp = await fetch(apuracoesUrl.toString(), { headers: { accept: 'application/json' }, cache: 'no-store' });
+      let apMap = new Map<number, ApuracaoItem>();
+      if (apResp.ok) {
+        const apData: ApuracoesResponse = await apResp.json();
+        apMap = new Map(
+          (apData.data || [])
+            .map(a => {
+              const id = getApuracaoId(a);
+              return id !== null ? [id, a] : null;
+            })
+            .filter((x): x is [number, ApuracaoItem] => !!x)
+        );
+      }
+
+      // Enriquecer pedidos com dados das apurações (se disponíveis)
+      const enriquecidos = allData.map(p => {
+        const ap = apMap.get(p.ORCAMENTO_ID);
+        const pAny = p as any;
+        const identificacaoNfe = ap?.IDENTIFICACAO_NFE ?? (ap as any)?.CHAVE_NFE ?? (ap as any)?.CHAVE ?? pAny.IDENTIFICACAO_NFE ?? pAny.CHAVE_NFE ?? null;
+        const numeroNota = ap?.NUMERO_NOTA ?? pAny.NUMERO_NOTA ?? null;
+        const bairroNota = ap?.NOME_BAIRRO_NOTA ?? ap?.BAIRRO ?? (ap as any)?.NOME_BAIRRO ?? pAny.NOME_BAIRRO_NOTA ?? pAny.BAIRRO ?? pAny.NOME_BAIRRO ?? null;
+        const cidadeNota = ap?.NOME_CIDADE ?? ap?.CIDADE ?? pAny.NOME_CIDADE ?? pAny.CIDADE ?? null;
+        const ufDestino = ap?.ESTADO_DESTINO ?? ap?.UF ?? pAny.ESTADO_DESTINO ?? pAny.UF ?? null;
+        const logradouroEntrega = pAny.LOGRADOURO_ENTREGA ?? ap?.LOGRADOURO ?? (ap as any)?.LOGRADOURO_ENTREGA ?? (ap as any)?.ENDERECO ?? pAny.LOGRADOURO ?? pAny.ENDERECO ?? null;
+        const complementoEntrega = pAny.COMPLEMENTO_ENTREGA ?? ap?.COMPLEMENTO ?? pAny.COMPLEMENTO ?? null;
+        const cepEntrega = ap?.CEP ?? pAny.CEP ?? pAny.CEP_ENTREGA ?? pAny.CEP_CONS_FINAL ?? null;
+
+        return {
+          ...p,
+          IDENTIFICACAO_NFE: identificacaoNfe,
+          NUMERO_NOTA: numeroNota,
+          NOME_BAIRRO_NOTA: bairroNota,
+          NOME_CIDADE: cidadeNota,
+          ESTADO_DESTINO: ufDestino,
+          LOGRADOURO_ENTREGA: logradouroEntrega,
+          COMPLEMENTO_ENTREGA: complementoEntrega,
+          CEP: cepEntrega,
+        } as Pedido;
+      });
+
+      return enriquecidos;
+    } catch (error) {
+      console.error('Erro ao buscar todos os pedidos:', error);
+      throw error;
+    }
+  };
+
+  const exportToExcel = async () => {
+    try {
+      showToast('Preparando Excel...', 'success');
+      const allData = await fetchAllFilteredPedidos();
+      
+      const dataToExport = allData.map(p => ({
+        'ID Pedido': p.ORCAMENTO_ID,
+        'Nota': getNumeroNota(p) || 'Pendente',
+        'Cliente': p.CLIENTE_NOME,
+        'Vendedor': p.VENDEDOR_NOME,
+        'Data': getDataReferenciaPedido(p, tipoData) ? format(getDataReferenciaPedido(p, tipoData)!, 'dd/MM/yyyy HH:mm') : '---',
+        'Tipo Entrega': p.TIPO_ENTREGA,
+        'Valor': parseValorNumero(p.VALOR_PEDIDO),
+        'Status': p.CANCELADO === 'S' ? 'Cancelado' : p.PEDIDO_FECHADO === 'S' ? 'Fechado' : 'Aberto'
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(dataToExport);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Pedidos');
+      XLSX.writeFile(wb, `pedidos_${format(new Date(), 'yyyyMMdd_HHmm')}.xlsx`);
+      showToast('Excel exportado com sucesso!');
+    } catch (error) {
+      console.error(error);
+      showToast('Erro ao exportar Excel', 'error');
+    }
+  };
+
+  const exportToPDF = async () => {
+    try {
+      showToast('Preparando PDF...', 'success');
+      const allData = await fetchAllFilteredPedidos();
+      
+      const pdfDoc = await PDFDocument.create();
+      const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+      const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+      
+      const drawHeader = (page: any) => {
+        const { height } = page.getSize();
+        page.drawText('Relatório de Ciclo de Pedidos', { x: 50, y: height - 50, size: 20, font: boldFont });
+        page.drawText(`Data de geração: ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, { x: 50, y: height - 80, size: 10, font });
+        
+        // Cabeçalho da tabela
+        const headerY = height - 120;
+        page.drawText('ID', { x: 50, y: headerY, size: 10, font: boldFont });
+        page.drawText('Cliente', { x: 100, y: headerY, size: 10, font: boldFont });
+        page.drawText('Data', { x: 300, y: headerY, size: 10, font: boldFont });
+        page.drawText('Valor', { x: 400, y: headerY, size: 10, font: boldFont });
+        page.drawText('Status', { x: 500, y: headerY, size: 10, font: boldFont });
+        return headerY - 20;
+      };
+
+      let page = pdfDoc.addPage();
+      let y = drawHeader(page);
+
+      allData.forEach((p, index) => {
+        if (y < 50) {
+          page = pdfDoc.addPage();
+          y = drawHeader(page);
+        }
+
+        page.drawText(String(p.ORCAMENTO_ID), { x: 50, y, size: 8, font });
+        page.drawText((p.CLIENTE_NOME || '').substring(0, 35), { x: 100, y, size: 8, font });
+        page.drawText(getDataReferenciaPedido(p, tipoData) ? format(getDataReferenciaPedido(p, tipoData)!, 'dd/MM/yyyy') : '---', { x: 300, y, size: 8, font });
+        page.drawText(new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(parseValorNumero(p.VALOR_PEDIDO)), { x: 400, y, size: 8, font });
+        page.drawText(p.CANCELADO === 'S' ? 'Cancelado' : p.PEDIDO_FECHADO === 'S' ? 'Fechado' : 'Aberto', { x: 500, y, size: 8, font });
+        y -= 15;
+      });
+
+      const pdfBytes = await pdfDoc.save();
+      const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `pedidos_${format(new Date(), 'yyyyMMdd_HHmm')}.pdf`;
+      link.click();
+      showToast('PDF exportado com sucesso!');
+    } catch (error) {
+      console.error(error);
+      showToast('Erro ao exportar PDF', 'error');
+    }
+  };
+
+  const exportarRelatorioAvancado = async () => {
+    try {
+      showToast('Gerando relatório completo...', 'success');
+      const periodo = getPeriodoConfig();
+      const params = new URLSearchParams();
+      
+      if (periodo.inicio) params.set('data_inicio', periodo.inicio);
+      if (periodo.fim) params.set('data_fim', periodo.fim);
+      params.set('tipo_data', tipoData);
+
+      if (filtroEntrega === 'entrega') {
+        params.set('tipo_entrega', 'EPG,ENT');
+      } else if (filtroEntrega === 'entrega_fechados') {
+        params.set('tipo_entrega', 'EPG,ENT');
+        params.set('status', 'FECHADO');
+      } else if (filtroEntrega === 'nao_entrega') {
+        params.set('tipo_entrega', 'NDF,ATO');
+      }
+
+      if (searchTerm.trim()) {
+        params.set('search', searchTerm.trim());
+      }
+
+      window.location.href = `/api/pedidos/exportar?${params.toString()}`;
+    } catch (error) {
+      console.error(error);
+      showToast('Erro ao exportar relatório', 'error');
+    }
+  };
+
+  const carregarPedidos = async () => {
+    const reqId = ++pedidosRequestId.current;
+    try {
+      setLoading(true);
+      const offset = (paginaAtual - 1) * pedidosPorPagina;
+      let url = `/api/pedidos/externos?limit=${pedidosPorPagina}&offset=${offset}&tipo_data=${tipoData}`;
+      const periodo = getPeriodoConfig();
+      
+      if (periodo.inicio) {
+        url += `&data_inicio=${periodo.inicio}`;
+      }
+      if (periodo.fim) {
+        url += `&data_fim=${periodo.fim}`;
+      }
+
       if (filtroEntrega === 'entrega') {
         url += '&tipo_entrega=EPG,ENT';
       } else if (filtroEntrega === 'entrega_fechados') {
@@ -529,1712 +626,737 @@ function CicloPedidosContent() {
         url += '&tipo_entrega=NDF,ATO';
       }
 
-      // Adicionar termo de busca se houver
       if (searchTerm.trim()) {
         url += `&search=${encodeURIComponent(searchTerm.trim())}`;
       }
 
-      console.log('[CicloPedidos] Buscando pedidos:', { url, periodo, filtroEntrega, searchTerm });
+      console.log('[Pedidos] Carregando URL:', url);
 
-      const response = await fetch(url, {
-        headers: {
-          'accept': 'application/json'
-        }
-      });
-
+      const response = await fetch(url, { headers: { accept: 'application/json' }, cache: 'no-store' });
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('[CicloPedidos] Erro na resposta da API:', { status: response.status, errorData });
-        throw new Error(`Erro na API: ${response.status} - ${errorData.error || response.statusText}`);
+        console.error('[Pedidos] Erro na resposta:', response.status, response.statusText);
+        throw new Error('Erro ao carregar pedidos');
       }
-
+      
       const data: PedidosResponse = await response.json();
-      
-      if ((data as any).error) {
-        console.error('[CicloPedidos] API retornou erro no corpo:', (data as any).error);
-        throw new Error((data as any).error);
-      }
-
-      const pedidosBase = data.data || [];
-      console.log(`[CicloPedidos] ${pedidosBase.length} pedidos recebidos`);
-
-      // Resto do código de enriquecimento...
-      const apuracoesUrl = new URL('/api/apuracoes', window.location.origin);
-      apuracoesUrl.searchParams.set('limit', '10000');
-      apuracoesUrl.searchParams.set('offset', '0');
-      if (periodo.inicio) apuracoesUrl.searchParams.set('data_inicio', periodo.inicio);
-      if (periodo.fim) apuracoesUrl.searchParams.set('data_fim', periodo.fim);
-
-      const apuracoesResponse = await fetch(apuracoesUrl.toString(), {
-        headers: { accept: 'application/json' }
+      if (reqId !== pedidosRequestId.current) return;
+      console.log('[Pedidos] Resposta API:', { 
+        total: data.total, 
+        count: data.data?.length,
+        periodo: getPeriodoConfig()
       });
-
-      let apuracoesMap = new Map<number, ApuracaoItem>();
-      let cadastroApuracoesMap = new Map<number, ApuracaoItem>();
-      if (apuracoesResponse.ok) {
-        const apuracoesData: ApuracoesResponse = await apuracoesResponse.json();
-        apuracoesMap = buildApuracoesMap(apuracoesData.data || []);
-        cadastroApuracoesMap = new Map(
-          (apuracoesData.data || [])
-            .map((a) => {
-              const id = getCadastroIdFromApuracao(a);
-              return id !== null ? [id, a] : null;
-            })
-            .filter((entry): entry is [number, ApuracaoItem] => entry !== null)
-        );
-        if (apuracoesMap.size === 0 && (periodo.inicio || periodo.fim)) {
-          const apuracoesFallbackUrl = new URL('/api/apuracoes', window.location.origin);
-          apuracoesFallbackUrl.searchParams.set('limit', '10000');
-          apuracoesFallbackUrl.searchParams.set('offset', '0');
-          const apuracoesFallbackResponse = await fetch(apuracoesFallbackUrl.toString(), {
-            headers: { accept: 'application/json' }
-          });
-          if (apuracoesFallbackResponse.ok) {
-            const apuracoesFallbackData: ApuracoesResponse = await apuracoesFallbackResponse.json();
-            apuracoesMap = buildApuracoesMap(apuracoesFallbackData.data || []);
-            cadastroApuracoesMap = new Map(
-              (apuracoesFallbackData.data || [])
-                .map((a) => {
-                  const id = getCadastroIdFromApuracao(a);
-                  return id !== null ? [id, a] : null;
-                })
-                .filter((entry): entry is [number, ApuracaoItem] => entry !== null)
-            );
-          }
-        }
-      }
-
-      const periodoInicioDate = periodo.inicio ? new Date(`${periodo.inicio}T00:00:00`) : null;
-      const periodoFimDate = periodo.fim ? new Date(`${periodo.fim}T23:59:59`) : null;
-      let pedidosParaExibir = pedidosBase;
-      let totalFiltradoGlobal = data.total || pedidosParaExibir.length;
-
-      if ((pedidosParaExibir.length === 0 || (data.total || 0) === 0) && (periodo.inicio || periodo.fim)) {
-        let urlAll = `/api/pedidos/externos?limit=10000&offset=0`;
-        if (filtroEntrega === 'entrega') {
-          urlAll += '&tipo_entrega=EPG,ENT';
-        } else if (filtroEntrega === 'entrega_fechados') {
-          urlAll += '&tipo_entrega=EPG,ENT&status=FECHADO';
-        } else if (filtroEntrega === 'nao_entrega') {
-          urlAll += '&tipo_entrega=NDF,ATO';
-        }
-        if (searchTerm.trim()) {
-          urlAll += `&search=${encodeURIComponent(searchTerm.trim())}`;
-        }
-        const respAll = await fetch(urlAll, { headers: { accept: 'application/json' } });
-        if (respAll.ok) {
-          const dataAll: PedidosResponse = await respAll.json();
-          const arr = dataAll.data || [];
-          const filtrados = arr.filter((p) => {
-            const searchMatch = 
-              (p.CLIENTE_NOME || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-              (p.NOME_FANTASIA || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-              (p.VENDEDOR_NOME || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-              p.ORCAMENTO_ID.toString().includes(searchTerm);
-            let entregaMatch = true;
-            if (filtroEntrega === 'entrega_fechados') {
-              entregaMatch = p.TIPO_ENTREGA !== 'NDF' && p.TIPO_ENTREGA !== 'ATO' && p.PEDIDO_FECHADO === 'S';
-            } else if (filtroEntrega === 'entrega') {
-              entregaMatch = p.TIPO_ENTREGA !== 'NDF' && p.TIPO_ENTREGA !== 'ATO';
-            } else if (filtroEntrega === 'nao_entrega') {
-              entregaMatch = p.TIPO_ENTREGA === 'NDF' || p.TIPO_ENTREGA === 'ATO';
-            } else if (filtroEntrega === 'todos') {
-              entregaMatch = true;
-            }
-            const dataReferencia = getDataReferenciaPedido(p as any);
-            const dataMatch =
-              !periodoInicioDate || !periodoFimDate
-                ? true
-                : !!dataReferencia && dataReferencia >= periodoInicioDate && dataReferencia <= periodoFimDate;
-            return searchMatch && entregaMatch && dataMatch;
-          });
-          totalFiltradoGlobal = filtrados.length;
-          pedidosParaExibir = filtrados.slice(offset, offset + pedidosPorPagina);
-        }
-      }
-
-      const pedidosEnriquecidos = pedidosParaExibir.map((p) => {
-        const apuracao = apuracoesMap.get(p.ORCAMENTO_ID) || cadastroApuracoesMap.get(p.CADASTRO_ID);
-        const valorBruto = (p as any).VALOR_PEDIDO ?? (p as any).VALOR_TOTAL ?? (p as any).VALOR ?? 0;
-        const valorNumerico = parseValorNumero(valorBruto);
-        if (!apuracao) {
-          return { ...p, VALOR_PEDIDO: valorNumerico };
-        }
-        return { ...p, VALOR_PEDIDO: valorNumerico, NUMERO_NOTA: apuracao.NUMERO_NOTA ?? null };
+      
+      const base = (data.data || []).slice().sort((a, b) => {
+        const da = getDataReferenciaPedido(a, tipoData)?.getTime() ?? 0;
+        const db = getDataReferenciaPedido(b, tipoData)?.getTime() ?? 0;
+        return da - db;
       });
-
-      setPedidos(pedidosEnriquecidos);
-      setTotalPedidos(totalFiltradoGlobal);
-      setTotalPaginas(Math.ceil((totalFiltradoGlobal) / pedidosPorPagina));
-      setError(null);
-
-      // Buscar dados de endereço automaticamente para todos os pedidos
-      if (pedidosEnriquecidos.length > 0) {
-        buscarDadosEnderecoAutomatico(pedidosEnriquecidos);
-      }
-    } catch (error: unknown) {
-      console.error('[CicloPedidos] Erro ao carregar pedidos:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Erro ao carregar pedidos';
-      setError(`Erro ao carregar pedidos: ${errorMessage}`);
-      enqueueSnackbar(errorMessage, { variant: 'error' });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleRefresh = () => {
-    carregarPedidos();
-  };
-
-  const handleFiltroPeriodoChange = (event: SelectChangeEvent) => {
-    const value = event.target.value;
-    setFiltroPeriodo(value);
-    
-    // Atualizar datas para corresponder ao período selecionado
-    const hoje = new Date();
-    if (value === 'hoje') {
-      const hojeFormatado = format(hoje, 'yyyy-MM-dd');
-      setDataInicio(hojeFormatado);
-      setDataFim(hojeFormatado);
-    } else if (value === 'ontem') {
-      const ontemFormatado = format(subDays(hoje, 1), 'yyyy-MM-dd');
-      setDataInicio(ontemFormatado);
-      setDataFim(ontemFormatado);
-    } else if (value === 'semana') {
-      setDataInicio(format(subDays(hoje, 7), 'yyyy-MM-dd'));
-      setDataFim(format(hoje, 'yyyy-MM-dd'));
-    } else if (value === 'mes') {
-      const primeiroDiaMes = format(new Date(hoje.getFullYear(), hoje.getMonth(), 1), 'yyyy-MM-dd');
-      setDataInicio(primeiroDiaMes);
-      setDataFim(format(hoje, 'yyyy-MM-dd'));
-    }
-  };
-
-  const handleFiltroEntregaChange = (event: SelectChangeEvent) => {
-    setFiltroEntrega(event.target.value);
-  };
-
-  const aplicarFiltros = () => {
-    console.log('[CicloPedidos] Aplicando filtros:', {
-      filtroPeriodo,
-      filtroEntrega,
-      dataInicio,
-      dataFim,
-      searchTerm
-    });
-    
-    // Se for filtro personalizado, garantir que temos datas válidas
-    if (filtroPeriodo === 'personalizado') {
-      if (!dataInicio || !dataFim) {
-        enqueueSnackbar('Por favor, selecione as datas de início e fim para o filtro personalizado', { variant: 'warning' });
-        return;
-      }
       
-      // Validar se data início é menor ou igual à data fim
-      const dataInicioDate = new Date(dataInicio);
-      const dataFimDate = new Date(dataFim);
-      
-      if (dataInicioDate > dataFimDate) {
-        enqueueSnackbar('A data de início deve ser menor ou igual à data de fim', { variant: 'warning' });
-        return;
-      }
-      
-      console.log('[CicloPedidos] Aplicando filtro personalizado:', { dataInicio, dataFim });
-    }
-    
-    // Log do período atual para debug
-    const periodo = getPeriodoConfig();
-    console.log('[CicloPedidos] Período configurado:', periodo);
-    
-    setPaginaAtual(1); // Resetar para primeira página
-    carregarPedidos();
-    setOpenFiltros(false);
-  };
-
-  // Função para buscar detalhes do pedido (bairro e cidade)
-  const buscarDadosEnderecoAutomatico = async (pedidos: Pedido[]) => {
-    // Buscar dados de endereço para pedidos que não têm os campos de bairro/cidade
-    const pedidosParaBuscar = pedidos.filter(p => 
-      !detalhesPedido[p.ORCAMENTO_ID.toString()] && 
-      p.TIPO_ENTREGA !== 'NDF' && 
-      p.TIPO_ENTREGA !== 'ATO'
-    );
-
-    if (pedidosParaBuscar.length === 0) return;
-
-    try {
-      // Buscar apurações com os dados de endereço
-      const periodo = getPeriodoConfig();
-      const apuracoesUrl = new URL('/api/apuracoes', window.location.origin);
-      apuracoesUrl.searchParams.set('limit', '10000');
-      apuracoesUrl.searchParams.set('offset', '0');
-      if (periodo.inicio) apuracoesUrl.searchParams.set('data_inicio', periodo.inicio);
-      if (periodo.fim) apuracoesUrl.searchParams.set('data_fim', periodo.fim);
-
-      const apuracoesResponse = await fetch(apuracoesUrl.toString(), {
-        headers: { accept: 'application/json' }
-      });
-
-      if (apuracoesResponse.ok) {
-        const apuracoesData: ApuracoesResponse = await apuracoesResponse.json();
-        let apuracoesMap = buildApuracoesMap(apuracoesData.data || []);
-        let cadastroApuracoesMap = new Map<number, ApuracaoItem>(
-          (apuracoesData.data || [])
-            .map((a) => {
-              const id = getCadastroIdFromApuracao(a);
-              return id !== null ? [id, a] : null;
-            })
-            .filter((entry): entry is [number, ApuracaoItem] => entry !== null)
-        );
-        if (apuracoesMap.size === 0 && (periodo.inicio || periodo.fim)) {
-          const apuracoesFallbackUrl = new URL('/api/apuracoes', window.location.origin);
-          apuracoesFallbackUrl.searchParams.set('limit', '10000');
-          apuracoesFallbackUrl.searchParams.set('offset', '0');
-          const apuracoesFallbackResponse = await fetch(apuracoesFallbackUrl.toString(), {
-            headers: { accept: 'application/json' }
-          });
-          if (apuracoesFallbackResponse.ok) {
-            const apuracoesFallbackData: ApuracoesResponse = await apuracoesFallbackResponse.json();
-            apuracoesMap = buildApuracoesMap(apuracoesFallbackData.data || []);
-            cadastroApuracoesMap = new Map<number, ApuracaoItem>(
-              (apuracoesFallbackData.data || [])
-                .map((a) => {
-                  const id = getCadastroIdFromApuracao(a);
-                  return id !== null ? [id, a] : null;
-                })
-                .filter((entry): entry is [number, ApuracaoItem] => entry !== null)
-            );
-          }
-        }
-
-        const novosDetalhes: Record<string, { bairro: string; cidade: string; estado?: string }> = {};
-        pedidosParaBuscar.forEach(p => {
-          const apuracao = apuracoesMap.get(p.ORCAMENTO_ID) || cadastroApuracoesMap.get(p.CADASTRO_ID);
-          novosDetalhes[p.ORCAMENTO_ID.toString()] = {
-            bairro: (apuracao as any)?.NOME_BAIRRO_NOTA ?? 'Não informado',
-            cidade: (apuracao as any)?.NOME_CIDADE ?? 'Não informado',
-            estado: (apuracao as any)?.ESTADO_DESTINO ?? 'Não informado'
-          };
+      // Log de amostra dos dados brutos da API
+      if (base.length > 0) {
+        console.log('[Pedidos] Amostra de pedido da API:', {
+          ORCAMENTO_ID: base[0].ORCAMENTO_ID,
+          IDENTIFICACAO_NFE: base[0].IDENTIFICACAO_NFE,
+          NUMERO_NOTA: (base[0] as any).NUMERO_NOTA,
+          NOME_BAIRRO_NOTA: (base[0] as any).NOME_BAIRRO_NOTA,
+          NOME_CIDADE: (base[0] as any).NOME_CIDADE,
+          ESTADO_DESTINO: (base[0] as any).ESTADO_DESTINO,
+          LOGRADOURO_ENTREGA: base[0].LOGRADOURO_ENTREGA,
+          keys: Object.keys(base[0]).filter(k => k.includes('BAIRRO') || k.includes('CIDADE') || k.includes('ESTADO') || k.includes('LOGRADOURO') || k.includes('ENDERECO') || k.includes('NFE') || k.includes('NOTA'))
         });
-
-        if (Object.keys(novosDetalhes).length > 0) {
-          setDetalhesPedido(prev => ({ ...prev, ...novosDetalhes }));
-        }
       }
-    } catch (error) {
-      console.error('[CicloPedidos] Erro ao buscar dados de endereço automaticamente:', error);
-    }
-  };
 
-  const abrirDetalhesModal = (pedido: Pedido) => {
-    setPedidoSelecionado(pedido);
-    setOpenDetalhesModal(true);
-  };
+      const valorTotal = (base || []).reduce((sum, p) => sum + parseValorNumero(p.VALOR_PEDIDO), 0);
+      setPedidos(base);
+      setTotalPedidos(data.total || 0);
+      setStats(prev => ({
+        ...prev,
+        hoje: base.length || 0,
+        valorHoje: valorTotal,
+      }));
 
-  const fecharDetalhesModal = () => {
-    setOpenDetalhesModal(false);
-    setPedidoSelecionado(null);
-  };
+      const statsId = ++statsRequestId.current;
+      void (async () => {
+        try {
+          const statsUrl = new URL('/api/pedidos/externos', window.location.origin);
+          statsUrl.searchParams.set('stats', '1');
+          statsUrl.searchParams.set('tipo_data', tipoData);
+          if (periodo.inicio) statsUrl.searchParams.set('data_inicio', periodo.inicio);
+          if (periodo.fim) statsUrl.searchParams.set('data_fim', periodo.fim);
+          if (filtroEntrega === 'entrega') {
+            statsUrl.searchParams.set('tipo_entrega', 'EPG,ENT');
+          } else if (filtroEntrega === 'entrega_fechados') {
+            statsUrl.searchParams.set('tipo_entrega', 'EPG,ENT');
+            statsUrl.searchParams.set('status', 'FECHADO');
+          } else if (filtroEntrega === 'nao_entrega') {
+            statsUrl.searchParams.set('tipo_entrega', 'NDF,ATO');
+          }
+          if (searchTerm.trim()) statsUrl.searchParams.set('search', searchTerm.trim());
 
-  const buscarDetalhesPedido = async (pedidoId: string) => {
-    if (detalhesPedido[pedidoId] || carregandoDetalhes[pedidoId]) {
-      return; // Já temos os detalhes ou estamos carregando
-    }
+          const statsResp = await fetch(statsUrl.toString(), { headers: { accept: 'application/json' }, cache: 'no-store' });
+          if (!statsResp.ok) return;
+          const statsData = await statsResp.json();
+          if (statsId !== statsRequestId.current) return;
+          const total = typeof statsData.total === 'number' ? statsData.total : base.length || 0;
+          const totalValor = typeof statsData.totalValor === 'number' ? statsData.totalValor : valorTotal;
+          setStats(prev => ({
+            ...prev,
+            hoje: total,
+            valorHoje: totalValor
+          }));
+        } catch (err) {
+          console.error('[Pedidos] Erro ao validar cards:', err);
+        }
+      })();
 
-    setCarregandoDetalhes(prev => ({ ...prev, [pedidoId]: true }));
-
-    try {
-      const url = `http://ec2-15-229-152-29.sa-east-1.compute.amazonaws.com/api/v1/apuracoes?limit=10&offset=0`;
-      console.log(`[CicloPedidos] Buscando detalhes do pedido ${pedidoId}:`, url);
-
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include'
+      const needsEnrich = base.some(p => {
+        const cep = (p as any).CEP || p.CEP_ENTREGA || p.CEP_CONS_FINAL;
+        return !getNumeroNota(p) || !p.NOME_BAIRRO_NOTA || !p.NOME_CIDADE || !p.ESTADO_DESTINO || !cep;
       });
 
-      if (!response.ok) {
-        throw new Error(`Erro ao buscar detalhes: ${response.status}`);
-      }
+      if (base.length > 0 && needsEnrich) {
+        void (async () => {
+          try {
+            const apuracoesUrl = new URL('/api/apuracoes', window.location.origin);
+            apuracoesUrl.searchParams.set('limit', '1000');
+            apuracoesUrl.searchParams.set('offset', '0');
+            if (periodo.inicio) apuracoesUrl.searchParams.set('data_inicio', periodo.inicio);
+            if (periodo.fim) apuracoesUrl.searchParams.set('data_fim', periodo.fim);
 
-      const data = await response.json();
-      console.log(`[CicloPedidos] Resposta da API de apurações:`, data);
+            const apResp = await fetch(apuracoesUrl.toString(), { headers: { accept: 'application/json' }, cache: 'no-store' });
+            if (!apResp.ok) return;
+            const apData: ApuracoesResponse = await apResp.json();
+            if (reqId !== pedidosRequestId.current) return;
 
-      // Procurar o pedido específico na resposta
-      if (data.results && Array.isArray(data.results)) {
-        const apuracao = data.results.find((item: any) => 
-          item.pedido_id === pedidoId || item.orcamento_id === pedidoId
-        );
+            const apMap = new Map(
+              (apData.data || [])
+                .map(a => {
+                  const id = getApuracaoId(a);
+                  return id !== null ? [id, a] : null;
+                })
+                .filter((x): x is [number, ApuracaoItem] => !!x)
+            );
 
-        if (apuracao) {
-          setDetalhesPedido(prev => ({
-            ...prev,
-            [pedidoId]: {
-              bairro: apuracao.bairro || 'Não informado',
-              cidade: apuracao.cidade || 'Não informado'
-            }
-          }));
-        } else {
-          console.warn(`[CicloPedidos] Pedido ${pedidoId} não encontrado na resposta`);
-          setDetalhesPedido(prev => ({
-            ...prev,
-            [pedidoId]: {
-              bairro: 'Não encontrado',
-              cidade: 'Não encontrado'
-            }
-          }));
-        }
-      } else {
-        console.warn('[CicloPedidos] Resposta da API não contém results array');
-        setDetalhesPedido(prev => ({
-          ...prev,
-          [pedidoId]: {
-            bairro: 'Dados não disponíveis',
-            cidade: 'Dados não disponíveis'
+            const enriquecidos = base.map(p => {
+              const ap = apMap.get(p.ORCAMENTO_ID);
+              if (!ap) return p;
+              const pAny = p as any;
+              const identificacaoNfe = ap?.IDENTIFICACAO_NFE ?? (ap as any)?.CHAVE_NFE ?? (ap as any)?.CHAVE ?? pAny.IDENTIFICACAO_NFE ?? pAny.CHAVE_NFE ?? null;
+              const numeroNota = ap?.NUMERO_NOTA ?? pAny.NUMERO_NOTA ?? null;
+              const bairroNota = ap?.NOME_BAIRRO_NOTA ?? ap?.BAIRRO ?? (ap as any)?.NOME_BAIRRO ?? pAny.NOME_BAIRRO_NOTA ?? pAny.BAIRRO ?? pAny.NOME_BAIRRO ?? null;
+              const cidadeNota = ap?.NOME_CIDADE ?? ap?.CIDADE ?? pAny.NOME_CIDADE ?? pAny.CIDADE ?? null;
+              const ufDestino = ap?.ESTADO_DESTINO ?? ap?.UF ?? pAny.ESTADO_DESTINO ?? pAny.UF ?? null;
+              const logradouroEntrega = pAny.LOGRADOURO_ENTREGA ?? ap?.LOGRADOURO ?? (ap as any)?.LOGRADOURO_ENTREGA ?? (ap as any)?.ENDERECO ?? pAny.LOGRADOURO ?? pAny.ENDERECO ?? null;
+              const complementoEntrega = pAny.COMPLEMENTO_ENTREGA ?? ap?.COMPLEMENTO ?? pAny.COMPLEMENTO ?? null;
+              const cepEntrega = ap?.CEP ?? pAny.CEP ?? pAny.CEP_ENTREGA ?? pAny.CEP_CONS_FINAL ?? null;
+
+              return {
+                ...p,
+                IDENTIFICACAO_NFE: identificacaoNfe,
+                NUMERO_NOTA: numeroNota,
+                NOME_BAIRRO_NOTA: bairroNota,
+                NOME_CIDADE: cidadeNota,
+                ESTADO_DESTINO: ufDestino,
+                LOGRADOURO_ENTREGA: logradouroEntrega,
+                COMPLEMENTO_ENTREGA: complementoEntrega,
+                CEP: cepEntrega,
+              } as Pedido;
+            });
+
+            if (reqId !== pedidosRequestId.current) return;
+            const ordenados = enriquecidos.slice().sort((a, b) => {
+              const da = getDataReferenciaPedido(a, tipoData)?.getTime() ?? 0;
+              const db = getDataReferenciaPedido(b, tipoData)?.getTime() ?? 0;
+              return da - db;
+            });
+            setPedidos(ordenados);
+          } catch (err) {
+            console.error('[Pedidos] Erro ao enriquecer apurações:', err);
           }
-        }));
+        })();
       }
     } catch (error) {
-      console.error(`[CicloPedidos] Erro ao buscar detalhes do pedido ${pedidoId}:`, error);
-      enqueueSnackbar(`Erro ao buscar detalhes do pedido: ${error instanceof Error ? error.message : 'Erro desconhecido'}`, { variant: 'error' });
+      console.error('[Pedidos] Erro:', error);
+      showToast('Erro ao carregar dados', 'error');
     } finally {
-      setCarregandoDetalhes(prev => ({ ...prev, [pedidoId]: false }));
+      if (reqId === pedidosRequestId.current) {
+        setLoading(false);
+      }
     }
   };
 
-  const limparFiltros = () => {
-    setFiltroPeriodo('hoje');
-    setFiltroEntrega('entrega_fechados');
-    setSearchTerm('');
-    setDataInicio(format(new Date(), 'yyyy-MM-dd'));
-    setDataFim(format(new Date(), 'yyyy-MM-dd'));
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      carregarPedidos();
+    }, 250);
+    return () => clearTimeout(handle);
+  }, [paginaAtual, filtroPeriodo, filtroEntrega, tipoData, dataInicio, dataFim, anoSelecionado]);
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
     setPaginaAtual(1);
     carregarPedidos();
   };
 
-  const getStatusEntrega = (tipoEntrega: string) => {
-    switch (tipoEntrega) {
-      case 'EPG':
-      case 'ENT':
-        return { label: 'Entrega', color: 'success' as const };
-      case 'NDF':
-      case 'ATO':
-        return { label: 'Não Entrega', color: 'default' as const };
-      default:
-        return { label: tipoEntrega, color: 'info' as const };
-    }
-  };
+  // Carregar métricas do mês ativo e resumo de hoje
+  useEffect(() => {
+    const carregarResumos = async () => {
+      try {
+        setStats(s => ({ ...s, loading: true }));
 
-  const formatarData = (dataString: string | null) => {
-    if (!dataString) return '-';
-    
-    try {
-      // Tenta diferentes formatos de data
-      let data: Date;
-      
-      // Se for um número (timestamp em milissegundos)
-      if (!isNaN(Number(dataString)) && dataString.length > 8) {
-        data = new Date(Number(dataString));
-      } 
-      // Se for string no formato ISO (2024-01-15T10:30:00)
-      else if (dataString.includes('T') && dataString.includes('-')) {
-        data = new Date(dataString);
-      }
-      // Se for string no formato YYYY-MM-DD ou YYYY/MM/DD
-      else if (dataString.match(/^\d{4}[-/]\d{2}[-/]\d{2}/)) {
-        const [ano, mes, dia] = dataString.split(/[-\/]/);
-        data = new Date(parseInt(ano), parseInt(mes) - 1, parseInt(dia));
-      }
-      // Se for string no formato DD/MM/YYYY ou DD-MM-YYYY
-      else if (dataString.match(/^\d{2}[-/]\d{2}[-/]\d{4}/)) {
-        const [dia, mes, ano] = dataString.split(/[-\/]/);
-        data = new Date(parseInt(ano), parseInt(mes) - 1, parseInt(dia));
-      }
-      // Se for timestamp em segundos (não milissegundos)
-      else if (!isNaN(Number(dataString)) && dataString.length <= 10) {
-        data = new Date(Number(dataString) * 1000);
-      }
-      // Outros formatos - tenta direto
-      else {
-        data = new Date(dataString);
-      }
-      
-      // Verifica se a data é válida
-      if (isNaN(data.getTime())) {
-        console.warn('Data inválida:', dataString);
-        return dataString; // Retorna original se não conseguir parse
-      }
-      
-      // Verifica se a data é muito antiga ou muito futura (indica parse errado)
-      const ano = data.getFullYear();
-      if (ano < 2000 || ano > 2050) {
-        console.warn('Data com ano suspeito:', dataString, '->', ano);
-        return dataString;
-      }
-      
-      return format(data, "dd/MM/yy HH:mm", { locale: ptBR });
-    } catch (error) {
-      console.error('Erro ao formatar data:', dataString, error);
-      return dataString;
-    }
-  };
-
-  const formatarEndereco = (logradouro: string | null, bairroId: number | null, cep: string | null) => {
-    if (!logradouro && !bairroId && !cep) return '-';
-    const partes = [];
-    if (logradouro) partes.push(logradouro);
-    if (bairroId) partes.push(`Bairro: ${bairroId}`);
-    if (cep) partes.push(`CEP: ${cep}`);
-    return partes.join(' - ');
-  };
-
-  const formatarValor = (valor: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
-    }).format(valor);
-  };
-
-  
-
-  const exportarPDF = async (escopo: 'current' | 'all' = 'current') => {
-    try {
-      let dadosParaExportar = filteredPedidos;
-      
-      if (escopo === 'all') {
-        // Carregar todos os pedidos para exportação
-        setLoading(true);
-        let url = `/api/pedidos/externos?limit=10000&offset=0`;
-        const periodoFiltro = getPeriodoConfig();
-        if (periodoFiltro.inicio && periodoFiltro.fim) {
-          url += `&data_inicio=${periodoFiltro.inicio}&data_fim=${periodoFiltro.fim}`;
-        }
-        
-        const response = await fetch(url, {
-          headers: {
-            'accept': 'application/json'
+        // Carregar resumo de hoje (Notas e Controles)
+        try {
+          const resumoHojeResp = await fetch('/api/dashboard/resumo-hoje');
+          if (resumoHojeResp.ok) {
+             const resumoHojeData = await resumoHojeResp.json();
+             setStats(s => ({ 
+               ...s, 
+               notasHoje: resumoHojeData.notasHoje || 0,
+               controlesHoje: resumoHojeData.controlesHoje || 0
+             }));
           }
-        });
-        
-        if (response.ok) {
-          const data: PedidosResponse = await response.json();
-          dadosParaExportar = data.data.filter(p => {
-            const searchMatch = 
-              (p.CLIENTE_NOME || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-              (p.NOME_FANTASIA || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-              (p.VENDEDOR_NOME || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-              p.ORCAMENTO_ID.toString().includes(searchTerm);
-            
-            let entregaMatch = true;
-            if (filtroEntrega === 'entrega_fechados') {
-              entregaMatch = p.TIPO_ENTREGA !== 'NDF' && p.TIPO_ENTREGA !== 'ATO' && p.PEDIDO_FECHADO === 'S';
-            } else if (filtroEntrega === 'entrega') {
-              entregaMatch = p.TIPO_ENTREGA !== 'NDF' && p.TIPO_ENTREGA !== 'ATO';
-            } else if (filtroEntrega === 'nao_entrega') {
-              entregaMatch = p.TIPO_ENTREGA === 'NDF' || p.TIPO_ENTREGA === 'ATO';
-            } else if (filtroEntrega === 'todos') {
-              entregaMatch = true;
-            }
-            
-            return searchMatch && entregaMatch;
-          });
+        } catch (e) {
+          console.error('Erro ao carregar resumo de hoje:', e);
         }
-        setLoading(false);
+
+        const hoje = new Date();
+        const primeiroDiaMes = format(new Date(hoje.getFullYear(), hoje.getMonth(), 1), 'yyyy-MM-dd');
+        const ultimoDiaMes = format(new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0), 'yyyy-MM-dd');
+        
+        console.log('[Resumo Mês] Buscando dados:', { primeiroDiaMes, ultimoDiaMes });
+        
+        const statsUrl = new URL('/api/pedidos/externos', window.location.origin);
+        statsUrl.searchParams.set('stats', '1');
+        statsUrl.searchParams.set('tipo_data', tipoData);
+        statsUrl.searchParams.set('data_inicio', primeiroDiaMes);
+        statsUrl.searchParams.set('data_fim', ultimoDiaMes);
+        statsUrl.searchParams.set('status', 'FECHADO');
+
+        const respMes = await fetch(statsUrl.toString(), { headers: { accept: 'application/json' }, cache: 'no-store' });
+        if (!respMes.ok) {
+          setStats(s => ({ ...s, mes: 0, valorMes: 0, loading: false }));
+          return;
+        }
+        const jsonMes = await respMes.json();
+        const total = typeof jsonMes.total === 'number' ? jsonMes.total : 0;
+        const valorMes = typeof jsonMes.totalValor === 'number' ? jsonMes.totalValor : 0;
+        setStats(s => ({ ...s, mes: total, valorMes, loading: false }));
+      } catch (err) {
+        console.error('[Resumo Mês] Erro completo:', err);
+        setStats(s => ({ ...s, mes: 0, valorMes: 0, loading: false }));
       }
-
-      const periodo = getPeriodoConfig();
-      const apuracoesUrl = new URL('/api/apuracoes', window.location.origin);
-      apuracoesUrl.searchParams.set('limit', '10000');
-      apuracoesUrl.searchParams.set('offset', '0');
-      if (periodo.inicio) apuracoesUrl.searchParams.set('data_inicio', periodo.inicio);
-      if (periodo.fim) apuracoesUrl.searchParams.set('data_fim', periodo.fim);
-
-      const apuracoesResponse = await fetch(apuracoesUrl.toString(), {
-        headers: { accept: 'application/json' }
-      });
-
-      if (apuracoesResponse.ok) {
-        const apuracoesData: ApuracoesResponse = await apuracoesResponse.json();
-        let apuracoesMap = buildApuracoesMap(apuracoesData.data || []);
-        if (apuracoesMap.size === 0 && (periodo.inicio || periodo.fim)) {
-          const apuracoesFallbackUrl = new URL('/api/apuracoes', window.location.origin);
-          apuracoesFallbackUrl.searchParams.set('limit', '10000');
-          apuracoesFallbackUrl.searchParams.set('offset', '0');
-          const apuracoesFallbackResponse = await fetch(apuracoesFallbackUrl.toString(), {
-            headers: { accept: 'application/json' }
-          });
-          if (apuracoesFallbackResponse.ok) {
-            const apuracoesFallbackData: ApuracoesResponse = await apuracoesFallbackResponse.json();
-            apuracoesMap = buildApuracoesMap(apuracoesFallbackData.data || []);
-          }
-        }
-        dadosParaExportar = dadosParaExportar.map((p) => {
-          const apuracao = apuracoesMap.get(p.ORCAMENTO_ID);
-          if (!apuracao) return p;
-          return { ...p, NUMERO_NOTA: apuracao.NUMERO_NOTA ?? null };
-        });
-      }
-      
-      const pdfDoc = await PDFDocument.create();
-      const page = pdfDoc.addPage([595, 842]); // A4
-      const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-      const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-      
-      const { width } = page.getSize();
-      let y = 800;
-      const fontSize = 10;
-      const lineHeight = 15;
-      
-      // Título
-      page.drawText('Relatório de Pedidos', {
-        x: 50,
-        y,
-        size: 18,
-        font: boldFont,
-        color: rgb(0, 0, 0),
-      });
-      y -= 30;
-      
-      page.drawText(`Período: ${periodo.inicio} a ${periodo.fim}`, {
-        x: 50,
-        y,
-        size: 12,
-        font: font,
-        color: rgb(0, 0, 0),
-      });
-      y -= 20;
-      
-      // Escopo
-      page.drawText(`Escopo: ${escopo === 'all' ? 'Todos os pedidos' : `Página ${paginaAtual}`}`, {
-        x: 50,
-        y,
-        size: 12,
-        font: font,
-        color: rgb(0, 0, 0),
-      });
-      y -= 30;
-      
-      // Cabeçalho da tabela
-      const headers = ['Nº Pedido', 'Nº Nota', 'Cliente', 'Fantasia', 'Data Recebimento', 'Endereço', 'CEP', 'Valor', 'Entrega', 'Vendedor', 'Status'];
-      const colWidths = [50, 45, 75, 55, 75, 75, 50, 50, 45, 55, 40];
-      
-      let x = 50;
-      headers.forEach((header, index) => {
-        page.drawText(header, {
-          x,
-          y,
-          size: fontSize,
-          font: boldFont,
-          color: rgb(0, 0, 0),
-        });
-        x += colWidths[index];
-      });
-      y -= lineHeight * 2;
-      
-      // Dados
-      dadosParaExportar.forEach((pedido) => {
-        if (y < 50) {
-          // Nova página
-          const newPage = pdfDoc.addPage([595, 842]);
-          y = 800;
-        }
-        
-        x = 50;
-        const rowData = [
-          pedido.ORCAMENTO_ID.toString(),
-          (pedido.NUMERO_NOTA || '').toString().substring(0, 10),
-          (pedido.CLIENTE_NOME || '').substring(0, 12),
-          (pedido.NOME_FANTASIA || '').substring(0, 10),
-          formatarData(pedido.DATA_HORA_RECEBIMENTO),
-          (pedido.LOGRADOURO_ENTREGA || '').substring(0, 12),
-          (pedido.CEP_ENTREGA || ''),
-          formatarValor(pedido.VALOR_PEDIDO),
-          getStatusEntrega(pedido.TIPO_ENTREGA).label,
-          (pedido.VENDEDOR_NOME || '').substring(0, 10),
-          pedido.PEDIDO_FECHADO === 'S' ? 'Fechado' : 'Aberto'
-        ];
-        
-        rowData.forEach((data, index) => {
-          page.drawText(data, {
-            x,
-            y,
-            size: fontSize - 1,
-            font: font,
-            color: rgb(0, 0, 0),
-          });
-          x += colWidths[index];
-        });
-        y -= lineHeight;
-      });
-      
-      const pdfBytes = await pdfDoc.save();
-      const blob = new Blob([pdfBytes as any], { type: 'application/pdf' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `pedidos_${escopo === 'all' ? 'todos' : `pagina_${paginaAtual}`}_${dataInicio}_${dataFim}.pdf`;
-      link.click();
-      URL.revokeObjectURL(url);
-      
-      enqueueSnackbar(`PDF (${escopo === 'all' ? 'todos' : 'página atual'}) exportado com sucesso!`, { variant: 'success' });
-    } catch (error) {
-      console.error('Erro ao exportar PDF:', error);
-      enqueueSnackbar('Erro ao exportar PDF', { variant: 'error' });
-    }
-  };
-
-  const exportarExcel = async (escopo: 'current' | 'all' = 'current') => {
-    try {
-      let dadosParaExportar = filteredPedidos;
-      
-      if (escopo === 'all') {
-        // Carregar todos os pedidos para exportação
-        setLoading(true);
-        let url = `/api/pedidos/externos?limit=10000&offset=0`;
-        const periodoFiltro = getPeriodoConfig();
-        if (periodoFiltro.inicio && periodoFiltro.fim) {
-          url += `&data_inicio=${periodoFiltro.inicio}&data_fim=${periodoFiltro.fim}`;
-        }
-        
-        const response = await fetch(url, {
-          headers: {
-            'accept': 'application/json'
-          }
-        });
-        
-        if (response.ok) {
-          const data: PedidosResponse = await response.json();
-          dadosParaExportar = data.data.filter(p => {
-            const searchMatch = 
-              (p.CLIENTE_NOME || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-              (p.NOME_FANTASIA || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-              (p.VENDEDOR_NOME || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-              p.ORCAMENTO_ID.toString().includes(searchTerm);
-            
-            let entregaMatch = true;
-            if (filtroEntrega === 'entrega_fechados') {
-              entregaMatch = p.TIPO_ENTREGA !== 'NDF' && p.TIPO_ENTREGA !== 'ATO' && p.PEDIDO_FECHADO === 'S';
-            } else if (filtroEntrega === 'entrega') {
-              entregaMatch = p.TIPO_ENTREGA !== 'NDF' && p.TIPO_ENTREGA !== 'ATO';
-            } else if (filtroEntrega === 'nao_entrega') {
-              entregaMatch = p.TIPO_ENTREGA === 'NDF' || p.TIPO_ENTREGA === 'ATO';
-            } else if (filtroEntrega === 'todos') {
-              entregaMatch = true;
-            }
-            
-            return searchMatch && entregaMatch;
-          });
-        }
-        setLoading(false);
-      }
-
-      const periodo = getPeriodoConfig();
-      const apuracoesUrl = new URL('/api/apuracoes', window.location.origin);
-      apuracoesUrl.searchParams.set('limit', '10000');
-      apuracoesUrl.searchParams.set('offset', '0');
-      if (periodo.inicio) apuracoesUrl.searchParams.set('data_inicio', periodo.inicio);
-      if (periodo.fim) apuracoesUrl.searchParams.set('data_fim', periodo.fim);
-
-      const apuracoesResponse = await fetch(apuracoesUrl.toString(), {
-        headers: { accept: 'application/json' }
-      });
-
-      if (apuracoesResponse.ok) {
-        const apuracoesData: ApuracoesResponse = await apuracoesResponse.json();
-        let apuracoesMap = buildApuracoesMap(apuracoesData.data || []);
-        if (apuracoesMap.size === 0 && (periodo.inicio || periodo.fim)) {
-          const apuracoesFallbackUrl = new URL('/api/apuracoes', window.location.origin);
-          apuracoesFallbackUrl.searchParams.set('limit', '10000');
-          apuracoesFallbackUrl.searchParams.set('offset', '0');
-          const apuracoesFallbackResponse = await fetch(apuracoesFallbackUrl.toString(), {
-            headers: { accept: 'application/json' }
-          });
-          if (apuracoesFallbackResponse.ok) {
-            const apuracoesFallbackData: ApuracoesResponse = await apuracoesFallbackResponse.json();
-            apuracoesMap = buildApuracoesMap(apuracoesFallbackData.data || []);
-          }
-        }
-        dadosParaExportar = dadosParaExportar.map((p) => {
-          const apuracao = apuracoesMap.get(p.ORCAMENTO_ID);
-          if (!apuracao) return p;
-          return { ...p, NUMERO_NOTA: apuracao.NUMERO_NOTA ?? null };
-        });
-      }
-      
-      const dados = dadosParaExportar.map(pedido => ({
-        'Nº Pedido': pedido.ORCAMENTO_ID,
-        'Nº Nota': pedido.NUMERO_NOTA || '',
-        'Cliente': pedido.CLIENTE_NOME || '',
-        'Fantasia': pedido.NOME_FANTASIA || '',
-        'Data Cadastro': formatarData(pedido.DATA_HORA_CADASTRO),
-        'Data Recebimento': formatarData(pedido.DATA_HORA_RECEBIMENTO),
-        'Endereço': pedido.LOGRADOURO_ENTREGA || '',
-        'Bairro ID': pedido.BAIRRO_ENTREGA_ID || '',
-        'CEP Entrega': pedido.CEP_ENTREGA || '',
-        'CEP Consumidor Final': pedido.CEP_CONS_FINAL || '',
-        'Valor Pedido': pedido.VALOR_PEDIDO,
-        'Tipo Entrega': pedido.TIPO_ENTREGA,
-        'Vendedor': pedido.VENDEDOR_NOME || '',
-        'Cadastro ID': pedido.CADASTRO_ID,
-        'Pedido Fechado': pedido.PEDIDO_FECHADO,
-        'Cancelado': pedido.CANCELADO,
-        'Data Entrega': formatarData(pedido.DATA_ENTREGA),
-        'Separado para Recebimento': pedido.SEPARADO_PARA_RECEBIMENTO,
-        'Entrega por Transportadora': pedido.ENTREGA_POR_TRANSPORTADORA
-      }));
-      
-      const ws = XLSX.utils.json_to_sheet(dados);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Pedidos');
-      
-      // Ajustar largura das colunas
-      const colWidths = [
-        { wch: 10 }, // Nº Pedido
-        { wch: 10 }, // Nº Nota
-        { wch: 30 }, // Cliente
-        { wch: 25 }, // Fantasia
-        { wch: 20 }, // Data Cadastro
-        { wch: 20 }, // Data Recebimento
-        { wch: 35 }, // Endereço
-        { wch: 12 }, // Bairro ID
-        { wch: 12 }, // CEP Entrega
-        { wch: 15 }, // CEP Consumidor Final
-        { wch: 12 }, // Valor Pedido
-        { wch: 15 }, // Tipo Entrega
-        { wch: 25 }, // Vendedor
-        { wch: 12 }, // Cadastro ID
-        { wch: 15 }, // Pedido Fechado
-        { wch: 10 }, // Cancelado
-        { wch: 20 }, // Data Entrega
-        { wch: 25 }, // Separado para Recebimento
-        { wch: 25 }  // Entrega por Transportadora
-      ];
-      ws['!cols'] = colWidths;
-      
-      XLSX.writeFile(wb, `pedidos_${escopo === 'all' ? 'todos' : `pagina_${paginaAtual}`}_${dataInicio}_${dataFim}.xlsx`);
-      
-      enqueueSnackbar(`Excel (${escopo === 'all' ? 'todos' : 'página atual'}) exportado com sucesso!`, { variant: 'success' });
-    } catch (error) {
-      console.error('Erro ao exportar Excel:', error);
-      enqueueSnackbar('Erro ao exportar Excel', { variant: 'error' });
-    }
-  };
-
-  if (error) {
-    return (
-      <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
-        <Alert 
-          severity="error" 
-          variant="standard"
-          sx={{ 
-            borderRadius: '16px',
-            backdropFilter: 'blur(12px)',
-            backgroundColor: alpha(theme.palette.error.main, 0.15),
-            color: theme.palette.error.dark,
-            border: `1px solid ${alpha(theme.palette.error.main, 0.3)}`,
-            '& .MuiAlert-icon': {
-              color: theme.palette.error.main,
-            },
-            boxShadow: `0 8px 32px 0 ${alpha(theme.palette.common.black, 0.1)}`,
-            fontWeight: 600,
-          }}
-        >
-          {error}
-        </Alert>
-      </Container>
-    );
-  }
+    };
+    carregarResumos();
+  }, []);
 
   return (
-    <Container maxWidth="xl" sx={{ py: 3 }}>
-      {/* Header Section */}
-      <MotionPaper
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        sx={{
-          p: 3,
-          mb: 3,
-          background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.05)} 0%, ${alpha(theme.palette.secondary.main, 0.05)} 100%)`,
-          border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-          borderRadius: 2,
-          backdropFilter: 'blur(10px)'
-        }}
-      >
-        <Stack direction={{ xs: 'column', sm: 'row' }} alignItems={{ sm: 'center' }} spacing={2}>
-          <Avatar
-            sx={{
-              width: 56,
-              height: 56,
-              background: `linear-gradient(135deg, ${theme.palette.success.main} 0%, ${theme.palette.info.main} 100%)`,
-              boxShadow: `0 8px 32px ${alpha(theme.palette.success.main, 0.3)}`
-            }}
-          >
-            <ReceiptIcon sx={{ fontSize: 32 }} />
-          </Avatar>
-          <Box flex={1}>
-            <Typography variant="h4" fontWeight="bold" color="primary.main" gutterBottom>
-              Ciclo do Pedido
-            </Typography>
-            <Stack direction="row" alignItems="center" spacing={2}>
-              <Typography variant="body1" color="text.secondary">
-                Visualize e gerencie todos os pedidos do sistema.
-              </Typography>
-              <Chip 
-                label={`Total: ${filteredPedidos.length} pedidos`} 
-                color="primary" 
-                variant="outlined" 
-                size="small" 
-                sx={{ fontWeight: 'bold' }} 
+    <AppLayout 
+      title="Pedidos Entregas" 
+      subtitle="Entregas fechadas do dia e resumo do mês"
+    >
+      <Head>
+        <title>Pedidos Entregas | ControlCarga</title>
+      </Head>
+
+      <div className="space-y-6">
+        {/* Resumo em Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card className="bg-gradient-to-br from-blue-500 to-blue-600 border-none text-white">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-blue-100 text-xs font-medium uppercase tracking-wider">Pedidos do Dia</p>
+                <h3 className="text-2xl font-bold mt-1">{stats.hoje}</h3>
+              </div>
+              <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm">
+                <ShoppingCart className="w-5 h-5 text-white" />
+              </div>
+            </div>
+            <div className="mt-4 flex items-center gap-1 text-xs text-blue-100">
+              <TrendingUp className="w-3 h-3" />
+              <span>Sincronizado em tempo real</span>
+            </div>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-emerald-500 to-emerald-600 border-none text-white">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-emerald-100 text-xs font-medium uppercase tracking-wider">Valor Total do Dia</p>
+                <h3 className="text-2xl font-bold mt-1">
+                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(stats.valorHoje)}
+                </h3>
+              </div>
+              <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm">
+                <TrendingUp className="w-5 h-5 text-white" />
+              </div>
+            </div>
+            <div className="mt-4 flex items-center gap-1 text-xs text-emerald-100">
+              <Clock className="w-3 h-3" />
+              <span>Atualizado agora</span>
+            </div>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-orange-500 to-orange-600 border-none text-white">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-orange-100 text-xs font-medium uppercase tracking-wider">Notas de Hoje</p>
+                <h3 className="text-2xl font-bold mt-1">{stats.notasHoje}</h3>
+              </div>
+              <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm">
+                <FileText className="w-5 h-5 text-white" />
+              </div>
+            </div>
+            <div className="mt-4 flex items-center gap-1 text-xs text-orange-100">
+              <Clock className="w-3 h-3" />
+              <span>Registradas hoje</span>
+            </div>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-cyan-500 to-cyan-600 border-none text-white">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-cyan-100 text-xs font-medium uppercase tracking-wider">Controles de Hoje</p>
+                <h3 className="text-2xl font-bold mt-1">{stats.controlesHoje}</h3>
+              </div>
+              <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm">
+                <Truck className="w-5 h-5 text-white" />
+              </div>
+            </div>
+            <div className="mt-4 flex items-center gap-1 text-xs text-cyan-100">
+              <Clock className="w-3 h-3" />
+              <span>Gerados hoje</span>
+            </div>
+          </Card>
+        </div>
+
+        {/* Filtros e Busca */}
+        <Card className="overflow-visible">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <form onSubmit={handleSearch} className="flex-1 flex gap-2">
+              <SearchInput 
+                placeholder="Buscar por cliente, pedido ou vendedor..." 
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
               />
-            </Stack>
-          </Box>
-          <Stack direction="row" spacing={2}>
-            <Tooltip title="Aplicar filtros">
-              <Button
-                variant="outlined"
-                startIcon={<FilterListIcon />}
-                onClick={() => setOpenFiltros(true)}
-                sx={{
-                  borderColor: alpha(theme.palette.primary.main, 0.3),
-                  color: theme.palette.primary.main,
-                  '&:hover': {
-                    borderColor: theme.palette.primary.main,
-                    background: alpha(theme.palette.primary.main, 0.04),
-                  },
-                }}
-              >
-                Filtros
+              <Button type="submit" variant="primary" iconLeft={<Search className="w-4 h-4" />}>
+                Buscar
               </Button>
-            </Tooltip>
-            <Tooltip title="Atualizar lista">
-              <IconButton
-                onClick={handleRefresh}
+            </form>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative">
+                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                <Select 
+                  className="pl-10"
+                  value={tipoData}
+                  onChange={(e) => {
+                    setTipoData(e.target.value as 'recebimento' | 'entrega');
+                    setPaginaAtual(1);
+                  }}
+                >
+                  <option value="recebimento">Data de Recebimento</option>
+                  <option value="entrega">Data de Entrega</option>
+                </Select>
+              </div>
+
+              <div className="relative">
+                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                <Select 
+                  className="pl-10"
+                  value={filtroPeriodo}
+                  onChange={(e) => {
+                    setFiltroPeriodo(e.target.value);
+                    setPaginaAtual(1);
+                  }}
+                >
+                  <option value="hoje">Hoje</option>
+                  <option value="ontem">Ontem</option>
+                  <option value="semana">Última Semana</option>
+                  <option value="mes">Este Mês</option>
+                  <option value="ano">Este Ano</option>
+                  <option value="personalizado">Personalizado</option>
+                </Select>
+              </div>
+
+              <div className="relative">
+                <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                <Select 
+                  className="pl-10"
+                  value={filtroEntrega}
+                  onChange={(e) => setFiltroEntrega(e.target.value)}
+                >
+                  <option value="entrega_fechados">Entrega e Fechados</option>
+                  <option value="entrega">Somente Entrega</option>
+                  <option value="nao_entrega">Não Entrega</option>
+                  <option value="todos">Todos os Pedidos</option>
+                </Select>
+              </div>
+
+              <Button 
+                variant="secondary" 
+                iconLeft={<RefreshCw className={cn("w-4 h-4", loading && "animate-spin")} />}
+                onClick={() => carregarPedidos()}
                 disabled={loading}
-                sx={{
-                  background: `linear-gradient(135deg, ${alpha(theme.palette.info.main, 0.1)} 0%, ${alpha(theme.palette.info.dark, 0.1)} 100%)`,
-                  border: `1px solid ${alpha(theme.palette.info.main, 0.2)}`,
-                  '&:hover': {
-                    background: `linear-gradient(135deg, ${alpha(theme.palette.info.main, 0.2)} 0%, ${alpha(theme.palette.info.dark, 0.2)} 100%)`,
-                  }
-                }}
               >
-                <RefreshIcon />
-              </IconButton>
-            </Tooltip>
-          </Stack>
-        </Stack>
-      </MotionPaper>
+                Atualizar
+              </Button>
 
-      {/* Summary Cards */}
-      <Grid container spacing={3} sx={{ mb: 3 }}>
-        <Grid item xs={12} sm={6} md={3}>
-          <StatCard 
-            title="Total Pedidos Hoje (Entregas)" 
-            value={stats.hoje} 
-            icon={<CheckCircleIcon sx={{ fontSize: 30 }} />}
-            color="success"
-            loading={stats.loading}
-            delay={0.1}
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <StatCard 
-            title="Total Pedidos Mês (Entregas)" 
-            value={stats.mes} 
-            icon={<CalendarMonthIcon sx={{ fontSize: 30 }} />}
-            color="info"
-            loading={stats.loading}
-            delay={0.2}
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <StatCard 
-            title="Valor Total Hoje (Entregas)" 
-            value={`R$ ${stats.valorHoje.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} 
-            icon={<TrendingUpIcon sx={{ fontSize: 30 }} />}
-            color="primary"
-            loading={stats.loading}
-            delay={0.3}
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <StatCard 
-            title="Valor Total Mês (Entregas)" 
-            value={`R$ ${stats.valorMes.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} 
-            icon={<ArticleIcon sx={{ fontSize: 30 }} />}
-            color="warning"
-            loading={stats.loading}
-            delay={0.4}
-          />
-        </Grid>
-      </Grid>
-
-      {/* Search Section */}
-      <MotionPaper
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.1 }}
-        sx={{
-          p: 2,
-          mb: 3,
-          background: `linear-gradient(135deg, ${alpha(theme.palette.background.paper, 0.9)} 0%, ${alpha(theme.palette.background.paper, 0.7)} 100%)`,
-          border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-          borderRadius: 2,
-          backdropFilter: 'blur(10px)'
-        }}
-      >
-        <TextField
-          fullWidth
-          placeholder="Buscar pedido por cliente, fantasia, vendedor ou número..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon color="action" />
-              </InputAdornment>
-            ),
-          }}
-          sx={{
-            '& .MuiOutlinedInput-root': {
-              borderRadius: 2,
-              background: alpha(theme.palette.background.paper, 0.8),
-              '&:hover fieldset': {
-                borderColor: alpha(theme.palette.primary.main, 0.3),
-              },
-              '&.Mui-focused fieldset': {
-                borderColor: theme.palette.primary.main,
-                boxShadow: `0 0 0 3px ${alpha(theme.palette.primary.main, 0.1)}`,
-              },
-            },
-          }}
-        />
-      </MotionPaper>
-
-      {/* Filtros por Tipo de Entrega */}
-      <MotionPaper
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.2 }}
-        sx={{
-          p: 2,
-          mb: 3,
-          background: `linear-gradient(135deg, ${alpha(theme.palette.info.light, 0.05)} 0%, ${alpha(theme.palette.info.main, 0.05)} 100%)`,
-          border: `1px solid ${alpha(theme.palette.info.main, 0.2)}`,
-          borderRadius: 2,
-        }}
-      >
-        <Stack spacing={2}>
-          <Typography variant="h6" fontWeight={600} color="primary.main">
-            Filtrar por Tipo de Entrega
-          </Typography>
-          <ToggleButtonGroup
-            value={filtroEntrega}
-            exclusive
-            onChange={(event, value) => {
-              if (value !== null) {
-                setFiltroEntrega(value);
-              }
-            }}
-            aria-label="tipo de entrega"
-            sx={{ flexWrap: 'wrap', gap: 1 }}
-          >
-            <ToggleButton value="entrega_fechados" sx={{ borderRadius: 2 }}>
-              <Stack direction="row" alignItems="center" spacing={1}>
-                <CheckCircleIcon fontSize="small" color="success" />
-                <Typography variant="body2">Entrega e Fechados</Typography>
-              </Stack>
-            </ToggleButton>
-            <ToggleButton value="entrega" sx={{ borderRadius: 2 }}>
-              <Stack direction="row" alignItems="center" spacing={1}>
-                <LocalShippingIcon fontSize="small" color="primary" />
-                <Typography variant="body2">Somente Entrega</Typography>
-              </Stack>
-            </ToggleButton>
-            <ToggleButton value="nao_entrega" sx={{ borderRadius: 2 }}>
-              <Stack direction="row" alignItems="center" spacing={1}>
-                <CancelIcon fontSize="small" color="error" />
-                <Typography variant="body2">Não Entrega</Typography>
-              </Stack>
-            </ToggleButton>
-            <ToggleButton value="todos" sx={{ borderRadius: 2 }}>
-              <Stack direction="row" alignItems="center" spacing={1}>
-                <TrendingUpIcon fontSize="small" />
-                <Typography variant="body2">Todos</Typography>
-              </Stack>
-            </ToggleButton>
-          </ToggleButtonGroup>
-          <Stack direction="row" spacing={2} alignItems="center" justifyContent="space-between">
-            <Typography variant="subtitle2" fontWeight={600} color="text.secondary">
-              Período: {getPeriodoConfig().label}
-            </Typography>
-            <Button 
-              size="small" 
-              onClick={limparFiltros}
-              startIcon={<RefreshIcon />}
-            >
-              Limpar filtros
-            </Button>
-          </Stack>
-        </Stack>
-      </MotionPaper>
-
-      {/* Dialog de Filtros */}
-      <Dialog open={openFiltros} onClose={() => setOpenFiltros(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          <Stack direction="row" alignItems="center" spacing={1}>
-            <FilterListIcon />
-            <Typography variant="h6">Filtros Avançados</Typography>
-          </Stack>
-        </DialogTitle>
-        <DialogContent>
-          <Stack spacing={3} sx={{ mt: 2 }}>
-            <FormControl fullWidth>
-              <InputLabel>Período</InputLabel>
-              <Select
-                value={filtroPeriodo}
-                label="Período"
-                onChange={handleFiltroPeriodoChange}
+              <Button 
+                variant="outline" 
+                iconLeft={<Download className="w-4 h-4" />}
+                onClick={exportarRelatorioAvancado}
               >
-                <MenuItem value="hoje">Hoje</MenuItem>
-                <MenuItem value="ontem">Ontem</MenuItem>
-                <MenuItem value="semana">Última semana</MenuItem>
-                <MenuItem value="mes">Este mês</MenuItem>
-                <MenuItem value="personalizado">Personalizado</MenuItem>
-              </Select>
-            </FormControl>
-            
-            {filtroPeriodo === 'personalizado' && (
-              <Stack direction="row" spacing={2}>
-                <TextField
-                  type="date"
-                  label="Data Início"
-                  value={dataInicio}
-                  onChange={(e) => {
-                    setDataInicio(e.target.value);
-                    setFiltroPeriodo('personalizado');
-                  }}
-                  InputLabelProps={{ shrink: true }}
-                  fullWidth
-                />
-                <TextField
-                  type="date"
-                  label="Data Fim"
-                  value={dataFim}
-                  onChange={(e) => {
-                    setDataFim(e.target.value);
-                    setFiltroPeriodo('personalizado');
-                  }}
-                  InputLabelProps={{ shrink: true }}
-                  fullWidth
-                />
-              </Stack>
-            )}
-            
-            <FormControl fullWidth>
-              <InputLabel>Tipo de Entrega</InputLabel>
-              <Select
-                value={filtroEntrega}
-                label="Tipo de Entrega"
-                onChange={handleFiltroEntregaChange}
-              >
-                <MenuItem value="entrega_fechados">Entrega e Fechados (Padrão)</MenuItem>
-                <MenuItem value="entrega">Somente entrega</MenuItem>
-                <MenuItem value="nao_entrega">Não entrega</MenuItem>
-                <MenuItem value="todos">Todos</MenuItem>
-              </Select>
-            </FormControl>
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpenFiltros(false)}>Cancelar</Button>
-          <Button onClick={aplicarFiltros} variant="contained">Aplicar Filtros</Button>
-        </DialogActions>
-      </Dialog>
+                Relatório Excel
+              </Button>
+            </div>
+          </div>
 
-      {/* Tabela de Pedidos */}
-      <MotionPaper
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.3 }}
-        sx={{
-          borderRadius: 2,
-          overflow: 'hidden',
-          border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-          boxShadow: `0 8px 32px ${alpha(theme.palette.common.black, 0.05)}`,
-          backdropFilter: 'blur(10px)',
-          background: `linear-gradient(135deg, ${alpha(theme.palette.background.paper, 0.9)} 0%, ${alpha(theme.palette.background.paper, 0.7)} 100%)`,
-        }}
-      >
-        {loading ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', p: 8 }}>
-            <CircularProgress />
-          </Box>
-        ) : (
-          <>
-            <TableContainer
-              sx={{
-                maxHeight: '65vh',
-                overflowX: 'auto',
-                overflowY: 'auto',
-                border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
-                borderRadius: '8px',
-                '& .MuiTableCell-root': {
-                  whiteSpace: 'nowrap',
-                  px: 1.5
-                },
-                // Custom scrollbar styling for better visibility
-                '&::-webkit-scrollbar': {
-                  width: '10px',
-                  height: '10px',
-                },
-                '&::-webkit-scrollbar-track': {
-                  backgroundColor: alpha(theme.palette.common.black, 0.05),
-                  borderRadius: '10px',
-                },
-                '&::-webkit-scrollbar-thumb': {
-                  backgroundColor: alpha(theme.palette.primary.main, 0.4),
-                  borderRadius: '10px',
-                  border: '2px solid transparent',
-                  backgroundClip: 'content-box',
-                  '&:hover': {
-                    backgroundColor: alpha(theme.palette.primary.main, 0.6),
-                  }
-                }
-              }}
-            >
-              <Table stickyHeader size="small">
-                <TableHead>
-                  <TableRow sx={{ background: alpha(theme.palette.primary.main, 0.05) }}>
-                    <TableCell sx={{ fontWeight: 600, color: 'primary.main', fontSize: '0.8rem', py: 1 }}>Nº Pedido</TableCell>
-                    <TableCell sx={{ fontWeight: 600, color: 'primary.main', fontSize: '0.8rem', py: 1 }}>Nº Nota</TableCell>
-                    <TableCell sx={{ fontWeight: 600, color: 'primary.main', fontSize: '0.8rem', py: 1 }}>Cliente</TableCell>
-                    <TableCell sx={{ fontWeight: 600, color: 'primary.main', fontSize: '0.8rem', py: 1 }}>Data/Hora Recebimento</TableCell>
-                    <TableCell sx={{ fontWeight: 600, color: 'primary.main', fontSize: '0.8rem', py: 1 }}>Endereço</TableCell>
-                    <TableCell sx={{ fontWeight: 600, color: 'primary.main', fontSize: '0.8rem', py: 1 }}>CEP</TableCell>
-                    <TableCell sx={{ fontWeight: 600, color: 'primary.main', fontSize: '0.8rem', py: 1 }}>Valor</TableCell>
-                    <TableCell sx={{ fontWeight: 600, color: 'primary.main', fontSize: '0.8rem', py: 1 }}>Entrega</TableCell>
-                    <TableCell sx={{ fontWeight: 600, color: 'primary.main', fontSize: '0.8rem', py: 1 }}>Vendedor</TableCell>
-                    {/* <TableCell sx={{ fontWeight: 600, color: 'primary.main', fontSize: '0.8rem', py: 1 }}>Status</TableCell> */}
-                    <TableCell sx={{ fontWeight: 600, color: 'primary.main', fontSize: '0.8rem', py: 1 }}>Ações</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {filteredPedidos.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={11} align="center" sx={{ py: 4 }}>
-                        <Typography variant="body1" color="text.secondary">
-                          Nenhum pedido encontrado com os filtros atuais.
-                        </Typography>
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    filteredPedidos.map((pedido, index) => {
-                      const statusEntrega = getStatusEntrega(pedido.TIPO_ENTREGA);
-                      
-                      return (
-                        <MotionTableRow
-                          key={pedido.ORCAMENTO_ID}
-                          initial={{ opacity: 0, x: -20 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ duration: 0.3, delay: index * 0.05 }}
-                          hover
-                          sx={{
-                            '&:hover': {
-                              background: alpha(theme.palette.primary.main, 0.03),
-                            },
-                          }}
-                        >
-                          <TableCell>
-                            <Typography variant="body2" fontWeight={600}>
-                              {pedido.ORCAMENTO_ID}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="body2" fontWeight={600}>
-                              {pedido.NUMERO_NOTA || '-'}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Stack direction="column" spacing={0.5}>
-                              <Typography variant="body2" fontWeight={600}>
-                                {pedido.CLIENTE_NOME || '-'}
-                              </Typography>
-                              <Typography variant="caption" color="text.secondary">
-                                {pedido.NOME_FANTASIA || '-'}
-                              </Typography>
-                            </Stack>
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="body2">
-                              {formatarData(pedido.DATA_HORA_RECEBIMENTO)}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Box>
-                              <Typography variant="body2">
-                                {pedido.LOGRADOURO_ENTREGA || '-'}
-                              </Typography>
-                              {detalhesPedido[pedido.ORCAMENTO_ID.toString()] ? (
-                                <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
-                                  {detalhesPedido[pedido.ORCAMENTO_ID.toString()].bairro}, {detalhesPedido[pedido.ORCAMENTO_ID.toString()].cidade}
-                                  {detalhesPedido[pedido.ORCAMENTO_ID.toString()].estado && ` - ${detalhesPedido[pedido.ORCAMENTO_ID.toString()].estado}`}
-                                </Typography>
-                              ) : (
-                                <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
-                                  Buscando endereço...
-                                </Typography>
-                              )}
-                            </Box>
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="body2" fontWeight={600}>
-                              {pedido.CEP_ENTREGA || '-'}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="body2" fontWeight={600} color="success.main">
-                              {formatarValor(pedido.VALOR_PEDIDO)}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Chip
-                              label={statusEntrega.label}
-                              size="small"
-                              color={statusEntrega.color}
-                              variant="outlined"
-                              sx={{ fontSize: '0.7rem', height: '24px' }}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="body2">
-                              {pedido.VENDEDOR_NOME || '-'}
-                            </Typography>
-                          </TableCell>
-                          {/* <TableCell>
-                            <Chip
-                              label={statusPedido.label}
-                              size="small"
-                              color={statusPedido.color}
-                              icon={statusPedido.icon}
-                              sx={{ fontSize: '0.7rem', height: '24px' }}
-                            />
-                          </TableCell> */}
-                          <TableCell>
-                            <Button
-                              variant="outlined"
-                              size="small"
-                              onClick={() => abrirDetalhesModal(pedido)}
-                              sx={{
-                                textTransform: 'none',
-                                fontSize: '0.7rem',
-                                padding: '2px 6px',
-                                minWidth: 'auto'
-                              }}
-                            >
-                              Detalhes
-                            </Button>
-                          </TableCell>
-                        </MotionTableRow>
-                      );
-                    })
-                  )}
-                </TableBody>
-              </Table>
-            </TableContainer>
-            
-            {/* Footer com estatísticas e paginação */}
-            <Box sx={{ p: 2, borderTop: `1px solid ${alpha(theme.palette.divider, 0.1)}` }}>
-              <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
-                <Typography variant="body2" color="text.secondary">
-                  Mostrando {filteredPedidos.length} pedidos (Página {paginaAtual} de {totalPaginas})
-                </Typography>
-                <Stack direction="row" spacing={1}>
-                  <Button
-                    startIcon={<PdfIcon />}
-                    variant="outlined"
-                    size="small"
-                    onClick={() => {
-                      setExportType('pdf');
-                      setOpenExportDialog(true);
-                    }}
-                    disabled={filteredPedidos.length === 0}
+          {filtroPeriodo === 'ano' && (
+            <div className="flex flex-wrap items-center gap-4 mt-4 p-4 bg-slate-50/50 rounded-xl border border-slate-100 animate-in slide-in-from-top-2">
+              <div className="space-y-1.5">
+                <Label>Ano</Label>
+                <div className="relative">
+                  <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                  <Select
+                    className="pl-10"
+                    value={anoSelecionado}
+                    onChange={(e) => setAnoSelecionado(e.target.value)}
                   >
-                    PDF
-                  </Button>
-                  <Button
-                    startIcon={<ExcelIcon />}
-                    variant="outlined"
-                    size="small"
-                    onClick={() => {
-                      setExportType('excel');
-                      setOpenExportDialog(true);
-                    }}
-                    disabled={filteredPedidos.length === 0}
-                  >
-                    Excel
-                  </Button>
-                </Stack>
-              </Stack>
-              
-              {/* Paginação */}
-              {totalPaginas > 1 && (
-                <Stack direction="row" justifyContent="center" alignItems="center" spacing={2}>
-                  <IconButton
-                    onClick={() => setPaginaAtual(1)}
-                    disabled={paginaAtual === 1}
-                    size="small"
-                  >
-                    <FirstPageIcon />
-                  </IconButton>
-                  <IconButton
-                    onClick={() => setPaginaAtual(paginaAtual - 1)}
-                    disabled={paginaAtual === 1}
-                    size="small"
-                  >
-                    <ChevronLeftIcon />
-                  </IconButton>
-                  
-                  <Typography variant="body2" sx={{ mx: 2 }}>
-                    Página {paginaAtual} de {totalPaginas}
-                  </Typography>
-                  
-                  <IconButton
-                    onClick={() => setPaginaAtual(paginaAtual + 1)}
-                    disabled={paginaAtual === totalPaginas}
-                    size="small"
-                  >
-                    <ChevronRightIcon />
-                  </IconButton>
-                  <IconButton
-                    onClick={() => setPaginaAtual(totalPaginas)}
-                    disabled={paginaAtual === totalPaginas}
-                    size="small"
-                  >
-                    <LastPageIcon />
-                  </IconButton>
-                </Stack>
-              )}
-            </Box>
-          </>
-        )}
-      </MotionPaper>
-
-      
-
-      {/* Dialog de Exportação */}
-      <Dialog open={openExportDialog} onClose={() => setOpenExportDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          <Stack direction="row" alignItems="center" spacing={1}>
-            <DownloadIcon />
-            <Typography variant="h6">Exportar {exportType === 'pdf' ? 'PDF' : 'Excel'}</Typography>
-          </Stack>
-        </DialogTitle>
-        <DialogContent>
-          <Stack spacing={3} sx={{ mt: 2 }}>
-            <Typography variant="body2" color="text.secondary">
-              Escolha o escopo da exportação:
-            </Typography>
-            <FormControl component="fieldset">
-              <RadioGroup
-                value={exportScope}
-                onChange={(e) => setExportScope(e.target.value as 'current' | 'all')}
-              >
-                <FormControlLabel 
-                  value="current" 
-                  control={<Radio />} 
-                  label={`Página atual (${filteredPedidos.length} pedidos)`} 
-                />
-                <FormControlLabel 
-                  value="all" 
-                  control={<Radio />} 
-                  label={`Todos os pedidos filtrados`} 
-                />
-              </RadioGroup>
-            </FormControl>
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpenExportDialog(false)}>Cancelar</Button>
-          <Button 
-            onClick={() => {
-              if (exportType === 'pdf') {
-                exportarPDF(exportScope);
-              } else {
-                exportarExcel(exportScope);
-              }
-              setOpenExportDialog(false);
-            }} 
-            variant="contained"
-          >
-            Exportar
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Modal de Detalhes do Pedido */}
-      <Dialog
-        open={openDetalhesModal}
-        onClose={fecharDetalhesModal}
-        maxWidth="md"
-        fullWidth
-        scroll="paper"
-      >
-        <DialogTitle>
-          <Box display="flex" alignItems="center" gap={1}>
-            <ReceiptIcon />
-            <Typography variant="h6" component="span">
-              Detalhes do Pedido #{pedidoSelecionado?.ORCAMENTO_ID}
-            </Typography>
-          </Box>
-        </DialogTitle>
-        
-        <DialogContent dividers>
-          {pedidoSelecionado && (
-            <Grid container spacing={2}>
-              {/* Informações Básicas */}
-              <Grid item xs={12}>
-                <Card variant="outlined">
-                  <CardContent>
-                    <Typography variant="h6" gutterBottom color="primary">
-                      Informações Básicas
-                    </Typography>
-                    <Grid container spacing={2}>
-                      <Grid item xs={6} md={3}>
-                        <Typography variant="body2" color="text.secondary">
-                          Número do Pedido
-                        </Typography>
-                        <Typography variant="body1" fontWeight="medium">
-                          {pedidoSelecionado.ORCAMENTO_ID}
-                        </Typography>
-                      </Grid>
-                      <Grid item xs={6} md={3}>
-                        <Typography variant="body2" color="text.secondary">
-                          Data do Pedido
-                        </Typography>
-                        <Typography variant="body1" fontWeight="medium">
-                          {format(new Date(pedidoSelecionado.DATA_HORA_CADASTRO), 'dd/MM/yyyy HH:mm')}
-                        </Typography>
-                      </Grid>
-                      <Grid item xs={6} md={3}>
-                        <Typography variant="body2" color="text.secondary">
-                          Status
-                        </Typography>
-                        <Chip 
-                          label={pedidoSelecionado.PEDIDO_FECHADO === 'S' ? 'Fechado' : 'Aberto'}
-                          color={pedidoSelecionado.PEDIDO_FECHADO === 'S' ? 'success' : 'warning'}
-                          size="small"
-                        />
-                      </Grid>
-                      <Grid item xs={6} md={3}>
-                        <Typography variant="body2" color="text.secondary">
-                          Cancelado
-                        </Typography>
-                        <Chip 
-                          label={pedidoSelecionado.CANCELADO === 'S' ? 'Sim' : 'Não'}
-                          color={pedidoSelecionado.CANCELADO === 'S' ? 'error' : 'success'}
-                          size="small"
-                        />
-                      </Grid>
-                    </Grid>
-                  </CardContent>
-                </Card>
-              </Grid>
-
-              {/* Cliente */}
-              <Grid item xs={12}>
-                <Card variant="outlined">
-                  <CardContent>
-                    <Typography variant="h6" gutterBottom color="primary">
-                      Cliente
-                    </Typography>
-                    <Grid container spacing={2}>
-                      <Grid item xs={12} md={6}>
-                        <Typography variant="body2" color="text.secondary">
-                          Nome do Cliente
-                        </Typography>
-                        <Typography variant="body1" fontWeight="medium">
-                          {pedidoSelecionado.CLIENTE_NOME}
-                        </Typography>
-                      </Grid>
-                      <Grid item xs={12} md={6}>
-                        <Typography variant="body2" color="text.secondary">
-                          Nome Fantasia
-                        </Typography>
-                        <Typography variant="body1" fontWeight="medium">
-                          {pedidoSelecionado.NOME_FANTASIA || 'Não informado'}
-                        </Typography>
-                      </Grid>
-                    </Grid>
-                  </CardContent>
-                </Card>
-              </Grid>
-
-              {/* Endereço de Entrega */}
-              <Grid item xs={12}>
-                <Card variant="outlined">
-                  <CardContent>
-                    <Typography variant="h6" gutterBottom color="primary">
-                      Endereço de Entrega
-                    </Typography>
-                    <Grid container spacing={2}>
-                      <Grid item xs={12}>
-                        <Typography variant="body2" color="text.secondary">
-                          Logradouro
-                        </Typography>
-                        <Typography variant="body1" fontWeight="medium">
-                          {pedidoSelecionado.LOGRADOURO_ENTREGA || 'Não informado'}
-                        </Typography>
-                      </Grid>
-                      <Grid item xs={12} md={4}>
-                        <Typography variant="body2" color="text.secondary">
-                          Bairro
-                        </Typography>
-                        <Typography variant="body1" fontWeight="medium">
-                          {detalhesPedido[pedidoSelecionado.ORCAMENTO_ID.toString()]?.bairro || 'Buscando...'}
-                        </Typography>
-                      </Grid>
-                      <Grid item xs={12} md={4}>
-                        <Typography variant="body2" color="text.secondary">
-                          Cidade
-                        </Typography>
-                        <Typography variant="body1" fontWeight="medium">
-                          {detalhesPedido[pedidoSelecionado.ORCAMENTO_ID.toString()]?.cidade || 'Buscando...'}
-                        </Typography>
-                      </Grid>
-                      <Grid item xs={12} md={4}>
-                        <Typography variant="body2" color="text.secondary">
-                          Estado
-                        </Typography>
-                        <Typography variant="body1" fontWeight="medium">
-                          {detalhesPedido[pedidoSelecionado.ORCAMENTO_ID.toString()]?.estado || 'Buscando...'}
-                        </Typography>
-                      </Grid>
-                      <Grid item xs={12} md={6}>
-                        <Typography variant="body2" color="text.secondary">
-                          CEP Entrega
-                        </Typography>
-                        <Typography variant="body1" fontWeight="medium">
-                          {pedidoSelecionado.CEP_ENTREGA || 'Não informado'}
-                        </Typography>
-                      </Grid>
-                      <Grid item xs={12} md={6}>
-                        <Typography variant="body2" color="text.secondary">
-                          CEP Consumidor Final
-                        </Typography>
-                        <Typography variant="body1" fontWeight="medium">
-                          {pedidoSelecionado.CEP_CONS_FINAL || 'Não informado'}
-                        </Typography>
-                      </Grid>
-                    </Grid>
-                  </CardContent>
-                </Card>
-              </Grid>
-
-              {/* Informações do Pedido */}
-              <Grid item xs={12}>
-                <Card variant="outlined">
-                  <CardContent>
-                    <Typography variant="h6" gutterBottom color="primary">
-                      Informações do Pedido
-                    </Typography>
-                    <Grid container spacing={2}>
-                      <Grid item xs={12} md={3}>
-                        <Typography variant="body2" color="text.secondary">
-                          Valor do Pedido
-                        </Typography>
-                        <Typography variant="body1" fontWeight="medium" color="success.main">
-                          R$ {pedidoSelecionado.VALOR_PEDIDO.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </Typography>
-                      </Grid>
-                      <Grid item xs={12} md={3}>
-                        <Typography variant="body2" color="text.secondary">
-                          Tipo de Entrega
-                        </Typography>
-                        <Typography variant="body1" fontWeight="medium">
-                          {pedidoSelecionado.TIPO_ENTREGA}
-                        </Typography>
-                      </Grid>
-                      <Grid item xs={12} md={3}>
-                        <Typography variant="body2" color="text.secondary">
-                          Vendedor
-                        </Typography>
-                        <Typography variant="body1" fontWeight="medium">
-                          {pedidoSelecionado.VENDEDOR_NOME}
-                        </Typography>
-                      </Grid>
-                      <Grid item xs={12} md={3}>
-                        <Typography variant="body2" color="text.secondary">
-                          Número da Nota
-                        </Typography>
-                        <Typography variant="body1" fontWeight="medium">
-                          {pedidoSelecionado.NUMERO_NOTA || 'Não informado'}
-                        </Typography>
-                      </Grid>
-                      <Grid item xs={12} md={4}>
-                        <Typography variant="body2" color="text.secondary">
-                          Data de Entrega
-                        </Typography>
-                        <Typography variant="body1" fontWeight="medium">
-                          {pedidoSelecionado.DATA_ENTREGA ? format(new Date(pedidoSelecionado.DATA_ENTREGA), 'dd/MM/yyyy') : 'Não informada'}
-                        </Typography>
-                      </Grid>
-                      <Grid item xs={12} md={4}>
-                        <Typography variant="body2" color="text.secondary">
-                          Separado para Recebimento
-                        </Typography>
-                        <Chip 
-                          label={pedidoSelecionado.SEPARADO_PARA_RECEBIMENTO === 'S' ? 'Sim' : 'Não'}
-                          color={pedidoSelecionado.SEPARADO_PARA_RECEBIMENTO === 'S' ? 'success' : 'default'}
-                          size="small"
-                        />
-                      </Grid>
-                      <Grid item xs={12} md={4}>
-                        <Typography variant="body2" color="text.secondary">
-                          Entrega por Transportadora
-                        </Typography>
-                        <Chip 
-                          label={pedidoSelecionado.ENTREGA_POR_TRANSPORTADORA === 'S' ? 'Sim' : 'Não'}
-                          color={pedidoSelecionado.ENTREGA_POR_TRANSPORTADORA === 'S' ? 'info' : 'default'}
-                          size="small"
-                        />
-                      </Grid>
-                    </Grid>
-                  </CardContent>
-                </Card>
-              </Grid>
-            </Grid>
+                    {anosDisponiveis.map((ano) => (
+                      <option key={ano} value={String(ano)}>
+                        {ano}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+              </div>
+            </div>
           )}
-        </DialogContent>
-        
-        <DialogActions>
-          <Button onClick={fecharDetalhesModal}>
-            Fechar
+          {filtroPeriodo === 'personalizado' && (
+            <div className="flex flex-wrap items-center gap-4 mt-4 p-4 bg-slate-50/50 rounded-xl border border-slate-100 animate-in slide-in-from-top-2">
+              <div className="space-y-1.5">
+                <Label>Data Início</Label>
+                <div className="relative">
+                  <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                  <Input 
+                    type="date" 
+                    className="pl-10"
+                    value={dataInicio}
+                    onChange={(e) => setDataInicio(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Data Fim</Label>
+                <div className="relative">
+                  <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                  <Input 
+                    type="date" 
+                    className="pl-10"
+                    value={dataFim}
+                    onChange={(e) => setDataFim(e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+        </Card>
+
+        {/* Tabela de Pedidos */}
+        <Card noPadding className="relative min-h-[400px]">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200">
+                  <th className="px-6 py-4 font-semibold text-textMain">Pedido / Nota</th>
+                  <th className="px-6 py-4 font-semibold text-textMain">Cliente</th>
+                  <th className="px-6 py-4 font-semibold text-textMain hidden md:table-cell">Data</th>
+                  <th className="px-6 py-4 font-semibold text-textMain hidden lg:table-cell">Entrega</th>
+                  <th className="px-6 py-4 font-semibold text-textMain">Valor</th>
+                  <th className="px-6 py-4 font-semibold text-textMain hidden sm:table-cell">Status</th>
+                  <th className="px-6 py-4 font-semibold text-textMain text-right">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {loading ? (
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <tr key={i} className="animate-pulse">
+                      <td colSpan={7} className="px-6 py-4">
+                        <div className="h-10 bg-slate-100 rounded w-full"></div>
+                      </td>
+                    </tr>
+                  ))
+                ) : pedidos.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-6 py-12 text-center">
+                      <div className="flex flex-col items-center gap-2 text-textMuted">
+                        <ShoppingCart className="w-10 h-10 opacity-20" />
+                        <p>Nenhum pedido encontrado para os filtros selecionados.</p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  pedidos.map((p) => {
+                    const enderecoResumo = getEnderecoResumo(p);
+                    const numeroNota = pickString(p.IDENTIFICACAO_NFE, getNumeroNota(p));
+
+                    return (
+                    <tr key={p.ORCAMENTO_ID} className="hover:bg-slate-50/50 transition-colors group">
+                      <td className="px-6 py-4">
+                        <div className="flex flex-col">
+                          <span className="font-bold text-textMain">#{p.ORCAMENTO_ID}</span>
+                          <span className="text-[10px] text-textMuted font-medium uppercase tracking-wider">
+                            {numeroNota ? `NF: ${numeroNota}` : 'Pendente'}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="hidden sm:flex w-8 h-8 rounded-full bg-slate-100 items-center justify-center text-slate-400">
+                            <User className="w-4 h-4" />
+                          </div>
+                          <div className="flex flex-col max-w-[200px]">
+                            <span className="font-medium text-textMain truncate" title={p.CLIENTE_NOME}>
+                              {p.CLIENTE_NOME}
+                            </span>
+                            <span className="text-[10px] text-textMuted truncate">
+                              {p.VENDEDOR_NOME}
+                            </span>
+                            <span className="text-[10px] text-textMuted flex items-start gap-1 max-w-[200px]" title={enderecoResumo}>
+                              <MapPin className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                              <span className="line-clamp-2">
+                                {enderecoResumo || 'Endereço não informado'}
+                              </span>
+                            </span>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 hidden md:table-cell">
+                        <div className="flex flex-col">
+                          <span className="text-textMain">
+                            {getDataReferenciaPedido(p, tipoData) ? format(getDataReferenciaPedido(p, tipoData)!, 'dd/MM/yyyy') : '---'}
+                          </span>
+                          <span className="text-[10px] text-textMuted flex items-center gap-1">
+                            <Clock className="w-3 h-3" />
+                            {getDataReferenciaPedido(p, tipoData) ? format(getDataReferenciaPedido(p, tipoData)!, 'HH:mm') : '--:--'}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 hidden lg:table-cell">
+                        <div className="flex flex-col gap-1">
+                          <Badge variant="info">Entrega</Badge>
+                          <span className="text-[10px] text-textMuted flex items-start gap-1 max-w-[220px]" title={enderecoResumo}>
+                            <MapPin className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                            <span className="line-clamp-2">
+                              {enderecoResumo || 'Endereço não informado'}
+                            </span>
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex flex-col">
+                          <span className="font-bold text-textMain">
+                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(parseValorNumero(p.VALOR_PEDIDO))}
+                          </span>
+                          <div className="sm:hidden mt-1">
+                            {p.CANCELADO === 'S' ? (
+                              <Badge variant="danger">Cancelado</Badge>
+                            ) : p.PEDIDO_FECHADO === 'S' ? (
+                              <Badge variant="success">Fechado</Badge>
+                            ) : (
+                              <Badge variant="warning">Aberto</Badge>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 hidden sm:table-cell">
+                        <div className="flex flex-col gap-1">
+                          {p.CANCELADO === 'S' ? (
+                            <Badge variant="danger">Cancelado</Badge>
+                          ) : p.PEDIDO_FECHADO === 'S' ? (
+                            <Badge variant="success">Fechado</Badge>
+                          ) : (
+                            <Badge variant="warning">Aberto</Badge>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex justify-end gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                          <Button 
+                            size="icon" 
+                            variant="ghost" 
+                            title="Ver Detalhes"
+                            onClick={() => {
+                              setPedidoSelecionado(p);
+                              setIsDetailModalOpen(true);
+                            }}
+                          >
+                            <Receipt className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Paginação Estilo SaaS */}
+          <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <p className="text-xs text-textMuted font-medium">
+              Mostrando <span className="text-textMain font-bold">{(paginaAtual - 1) * pedidosPorPagina + 1}</span> a <span className="text-textMain font-bold">{Math.min(paginaAtual * pedidosPorPagina, totalPedidos)}</span> de <span className="text-textMain font-bold">{totalPedidos}</span> resultados
+            </p>
+            
+            <div className="flex items-center gap-1">
+              <Button 
+                variant="secondary" 
+                size="sm" 
+                iconLeft={<ChevronsLeft className="w-4 h-4" />}
+                onClick={() => setPaginaAtual(1)}
+                disabled={paginaAtual === 1 || loading}
+              />
+              <Button 
+                variant="secondary" 
+                size="sm" 
+                iconLeft={<ChevronLeft className="w-4 h-4" />}
+                onClick={() => setPaginaAtual(p => Math.max(1, p - 1))}
+                disabled={paginaAtual === 1 || loading}
+              >
+                Anterior
+              </Button>
+              
+              <div className="flex items-center gap-1 px-2">
+                <span className="text-xs font-semibold text-textMain">Página {paginaAtual} de {totalPaginas}</span>
+              </div>
+
+              <Button 
+                variant="secondary" 
+                size="sm" 
+                iconRight={<ChevronRight className="w-4 h-4" />}
+                onClick={() => setPaginaAtual(p => Math.min(totalPaginas, p + 1))}
+                disabled={paginaAtual === totalPaginas || loading}
+              >
+                Próxima
+              </Button>
+              <Button 
+                variant="secondary" 
+                size="sm" 
+                iconLeft={<ChevronsRight className="w-4 h-4" />}
+                onClick={() => setPaginaAtual(totalPaginas)}
+                disabled={paginaAtual === totalPaginas || loading}
+              />
+            </div>
+          </div>
+        </Card>
+
+        {/* Ações de Exportação */}
+        <div className="flex flex-col sm:flex-row justify-end gap-3">
+          <Button 
+            variant="outline" 
+            iconLeft={<FileSpreadsheet className="w-4 h-4" />}
+            onClick={exportToExcel}
+            className="w-full sm:w-auto"
+          >
+            Exportar Excel
           </Button>
-        </DialogActions>
-      </Dialog>
-    </Container>
+          <Button 
+            variant="outline" 
+            iconLeft={<FileText className="w-4 h-4" />}
+            onClick={exportToPDF}
+            className="w-full sm:w-auto"
+          >
+            Exportar PDF
+          </Button>
+        </div>
+      </div>
+
+      {/* Modal de Detalhes */}
+      <Modal
+        isOpen={isDetailModalOpen}
+        onClose={() => setIsDetailModalOpen(false)}
+        title={`Detalhes do Pedido #${pedidoSelecionado?.ORCAMENTO_ID}`}
+        size="lg"
+      >
+        {pedidoSelecionado && (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <h4 className="text-sm font-bold text-textMain uppercase tracking-wider border-b border-slate-100 pb-2">Informações Gerais</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-[10px] text-textMuted uppercase font-bold">Cliente</p>
+                    <p className="text-sm font-medium">{pedidoSelecionado.CLIENTE_NOME}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-textMuted uppercase font-bold">Vendedor</p>
+                    <p className="text-sm font-medium">{pedidoSelecionado.VENDEDOR_NOME}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-textMuted uppercase font-bold">Data Cadastro</p>
+                    <p className="text-sm font-medium">
+                      {getDataReferenciaPedido(pedidoSelecionado) ? format(getDataReferenciaPedido(pedidoSelecionado)!, 'dd/MM/yyyy HH:mm') : '---'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-textMuted uppercase font-bold">Valor Total</p>
+                    <p className="text-sm font-bold text-primary">
+                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(parseValorNumero(pedidoSelecionado.VALOR_PEDIDO))}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <h4 className="text-sm font-bold text-textMain uppercase tracking-wider border-b border-slate-100 pb-2">Logística</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-[10px] text-textMuted uppercase font-bold">Tipo Entrega</p>
+                    <Badge variant={pedidoSelecionado.TIPO_ENTREGA === 'NDF' ? 'neutral' : 'info'}>
+                      {pedidoSelecionado.TIPO_ENTREGA}
+                    </Badge>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-textMuted uppercase font-bold">Status</p>
+                    {pedidoSelecionado.CANCELADO === 'S' ? (
+                      <Badge variant="danger">Cancelado</Badge>
+                    ) : pedidoSelecionado.PEDIDO_FECHADO === 'S' ? (
+                      <Badge variant="success">Fechado</Badge>
+                    ) : (
+                      <Badge variant="warning">Aberto</Badge>
+                    )}
+                  </div>
+                  <div className="col-span-2">
+                    <p className="text-[10px] text-textMuted uppercase font-bold">Endereço de Entrega</p>
+                    <p className="text-sm font-medium flex items-center gap-1">
+                      <MapPin className="w-3 h-3 text-textMuted" />
+                      {getEnderecoResumo(pedidoSelecionado) || 'Não informado'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {pedidoSelecionado.OBSERVACAO && (
+              <div className="space-y-2 p-4 bg-slate-50 rounded-lg border border-slate-100">
+                <p className="text-[10px] text-textMuted uppercase font-bold">Observações</p>
+                <p className="text-sm text-textMain italic">{pedidoSelecionado.OBSERVACAO}</p>
+              </div>
+            )}
+          </div>
+        )}
+      </Modal>
+
+      {/* Toast Notification */}
+      {toast.show && (
+        <div className={cn(
+          "fixed bottom-6 left-1/2 -translate-x-1/2 md:left-auto md:translate-x-0 md:right-6 z-[100] px-6 py-3 rounded-xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-bottom-10 md:slide-in-from-right-10 w-[calc(100%-2rem)] max-w-[400px] md:w-auto",
+          toast.type === 'success' ? "bg-emerald-600 text-white" : "bg-rose-600 text-white"
+        )}>
+          {toast.type === 'success' ? <CheckCircle2 className="w-5 h-5" /> : <XCircle className="w-5 h-5" />}
+          <span className="font-medium">{toast.message}</span>
+        </div>
+      )}
+    </AppLayout>
   );
 }
-
-const CicloPedidosPage: NextPage = () => {
-  return (
-    <AdminRoute>
-      <Head>
-        <title>Ciclo do Pedido - Sistema de Controle de Carga</title>
-        <meta name="description" content="Visualize e gerencie todos os pedidos do sistema" />
-      </Head>
-      <VisualPageLayout
-        title="Ciclo do Pedido"
-        subtitle="Visualize e gerencie todos os pedidos do sistema"
-      >
-        <CicloPedidosContent />
-      </VisualPageLayout>
-    </AdminRoute>
-  );
-};
-
-export default CicloPedidosPage;

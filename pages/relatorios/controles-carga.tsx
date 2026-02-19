@@ -513,15 +513,15 @@ const RelatorioControlesCargaPage: React.FC = () => {
             </Typography>
             <TableContainer>
               <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell><strong>Transportadora</strong></TableCell>
-                    <TableCell align="right"><strong>Controles</strong></TableCell>
-                    <TableCell align="right"><strong>Pallets Levados</strong></TableCell>
-                    <TableCell align="right"><strong>Pallets Devolvidos</strong></TableCell>
-                    <TableCell align="right"><strong>Diferença Pallets</strong></TableCell>
-                    <TableCell align="right"><strong>Total Notas</strong></TableCell>
-                    <TableCell align="right"><strong>% Assinados</strong></TableCell>
+                <TableHead sx={{ bgcolor: 'rgba(241,245,249,0.5)' }}>
+                  <TableRow sx={{ borderBottom: '1px solid #e2e8f0' }}>
+                    <TableCell sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em' }}>Transportadora</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em' }}>Controles</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em' }}>Pallets Levados</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em' }}>Pallets Devolvidos</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em' }}>Diferença Pallets</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em' }}>Total Notas</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em' }}>% Assinados</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -569,16 +569,16 @@ const RelatorioControlesCargaPage: React.FC = () => {
             </Typography>
             <TableContainer>
               <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell><strong>Motorista</strong></TableCell>
-                    <TableCell><strong>Transportadora</strong></TableCell>
-                    <TableCell align="right"><strong>Controles</strong></TableCell>
-                    <TableCell align="right"><strong>Pallets Levados</strong></TableCell>
-                    <TableCell align="right"><strong>Pallets Devolvidos</strong></TableCell>
-                    <TableCell align="right"><strong>Diferença Pallets</strong></TableCell>
-                    <TableCell align="right"><strong>Total Notas</strong></TableCell>
-                    <TableCell align="right"><strong>Assinados</strong></TableCell>
+                <TableHead sx={{ bgcolor: 'rgba(241,245,249,0.5)' }}>
+                  <TableRow sx={{ borderBottom: '1px solid #e2e8f0' }}>
+                    <TableCell sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em' }}>Motorista</TableCell>
+                    <TableCell sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em' }}>Transportadora</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em' }}>Controles</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em' }}>Pallets Levados</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em' }}>Pallets Devolvidos</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em' }}>Diferença Pallets</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em' }}>Total Notas</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em' }}>Assinados</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -621,17 +621,17 @@ const RelatorioControlesCargaPage: React.FC = () => {
             </Typography>
             <TableContainer>
               <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell><strong>Data</strong></TableCell>
-                    <TableCell><strong>Motorista</strong></TableCell>
-                    <TableCell><strong>Transportadora</strong></TableCell>
-                    <TableCell align="right"><strong>Pallets Levados</strong></TableCell>
-                    <TableCell align="right"><strong>Pallets Devolvidos</strong></TableCell>
-                    <TableCell align="right"><strong>Diferença</strong></TableCell>
-                    <TableCell align="right"><strong>Notas</strong></TableCell>
-                    <TableCell><strong>Status</strong></TableCell>
-                    <TableCell><strong>Assinaturas</strong></TableCell>
+                <TableHead sx={{ bgcolor: 'rgba(241,245,249,0.5)' }}>
+                  <TableRow sx={{ borderBottom: '1px solid #e2e8f0' }}>
+                    <TableCell sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em' }}>Data</TableCell>
+                    <TableCell sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em' }}>Motorista</TableCell>
+                    <TableCell sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em' }}>Transportadora</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em' }}>Pallets Levados</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em' }}>Pallets Devolvidos</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em' }}>Diferença</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em' }}>Notas</TableCell>
+                    <TableCell sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em' }}>Status</TableCell>
+                    <TableCell sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em' }}>Assinaturas</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>

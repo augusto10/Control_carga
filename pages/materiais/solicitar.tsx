@@ -37,7 +37,7 @@ import {
   Inventory as InventoryIcon,
   Today as TodayIcon
 } from '@mui/icons-material';
-import Layout from '@/components/Layout';
+ 
 import { useSnackbar } from 'notistack';
 import api from '@/lib/api';
 import { format } from 'date-fns';
@@ -45,6 +45,7 @@ import { ptBR } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'framer-motion';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import ResponsiveContainer from '@/components/ResponsiveContainer';
+import { SearchInput } from '@/components/ui/SearchInput';
 
 const MotionBox = motion(Box);
 const MotionPaper = motion(Paper);
@@ -105,6 +106,7 @@ export default function SolicitarMaterial() {
   const [itens, setItens] = useState<ItemSolicitacao[]>([]);
   const [observacao, setObservacao] = useState('');
   const [mostrarHistorico, setMostrarHistorico] = useState(false);
+  const [searchTermHistorico, setSearchTermHistorico] = useState('');
 
   // Novo item
   const [materialSelecionado, setMaterialSelecionado] = useState<Material | null>(null);
@@ -144,6 +146,15 @@ export default function SolicitarMaterial() {
       enqueueSnackbar(error.response?.data?.error || 'Erro ao carregar solicitações', { variant: 'error' });
     }
   };
+
+  const solicitacoesFiltradas = solicitacoes.filter((s) => {
+    const termo = searchTermHistorico.trim().toLowerCase();
+    if (!termo) return true;
+    const id = s.id?.toLowerCase() || '';
+    const status = (statusLabels[s.status] || s.status || '').toLowerCase();
+    const obs = s.observacao?.toLowerCase() || '';
+    return id.includes(termo) || status.includes(termo) || obs.includes(termo);
+  });
 
   const handleAdicionarItem = () => {
     if (!materialSelecionado) {
@@ -495,6 +506,15 @@ export default function SolicitarMaterial() {
               exit={{ opacity: 0, x: -20 }}
               transition={{ duration: 0.3 }}
             >
+              <Box sx={{ mb: 3 }}>
+                <div className="max-w-md">
+                  <SearchInput
+                    placeholder="Buscar solicitações por número, status ou observação"
+                    value={searchTermHistorico}
+                    onChange={(e) => setSearchTermHistorico(e.target.value)}
+                  />
+                </div>
+              </Box>
               {solicitacoes.length === 0 ? (
                 <MotionPaper
                   sx={{ p: 10, textAlign: 'center', borderRadius: 4, ...glassStyles }}
@@ -509,7 +529,7 @@ export default function SolicitarMaterial() {
                 </MotionPaper>
               ) : (
                 <Stack spacing={3}>
-                  {solicitacoes.map((solicitacao, index) => (
+                  {solicitacoesFiltradas.map((solicitacao, index) => (
                     <MotionPaper
                       key={solicitacao.id}
                       initial={{ opacity: 0, y: 20 }}

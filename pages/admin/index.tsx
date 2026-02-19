@@ -1,44 +1,25 @@
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { 
-  Grid, 
-  Paper, 
-  Typography, 
-  Box, 
-  Card, 
-  CardContent, 
-  Avatar, 
-  IconButton, 
-  List, 
-  ListItem, 
-  ListItemAvatar, 
-  ListItemText,
-  Divider,
-  LinearProgress,
-  Stack,
-  Tooltip,
-  useTheme,
-  alpha
-} from '@mui/material';
-import { 
-  People as PeopleIcon, 
-  Assignment as AssignmentIcon, 
-  CheckCircle as CheckCircleIcon, 
-  Pending as PendingIcon,
-  Refresh as RefreshIcon,
-  TrendingUp as TrendingUpIcon,
-  ArrowForward as ArrowForwardIcon,
-  AccessTime as AccessTimeIcon,
-  CalendarMonth as CalendarMonthIcon
-} from '@mui/icons-material';
+  Users, 
+  ClipboardList, 
+  CheckCircle2, 
+  Clock, 
+  RefreshCw, 
+  TrendingUp, 
+  ChevronRight,
+  Calendar,
+  UserPlus,
+  Activity,
+  AlertCircle
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import AdminLayout from '../../components/admin/AdminLayout';
-import AdminRoute from '../../components/admin/AdminRoute';
-
-const MotionBox = motion(Box);
-const MotionPaper = motion(Paper);
-const MotionCard = motion(Card);
-const MotionGrid = motion(Grid);
+import { AppLayout } from '@/components/layout/AppLayout';
+import AdminRoute from '@/components/admin/AdminRoute';
+import { cn } from '@/utils/cn';
+import { Card } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { StatCard } from '@/components/ui/StatCard';
 
 interface DashboardStats {
   totalUsuarios: number;
@@ -60,7 +41,6 @@ function AdminDashboardContent() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
 
-
   const loadStats = async () => {
     try {
       setLoading(true);
@@ -68,7 +48,6 @@ function AdminDashboardContent() {
       const hoje = format(new Date(), 'yyyy-MM-dd');
       const primeiroDiaMes = format(new Date(new Date().getFullYear(), new Date().getMonth(), 1), 'yyyy-MM-dd');
 
-      // Buscar dados reais de diferentes endpoints
       const [usuariosRes, controlesRes, pedidosHojeRes, pedidosMesRes] = await Promise.all([
         fetch('/api/admin/usuarios', { credentials: 'include' }),
         fetch('/api/controles', { credentials: 'include' }),
@@ -87,7 +66,6 @@ function AdminDashboardContent() {
         ultimosUsuarios: []
       };
 
-      // Processar dados de usuários
       if (usuariosRes.ok) {
         const usuarios = await usuariosRes.json();
         statsData.totalUsuarios = usuarios.length;
@@ -103,7 +81,6 @@ function AdminDashboardContent() {
           }));
       }
 
-      // Processar dados de controles
       if (controlesRes.ok) {
         const controles = await controlesRes.json();
         statsData.totalControles = controles.length;
@@ -111,7 +88,6 @@ function AdminDashboardContent() {
         statsData.controlesPendentes = controles.filter((c: any) => !c.finalizado).length;
       }
 
-      // Processar dados de pedidos
       const filtrarPedidos = (lista: any[]) => {
         if (!Array.isArray(lista)) return 0;
         return lista.filter(p => {
@@ -151,213 +127,108 @@ function AdminDashboardContent() {
 
   useEffect(() => {
     loadStats();
-    
-    // Atualizar dados automaticamente a cada 3 minutos
     const interval = setInterval(() => {
       loadStats();
     }, 3 * 60 * 1000);
-
     return () => clearInterval(interval);
   }, []);
 
-  const theme = useTheme();
-
-  const StatCard = ({ 
-    title, 
-    value, 
-    icon, 
-    color = 'primary',
-    loading: isLoading,
-    delay = 0 
-  }: { 
-    title: string; 
-    value: string | number; 
-    icon: React.ReactNode;
-    color?: 'primary' | 'secondary' | 'error' | 'info' | 'success' | 'warning';
-    loading?: boolean;
-    delay?: number;
-  }) => (
-    <MotionCard
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay, duration: 0.5 }}
-      whileHover={{ y: -5, transition: { duration: 0.2 } }}
-      sx={{
-        height: '100%',
-        borderRadius: 4,
-        background: 'rgba(255, 255, 255, 0.8)',
-        backdropFilter: 'blur(10px)',
-        border: '1px solid rgba(255, 255, 255, 0.3)',
-        boxShadow: '0 8px 32px rgba(0,0,0,0.05)',
-        overflow: 'hidden',
-        position: 'relative'
-      }}
-    >
-      <Box sx={{ 
-        position: 'absolute', 
-        top: 0, 
-        left: 0, 
-        width: '4px', 
-        height: '100%', 
-        bgcolor: `${color}.main` 
-      }} />
-      <CardContent sx={{ p: 3 }}>
-        {isLoading ? (
-          <Box sx={{ width: '100%', mt: 2 }}>
-            <LinearProgress sx={{ borderRadius: 1 }} />
-          </Box>
-        ) : (
-          <Stack spacing={2}>
-            <Box display="flex" justifyContent="space-between" alignItems="flex-start">
-              <Box>
-                <Typography variant="overline" color="text.secondary" fontWeight="700" sx={{ letterSpacing: 1 }}>
-                  {title}
-                </Typography>
-                <Typography variant="h3" component="div" fontWeight="800" sx={{ color: '#1e293b', mt: 0.5 }}>
-                  {value}
-                </Typography>
-              </Box>
-              <Avatar 
-                sx={{ 
-                  backgroundColor: alpha(theme.palette[color].main, 0.1), 
-                  color: `${color}.main`,
-                  width: 56,
-                  height: 56,
-                  borderRadius: 3
-                }}
-              >
-                {icon}
-              </Avatar>
-            </Box>
-            <Box display="flex" alignItems="center" gap={0.5}>
-              <TrendingUpIcon sx={{ fontSize: 16, color: 'success.main' }} />
-              <Typography variant="caption" color="success.main" fontWeight="600">
-                +12% este mês
-              </Typography>
-            </Box>
-          </Stack>
-        )}
-      </CardContent>
-    </MotionCard>
-  );
-
   return (
-    <AdminLayout title="Dashboard Administrativo">
-      <Box sx={{ position: 'relative', zIndex: 1 }}>
-        {/* Header Section */}
-        <Box mb={4}>
-          <Typography variant="h4" fontWeight="800" color="#1e293b" gutterBottom>
-            Bem-vindo ao Painel Admin
-          </Typography>
-          <Typography variant="body1" color="text.secondary">
-            Acompanhe as métricas principais e atividades recentes do sistema.
-          </Typography>
-        </Box>
+    <AppLayout 
+      title="Painel Administrativo" 
+      subtitle="Visão geral e indicadores do sistema"
+    >
+      <div className="space-y-6 md:space-y-8 max-w-[1600px] mx-auto px-4 sm:px-0">
+        {/* Stats Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 md:gap-6">
+          <StatCard 
+            title="Total de Usuários" 
+            value={stats?.totalUsuarios || 0} 
+            icon={Users}
+            color="blue"
+            loading={loading}
+            delay={0.1}
+          />
+          <StatCard 
+            title="Usuários Ativos" 
+            value={stats?.usuariosAtivos || 0} 
+            icon={CheckCircle2}
+            color="green"
+            loading={loading}
+            delay={0.2}
+          />
+          <StatCard 
+            title="Controles Totais" 
+            value={stats?.totalControles || 0} 
+            icon={ClipboardList}
+            color="indigo"
+            loading={loading}
+            delay={0.3}
+          />
+          <StatCard 
+            title="Controles Pendentes" 
+            value={stats?.controlesPendentes || 0} 
+            icon={Clock}
+            color="orange"
+            loading={loading}
+            delay={0.4}
+          />
+          <StatCard 
+            title="Pedidos de Hoje" 
+            value={stats?.pedidosHoje || 0} 
+            icon={CheckCircle2}
+            color="cyan"
+            loading={loading}
+            delay={0.5}
+          />
+          <StatCard 
+            title="Pedidos do Mês" 
+            value={stats?.pedidosMes || 0} 
+            icon={Calendar}
+            color="blue"
+            loading={loading}
+            delay={0.6}
+          />
+        </div>
 
-        <Grid container spacing={3}>
-          {/* Cards de Estatísticas */}
-          <Grid item xs={12} sm={6} md={3}>
-            <StatCard 
-              title="Total de Usuários" 
-              value={stats?.totalUsuarios || 0} 
-              icon={<PeopleIcon sx={{ fontSize: 30 }} />}
-              color="primary"
-              loading={loading}
-              delay={0.1}
-            />
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <StatCard 
-              title="Usuários Ativos" 
-              value={stats?.usuariosAtivos || 0} 
-              icon={<CheckCircleIcon sx={{ fontSize: 30 }} />}
-              color="success"
-              loading={loading}
-              delay={0.2}
-            />
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <StatCard 
-              title="Controles Totais" 
-              value={stats?.totalControles || 0} 
-              icon={<AssignmentIcon sx={{ fontSize: 30 }} />}
-              color="info"
-              loading={loading}
-              delay={0.3}
-            />
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <StatCard 
-              title="Controles Pendentes" 
-              value={stats?.controlesPendentes || 0} 
-              icon={<PendingIcon sx={{ fontSize: 30 }} />}
-              color="warning"
-              loading={loading}
-              delay={0.4}
-            />
-          </Grid>
-
-          {/* Pedidos Fechados */}
-          <Grid item xs={12} sm={6} md={3}>
-            <StatCard 
-              title="Pedidos de Hoje (Fechados)" 
-              value={stats?.pedidosHoje || 0} 
-              icon={<CheckCircleIcon sx={{ fontSize: 30 }} />}
-              color="success"
-              loading={loading}
-              delay={0.5}
-            />
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <StatCard 
-              title="Pedidos do Mês (Fechados)" 
-              value={stats?.pedidosMes || 0} 
-              icon={<CalendarMonthIcon sx={{ fontSize: 30 }} />}
-              color="info"
-              loading={loading}
-              delay={0.6}
-            />
-          </Grid>
-
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Últimos Usuários */}
-          <Grid item xs={12} md={7}>
-            <MotionPaper
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.5 }}
-              sx={{
-                p: 0,
-                borderRadius: 4,
-                background: 'rgba(255, 255, 255, 0.8)',
-                backdropFilter: 'blur(10px)',
-                border: '1px solid rgba(255, 255, 255, 0.3)',
-                boxShadow: '0 8px 32px rgba(0,0,0,0.05)',
-                overflow: 'hidden'
-              }}
-            >
-              <Box p={3} display="flex" justifyContent="space-between" alignItems="center" bgcolor="rgba(25, 118, 210, 0.03)">
-                <Stack direction="row" spacing={1.5} alignItems="center">
-                  <Box sx={{ p: 1, bgcolor: 'primary.main', borderRadius: 2, color: 'white', display: 'flex' }}>
-                    <PeopleIcon fontSize="small" />
-                  </Box>
-                  <Typography variant="h6" fontWeight="700">Últimos Usuários</Typography>
-                </Stack>
-                <Tooltip title="Atualizar dados">
-                  <IconButton size="small" onClick={loadStats} disabled={loading} sx={{ bgcolor: 'white', '&:hover': { bgcolor: '#f1f5f9' } }}>
-                    <RefreshIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-              </Box>
-              <Divider sx={{ opacity: 0.5 }} />
+          <motion.div 
+            className="lg:col-span-7"
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.5 }}
+          >
+            <Card className="overflow-hidden h-full">
+              <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-600 rounded-lg text-white">
+                    <UserPlus size={18} />
+                  </div>
+                  <h2 className="text-lg font-bold text-slate-800">Últimos Usuários</h2>
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={loadStats} 
+                  disabled={loading}
+                  className="bg-white"
+                >
+                  <RefreshCw size={14} className={cn("mr-2", loading && "animate-spin")} />
+                  Atualizar
+                </Button>
+              </div>
               
-              <Box sx={{ maxHeight: 400, overflow: 'auto' }}>
+              <div className="max-h-[450px] overflow-auto">
                 {loading ? (
-                  <Box p={4} textAlign="center">
-                    <LinearProgress sx={{ borderRadius: 1, mb: 2 }} />
-                    <Typography color="text.secondary">Carregando usuários...</Typography>
-                  </Box>
+                  <div className="p-8 text-center space-y-4">
+                    <div className="flex justify-center">
+                      <RefreshCw size={32} className="text-blue-500 animate-spin" />
+                    </div>
+                    <p className="text-slate-500 font-medium">Carregando usuários...</p>
+                  </div>
                 ) : (
-                  <List disablePadding>
+                  <div className="divide-y divide-slate-50">
                     <AnimatePresence>
                       {stats?.ultimosUsuarios.length ? (
                         stats.ultimosUsuarios.map((usuario, index) => (
@@ -366,112 +237,84 @@ function AdminDashboardContent() {
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: 0.1 * index }}
+                            className="p-4 hover:bg-slate-50 transition-colors flex items-center justify-between group"
                           >
-                            <ListItem sx={{ 
-                              px: 3, 
-                              py: 2, 
-                              '&:hover': { bgcolor: 'rgba(25, 118, 210, 0.02)' },
-                              transition: 'background-color 0.2s'
-                            }}>
-                              <ListItemAvatar>
-                                <Avatar sx={{ 
-                                  bgcolor: alpha(theme.palette.primary.main, 0.1),
-                                  color: 'primary.main',
-                                  fontWeight: 'bold',
-                                  width: 45,
-                                  height: 45
-                                }}>
-                                  {usuario.nome.charAt(0).toUpperCase()}
-                                </Avatar>
-                              </ListItemAvatar>
-                              <ListItemText
-                                primary={
-                                  <Typography variant="subtitle1" fontWeight="700" color="#1e293b">
-                                    {usuario.nome}
-                                  </Typography>
-                                }
-                                secondary={
-                                  <Stack direction="row" spacing={1} alignItems="center" mt={0.5}>
-                                    <AccessTimeIcon sx={{ fontSize: 14, color: 'text.disabled' }} />
-                                    <Typography variant="caption" color="text.secondary">
-                                      {usuario.ultimoAcesso 
-                                        ? `Acesso em ${new Date(usuario.ultimoAcesso).toLocaleString()}` 
-                                        : 'Sem acessos registrados'}
-                                    </Typography>
-                                  </Stack>
-                                }
-                              />
-                              <IconButton size="small">
-                                <ArrowForwardIcon fontSize="small" color="action" />
-                              </IconButton>
-                            </ListItem>
-                            {index < stats.ultimosUsuarios.length - 1 && <Divider variant="inset" sx={{ opacity: 0.5 }} />}
+                            <div className="flex items-center gap-4">
+                              <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-lg border border-blue-100">
+                                {usuario.nome.charAt(0).toUpperCase()}
+                              </div>
+                              <div className="space-y-0.5">
+                                <h4 className="font-bold text-slate-800 group-hover:text-blue-600 transition-colors">
+                                  {usuario.nome}
+                                </h4>
+                                <div className="flex items-center gap-1.5 text-slate-400">
+                                  <Clock size={12} />
+                                  <span className="text-xs">
+                                    {usuario.ultimoAcesso 
+                                      ? `Acesso em ${new Date(usuario.ultimoAcesso).toLocaleString()}` 
+                                      : 'Sem acessos registrados'}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                            <button className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all md:opacity-0 md:group-hover:opacity-100 opacity-100">
+                              <ChevronRight size={18} />
+                            </button>
                           </motion.div>
                         ))
                       ) : (
-                        <Box p={8} textAlign="center">
-                          <PeopleIcon sx={{ fontSize: 48, color: 'text.disabled', opacity: 0.3, mb: 2 }} />
-                          <Typography color="text.secondary" fontWeight="500">Nenhum usuário encontrado</Typography>
-                        </Box>
+                        <div className="p-16 text-center space-y-4">
+                          <div className="flex justify-center opacity-20">
+                            <Users size={64} />
+                          </div>
+                          <p className="text-slate-400 font-medium">Nenhum usuário encontrado</p>
+                        </div>
                       )}
                     </AnimatePresence>
-                  </List>
+                  </div>
                 )}
-              </Box>
-            </MotionPaper>
-          </Grid>
+              </div>
+            </Card>
+          </motion.div>
 
           {/* Atividades Recentes */}
-          <Grid item xs={12} md={5}>
-            <MotionPaper
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.6 }}
-              sx={{
-                p: 0,
-                height: '100%',
-                borderRadius: 4,
-                background: 'rgba(255, 255, 255, 0.8)',
-                backdropFilter: 'blur(10px)',
-                border: '1px solid rgba(255, 255, 255, 0.3)',
-                boxShadow: '0 8px 32px rgba(0,0,0,0.05)',
-                overflow: 'hidden'
-              }}
-            >
-              <Box p={3} bgcolor="rgba(25, 118, 210, 0.03)">
-                <Stack direction="row" spacing={1.5} alignItems="center">
-                  <Box sx={{ p: 1, bgcolor: 'secondary.main', borderRadius: 2, color: 'white', display: 'flex' }}>
-                    <AssignmentIcon fontSize="small" />
-                  </Box>
-                  <Typography variant="h6" fontWeight="700">Atividades do Sistema</Typography>
-                </Stack>
-              </Box>
-              <Divider sx={{ opacity: 0.5 }} />
-              <Box p={4} sx={{ textAlign: 'center', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                <Box sx={{ 
-                  width: 80, 
-                  height: 80, 
-                  borderRadius: '50%', 
-                  bgcolor: 'rgba(0,0,0,0.03)', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center',
-                  margin: '0 auto 24px'
-                }}>
-                  <AccessTimeIcon sx={{ fontSize: 40, color: 'text.disabled', opacity: 0.3 }} />
-                </Box>
-                <Typography variant="h6" color="text.secondary" fontWeight="600" gutterBottom>
-                  Em Breve
-                </Typography>
-                <Typography color="text.secondary" variant="body2" sx={{ maxWidth: 250, margin: '0 auto' }}>
-                  O registro detalhado de atividades e logs do sistema será exibido aqui em uma atualização futura.
-                </Typography>
-              </Box>
-            </MotionPaper>
-          </Grid>
-        </Grid>
-      </Box>
-    </AdminLayout>
+          <motion.div 
+            className="lg:col-span-5"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.6 }}
+          >
+            <Card className="h-full overflow-hidden flex flex-col">
+              <div className="p-6 border-b border-slate-100 bg-slate-50/50">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-indigo-600 rounded-lg text-white">
+                    <Activity size={18} />
+                  </div>
+                  <h2 className="text-lg font-bold text-slate-800">Atividades do Sistema</h2>
+                </div>
+              </div>
+              <div className="flex-1 flex flex-col items-center justify-center p-8 text-center space-y-4 bg-white">
+                <div className="w-20 h-20 rounded-full bg-slate-50 flex items-center justify-center border border-slate-100">
+                  <Clock size={32} className="text-slate-300" />
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-xl font-bold text-slate-700">Em Breve</h3>
+                  <p className="text-slate-500 text-sm max-w-[280px] leading-relaxed">
+                    O registro detalhado de atividades e logs do sistema será exibido aqui em uma atualização futura.
+                  </p>
+                </div>
+                <div className="pt-4">
+                  <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-50 text-amber-700 rounded-full text-[10px] font-bold uppercase tracking-wider border border-amber-100">
+                    <AlertCircle size={12} />
+                    Funcionalidade em desenvolvimento
+                  </div>
+                </div>
+              </div>
+            </Card>
+          </motion.div>
+        </div>
+      </div>
+    </AppLayout>
   );
 }
 
@@ -482,3 +325,5 @@ export default function AdminDashboard() {
     </AdminRoute>
   );
 }
+
+(AdminDashboard as any).usesAppLayout = true;

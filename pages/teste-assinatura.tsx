@@ -16,7 +16,6 @@ import {
   alpha,
   useTheme
 } from '@mui/material';
-import Layout from '../components/Layout';
 import SignaturePadPro, { SignaturePadProHandles } from '../components/SignaturePadPro';
 import ModalAssinaturaDigitalPro from '../components/ModalAssinaturaDigitalPro';
 import SaveIcon from '@mui/icons-material/Save';
@@ -46,8 +45,8 @@ const TesteAssinatura: React.FC = () => {
   };
 
   return (
-    <Layout>
-      <Container maxWidth="lg" sx={{ py: 4 }}>
+    <>
+    <Container maxWidth="lg" sx={{ py: 4 }}>
         <Paper elevation={3} sx={{ p: 4 }}>
           <Typography variant="h4" gutterBottom color="primary">
             Teste do Novo Componente de Assinatura
@@ -263,7 +262,7 @@ const TesteAssinatura: React.FC = () => {
           console.log(`Assinatura do ${modalType} salva!`);
         }}
       />
-    </Layout>
+    </>
   );
 };
 

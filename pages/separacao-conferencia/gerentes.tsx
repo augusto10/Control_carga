@@ -12,7 +12,6 @@ import {
   AssignmentTurnedIn as ConferenciasIcon,
   EmojiEvents as GamificacaoIcon
 } from '@mui/icons-material';
-import Layout from '../../components/Layout';
 
 const MotionBox = motion(Box);
 
@@ -85,7 +84,7 @@ export default function PaginaGerentes() {
   ];
 
   return (
-    <Layout>
+    
       <Box sx={{ 
         minHeight: '100vh',
         background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
@@ -181,6 +180,6 @@ export default function PaginaGerentes() {
           </Box>
         </Container>
       </Box>
-    </Layout>
+    
   );
 }

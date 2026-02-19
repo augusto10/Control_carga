@@ -42,7 +42,7 @@ import {
   Warning as WarningIcon,
   Search as SearchIcon
 } from '@mui/icons-material';
-import Layout from '@/components/Layout';
+ 
 import ResponsiveContainer from '@/components/ResponsiveContainer';
 import { useSnackbar } from 'notistack';
 import api from '@/lib/api';

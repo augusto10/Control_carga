@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import Layout from '../../components/Layout';
 import {
   Container,
   Typography,
@@ -148,7 +147,7 @@ function HistoricoPage() {
 
   if (loading) {
     return (
-      <Layout>
+      
         <Box sx={{ 
           height: '100vh', 
           display: 'flex', 
@@ -163,12 +162,12 @@ function HistoricoPage() {
             </Typography>
           </Stack>
         </Box>
-      </Layout>
+      
     );
   }
 
   return (
-    <Layout>
+    <>
       <Box sx={{ 
         minHeight: '100vh',
         background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
@@ -520,7 +519,7 @@ function HistoricoPage() {
           animation: spin 1s linear infinite;
         }
       `}</style>
-    </Layout>
+    </>
   );
 }
 

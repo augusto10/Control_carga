@@ -141,7 +141,7 @@ const PainelGerencial: React.FC = () => {
 
   if (!user || user.tipo !== 'ADMIN') {
     return (
-      <Layout title="Acesso Negado">
+      
         <Container maxWidth="md" sx={{ mt: 8 }}>
           <MotionPaper
             initial={{ opacity: 0, scale: 0.9 }}
@@ -160,7 +160,7 @@ const PainelGerencial: React.FC = () => {
             </Button>
           </MotionPaper>
         </Container>
-      </Layout>
+      
     );
   }
 

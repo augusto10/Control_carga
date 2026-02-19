@@ -30,7 +30,6 @@ import {
   Error as ErrorIcon,
   Pending as PendingIcon
 } from '@mui/icons-material';
-import Layout from '../../components/Layout';
 import { useRouter } from 'next/router';
 
 const MotionBox = motion(Box);
@@ -101,7 +100,7 @@ export default function RelatoriosPage() {
   }
 
   return (
-    <Layout>
+    
       <Box sx={{ 
         minHeight: '100vh',
         background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
@@ -309,6 +308,6 @@ export default function RelatoriosPage() {
           </MotionPaper>
         </Container>
       </Box>
-    </Layout>
+    
   );
 }

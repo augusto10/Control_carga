@@ -577,14 +577,14 @@ const RelatorioPalletsPage: React.FC = () => {
         </Typography>
         <TableContainer>
           <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell><strong>Motorista</strong></TableCell>
-                <TableCell><strong>Transportadora</strong></TableCell>
-                <TableCell align="right"><strong>Pallets Levados</strong></TableCell>
-                <TableCell align="right"><strong>Pallets Devolvidos</strong></TableCell>
-                <TableCell align="right"><strong>Diferença Pallets</strong></TableCell>
-                <TableCell align="right"><strong>Total Controles</strong></TableCell>
+            <TableHead sx={{ bgcolor: 'rgba(241,245,249,0.5)' }}>
+              <TableRow sx={{ borderBottom: '1px solid #e2e8f0' }}>
+                <TableCell sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em' }}>Motorista</TableCell>
+                <TableCell sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em' }}>Transportadora</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em' }}>Pallets Levados</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em' }}>Pallets Devolvidos</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em' }}>Diferença Pallets</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em' }}>Total Controles</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>

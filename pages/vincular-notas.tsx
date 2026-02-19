@@ -313,7 +313,7 @@ const VincularNotasPage = () => {
             anchorOrigin: { vertical: 'top', horizontal: 'center' }
           }
         );
-        router.push('/listar-controles');
+        router.push('/controles');
       }
     } catch (error) {
       console.error('Erro ao processar o formulário:', error);
@@ -356,7 +356,7 @@ const VincularNotasPage = () => {
           <Button 
             variant="contained" 
             color="primary" 
-            onClick={() => router.push('/listar-controles')}
+            onClick={() => router.push('/controles')}
           >
             Voltar para a lista
           </Button>
@@ -556,7 +556,7 @@ const VincularNotasPage = () => {
         <Box display="flex" justifyContent="flex-end" gap={2}>
           <Button 
             variant="outlined" 
-            onClick={() => router.push('/listar-controles')}
+            onClick={() => router.push('/controles')}
           >
             Cancelar
           </Button>

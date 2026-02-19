@@ -4,6 +4,7 @@ import dynamic from 'next/dynamic';
 import { useAuth } from '../contexts/AuthContext';
 import { USER_TYPES } from '../types/auth-types';
 import ProtectedRoute from '../components/ProtectedRoute';
+import { AppLayout } from '@/components/layout/AppLayout';
 
 // Carrega o componente de forma dinâmica para evitar problemas de SSR
 const AdicionarNotasContent = dynamic(
@@ -32,9 +33,16 @@ const AdicionarNotasPage = () => {
 
   return (
     <ProtectedRoute allowedRoles={[USER_TYPES.ADMIN, USER_TYPES.GERENTE, USER_TYPES.USUARIO]}>
-      <AdicionarNotasContent />
+      <AppLayout 
+        title="Adicionar Notas" 
+        subtitle="Registre novas notas fiscais no sistema"
+      >
+        <AdicionarNotasContent />
+      </AppLayout>
     </ProtectedRoute>
   );
 };
+
+(AdicionarNotasPage as any).usesAppLayout = true;
 
 export default AdicionarNotasPage;

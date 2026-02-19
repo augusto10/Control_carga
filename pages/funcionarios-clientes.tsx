@@ -295,7 +295,7 @@ const FuncionariosClientes: React.FC = () => {
   // Verifica se o usuário tem permissão
   if (!user || !['ADMIN', 'GERENTE'].includes(user.tipo)) {
     return (
-      <Layout>
+      
         <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
           <Alert 
             severity="error"
@@ -316,14 +316,13 @@ const FuncionariosClientes: React.FC = () => {
             Você não tem permissão para acessar esta página.
           </Alert>
         </Container>
-      </Layout>
     );
   }
 
   return (
     <ProtectedRoute>
       <ResponsiveContainer
-        breadcrumb={[
+        breadcrumbs={[
           { label: 'Dashboard', path: '/' },
           { label: 'Funcionários e Clientes' }
         ]}

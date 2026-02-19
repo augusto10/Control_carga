@@ -302,15 +302,10 @@ const menuItems = [
     adminOnly: true,
     subItems: [
       {
-        text: 'Ciclo do Pedido',
+        text: 'Pedidos Entregas',
         icon: <ReceiptModernIcon sx={{ fontSize: 20 }} />,
         path: '/admin/pedidos'
       },
-      {
-        text: 'Status do Pedido',
-        icon: <TimelineModernIcon sx={{ fontSize: 20 }} />,
-        path: '/admin/pedidos/status'
-      }
     ]
   },
   { 
@@ -329,22 +324,22 @@ const menuItems = [
       }
     ]
   },
-  {
-    text: 'Controle de Carga',
-    icon: <ShippingIcon sx={{ fontSize: 22 }} />,
-    subItems: [
       { 
-        text: 'Criar Controle', 
-        icon: <AddIcon sx={{ fontSize: 20 }} />, 
-        path: '/criar-controle' 
+        text: 'Controle de Carga',
+        icon: <ShippingIcon sx={{ fontSize: 22 }} />,
+        subItems: [
+          { 
+            text: 'Criar Controle', 
+            icon: <AddIcon sx={{ fontSize: 20 }} />, 
+            path: '/criar-controle' 
+          },
+          { 
+            text: 'Listar Controles', 
+            icon: <DocumentIcon sx={{ fontSize: 20 }} />, 
+            path: '/controles' 
+          },
+        ]
       },
-      { 
-        text: 'Listar Controles', 
-        icon: <DocumentIcon sx={{ fontSize: 20 }} />, 
-        path: '/listar-controles' 
-      },
-    ]
-  },
   {
     text: 'Checklist Recebimento',
     icon: <ChecklistModernIcon sx={{ fontSize: 22 }} />,

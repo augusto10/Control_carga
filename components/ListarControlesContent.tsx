@@ -69,7 +69,6 @@ import FilterListIcon from '@mui/icons-material/FilterList';
 import ClearIcon from '@mui/icons-material/Clear';
 
 import ResponsiveTable from './ResponsiveTable';
-import ResponsiveContainer from './ResponsiveContainer';
 import ModalAssinaturaDigitalPro from './ModalAssinaturaDigitalPro';
 import ModalAssinaturaSimplesAlternativo from './ModalAssinaturaSimplesAlternativo';
 import ImageCapture from './ImageCapture';
@@ -679,15 +678,14 @@ const ListarControlesContent: React.FC = () => {
       const minSpaceForSignatures = 160; // espaço otimizado para duas assinaturas
       let yPos = height - topMargin;
 
-      // Helpers de paginação (duas colunas)
-      const leftBaseX = 40;
-      const rightBaseX = 300; // distância horizontal para segunda coluna
+      // Helpers de paginação (uma coluna)
+      const tableBaseX = 40;
 
       const drawTableHeaderForColumn = (baseX: number, headerY: number) => {
         const col1 = baseX;       // Qtd
         const col2 = baseX + 30;  // Nota Fiscal
-        const col3 = baseX + 100; // Data
-        const col4 = baseX + 200; // Volumes
+        const col3 = baseX + 110; // Data
+        const col4 = baseX + 220; // Volumes
         page.drawText('Qtd', { x: col1, y: headerY, size: fontSize, font, color: rgb(0, 0, 0) });
         page.drawText('Nota Fiscal', { x: col2, y: headerY, size: fontSize, font, color: rgb(0, 0, 0) });
         page.drawText('Data', { x: col3, y: headerY, size: fontSize, font, color: rgb(0, 0, 0) });
@@ -695,7 +693,7 @@ const ListarControlesContent: React.FC = () => {
         // linha sob o cabeçalho desta coluna
         page.drawLine({
           start: { x: baseX, y: headerY - 5 },
-          end: { x: baseX + 240, y: headerY - 5 },
+          end: { x: width - 50, y: headerY - 5 },
           thickness: 1,
           color: rgb(0, 0, 0),
         });
@@ -868,22 +866,19 @@ const ListarControlesContent: React.FC = () => {
         yPos -= imagensLayout.rows * (imagensLayout.height + 25) + 10;
       }
       
-      // Tabela de Notas (duas colunas) - Ajustada dinamicamente
+      // Tabela de Notas (uma coluna) - Ajustada dinamicamente
       yPos -= lineHeight * 1.5; // Espaço reduzido antes da tabela
       
       // Calcular quantas linhas cabem no espaço restante
       const espacoRestante = yPos - (bottomMargin + minSpaceForSignatures);
       const rowSpacing = lineHeight * 2; // cada nota consome duas linhas (principal + detalhes)
       const maxRowsPossivel = Math.floor(espacoRestante / rowSpacing) - 2; // reserva espaço para totais
-      const maxRowsPerColumn = Math.max(6, Math.min(12, Math.floor(maxRowsPossivel / 2))); // ajuste para duas colunas
+      const maxRowsPerPage = Math.max(8, Math.min(22, maxRowsPossivel));
       
-      // Cabeçalho para ambas as colunas na mesma linha
-      const leftHeader = drawTableHeaderForColumn(leftBaseX, yPos);
-      const rightHeader = drawTableHeaderForColumn(rightBaseX, yPos);
-      let yLeft = leftHeader.nextY;
-      let yRight = rightHeader.nextY;
-      let rowsLeft = 0;
-      let rowsRight = 0;
+      // Cabeçalho para a coluna única
+      const header = drawTableHeaderForColumn(tableBaseX, yPos);
+      let yRow = header.nextY;
+      let rows = 0;
 
       const drawNota = (idx: number, nota: any, cols: {col1:number,col2:number,col3:number,col4:number}, y: number) => {
         const volumes = parseInt(nota.volumes) || 1;
@@ -949,44 +944,18 @@ const ListarControlesContent: React.FC = () => {
           : (typeof (nota as any).peso === 'number' ? (nota as any).peso : undefined);
         if (typeof pesoItem === 'number') totalPeso += pesoItem;
 
-        // Verifica se precisamos de nova página (sem espaço para mais linhas + assinaturas)
-        const noSpaceLeft = (rowsLeft >= maxRowsPerColumn) || (yLeft < bottomMargin + minSpaceForSignatures + lineHeight);
-        const noSpaceRight = (rowsRight >= maxRowsPerColumn) || (yRight < bottomMargin + minSpaceForSignatures + lineHeight);
-        if (noSpaceLeft && noSpaceRight) {
+        const noSpace = (rows >= maxRowsPerPage) || (yRow < bottomMargin + minSpaceForSignatures + lineHeight);
+        if (noSpace) {
           page.drawText('Continua na próxima página...', { x: 50, y: 40, size: fontSize - 2, font, color: rgb(0.5, 0.5, 0.5) });
           addNewPage();
-          // redesenha cabeçalhos em nova página
-          const newLeft = drawTableHeaderForColumn(leftBaseX, yPos);
-          const newRight = drawTableHeaderForColumn(rightBaseX, yPos);
-          yLeft = newLeft.nextY;
-          yRight = newRight.nextY;
-          rowsLeft = 0;
-          rowsRight = 0;
+          const newHeader = drawTableHeaderForColumn(tableBaseX, yPos);
+          yRow = newHeader.nextY;
+          rows = 0;
         }
 
-        // Preenche coluna esquerda até 15 linhas, senão a direita
-        if (!noSpaceLeft && rowsLeft < maxRowsPerColumn) {
-          drawNota(index, nota, leftHeader, yLeft);
-          yLeft -= rowSpacing;
-          rowsLeft += 1;
-        } else if (!noSpaceRight && rowsRight < maxRowsPerColumn) {
-          drawNota(index, nota, rightHeader, yRight);
-          yRight -= rowSpacing;
-          rowsRight += 1;
-        } else {
-          // caso limite atingido em ambas após checks, força nova página e desenha na esquerda
-          page.drawText('Continua na próxima página...', { x: 50, y: 40, size: fontSize - 2, font, color: rgb(0.5, 0.5, 0.5) });
-          addNewPage();
-          const newLeft = drawTableHeaderForColumn(leftBaseX, yPos);
-          const newRight = drawTableHeaderForColumn(rightBaseX, yPos);
-          yLeft = newLeft.nextY;
-          yRight = newRight.nextY;
-          rowsLeft = 0;
-          rowsRight = 0;
-          drawNota(index, nota, newLeft, yLeft);
-          yLeft -= rowSpacing;
-          rowsLeft += 1;
-        }
+        drawNota(index, nota, header, yRow);
+        yRow -= rowSpacing;
+        rows += 1;
       });
       
       // Totalizadores
@@ -998,8 +967,8 @@ const ListarControlesContent: React.FC = () => {
         color: rgb(0, 0, 0),
       });
       
-      // posiciona totalizadores considerando a menor Y das duas colunas
-      yPos = Math.min(yLeft, yRight) - 8;
+      // posiciona totalizadores considerando a última linha da coluna
+      yPos = yRow - 8;
       page.drawLine({
         start: { x: 50, y: yPos },
         end: { x: width - 50, y: yPos },
@@ -1008,9 +977,9 @@ const ListarControlesContent: React.FC = () => {
       });
       yPos -= lineHeight;
       // Totais alinhados na coluna esquerda
-      page.drawText('TOTAL:', { x: leftBaseX + 80, y: yPos, size: fontSize, font, color: rgb(0, 0, 0) });
-      page.drawText(notasParaPdf.length.toString(), { x: leftBaseX, y: yPos, size: fontSize, font, color: rgb(0, 0, 0) });
-      page.drawText(totalVolumes.toString(), { x: leftBaseX + 200, y: yPos, size: fontSize, font, color: rgb(0, 0, 0) });
+      page.drawText('TOTAL:', { x: tableBaseX + 80, y: yPos, size: fontSize, font, color: rgb(0, 0, 0) });
+      page.drawText(notasParaPdf.length.toString(), { x: tableBaseX, y: yPos, size: fontSize, font, color: rgb(0, 0, 0) });
+      page.drawText(totalVolumes.toString(), { x: tableBaseX + 220, y: yPos, size: fontSize, font, color: rgb(0, 0, 0) });
       
       // Rodapé
       yPos -= lineHeight * 2;

@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import Layout from '../../components/Layout';
 import {
   Container,
   Typography,
@@ -176,7 +175,7 @@ function GamificacaoPage() {
 
   if (loading) {
     return (
-      <Layout>
+      
         <Box sx={{ 
           height: '100vh', 
           display: 'flex', 
@@ -208,12 +207,12 @@ function GamificacaoPage() {
             </Box>
           </Stack>
         </Box>
-      </Layout>
+      
     );
   }
 
   return (
-    <Layout>
+    
       <Box sx={{ 
         minHeight: '100vh',
         background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
@@ -748,7 +747,7 @@ function GamificacaoPage() {
           `}</style>
         </Container>
       </Box>
-    </Layout>
+    
   );
 }
 

@@ -20,11 +20,16 @@ import {
   Settings as SettingsIcon,
 } from '@mui/icons-material';
 
-export default function UserMenu() {
+type UserMenuProps = {
+  showInlineLabel?: boolean;
+};
+
+export default function UserMenu({ showInlineLabel = false }: UserMenuProps) {
   const { user, logout } = useAuth();
   const router = useRouter();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const open = Boolean(anchorEl);
+  const isAdmin = !!user && String(user.tipo).toUpperCase() === 'ADMIN';
 
   if (!user) return null;
 
@@ -54,11 +59,21 @@ export default function UserMenu() {
 
   return (
     <Box sx={{ display: 'flex', alignItems: 'center' }}>
+      {showInlineLabel && (
+        <Box sx={{ display: { xs: 'none', sm: 'flex' }, flexDirection: 'column', alignItems: 'flex-end' }}>
+          <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.primary', lineHeight: 1 }}>
+            {user.nome}
+          </Typography>
+          <Typography variant="caption" sx={{ color: 'text.secondary', lineHeight: 1 }}>
+            {user.tipo}
+          </Typography>
+        </Box>
+      )}
       <Tooltip title={`${user.nome} (${user.tipo})`}>
         <IconButton
           onClick={handleClick}
           size="small"
-          sx={{ ml: 2 }}
+          sx={{ ml: showInlineLabel ? 1.5 : 2 }}
           aria-controls={open ? 'account-menu' : undefined}
           aria-haspopup="true"
           aria-expanded={open ? 'true' : undefined}
@@ -114,7 +129,7 @@ export default function UserMenu() {
         </MenuItem>
         <Divider />
         
-        {user.tipo === 'ADMIN' && (
+        {isAdmin && (
           <MenuItem onClick={handleAdmin}>
             <ListItemIcon>
               <AdminIcon fontSize="small" />

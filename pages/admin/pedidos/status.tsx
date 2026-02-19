@@ -3,55 +3,30 @@ import { useRouter } from 'next/router';
 import Head from 'next/head';
 import { useState, useEffect } from 'react';
 import {
-  Container,
-  Typography,
-  Paper,
-  Grid,
-  Card,
-  CardContent,
-  Box,
-  Chip,
-  Stack,
-  Avatar,
-  LinearProgress,
-  Button,
-  IconButton,
-  Tooltip,
-  alpha,
-  useTheme,
-  ToggleButton,
-  ToggleButtonGroup,
-  Divider,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  CircularProgress,
-  Alert
-} from '@mui/material';
-import {
-  LocalShipping as LocalShippingIcon,
-  Inventory as InventoryIcon,
-  CheckCircle as CheckCircleIcon,
-  Pending as PendingIcon,
-  Schedule as ScheduleIcon,
-  Refresh as RefreshIcon,
-  FilterList as FilterListIcon,
-  Download as DownloadIcon,
-  TrendingUp as TrendingUpIcon,
-  Warning as WarningIcon,
-  Error as ErrorIcon
-} from '@mui/icons-material';
-import { motion } from 'framer-motion';
-import { useAuth } from '../../../contexts/AuthContext';
+  TrendingUp,
+  Package,
+  CheckCircle2,
+  Clock,
+  RefreshCw,
+  Filter,
+  Download,
+  AlertTriangle,
+  LayoutDashboard,
+  Search,
+  Truck,
+  ArrowLeft
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useAuth } from '@/contexts/AuthContext';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import VisualPageLayout from '../../../components/VisualPageLayout';
-import AdminRoute from '../../../components/AdminRoute';
+import { AppLayout } from '@/components/layout/AppLayout';
+import AdminRoute from '@/components/admin/AdminRoute';
+import { Card } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { Badge } from '@/components/ui/Badge';
+import { cn } from '@/utils/cn';
 
-const MotionPaper = motion(Paper);
 const MotionCard = motion(Card);
 
 interface PedidoStatus {
@@ -132,8 +107,45 @@ const buildApuracoesMap = (items: ApuracaoItem[]) =>
 
 type StatusFiltro = 'todos' | 'separacao' | 'separado' | 'aguardando-entrega';
 
+const parsePedidoDate = (value: unknown) => {
+  if (!value) return null;
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+
+  const raw = String(value).trim();
+  if (!raw) return null;
+
+  if (/^\d+$/.test(raw)) {
+    const numericDate = new Date(Number(raw));
+    return Number.isNaN(numericDate.getTime()) ? null : numericDate;
+  }
+
+  if (raw.includes('T')) {
+    const isoDate = parseISO(raw);
+    return Number.isNaN(isoDate.getTime()) ? null : isoDate;
+  }
+
+  const nativeDate = new Date(raw);
+  return Number.isNaN(nativeDate.getTime()) ? null : nativeDate;
+};
+
+const getDataReferenciaPedido = (p: PedidoStatus) => {
+  return (
+    parsePedidoDate(p.DATA_HORA_CADASTRO) ||
+    parsePedidoDate((p as any).DATA_CADASTRO) ||
+    parsePedidoDate((p as any).DATA_HORA_PEDIDO) ||
+    parsePedidoDate((p as any).DATA_PEDIDO) ||
+    parsePedidoDate((p as any).DATA_HORA_EMISSAO) ||
+    parsePedidoDate((p as any).DATA_EMISSAO) ||
+    parsePedidoDate((p as any).EMISSAO) ||
+    parsePedidoDate((p as any).DATA) ||
+    parsePedidoDate(p.DATA_HORA_RECEBIMENTO) ||
+    parsePedidoDate((p as any).DATA_RECEBIMENTO) ||
+    parsePedidoDate(p.DATA_ENTREGA) ||
+    null
+  );
+};
+
 function StatusPedidosContent() {
-  const theme = useTheme();
   const { user } = useAuth();
   const router = useRouter();
   const [pedidos, setPedidos] = useState<PedidoStatus[]>([]);
@@ -161,6 +173,7 @@ function StatusPedidosContent() {
   const carregarPedidos = async () => {
     try {
       setLoading(true);
+      setError(null);
       
       const pedidosUrl = '/api/pedidos/externos?limit=100&offset=0';
       const response = await fetch(pedidosUrl, {
@@ -177,12 +190,7 @@ function StatusPedidosContent() {
 
       const pedidosBase = data.data || [];
       const datas = pedidosBase
-        .map((p) => {
-          const dataCand = p.DATA_HORA_RECEBIMENTO || p.DATA_HORA_CADASTRO || p.DATA_ENTREGA;
-          if (!dataCand) return null;
-          const d = new Date(dataCand);
-          return Number.isNaN(d.getTime()) ? null : d;
-        })
+        .map((p) => getDataReferenciaPedido(p))
         .filter((d): d is Date => !!d);
 
       const minDate = datas.length ? new Date(Math.min(...datas.map((d) => d.getTime()))) : null;
@@ -262,65 +270,62 @@ function StatusPedidosContent() {
     });
   };
 
-  const determinarStatusPedido = (pedido: PedidoStatus): { status: StatusFiltro, label: string, color: 'warning' | 'success' | 'info' | 'error' | 'default', icon: React.ReactElement } => {
+  const determinarStatusPedido = (pedido: PedidoStatus): { 
+    status: StatusFiltro, 
+    label: string, 
+    variant: 'warning' | 'success' | 'info' | 'danger' | 'default', 
+    icon: React.ReactNode 
+  } => {
     if (pedido.CANCELADO === 'S') {
       return {
         status: 'todos',
         label: 'Cancelado',
-        color: 'error',
-        icon: <ErrorIcon />
+        variant: 'danger',
+        icon: <AlertTriangle className="w-3 h-3" />
       };
     }
 
-    // Prioridade 1: Nota Gerada (Aguardando Entrega)
     if (pedido.NUMERO_NOTA) {
       return {
         status: 'aguardando-entrega',
         label: 'Aguardando Entrega',
-        color: 'info',
-        icon: <ScheduleIcon />
+        variant: 'info',
+        icon: <Clock className="w-3 h-3" />
       };
     }
 
-    // Prioridade 2: Entregue (Adicionado status entregue se necessário no futuro, por enquanto mantém lógica anterior ou ajusta conforme ciclo)
-    // Se DATA_ENTREGA existe e não tem nota, tecnicamente já foi entregue ou é um estado inconsistente?
-    // Mantendo coerência com o Ciclo: se tem DATA_ENTREGA, é entregue. Mas aqui os filtros são específicos.
-    // Vamos manter a lógica de "Separado" se tiver separado e sem nota.
-
-    // Prioridade 3: Em Separação
     if (pedido.SEPARADO_PARA_RECEBIMENTO === 'N' && pedido.PEDIDO_FECHADO === 'S') {
       return {
         status: 'separacao',
         label: 'Em Separação',
-        color: 'warning',
-        icon: <PendingIcon />
+        variant: 'warning',
+        icon: <Package className="w-3 h-3" />
       };
     }
 
-    // Prioridade 4: Separado
     if (pedido.SEPARADO_PARA_RECEBIMENTO === 'S') {
       return {
         status: 'separado',
         label: 'Separado',
-        color: 'success',
-        icon: <CheckCircleIcon />
+        variant: 'success',
+        icon: <CheckCircle2 className="w-3 h-3" />
       };
     }
 
     return {
       status: 'todos',
       label: 'Outro',
-      color: 'default',
-      icon: <InventoryIcon />
+      variant: 'default',
+      icon: <Package className="w-3 h-3" />
     };
   };
 
   const pedidosFiltrados = pedidos.filter(pedido => {
-    const pedidoSelecionado = router.query.pedido
+    const pedidoSelecionadoId = router.query.pedido
       ? Number(router.query.pedido as string)
       : null;
 
-    if (pedidoSelecionado && pedido.ORCAMENTO_ID !== pedidoSelecionado) {
+    if (pedidoSelecionadoId && pedido.ORCAMENTO_ID !== pedidoSelecionadoId) {
       return false;
     }
 
@@ -330,14 +335,7 @@ function StatusPedidosContent() {
     return status.status === filtroStatus;
   });
 
-  const formatarData = (dataString: string | null) => {
-    if (!dataString) return '-';
-    try {
-      return format(parseISO(dataString), "dd/MM/yy HH:mm", { locale: ptBR });
-    } catch {
-      return dataString;
-    }
-  };
+  const formatarData = (data: Date | null) => (data ? format(data, "dd/MM/yy HH:mm", { locale: ptBR }) : '-');
 
   const formatarValor = (valor: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -346,441 +344,282 @@ function StatusPedidosContent() {
     }).format(valor);
   };
 
-  const handleFiltroChange = (
-    event: React.MouseEvent<HTMLElement>,
-    newFiltro: StatusFiltro | null,
-  ) => {
-    if (newFiltro !== null) {
-      setFiltroStatus(newFiltro);
-    }
-  };
-
-  if (error) {
-    return (
-      <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
-        <Alert 
-          severity="error" 
-          variant="standard"
-          sx={{ 
-            borderRadius: '16px',
-            backdropFilter: 'blur(12px)',
-            backgroundColor: alpha(theme.palette.error.main, 0.15),
-            color: theme.palette.error.dark,
-            border: `1px solid ${alpha(theme.palette.error.main, 0.3)}`,
-            '& .MuiAlert-icon': {
-              color: theme.palette.error.main,
-            },
-            boxShadow: `0 8px 32px 0 ${alpha(theme.palette.common.black, 0.1)}`,
-            fontWeight: 600,
-          }}
-        >
-          {error}
-        </Alert>
-      </Container>
-    );
-  }
-
   return (
-    <Container maxWidth="xl" sx={{ py: 3 }}>
-      {/* Header Section */}
-      <MotionPaper
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        sx={{
-          p: 3,
-          mb: 3,
-          background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.05)} 0%, ${alpha(theme.palette.secondary.main, 0.05)} 100%)`,
-          border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-          borderRadius: 2,
-          backdropFilter: 'blur(10px)'
-        }}
-      >
-        <Stack direction={{ xs: 'column', sm: 'row' }} alignItems={{ sm: 'center' }} spacing={2}>
-          <Avatar
-            sx={{
-              width: 56,
-              height: 56,
-              background: `linear-gradient(135deg, ${theme.palette.info.main} 0%, ${theme.palette.success.main} 100%)`,
-              boxShadow: `0 8px 32px ${alpha(theme.palette.info.main, 0.3)}`
-            }}
-          >
-            <InventoryIcon sx={{ fontSize: 32 }} />
-          </Avatar>
-          <Box flex={1}>
-            <Typography variant="h4" fontWeight="bold" color="primary.main" gutterBottom>
-              Painel de Status dos Pedidos
-            </Typography>
-            <Typography variant="body1" color="text.secondary">
-              Acompanhe o ciclo completo dos pedidos: separação, separado e aguardando entrega
-            </Typography>
-          </Box>
-          <Stack direction="row" spacing={2}>
-            <Tooltip title="Atualizar lista">
-              <IconButton
-                onClick={carregarPedidos}
-                disabled={loading}
-                sx={{
-                  background: `linear-gradient(135deg, ${alpha(theme.palette.info.main, 0.1)} 0%, ${alpha(theme.palette.info.dark, 0.1)} 100%)`,
-                  border: `1px solid ${alpha(theme.palette.info.main, 0.2)}`,
-                  '&:hover': {
-                    background: `linear-gradient(135deg, ${alpha(theme.palette.info.main, 0.2)} 0%, ${alpha(theme.palette.info.dark, 0.2)} 100%)`,
-                  }
-                }}
-              >
-                <RefreshIcon />
-              </IconButton>
-            </Tooltip>
-          </Stack>
-        </Stack>
-      </MotionPaper>
-
+    <div className="space-y-6">
       {/* Cards de Estatísticas */}
-      <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid item xs={12} sm={6} md={3}>
-          <MotionCard
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.1 }}
-            sx={{
-              borderRadius: 2,
-              border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-              boxShadow: `0 8px 32px ${alpha(theme.palette.common.black, 0.05)}`,
-              backdropFilter: 'blur(10px)',
-              background: `linear-gradient(135deg, ${alpha(theme.palette.background.paper, 0.9)} 0%, ${alpha(theme.palette.background.paper, 0.7)} 100%)`,
-            }}
-          >
-            <CardContent>
-              <Stack direction="row" alignItems="center" spacing={2}>
-                <Avatar sx={{ bgcolor: alpha(theme.palette.primary.main, 0.1) }}>
-                  <TrendingUpIcon color="primary" />
-                </Avatar>
-                <Box>
-                  <Typography variant="h4" fontWeight="bold">
-                    {stats.total}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Total de Pedidos
-                  </Typography>
-                </Box>
-              </Stack>
-            </CardContent>
-          </MotionCard>
-        </Grid>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <MotionCard
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+          className="bg-white p-3 sm:p-4"
+          noPadding
+        >
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
+              <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xl sm:text-2xl font-bold text-slate-900 truncate">{stats.total}</p>
+              <p className="text-[10px] sm:text-sm text-slate-500 truncate">Total</p>
+            </div>
+          </div>
+        </MotionCard>
 
-        <Grid item xs={12} sm={6} md={3}>
-          <MotionCard
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.2 }}
-            sx={{
-              borderRadius: 2,
-              border: `1px solid ${alpha(theme.palette.warning.main, 0.2)}`,
-              boxShadow: `0 8px 32px ${alpha(theme.palette.warning.main, 0.1)}`,
-              backdropFilter: 'blur(10px)',
-              background: `linear-gradient(135deg, ${alpha(theme.palette.warning.main, 0.05)} 0%, ${alpha(theme.palette.warning.light, 0.05)} 100%)`,
-            }}
-          >
-            <CardContent>
-              <Stack direction="row" alignItems="center" spacing={2}>
-                <Avatar sx={{ bgcolor: alpha(theme.palette.warning.main, 0.1) }}>
-                  <PendingIcon color="warning" />
-                </Avatar>
-                <Box>
-                  <Typography variant="h4" fontWeight="bold" color="warning.main">
-                    {stats.separacao}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Em Separação
-                  </Typography>
-                </Box>
-              </Stack>
-              <LinearProgress 
-                variant="determinate" 
-                value={stats.total > 0 ? (stats.separacao / stats.total) * 100 : 0}
-                color="warning"
-                sx={{ mt: 2, borderRadius: 1 }}
-              />
-            </CardContent>
-          </MotionCard>
-        </Grid>
+        <MotionCard
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.1 }}
+          className="bg-card-orange/10 border-card-orange/20 p-3 sm:p-4"
+          noPadding
+        >
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-card-orange/20 flex items-center justify-center text-card-orange shrink-0">
+              <Package className="w-5 h-5 sm:w-6 sm:h-6" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xl sm:text-2xl font-bold text-card-orange truncate">{stats.separacao}</p>
+              <p className="text-[10px] sm:text-sm text-card-orange/80 truncate">Separação</p>
+            </div>
+          </div>
+          <div className="mt-3 sm:mt-4 w-full bg-card-orange/10 rounded-full h-1 sm:h-1.5 overflow-hidden">
+            <div 
+              className="bg-card-orange h-full transition-all duration-500" 
+              style={{ width: `${stats.total > 0 ? (stats.separacao / stats.total) * 100 : 0}%` }}
+            />
+          </div>
+        </MotionCard>
 
-        <Grid item xs={12} sm={6} md={3}>
-          <MotionCard
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.3 }}
-            sx={{
-              borderRadius: 2,
-              border: `1px solid ${alpha(theme.palette.success.main, 0.2)}`,
-              boxShadow: `0 8px 32px ${alpha(theme.palette.success.main, 0.1)}`,
-              backdropFilter: 'blur(10px)',
-              background: `linear-gradient(135deg, ${alpha(theme.palette.success.main, 0.05)} 0%, ${alpha(theme.palette.success.light, 0.05)} 100%)`,
-            }}
-          >
-            <CardContent>
-              <Stack direction="row" alignItems="center" spacing={2}>
-                <Avatar sx={{ bgcolor: alpha(theme.palette.success.main, 0.1) }}>
-                  <CheckCircleIcon color="success" />
-                </Avatar>
-                <Box>
-                  <Typography variant="h4" fontWeight="bold" color="success.main">
-                    {stats.separado}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Separados
-                  </Typography>
-                </Box>
-              </Stack>
-              <LinearProgress 
-                variant="determinate" 
-                value={stats.total > 0 ? (stats.separado / stats.total) * 100 : 0}
-                color="success"
-                sx={{ mt: 2, borderRadius: 1 }}
-              />
-            </CardContent>
-          </MotionCard>
-        </Grid>
+        <MotionCard
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.2 }}
+          className="bg-card-green/10 border-card-green/20 p-3 sm:p-4"
+          noPadding
+        >
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-card-green/20 flex items-center justify-center text-card-green shrink-0">
+              <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xl sm:text-2xl font-bold text-card-green truncate">{stats.separado}</p>
+              <p className="text-[10px] sm:text-sm text-card-green/80 truncate">Separados</p>
+            </div>
+          </div>
+          <div className="mt-3 sm:mt-4 w-full bg-card-green/10 rounded-full h-1 sm:h-1.5 overflow-hidden">
+            <div 
+              className="bg-card-green h-full transition-all duration-500" 
+              style={{ width: `${stats.total > 0 ? (stats.separado / stats.total) * 100 : 0}%` }}
+            />
+          </div>
+        </MotionCard>
 
-        <Grid item xs={12} sm={6} md={3}>
-          <MotionCard
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.4 }}
-            sx={{
-              borderRadius: 2,
-              border: `1px solid ${alpha(theme.palette.info.main, 0.2)}`,
-              boxShadow: `0 8px 32px ${alpha(theme.palette.info.main, 0.1)}`,
-              backdropFilter: 'blur(10px)',
-              background: `linear-gradient(135deg, ${alpha(theme.palette.info.main, 0.05)} 0%, ${alpha(theme.palette.info.light, 0.05)} 100%)`,
-            }}
-          >
-            <CardContent>
-              <Stack direction="row" alignItems="center" spacing={2}>
-                <Avatar sx={{ bgcolor: alpha(theme.palette.info.main, 0.1) }}>
-                  <ScheduleIcon color="info" />
-                </Avatar>
-                <Box>
-                  <Typography variant="h4" fontWeight="bold" color="info.main">
-                    {stats.aguardandoEntrega}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Aguardando Entrega
-                  </Typography>
-                </Box>
-              </Stack>
-              <LinearProgress 
-                variant="determinate" 
-                value={stats.total > 0 ? (stats.aguardandoEntrega / stats.total) * 100 : 0}
-                color="info"
-                sx={{ mt: 2, borderRadius: 1 }}
-              />
-            </CardContent>
-          </MotionCard>
-        </Grid>
-      </Grid>
+        <MotionCard
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.3 }}
+          className="bg-card-blue/10 border-card-blue/20 p-3 sm:p-4"
+          noPadding
+        >
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-card-blue/20 flex items-center justify-center text-card-blue shrink-0">
+              <Clock className="w-5 h-5 sm:w-6 sm:h-6" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xl sm:text-2xl font-bold text-card-blue truncate">{stats.aguardandoEntrega}</p>
+              <p className="text-[10px] sm:text-sm text-card-blue/80 truncate">Aguardando</p>
+            </div>
+          </div>
+          <div className="mt-3 sm:mt-4 w-full bg-card-blue/10 rounded-full h-1 sm:h-1.5 overflow-hidden">
+            <div 
+              className="bg-card-blue h-full transition-all duration-500" 
+              style={{ width: `${stats.total > 0 ? (stats.aguardandoEntrega / stats.total) * 100 : 0}%` }}
+            />
+          </div>
+        </MotionCard>
+      </div>
 
-      {/* Filtros de Status */}
-      <MotionPaper
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.5 }}
-        sx={{
-          p: 3,
-          mb: 3,
-          background: `linear-gradient(135deg, ${alpha(theme.palette.background.paper, 0.9)} 0%, ${alpha(theme.palette.background.paper, 0.7)} 100%)`,
-          border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-          borderRadius: 2,
-          backdropFilter: 'blur(10px)'
-        }}
-      >
-        <Stack spacing={2}>
-          <Typography variant="h6" fontWeight={600} color="primary.main">
-            Filtrar por Status
-          </Typography>
-          <ToggleButtonGroup
-            value={filtroStatus}
-            exclusive
-            onChange={handleFiltroChange}
-            aria-label="status do pedido"
-            sx={{ flexWrap: 'wrap', gap: 1 }}
-          >
-            <ToggleButton value="todos" sx={{ borderRadius: 2 }}>
-              <Stack direction="row" alignItems="center" spacing={1}>
-                <TrendingUpIcon fontSize="small" />
-                <Typography variant="body2">Todos ({stats.total})</Typography>
-              </Stack>
-            </ToggleButton>
-            <ToggleButton value="separacao" sx={{ borderRadius: 2 }}>
-              <Stack direction="row" alignItems="center" spacing={1}>
-                <PendingIcon fontSize="small" color="warning" />
-                <Typography variant="body2">Em Separação ({stats.separacao})</Typography>
-              </Stack>
-            </ToggleButton>
-            <ToggleButton value="separado" sx={{ borderRadius: 2 }}>
-              <Stack direction="row" alignItems="center" spacing={1}>
-                <CheckCircleIcon fontSize="small" color="success" />
-                <Typography variant="body2">Separados ({stats.separado})</Typography>
-              </Stack>
-            </ToggleButton>
-            <ToggleButton value="aguardando-entrega" sx={{ borderRadius: 2 }}>
-              <Stack direction="row" alignItems="center" spacing={1}>
-                <ScheduleIcon fontSize="small" color="info" />
-                <Typography variant="body2">Aguardando Entrega ({stats.aguardandoEntrega})</Typography>
-              </Stack>
-            </ToggleButton>
-          </ToggleButtonGroup>
-        </Stack>
-      </MotionPaper>
+      {/* Filtros e Ações */}
+      <Card className="p-4">
+        <div className="flex flex-col lg:flex-row gap-4 items-center justify-between">
+          <div className="flex items-center gap-2 w-full lg:w-auto">
+            <Filter className="w-5 h-5 text-primary shrink-0" />
+            <h3 className="font-semibold text-slate-800">Filtrar por Status</h3>
+          </div>
+          <div className="flex flex-wrap gap-2 w-full lg:w-auto justify-start sm:justify-center lg:justify-end">
+            {[
+              { id: 'todos', label: 'Todos', count: stats.total, icon: TrendingUp },
+              { id: 'separacao', label: 'Separação', count: stats.separacao, icon: Package, color: 'text-amber-600' },
+              { id: 'separado', label: 'Separados', count: stats.separado, icon: CheckCircle2, color: 'text-emerald-600' },
+              { id: 'aguardando-entrega', label: 'Aguardando', count: stats.aguardandoEntrega, icon: Clock, color: 'text-blue-600' },
+            ].map((filtro) => (
+              <button
+                key={filtro.id}
+                onClick={() => setFiltroStatus(filtro.id as StatusFiltro)}
+                className={cn(
+                  "flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all",
+                  filtroStatus === filtro.id
+                    ? "bg-primary text-white shadow-md shadow-primary/20"
+                    : "bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200"
+                )}
+              >
+                <filtro.icon className={cn("w-3.5 h-3.5 sm:w-4 h-4", filtroStatus !== filtro.id && filtro.color)} />
+                <span className="whitespace-nowrap">{filtro.label}</span>
+                <span className={cn(
+                  "ml-1 px-1.5 py-0.5 rounded-full text-[10px]",
+                  filtroStatus === filtro.id ? "bg-white/20 text-white" : "bg-slate-200 text-slate-500"
+                )}>
+                  {filtro.count}
+                </span>
+              </button>
+            ))}
+          </div>
+          <div className="w-full lg:w-auto flex justify-end">
+            <Button variant="outline" size="sm" onClick={carregarPedidos} disabled={loading} className="w-full sm:w-auto">
+              <RefreshCw className={cn("w-4 h-4 mr-2", loading && "animate-spin")} />
+              Atualizar
+            </Button>
+          </div>
+        </div>
+      </Card>
 
       {/* Tabela de Pedidos */}
-      <MotionPaper
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.6 }}
-        sx={{
-          borderRadius: 2,
-          overflow: 'hidden',
-          border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-          boxShadow: `0 8px 32px ${alpha(theme.palette.common.black, 0.05)}`,
-          backdropFilter: 'blur(10px)',
-          background: `linear-gradient(135deg, ${alpha(theme.palette.background.paper, 0.9)} 0%, ${alpha(theme.palette.background.paper, 0.7)} 100%)`,
-        }}
-      >
-        {loading ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', p: 8 }}>
-            <CircularProgress />
-          </Box>
-        ) : (
-          <>
-            <TableContainer
-              sx={{
-                maxHeight: { xs: 400, md: 600 },
-                overflow: 'auto',
-                '& .MuiTableCell-root': {
-                  whiteSpace: 'nowrap',
-                  px: 1.5,
-                  py: 1,
-                  fontSize: '0.8rem'
-                }
-              }}
+      <Card noPadding>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-slate-50/50 border-b border-slate-100">
+                <th className="px-4 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider w-20">Pedido</th>
+                <th className="px-4 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider w-24 hidden sm:table-cell">Nota</th>
+                <th className="px-4 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Cliente</th>
+                <th className="px-4 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider w-32">Status</th>
+                <th className="px-4 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider hidden md:table-cell">Recebimento</th>
+                <th className="px-4 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider hidden lg:table-cell">Valor</th>
+                <th className="px-4 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider hidden xl:table-cell">Endereço</th>
+                <th className="px-4 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider hidden sm:table-cell">Vendedor</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {loading ? (
+                Array.from({ length: 5 }).map((_, i) => (
+                  <tr key={i} className="animate-pulse">
+                    <td colSpan={8} className="px-4 py-4">
+                      <div className="h-4 bg-slate-100 rounded w-full"></div>
+                    </td>
+                  </tr>
+                ))
+              ) : pedidosFiltrados.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="px-4 py-12 text-center text-slate-500">
+                    <Package className="w-12 h-12 mx-auto mb-3 opacity-20" />
+                    <p className="text-lg font-medium">Nenhum pedido encontrado</p>
+                    <p className="text-sm">Tente ajustar seus filtros de busca</p>
+                  </td>
+                </tr>
+              ) : (
+                pedidosFiltrados.map((pedido) => {
+                  const status = determinarStatusPedido(pedido);
+                  const pedidoSelecionadoId = router.query.pedido ? Number(router.query.pedido as string) : null;
+                  const isSelected = pedidoSelecionadoId === pedido.ORCAMENTO_ID;
+
+                  return (
+                    <tr 
+                      key={pedido.ORCAMENTO_ID} 
+                      className={cn(
+                        "hover:bg-slate-50/50 transition-colors group",
+                        isSelected && "bg-emerald-50/50 border-l-4 border-l-emerald-500"
+                      )}
+                    >
+                      <td className="px-4 py-4">
+                        <span className="font-bold text-slate-800 text-sm">#{pedido.ORCAMENTO_ID}</span>
+                      </td>
+                      <td className="px-4 py-4 hidden sm:table-cell">
+                        <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-1 rounded">
+                          {pedido.NUMERO_NOTA || '-'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-4">
+                        <div className="flex flex-col max-w-[120px] sm:max-w-[200px] md:max-w-xs">
+                          <span className="font-semibold text-slate-700 text-sm truncate" title={pedido.CLIENTE_NOME}>
+                            {pedido.CLIENTE_NOME}
+                          </span>
+                          <span className="text-[11px] text-slate-400 truncate">
+                            {pedido.NOME_FANTASIA || '-'}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-4">
+                        <Badge variant={status.variant} className="flex items-center gap-1 w-fit whitespace-nowrap">
+                          {status.icon}
+                          <span className="hidden sm:inline">{status.label}</span>
+                          <span className="sm:hidden">{status.label.split(' ')[0]}</span>
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-4 hidden md:table-cell">
+                        <div className="flex items-center gap-2 text-xs text-slate-500">
+                          <Clock className="w-3 h-3" />
+                          {formatarData(getDataReferenciaPedido(pedido))}
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 hidden lg:table-cell">
+                        <span className="font-bold text-slate-700 text-sm">
+                          {formatarValor(pedido.VALOR_PEDIDO)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-4 hidden xl:table-cell">
+                        <div className="flex flex-col max-w-[200px]">
+                          <span className="text-xs text-slate-600 truncate" title={`${pedido.LOGRADOURO_ENTREGA}, ${pedido.CEP_ENTREGA}`}>
+                            {pedido.LOGRADOURO_ENTREGA || '-'}
+                          </span>
+                          <span className="text-[10px] text-slate-400">
+                            CEP: {pedido.CEP_ENTREGA || '-'}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 hidden sm:table-cell">
+                        <span className="text-xs text-slate-500">{pedido.VENDEDOR_NOME}</span>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+        
+        {/* Footer */}
+        <div className="px-6 py-4 bg-slate-50/50 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <p className="text-sm text-slate-500 text-center sm:text-left">
+            Mostrando <strong>{pedidosFiltrados.length}</strong> de <strong>{pedidos.length}</strong> pedidos
+          </p>
+          <Button variant="outline" size="sm" className="w-full sm:w-auto">
+            <Download className="w-4 h-4 mr-2" />
+            Exportar Lista
+          </Button>
+        </div>
+      </Card>
+
+      {/* Alerta de Erro */}
+      <AnimatePresence>
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="bg-rose-50 border border-rose-100 rounded-xl p-4 flex items-start sm:items-center gap-3 text-rose-800"
+          >
+            <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5 sm:mt-0" />
+            <p className="text-sm font-medium flex-1">{error}</p>
+            <button 
+              onClick={() => setError(null)} 
+              className="p-1 hover:bg-rose-100 rounded-lg transition-colors text-rose-400 hover:text-rose-600"
             >
-              <Table>
-                <TableHead>
-                  <TableRow sx={{ background: alpha(theme.palette.primary.main, 0.05) }}>
-                    <TableCell sx={{ fontWeight: 600, color: 'primary.main' }}>Nº Pedido</TableCell>
-                    <TableCell sx={{ fontWeight: 600, color: 'primary.main' }}>Nº Nota</TableCell>
-                    <TableCell sx={{ fontWeight: 600, color: 'primary.main' }}>Cliente</TableCell>
-                    {/* <TableCell sx={{ fontWeight: 600, color: 'primary.main' }}>Status</TableCell> */}
-                    <TableCell sx={{ fontWeight: 600, color: 'primary.main' }}>Data Recebimento</TableCell>
-                    <TableCell sx={{ fontWeight: 600, color: 'primary.main' }}>Data Entrega</TableCell>
-                    <TableCell sx={{ fontWeight: 600, color: 'primary.main' }}>Valor</TableCell>
-                    <TableCell sx={{ fontWeight: 600, color: 'primary.main' }}>Endereço</TableCell>
-                    <TableCell sx={{ fontWeight: 600, color: 'primary.main' }}>Vendedor</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {pedidosFiltrados.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={9} align="center" sx={{ py: 4 }}>
-                        <Typography variant="body1" color="text.secondary">
-                          Nenhum pedido encontrado com os filtros atuais.
-                        </Typography>
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    pedidosFiltrados.map((pedido, index) => {
-                      const status = determinarStatusPedido(pedido);
-                      const pedidoSelecionado = router.query.pedido
-                        ? Number(router.query.pedido as string)
-                        : null;
-                      const selecionado = pedidoSelecionado === pedido.ORCAMENTO_ID;
-                      return (
-                        <TableRow
-                          key={pedido.ORCAMENTO_ID}
-                          hover
-                          sx={{
-                            background: selecionado
-                              ? alpha(theme.palette.success.main, 0.08)
-                              : 'transparent',
-                            '&:hover': {
-                              background: alpha(theme.palette.primary.main, 0.03),
-                            },
-                          }}
-                        >
-                          <TableCell>
-                            <Typography variant="body2" fontWeight={600}>
-                              {pedido.ORCAMENTO_ID}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="body2" fontWeight={600}>
-                              {pedido.NUMERO_NOTA || '-'}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Stack direction="column" spacing={0.5}>
-                              <Typography variant="body2" fontWeight={600}>
-                                {pedido.CLIENTE_NOME || '-'}
-                              </Typography>
-                              <Typography variant="caption" color="text.secondary">
-                                {pedido.NOME_FANTASIA || '-'}
-                              </Typography>
-                            </Stack>
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="body2">
-                              {formatarData(pedido.DATA_HORA_RECEBIMENTO)}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="body2">
-                              {formatarData(pedido.DATA_ENTREGA)}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="body2" fontWeight={600} color="success.main">
-                              {formatarValor(pedido.VALOR_PEDIDO)}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="body2">
-                              {pedido.LOGRADOURO_ENTREGA || '-'}
-                              {pedido.CEP_ENTREGA && ` (CEP: ${pedido.CEP_ENTREGA})`}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="body2">
-                              {pedido.VENDEDOR_NOME || '-'}
-                            </Typography>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })
-                  )}
-                </TableBody>
-              </Table>
-            </TableContainer>
-            
-            {/* Footer com estatísticas */}
-            <Box sx={{ p: 2, borderTop: `1px solid ${alpha(theme.palette.divider, 0.1)}` }}>
-              <Stack direction="row" justifyContent="space-between" alignItems="center">
-                <Typography variant="body2" color="text.secondary">
-                  Mostrando {pedidosFiltrados.length} de {pedidos.length} pedidos
-                </Typography>
-                <Button
-                  startIcon={<DownloadIcon />}
-                  variant="outlined"
-                  size="small"
-                >
-                  Exportar
-                </Button>
-              </Stack>
-            </Box>
-          </>
+              <RefreshCw className="w-4 h-4" />
+            </button>
+          </motion.div>
         )}
-      </MotionPaper>
-    </Container>
+      </AnimatePresence>
+    </div>
   );
 }
 
@@ -791,14 +630,17 @@ const StatusPedidosPage: NextPage = () => {
         <title>Status dos Pedidos - Sistema de Controle de Carga</title>
         <meta name="description" content="Acompanhe o status dos pedidos: separação, separado e aguardando entrega" />
       </Head>
-      <VisualPageLayout
+      <AppLayout
         title="Status dos Pedidos"
-        subtitle="Acompanhe o ciclo completo dos pedidos"
+        subtitle="Acompanhe o ciclo completo dos pedidos em tempo real"
       >
         <StatusPedidosContent />
-      </VisualPageLayout>
+      </AppLayout>
     </AdminRoute>
   );
 };
 
 export default StatusPedidosPage;
+
+(StatusPedidosPage as any).usesAppLayout = true;
+
