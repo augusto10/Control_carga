@@ -1,0 +1,334 @@
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import { useRouter } from 'next/router';
+import Cookies from 'js-cookie';
+import { api } from '../services/api';
+import { User, AuthError, LoginCredentials, USER_TYPES } from '../types/auth-types';
+import jwt from 'jsonwebtoken';
+
+// Tipagem para o estado de autenticação
+type AuthState = {
+  user: User | null;
+  token: string | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  error: string | null;
+};
+
+// Tipagem para o contexto
+type AuthContextType = {
+  user: User | null;
+  login: (credentials: LoginCredentials) => Promise<void>;
+  logout: () => void;
+  isLoading: boolean;
+  error: string | null;
+  isAuthenticated: boolean;
+  updateUser: (userData: Partial<User>) => void;
+  checkTokenExpiration: () => void;
+  authError: AuthError | null;
+};
+
+// Contexto de autenticação
+export const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+// Hook personalizado para usar o contexto
+export const useAuth = (): AuthContextType => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth deve ser usado dentro de um AuthProvider');
+  }
+  return context;
+};
+
+// Funções auxiliares para manipulação de cookies
+const getCookie = (name: string): string | undefined => {
+  if (typeof window === 'undefined') return undefined;
+  return Cookies.get(name);
+};
+
+const setCookie = (name: string, value: string, options: Cookies.CookieAttributes = {}): void => {
+  if (typeof window !== 'undefined') {
+    Cookies.set(name, value, { 
+      expires: 7, // 7 dias
+      path: '/',
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      ...options 
+    });
+  }
+};
+
+const removeCookie = (name: string): void => {
+  if (typeof window !== 'undefined') {
+    Cookies.remove(name, { path: '/' });
+  }
+};
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [state, setState] = useState<AuthState>({
+    user: null,
+    token: null,
+    isAuthenticated: false,
+    isLoading: true,
+    error: null
+  });
+  
+  const [authError, setAuthError] = useState<AuthError | null>(null);
+  const router = useRouter();
+
+  // Atualizar estado de forma segura
+  const updateAuthState = useCallback((updates: Partial<AuthState>) => {
+    setState(prev => ({
+      ...prev,
+      ...updates
+    }));
+  }, []);
+
+  // Definir erro de autenticação
+  const setAuthenticationError = useCallback((error: AuthError | null) => {
+    setAuthError(error);
+    if (error) {
+      updateAuthState({ 
+        error: error.message,
+        isLoading: false,
+        isAuthenticated: false,
+        user: null,
+        token: null
+      });
+    }
+  }, [updateAuthState]);
+
+  // Verificar autenticação ao carregar
+  const loadUserFromStorage = useCallback(async () => {
+    try {
+      console.log('[AuthContext] Carregando usuário do armazenamento...');
+      const token = getCookie('auth_token');
+      
+      if (!token) {
+        console.log('[AuthContext] Nenhum token encontrado');
+        updateAuthState({ isLoading: false, isAuthenticated: false });
+        return;
+      }
+
+      console.log('[AuthContext] Token encontrado, verificando validade...');
+      try {
+        // Verificar se o token é válido
+        const decoded = jwt.verify(token, process.env.NEXT_PUBLIC_JWT_SECRET || '') as { exp?: number };
+        if (decoded?.exp && decoded.exp * 1000 < Date.now()) {
+          throw new Error('Token expirado');
+        }
+
+        // Buscar informações do usuário
+        const response = await api.get('/api/auth/me');
+        const userData = response.data;
+        
+        updateAuthState({
+          user: userData,
+          token,
+          isAuthenticated: true,
+          isLoading: false,
+          error: null
+        });
+        
+        // Atualizar header de autorização
+        api.defaults.headers.Authorization = `Bearer ${token}`;
+        
+      } catch (err) {
+        console.error('[AuthContext] Erro ao verificar token:', err);
+        // Se houver erro, limpa o estado e redireciona para o login
+        updateAuthState({
+          user: null,
+          token: null,
+          isAuthenticated: false,
+          isLoading: false,
+          error: 'Sessão expirada. Faça login novamente.'
+        });
+        
+        // Remover token inválido
+        removeCookie('auth_token');
+        delete api.defaults.headers.Authorization;
+        
+        // Redirecionar para login se não estiver na página de login
+        if (router.pathname !== '/login') {
+          router.push('/login');
+        }
+      }
+    } catch (err) {
+      console.error('[AuthContext] Erro ao carregar autenticação:', err);
+      updateAuthState({
+        isLoading: false,
+        isAuthenticated: false,
+        error: 'Erro ao carregar autenticação'
+      });
+    }
+  }, [router, updateAuthState]);
+
+  // Efeito para carregar o usuário ao montar o componente
+  useEffect(() => {
+    loadUserFromStorage();
+  }, [loadUserFromStorage]);
+
+  // Função de login
+  const login = useCallback(async ({ email, senha }: LoginCredentials): Promise<void> => {
+    try {
+      console.log('[AuthContext] Iniciando processo de login...');
+      updateAuthState({ isLoading: true, error: null });
+      setAuthenticationError(null);
+
+      console.log('[AuthContext] Fazendo requisição para /api/auth/login...');
+      const response = await api.post('/api/auth/login', { email, senha });
+      
+      console.log('[AuthContext] Resposta da API:', response.data);
+      
+      // Verificar se a resposta tem a estrutura esperada
+      if (!response.data || !response.data.success) {
+        const errorMessage = response.data?.message || 'Erro ao fazer login. Tente novamente.';
+        throw new Error(errorMessage);
+      }
+      
+      const { user, token } = response.data;
+
+      if (!token) {
+        console.error('[AuthContext] Token não recebido do servidor');
+        throw new Error('Token não recebido do servidor');
+      }
+
+      console.log('[AuthContext] Armazenando token em cookie...');
+      // Armazenar token em cookie seguro
+      setCookie('auth_token', token);
+
+      console.log('[AuthContext] Atualizando header de autorização...');
+      // Atualizar header de autorização
+      api.defaults.headers.Authorization = `Bearer ${token}`;
+
+      console.log('[AuthContext] Atualizando estado do contexto...');
+      // Atualizar estado
+      updateAuthState({
+        user,
+        token,
+        isAuthenticated: true,
+        isLoading: false,
+        error: null
+      });
+
+      // Redirecionar com base no tipo de usuário
+      console.log(`[AuthContext] Redirecionando usuário do tipo ${user.tipo}...`);
+      if (user.tipo === USER_TYPES.ADMIN) {
+        console.log('[AuthContext] Redirecionando para /admin');
+        router.push('/admin');
+      } else {
+        console.log('[AuthContext] Redirecionando para /dashboard');
+        router.push('/dashboard');
+      }
+    } catch (error: any) {
+      console.error('[AuthContext] Erro no login:', error);
+      
+      // Mensagem de erro amigável
+      let errorMessage = 'Erro ao fazer login. Verifique suas credenciais e tente novamente.';
+      
+      if (error.response) {
+        // Erro da API
+        errorMessage = error.response.data?.message || errorMessage;
+      } else if (error.request) {
+        // Erro de rede ou servidor indisponível
+        errorMessage = 'Não foi possível conectar ao servidor. Verifique sua conexão.';
+      } else if (error.message) {
+        // Erro lançado manualmente
+        errorMessage = error.message;
+      }
+      
+      console.error('[AuthContext] Detalhes do erro:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        code: error.code
+      });
+      
+      // Definir erro de autenticação
+      setAuthenticationError({
+        message: errorMessage,
+        code: error.response?.status || 500,
+        details: process.env.NODE_ENV === 'development' ? {
+          originalError: error.message,
+          stack: error.stack
+        } : undefined
+      });
+      
+      // Remover token inválido
+      removeCookie('auth_token');
+      delete api.defaults.headers.Authorization;
+    }
+  }, [router, updateAuthState, setAuthenticationError]);
+
+  // Função de logout
+  const logout = useCallback(() => {
+    console.log('[AuthContext] Efetuando logout...');
+    
+    // Remover cookies
+    removeCookie('auth_token');
+    removeCookie('user');
+    
+    // Limpar header de autorização
+    delete api.defaults.headers.Authorization;
+    
+    // Atualizar estado
+    updateAuthState({
+      user: null,
+      token: null,
+      isAuthenticated: false,
+      isLoading: false,
+      error: null
+    });
+    
+    // Redirecionar para a página de login
+    console.log('[AuthContext] Redirecionando para /login');
+    router.push('/login');
+  }, [router, updateAuthState]);
+
+  // Atualizar dados do usuário
+  const updateUser = useCallback((userData: Partial<User>) => {
+    updateAuthState({
+      user: state.user ? { ...state.user, ...userData } : null
+    });
+  }, [state.user, updateAuthState]);
+
+  // Verificar expiração do token
+  const checkTokenExpiration = useCallback(() => {
+    const token = getCookie('auth_token');
+    if (token) {
+      try {
+        const decoded = jwt.decode(token) as { exp?: number };
+        if (decoded?.exp && decoded.exp * 1000 < Date.now()) {
+          console.log('[AuthContext] Token expirado');
+          logout();
+        }
+      } catch (error) {
+        console.error('[AuthContext] Erro ao verificar expiração do token:', error);
+        logout();
+      }
+    }
+  }, [logout]);
+
+  // Verificar expiração do token periodicamente (a cada 5 minutos)
+  useEffect(() => {
+    const interval = setInterval(checkTokenExpiration, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [checkTokenExpiration]);
+
+  return (
+    <AuthContext.Provider 
+      value={{ 
+        user: state.user, 
+        login, 
+        logout, 
+        isLoading: state.isLoading, 
+        error: state.error, 
+        isAuthenticated: state.isAuthenticated,
+        updateUser,
+        checkTokenExpiration,
+        authError
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
+}
