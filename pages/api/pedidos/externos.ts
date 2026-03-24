@@ -79,6 +79,9 @@ export default async function handler(
           const trimmed = value.trim();
           if (trimmed) return trimmed;
         }
+        if (typeof value === 'number' && Number.isFinite(value)) {
+          return String(value);
+        }
       }
       return null;
     };
@@ -182,6 +185,7 @@ export default async function handler(
     };
 
     const normalizePedido = (p: any) => {
+      const cliente = p?.CLIENTE ?? p?.cliente ?? null;
       const numeroNota = pickString(
         p.NUMERO_NOTA,
         p.NUMERO_NOTA_FISCAL,
@@ -193,6 +197,24 @@ export default async function handler(
         p.NUMERO,
         p.NOTA_FISCAL
       );
+      const cnpjCpf = pickString(
+        p.CNPJ_CPF,
+        p.CNPJCPF,
+        p.CNPJ_CPF_DESTINATARIO,
+        p.CPF_CNPJ,
+        p.CNPJ,
+        p.CPF,
+        p.cnpj_cpf,
+        p.cnpjcpf,
+        p.cnpj,
+        p.cpf,
+        cliente?.CNPJ,
+        cliente?.CPF,
+        cliente?.CNPJ_CPF,
+        cliente?.cnpj,
+        cliente?.cpf,
+        cliente?.cnpj_cpf
+      );
       const identificacaoNfe = pickString(
         p.IDENTIFICACAO_NFE,
         p.CHAVE_NFE,
@@ -203,21 +225,35 @@ export default async function handler(
       );
       const nomeBairroNota = pickString(
         p.NOME_BAIRRO_NOTA,
+        p.nome_bairro_nota,
         p.BAIRRO,
+        p.bairro,
         p.NOME_BAIRRO,
-        p.BAIRRO_ENTREGA
+        p.BAIRRO_ENTREGA,
+        cliente?.BAIRRO,
+        cliente?.bairro
       );
       const nomeCidade = pickString(
         p.NOME_CIDADE,
+        p.nome_cidade,
         p.CIDADE,
+        p.cidade,
         p.CIDADE_ENTREGA,
-        p.MUNICIPIO
+        p.MUNICIPIO,
+        cliente?.CIDADE,
+        cliente?.cidade
       );
       const estadoDestino = pickString(
         p.ESTADO_DESTINO,
+        p.estado_destino,
         p.UF,
+        p.uf,
         p.UF_ENTREGA,
-        p.ESTADO
+        p.ESTADO,
+        cliente?.ESTADO,
+        cliente?.estado,
+        cliente?.UF,
+        cliente?.uf
       );
       const logradouroEntrega = pickString(
         p.LOGRADOURO_ENTREGA,
@@ -225,7 +261,9 @@ export default async function handler(
         p.RUA,
         p.ENDERECO,
         p.ENDERECO_ENTREGA,
-        p.ENDERECO_COMPLETO
+        p.ENDERECO_COMPLETO,
+        cliente?.ENDERECO,
+        cliente?.endereco
       );
       const complementoEntrega = pickString(
         p.COMPLEMENTO_ENTREGA,
@@ -236,12 +274,15 @@ export default async function handler(
         p.CEP,
         p.CEP_ENTREGA,
         p.CEP_CONS_FINAL,
-        p.CEP_DESTINO
+        p.CEP_DESTINO,
+        cliente?.CEP,
+        cliente?.cep
       );
       return {
         ...p,
         NUMERO_NOTA: numeroNota ?? p.NUMERO_NOTA ?? null,
         IDENTIFICACAO_NFE: identificacaoNfe ?? p.IDENTIFICACAO_NFE ?? null,
+        CNPJ_CPF: cnpjCpf ?? p.CNPJ_CPF ?? p.CNPJ ?? p.CPF ?? null,
         NOME_BAIRRO_NOTA: nomeBairroNota ?? p.NOME_BAIRRO_NOTA ?? null,
         NOME_CIDADE: nomeCidade ?? p.NOME_CIDADE ?? null,
         ESTADO_DESTINO: estadoDestino ?? p.ESTADO_DESTINO ?? null,
@@ -263,6 +304,7 @@ export default async function handler(
 
     const enrichWithApuracao = (p: any, ap: any) => {
       if (!ap) return p;
+      const cliente = ap?.CLIENTE ?? ap?.cliente ?? null;
       const numeroNota = pickString(
         ap.NUMERO_NOTA,
         ap.NUMERO_NOTA_FISCAL,
@@ -272,6 +314,24 @@ export default async function handler(
         ap.NF,
         ap.NUMERO_NF,
         ap.NUMERO
+      );
+      const cnpjCpf = pickString(
+        ap.CNPJ_CPF,
+        ap.CNPJCPF,
+        ap.CNPJ_CPF_DESTINATARIO,
+        ap.CPF_CNPJ,
+        ap.CNPJ,
+        ap.CPF,
+        ap.cnpj_cpf,
+        ap.cnpjcpf,
+        ap.cnpj,
+        ap.cpf,
+        cliente?.CNPJ,
+        cliente?.CPF,
+        cliente?.CNPJ_CPF,
+        cliente?.cnpj,
+        cliente?.cpf,
+        cliente?.cnpj_cpf
       );
       const identificacaoNfe = pickString(
         ap.IDENTIFICACAO_NFE,
@@ -283,21 +343,35 @@ export default async function handler(
       );
       const nomeBairroNota = pickString(
         ap.NOME_BAIRRO_NOTA,
+        ap.nome_bairro_nota,
         ap.BAIRRO,
+        ap.bairro,
         ap.NOME_BAIRRO,
-        ap.BAIRRO_ENTREGA
+        ap.BAIRRO_ENTREGA,
+        cliente?.BAIRRO,
+        cliente?.bairro
       );
       const nomeCidade = pickString(
         ap.NOME_CIDADE,
+        ap.nome_cidade,
         ap.CIDADE,
+        ap.cidade,
         ap.CIDADE_ENTREGA,
-        ap.MUNICIPIO
+        ap.MUNICIPIO,
+        cliente?.CIDADE,
+        cliente?.cidade
       );
       const estadoDestino = pickString(
         ap.ESTADO_DESTINO,
+        ap.estado_destino,
         ap.UF,
+        ap.uf,
         ap.UF_ENTREGA,
-        ap.ESTADO
+        ap.ESTADO,
+        cliente?.ESTADO,
+        cliente?.estado,
+        cliente?.UF,
+        cliente?.uf
       );
       const logradouroEntrega = pickString(
         ap.LOGRADOURO,
@@ -305,7 +379,9 @@ export default async function handler(
         ap.RUA,
         ap.ENDERECO,
         ap.ENDERECO_ENTREGA,
-        ap.ENDERECO_COMPLETO
+        ap.ENDERECO_COMPLETO,
+        cliente?.ENDERECO,
+        cliente?.endereco
       );
       const complementoEntrega = pickString(
         ap.COMPLEMENTO,
@@ -315,12 +391,15 @@ export default async function handler(
         ap.CEP,
         ap.CEP_ENTREGA,
         ap.CEP_CONS_FINAL,
-        ap.CEP_DESTINO
+        ap.CEP_DESTINO,
+        cliente?.CEP,
+        cliente?.cep
       );
       return normalizePedido({
         ...p,
         NUMERO_NOTA: numeroNota ?? p.NUMERO_NOTA,
         IDENTIFICACAO_NFE: identificacaoNfe ?? p.IDENTIFICACAO_NFE,
+        CNPJ_CPF: cnpjCpf ?? p.CNPJ_CPF ?? p.CNPJ ?? p.CPF,
         NOME_BAIRRO_NOTA: nomeBairroNota ?? p.NOME_BAIRRO_NOTA,
         NOME_CIDADE: nomeCidade ?? p.NOME_CIDADE,
         ESTADO_DESTINO: estadoDestino ?? p.ESTADO_DESTINO,

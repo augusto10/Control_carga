@@ -36,6 +36,7 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { SearchInput } from '@/components/ui/SearchInput';
 import { Modal } from '@/components/ui/Modal';
+import { StatCard } from '@/components/ui/StatCard';
 import { cn } from '@/utils/cn';
 import { Label } from '@/components/ui/Label';
 import { Input } from '@/components/ui/Input';
@@ -84,6 +85,9 @@ interface ApuracaoItem {
   NUMERO_NOTA?: string;
   DATA_EMISSAO?: string;
   IDENTIFICACAO_NFE?: string;
+  CNPJ_CPF?: string | number;
+  CNPJ?: string | number;
+  CPF?: string | number;
   NOME_BAIRRO_NOTA?: string;
   NOME_CIDADE?: string;
   ESTADO_DESTINO?: string;
@@ -119,6 +123,9 @@ const pickString = (...values: Array<unknown>) => {
       const trimmed = value.trim();
       if (trimmed) return trimmed;
     }
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return String(value);
+    }
   }
   return null;
 };
@@ -147,13 +154,16 @@ const getNumeroNota = (p: Pedido) => {
 
 const getEnderecoResumo = (p: Pedido) => {
   const pAny = p as any;
+  const cliente = pAny?.CLIENTE ?? pAny?.cliente ?? null;
   const logradouro = pickString(
     p.LOGRADOURO_ENTREGA,
     pAny.LOGRADOURO,
     pAny.RUA,
     pAny.ENDERECO,
     pAny.ENDERECO_ENTREGA,
-    pAny.ENDERECO_COMPLETO
+    pAny.ENDERECO_COMPLETO,
+    cliente?.ENDERECO,
+    cliente?.endereco
   );
   const numero = pickString(
     pAny.NUMERO,
@@ -167,30 +177,154 @@ const getEnderecoResumo = (p: Pedido) => {
   );
   const bairro = pickString(
     p.NOME_BAIRRO_NOTA,
+    pAny.NOME_BAIRRO_NOTA,
     pAny.BAIRRO,
+    pAny.bairro,
     pAny.NOME_BAIRRO,
-    pAny.BAIRRO_ENTREGA
+    pAny.BAIRRO_ENTREGA,
+    cliente?.BAIRRO,
+    cliente?.bairro
   );
   const cidade = pickString(
     p.NOME_CIDADE,
     pAny.CIDADE,
+    pAny.cidade,
     pAny.CIDADE_ENTREGA,
-    pAny.MUNICIPIO
+    pAny.MUNICIPIO,
+    cliente?.CIDADE,
+    cliente?.cidade
   );
   const uf = pickString(
     p.ESTADO_DESTINO,
     pAny.UF,
+    pAny.uf,
     pAny.UF_ENTREGA,
-    pAny.ESTADO
+    pAny.ESTADO,
+    cliente?.ESTADO,
+    cliente?.estado,
+    cliente?.UF,
+    cliente?.uf
   );
   const cep = pickString(
     (p as any).CEP,
     p.CEP_ENTREGA,
     p.CEP_CONS_FINAL,
-    pAny.CEP_ENTREGA
+    pAny.CEP_ENTREGA,
+    cliente?.CEP,
+    cliente?.cep
   );
   const cidadeUf = [cidade, uf].filter(Boolean).join('/');
   return [logradouro, numero, complemento, bairro, cep, cidadeUf].filter(Boolean).join(', ');
+};
+
+const getCnpjPedido = (p: Pedido) => {
+  const pAny = p as any;
+  const cliente = pAny?.CLIENTE ?? pAny?.cliente ?? null;
+  return pickString(
+    pAny.CNPJ,
+    pAny.cnpj,
+    pAny.CNPJ_CPF,
+    pAny.cnpj_cpf,
+    pAny.CPF,
+    pAny.cpf,
+    cliente?.CNPJ,
+    cliente?.CPF,
+    cliente?.CNPJ_CPF,
+    cliente?.cnpj,
+    cliente?.cpf,
+    cliente?.cnpj_cpf
+  );
+};
+
+const getIdentificacaoNfeReduzida = (codigo?: string | null) => {
+  if (!codigo) return null;
+  const codigoLimpo = String(codigo).replace(/[^\d]/g, '');
+  if (!codigoLimpo) return null;
+  if (codigoLimpo.length === 44) {
+    return codigoLimpo.substring(25, 34).replace(/^0+/, '');
+  }
+  if (codigoLimpo.length > 44) {
+    for (let i = 0; i <= codigoLimpo.length - 44; i++) {
+      const bloco = codigoLimpo.substring(i, i + 44);
+      if (['8', '9'].includes(bloco[0])) {
+        return bloco.substring(25, 34).replace(/^0+/, '');
+      }
+    }
+  }
+  if (codigo.includes('-')) {
+    const partes = codigo.split('-');
+    return (partes[1] ? partes[1].replace(/[^\d]/g, '') : '').replace(/^0+/, '');
+  }
+  if (codigoLimpo.length <= 20) {
+    return codigoLimpo.replace(/^0+/, '');
+  }
+  return codigoLimpo.slice(-9).replace(/^0+/, '');
+};
+
+const getEnderecoCampos = (p: Pedido) => {
+  const pAny = p as any;
+  const cliente = pAny?.CLIENTE ?? pAny?.cliente ?? null;
+  const logradouro = pickString(
+    p.LOGRADOURO_ENTREGA,
+    pAny.LOGRADOURO,
+    pAny.RUA,
+    pAny.ENDERECO,
+    pAny.ENDERECO_ENTREGA,
+    pAny.ENDERECO_COMPLETO,
+    cliente?.ENDERECO,
+    cliente?.endereco
+  );
+  const numero = pickString(
+    pAny.NUMERO,
+    pAny.NUMERO_ENDERECO,
+    pAny.NUMERO_ENTREGA
+  );
+  const complemento = pickString(
+    p.COMPLEMENTO_ENTREGA,
+    pAny.COMPLEMENTO,
+    pAny.COMPLEMENTO_ENTREGA
+  );
+  const bairro = pickString(
+    p.NOME_BAIRRO_NOTA,
+    pAny.NOME_BAIRRO_NOTA,
+    pAny.BAIRRO,
+    pAny.bairro,
+    pAny.NOME_BAIRRO,
+    pAny.BAIRRO_ENTREGA,
+    cliente?.BAIRRO,
+    cliente?.bairro
+  );
+  const cidade = pickString(
+    p.NOME_CIDADE,
+    pAny.NOME_CIDADE,
+    pAny.CIDADE,
+    pAny.cidade,
+    pAny.CIDADE_ENTREGA,
+    pAny.MUNICIPIO,
+    cliente?.CIDADE,
+    cliente?.cidade
+  );
+  const uf = pickString(
+    p.ESTADO_DESTINO,
+    pAny.ESTADO_DESTINO,
+    pAny.UF,
+    pAny.uf,
+    pAny.UF_ENTREGA,
+    pAny.ESTADO,
+    cliente?.ESTADO,
+    cliente?.estado,
+    cliente?.UF,
+    cliente?.uf
+  );
+  const cep = pickString(
+    (p as any).CEP,
+    p.CEP_ENTREGA,
+    p.CEP_CONS_FINAL,
+    pAny.CEP_ENTREGA,
+    cliente?.CEP,
+    cliente?.cep
+  );
+  return { logradouro, numero, complemento, bairro, cidade, uf, cep };
 };
 
 const parsePedidoDate = (value?: string | null) => {
@@ -333,6 +467,8 @@ export default function CicloPedidoPage() {
     valorMes: 0,
     notasHoje: 0,
     controlesHoje: 0,
+    totalNotas: 0,
+    totalControles: 0,
     loading: false
   });
 
@@ -350,6 +486,14 @@ export default function CicloPedidoPage() {
     setToast({ show: true, message, type });
     setTimeout(() => setToast(prev => ({ ...prev, show: false })), 3000);
   };
+
+  const showCnpjColumn = useMemo(() => pedidos.some((p) => Boolean(getCnpjPedido(p))), [pedidos]);
+  const showBairroColumn = useMemo(() => pedidos.some((p) => Boolean(getEnderecoCampos(p).bairro)), [pedidos]);
+  const showCidadeColumn = useMemo(() => pedidos.some((p) => {
+    const endereco = getEnderecoCampos(p);
+    return Boolean(endereco.cidade || endereco.uf);
+  }), [pedidos]);
+  const tableColumnCount = 9 + (showCnpjColumn ? 1 : 0) + (showBairroColumn ? 1 : 0) + (showCidadeColumn ? 1 : 0);
 
   const getPeriodoConfig = () => {
     const hoje = new Date();
@@ -465,6 +609,21 @@ export default function CicloPedidoPage() {
         const pAny = p as any;
         const identificacaoNfe = ap?.IDENTIFICACAO_NFE ?? (ap as any)?.CHAVE_NFE ?? (ap as any)?.CHAVE ?? pAny.IDENTIFICACAO_NFE ?? pAny.CHAVE_NFE ?? null;
         const numeroNota = ap?.NUMERO_NOTA ?? pAny.NUMERO_NOTA ?? null;
+        const cnpjCpf = pickString(
+          ap?.CNPJ_CPF,
+          (ap as any)?.CNPJCPF,
+          (ap as any)?.CNPJ_CPF_DESTINATARIO,
+          (ap as any)?.CPF_CNPJ,
+          ap?.CNPJ,
+          ap?.CPF,
+          (ap as any)?.CNPJ_DESTINATARIO,
+          (ap as any)?.CPF_DESTINATARIO,
+          pAny.CNPJ_CPF,
+          pAny.CNPJ,
+          pAny.CPF,
+          pAny.cnpj,
+          pAny.cpf
+        );
         const bairroNota = ap?.NOME_BAIRRO_NOTA ?? ap?.BAIRRO ?? (ap as any)?.NOME_BAIRRO ?? pAny.NOME_BAIRRO_NOTA ?? pAny.BAIRRO ?? pAny.NOME_BAIRRO ?? null;
         const cidadeNota = ap?.NOME_CIDADE ?? ap?.CIDADE ?? pAny.NOME_CIDADE ?? pAny.CIDADE ?? null;
         const ufDestino = ap?.ESTADO_DESTINO ?? ap?.UF ?? pAny.ESTADO_DESTINO ?? pAny.UF ?? null;
@@ -476,6 +635,8 @@ export default function CicloPedidoPage() {
           ...p,
           IDENTIFICACAO_NFE: identificacaoNfe,
           NUMERO_NOTA: numeroNota,
+          CNPJ_CPF: cnpjCpf ?? pAny.CNPJ_CPF ?? null,
+          CNPJ: pAny.CNPJ ?? cnpjCpf ?? null,
           NOME_BAIRRO_NOTA: bairroNota,
           NOME_CIDADE: cidadeNota,
           ESTADO_DESTINO: ufDestino,
@@ -711,7 +872,7 @@ export default function CicloPedidoPage() {
 
       const needsEnrich = base.some(p => {
         const cep = (p as any).CEP || p.CEP_ENTREGA || p.CEP_CONS_FINAL;
-        return !getNumeroNota(p) || !p.NOME_BAIRRO_NOTA || !p.NOME_CIDADE || !p.ESTADO_DESTINO || !cep;
+        return !getNumeroNota(p) || !getCnpjPedido(p) || !p.NOME_BAIRRO_NOTA || !p.NOME_CIDADE || !p.ESTADO_DESTINO || !cep;
       });
 
       if (base.length > 0 && needsEnrich) {
@@ -743,6 +904,21 @@ export default function CicloPedidoPage() {
               const pAny = p as any;
               const identificacaoNfe = ap?.IDENTIFICACAO_NFE ?? (ap as any)?.CHAVE_NFE ?? (ap as any)?.CHAVE ?? pAny.IDENTIFICACAO_NFE ?? pAny.CHAVE_NFE ?? null;
               const numeroNota = ap?.NUMERO_NOTA ?? pAny.NUMERO_NOTA ?? null;
+              const cnpjCpf = pickString(
+                ap?.CNPJ_CPF,
+                (ap as any)?.CNPJCPF,
+                (ap as any)?.CNPJ_CPF_DESTINATARIO,
+                (ap as any)?.CPF_CNPJ,
+                ap?.CNPJ,
+                ap?.CPF,
+                (ap as any)?.CNPJ_DESTINATARIO,
+                (ap as any)?.CPF_DESTINATARIO,
+                pAny.CNPJ_CPF,
+                pAny.CNPJ,
+                pAny.CPF,
+                pAny.cnpj,
+                pAny.cpf
+              );
               const bairroNota = ap?.NOME_BAIRRO_NOTA ?? ap?.BAIRRO ?? (ap as any)?.NOME_BAIRRO ?? pAny.NOME_BAIRRO_NOTA ?? pAny.BAIRRO ?? pAny.NOME_BAIRRO ?? null;
               const cidadeNota = ap?.NOME_CIDADE ?? ap?.CIDADE ?? pAny.NOME_CIDADE ?? pAny.CIDADE ?? null;
               const ufDestino = ap?.ESTADO_DESTINO ?? ap?.UF ?? pAny.ESTADO_DESTINO ?? pAny.UF ?? null;
@@ -754,6 +930,8 @@ export default function CicloPedidoPage() {
                 ...p,
                 IDENTIFICACAO_NFE: identificacaoNfe,
                 NUMERO_NOTA: numeroNota,
+                CNPJ_CPF: cnpjCpf ?? pAny.CNPJ_CPF ?? null,
+                CNPJ: pAny.CNPJ ?? cnpjCpf ?? null,
                 NOME_BAIRRO_NOTA: bairroNota,
                 NOME_CIDADE: cidadeNota,
                 ESTADO_DESTINO: ufDestino,
@@ -806,13 +984,17 @@ export default function CicloPedidoPage() {
 
         // Carregar resumo de hoje (Notas e Controles)
         try {
-          const resumoHojeResp = await fetch('/api/dashboard/resumo-hoje');
+          const resumoHojeResp = await fetch('/api/dashboard/resumo-hoje', { credentials: 'include' });
           if (resumoHojeResp.ok) {
              const resumoHojeData = await resumoHojeResp.json();
              setStats(s => ({ 
                ...s, 
+               hoje: resumoHojeData.pedidosHoje || 0,
+               valorHoje: resumoHojeData.valorHoje || 0,
                notasHoje: resumoHojeData.notasHoje || 0,
-               controlesHoje: resumoHojeData.controlesHoje || 0
+               controlesHoje: resumoHojeData.controlesHoje || 0,
+               totalNotas: resumoHojeData.totalNotas || 0,
+               totalControles: resumoHojeData.totalControles || 0
              }));
           }
         } catch (e) {
@@ -822,7 +1004,30 @@ export default function CicloPedidoPage() {
         const hoje = new Date();
         const primeiroDiaMes = format(new Date(hoje.getFullYear(), hoje.getMonth(), 1), 'yyyy-MM-dd');
         const ultimoDiaMes = format(new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0), 'yyyy-MM-dd');
-        
+
+        // Carregar resumo de hoje dos pedidos externos
+        try {
+          const hojeStr = format(hoje, 'yyyy-MM-dd');
+          const statsHojeUrl = new URL('/api/pedidos/externos', window.location.origin);
+          statsHojeUrl.searchParams.set('stats', '1');
+          statsHojeUrl.searchParams.set('tipo_data', tipoData);
+          statsHojeUrl.searchParams.set('data_inicio', hojeStr);
+          statsHojeUrl.searchParams.set('data_fim', hojeStr);
+          statsHojeUrl.searchParams.set('status', 'FECHADO');
+
+          const respHoje = await fetch(statsHojeUrl.toString(), { headers: { accept: 'application/json' }, cache: 'no-store' });
+          if (respHoje.ok) {
+            const jsonHoje = await respHoje.json();
+            setStats(s => ({ 
+              ...s, 
+              hoje: typeof jsonHoje.total === 'number' ? jsonHoje.total : 0,
+              valorHoje: typeof jsonHoje.totalValor === 'number' ? jsonHoje.totalValor : 0
+            }));
+          }
+        } catch (e) {
+          console.error('Erro ao carregar resumo de hoje dos pedidos externos:', e);
+        }
+
         console.log('[Resumo Mês] Buscando dados:', { primeiroDiaMes, ultimoDiaMes });
         
         const statsUrl = new URL('/api/pedidos/externos', window.location.origin);
@@ -847,7 +1052,7 @@ export default function CicloPedidoPage() {
       }
     };
     carregarResumos();
-  }, []);
+  }, [tipoData]);
 
   return (
     <AppLayout 
@@ -860,72 +1065,46 @@ export default function CicloPedidoPage() {
 
       <div className="space-y-6">
         {/* Resumo em Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card className="bg-gradient-to-br from-blue-500 to-blue-600 border-none text-white">
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-blue-100 text-xs font-medium uppercase tracking-wider">Pedidos do Dia</p>
-                <h3 className="text-2xl font-bold mt-1">{stats.hoje}</h3>
-              </div>
-              <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm">
-                <ShoppingCart className="w-5 h-5 text-white" />
-              </div>
-            </div>
-            <div className="mt-4 flex items-center gap-1 text-xs text-blue-100">
-              <TrendingUp className="w-3 h-3" />
-              <span>Sincronizado em tempo real</span>
-            </div>
-          </Card>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4 gap-4">
+          <StatCard
+            title="Pedidos do Dia"
+            value={stats.hoje}
+            icon={ShoppingCart}
+            color="blue"
+            trend="Sincronizado em tempo real"
+            loading={stats.loading}
+            size="sm"
+          />
 
-          <Card className="bg-gradient-to-br from-emerald-500 to-emerald-600 border-none text-white">
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-emerald-100 text-xs font-medium uppercase tracking-wider">Valor Total do Dia</p>
-                <h3 className="text-2xl font-bold mt-1">
-                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(stats.valorHoje)}
-                </h3>
-              </div>
-              <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm">
-                <TrendingUp className="w-5 h-5 text-white" />
-              </div>
-            </div>
-            <div className="mt-4 flex items-center gap-1 text-xs text-emerald-100">
-              <Clock className="w-3 h-3" />
-              <span>Atualizado agora</span>
-            </div>
-          </Card>
+          <StatCard
+            title="Valor Total do Dia"
+            value={new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(stats.valorHoje)}
+            icon={TrendingUp}
+            color="green"
+            trend="Atualizado agora"
+            loading={stats.loading}
+            size="sm"
+          />
 
-          <Card className="bg-gradient-to-br from-orange-500 to-orange-600 border-none text-white">
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-orange-100 text-xs font-medium uppercase tracking-wider">Notas de Hoje</p>
-                <h3 className="text-2xl font-bold mt-1">{stats.notasHoje}</h3>
-              </div>
-              <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm">
-                <FileText className="w-5 h-5 text-white" />
-              </div>
-            </div>
-            <div className="mt-4 flex items-center gap-1 text-xs text-orange-100">
-              <Clock className="w-3 h-3" />
-              <span>Registradas hoje</span>
-            </div>
-          </Card>
+          <StatCard
+            title="Notas de Hoje"
+            value={stats.notasHoje}
+            icon={FileText}
+            color="orange"
+            trend="Hoje"
+            loading={stats.loading}
+            size="sm"
+          />
 
-          <Card className="bg-gradient-to-br from-cyan-500 to-cyan-600 border-none text-white">
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-cyan-100 text-xs font-medium uppercase tracking-wider">Controles de Hoje</p>
-                <h3 className="text-2xl font-bold mt-1">{stats.controlesHoje}</h3>
-              </div>
-              <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm">
-                <Truck className="w-5 h-5 text-white" />
-              </div>
-            </div>
-            <div className="mt-4 flex items-center gap-1 text-xs text-cyan-100">
-              <Clock className="w-3 h-3" />
-              <span>Gerados hoje</span>
-            </div>
-          </Card>
+          <StatCard
+            title="Controles de Hoje"
+            value={stats.controlesHoje}
+            icon={Truck}
+            color="cyan"
+            trend="Hoje"
+            loading={stats.loading}
+            size="sm"
+          />
         </div>
 
         {/* Filtros e Busca */}
@@ -1071,23 +1250,34 @@ export default function CicloPedidoPage() {
                   <th className="px-6 py-4 font-semibold text-textMain">Cliente</th>
                   <th className="px-6 py-4 font-semibold text-textMain hidden md:table-cell">Data</th>
                   <th className="px-6 py-4 font-semibold text-textMain hidden lg:table-cell">Entrega</th>
+                  {showCnpjColumn && (
+                    <th className="px-6 py-4 font-semibold text-textMain hidden xl:table-cell">CNPJ</th>
+                  )}
+                  <th className="px-6 py-4 font-semibold text-textMain hidden xl:table-cell">Endereço</th>
+                  {showBairroColumn && (
+                    <th className="px-6 py-4 font-semibold text-textMain hidden xl:table-cell">Bairro</th>
+                  )}
+                  {showCidadeColumn && (
+                    <th className="px-6 py-4 font-semibold text-textMain hidden xl:table-cell">Cidade/UF</th>
+                  )}
+                  <th className="px-6 py-4 font-semibold text-textMain hidden xl:table-cell">CEP</th>
                   <th className="px-6 py-4 font-semibold text-textMain">Valor</th>
                   <th className="px-6 py-4 font-semibold text-textMain hidden sm:table-cell">Status</th>
-                  <th className="px-6 py-4 font-semibold text-textMain text-right">Ações</th>
+                  <th className="px-6 py-4 font-semibold text-textMain text-right">Detalhes</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {loading ? (
                   Array.from({ length: 5 }).map((_, i) => (
                     <tr key={i} className="animate-pulse">
-                      <td colSpan={7} className="px-6 py-4">
+                      <td colSpan={tableColumnCount} className="px-6 py-4">
                         <div className="h-10 bg-slate-100 rounded w-full"></div>
                       </td>
                     </tr>
                   ))
                 ) : pedidos.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-6 py-12 text-center">
+                    <td colSpan={tableColumnCount} className="px-6 py-12 text-center">
                       <div className="flex flex-col items-center gap-2 text-textMuted">
                         <ShoppingCart className="w-10 h-10 opacity-20" />
                         <p>Nenhum pedido encontrado para os filtros selecionados.</p>
@@ -1096,8 +1286,12 @@ export default function CicloPedidoPage() {
                   </tr>
                 ) : (
                   pedidos.map((p) => {
-                    const enderecoResumo = getEnderecoResumo(p);
-                    const numeroNota = pickString(p.IDENTIFICACAO_NFE, getNumeroNota(p));
+                    const enderecoCampos = getEnderecoCampos(p);
+                    const logradouroCompleto = [enderecoCampos.logradouro, enderecoCampos.numero, enderecoCampos.complemento]
+                      .filter(Boolean)
+                      .join(', ');
+                    const cidadeUf = [enderecoCampos.cidade, enderecoCampos.uf].filter(Boolean).join('/');
+                    const numeroNota = getIdentificacaoNfeReduzida(p.IDENTIFICACAO_NFE) || getNumeroNota(p);
 
                     return (
                     <tr key={p.ORCAMENTO_ID} className="hover:bg-slate-50/50 transition-colors group">
@@ -1121,12 +1315,6 @@ export default function CicloPedidoPage() {
                             <span className="text-[10px] text-textMuted truncate">
                               {p.VENDEDOR_NOME}
                             </span>
-                            <span className="text-[10px] text-textMuted flex items-start gap-1 max-w-[200px]" title={enderecoResumo}>
-                              <MapPin className="w-3 h-3 mt-0.5 flex-shrink-0" />
-                              <span className="line-clamp-2">
-                                {enderecoResumo || 'Endereço não informado'}
-                              </span>
-                            </span>
                           </div>
                         </div>
                       </td>
@@ -1142,15 +1330,44 @@ export default function CicloPedidoPage() {
                         </div>
                       </td>
                       <td className="px-6 py-4 hidden lg:table-cell">
-                        <div className="flex flex-col gap-1">
-                          <Badge variant="info">Entrega</Badge>
-                          <span className="text-[10px] text-textMuted flex items-start gap-1 max-w-[220px]" title={enderecoResumo}>
-                            <MapPin className="w-3 h-3 mt-0.5 flex-shrink-0" />
-                            <span className="line-clamp-2">
-                              {enderecoResumo || 'Endereço não informado'}
-                            </span>
-                          </span>
+                        <div className="flex items-center justify-center">
+                          {(() => {
+                            const tipoEntrega = String(p.TIPO_ENTREGA || '').toUpperCase();
+                            const isEntrega = ['EPG', 'ENT'].includes(tipoEntrega);
+                            return isEntrega ? <CheckCircle2 className="w-5 h-5 text-emerald-500" /> : null;
+                          })()}
                         </div>
+                      </td>
+                      {showCnpjColumn && (
+                        <td className="px-6 py-4 hidden xl:table-cell">
+                          <span className="text-textMain">
+                            {getCnpjPedido(p) || '---'}
+                          </span>
+                        </td>
+                      )}
+                      <td className="px-6 py-4 hidden xl:table-cell">
+                        <span className="text-textMain text-xs leading-tight">
+                          {logradouroCompleto || '---'}
+                        </span>
+                      </td>
+                      {showBairroColumn && (
+                        <td className="px-6 py-4 hidden xl:table-cell">
+                          <span className="text-textMain">
+                            {enderecoCampos.bairro || '---'}
+                          </span>
+                        </td>
+                      )}
+                      {showCidadeColumn && (
+                        <td className="px-6 py-4 hidden xl:table-cell">
+                          <span className="text-textMain">
+                            {cidadeUf || '---'}
+                          </span>
+                        </td>
+                      )}
+                      <td className="px-6 py-4 hidden xl:table-cell">
+                        <span className="text-textMain text-xs leading-tight">
+                          {enderecoCampos.cep || '---'}
+                        </span>
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex flex-col">
@@ -1180,19 +1397,16 @@ export default function CicloPedidoPage() {
                         </div>
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <div className="flex justify-end gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-                          <Button 
-                            size="icon" 
-                            variant="ghost" 
-                            title="Ver Detalhes"
-                            onClick={() => {
-                              setPedidoSelecionado(p);
-                              setIsDetailModalOpen(true);
-                            }}
-                          >
-                            <Receipt className="w-4 h-4" />
-                          </Button>
-                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setPedidoSelecionado(p);
+                            setIsDetailModalOpen(true);
+                          }}
+                        >
+                          Detalhes
+                        </Button>
                       </td>
                     </tr>
                     );

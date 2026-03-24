@@ -8,7 +8,7 @@ import { USER_TYPES } from '../types/auth-types';
 // Lista de rotas públicas que não requerem autenticação
 const PUBLIC_ROUTES = ['/login', '/esqueci-senha', '/cadastro'];
 
-type TipoUsuario = typeof USER_TYPES.ADMIN | typeof USER_TYPES.GERENTE | typeof USER_TYPES.USUARIO | typeof USER_TYPES.SEPARADOR | typeof USER_TYPES.AUDITOR | typeof USER_TYPES.CONFERENTE;
+type TipoUsuario = typeof USER_TYPES.ADMIN | typeof USER_TYPES.GERENTE | typeof USER_TYPES.USUARIO;
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -18,13 +18,11 @@ interface ProtectedRouteProps {
 
 export default function ProtectedRoute({ 
   children, 
-  allowedRoles = [USER_TYPES.ADMIN, USER_TYPES.GERENTE, USER_TYPES.USUARIO, USER_TYPES.SEPARADOR, USER_TYPES.AUDITOR, USER_TYPES.CONFERENTE],
+  allowedRoles = [USER_TYPES.ADMIN, USER_TYPES.GERENTE, USER_TYPES.USUARIO],
   redirectTo = '/login' 
 }: ProtectedRouteProps) {
   const { user, isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
-  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
-  const [shouldRedirect, setShouldRedirect] = useState(false);
 
   useEffect(() => {
     // Se ainda está carregando, não faz nada
@@ -32,40 +30,28 @@ export default function ProtectedRoute({
 
     // Se é uma rota pública, não precisa verificar autenticação
     if (PUBLIC_ROUTES.includes(router.pathname)) {
-      setIsCheckingAuth(false);
       return;
     }
 
-    // Se não está autenticado, marca para redirecionar
-    if (!isAuthenticated) {
+    // Se não está autenticado e não está na página de login, redireciona
+    if (!isAuthenticated && router.pathname !== '/login') {
       console.log('[ProtectedRoute] Usuário não autenticado, redirecionando para login...');
-      setShouldRedirect(true);
+      router.replace(redirectTo);
       return;
     }
 
     // Se está autenticado, verifica as permissões
-    if (user) {
+    if (isAuthenticated && user) {
       const hasPermission = allowedRoles.includes(user.tipo);
       if (!hasPermission) {
         console.log('[ProtectedRoute] Usuário não autorizado, redirecionando...');
-        router.push('/acesso-negado');
-        return;
+        router.replace('/acesso-negado');
       }
     }
-
-    // Se chegou até aqui, está tudo ok
-    setIsCheckingAuth(false);
-  }, [isLoading, isAuthenticated, user, router, allowedRoles]);
-
-  // Efeito para lidar com o redirecionamento
-  useEffect(() => {
-    if (shouldRedirect && !isLoading && !isAuthenticated) {
-      router.push(redirectTo);
-    }
-  }, [shouldRedirect, isLoading, isAuthenticated, router, redirectTo]);
+  }, [isLoading, isAuthenticated, user, router.pathname, allowedRoles, redirectTo]);
 
   // Mostra um loader enquanto verifica a autenticação
-  if (isLoading || isCheckingAuth) {
+  if (isLoading) {
     return (
       <Box 
         display="flex" 
@@ -78,11 +64,15 @@ export default function ProtectedRoute({
     );
   }
 
-  // Se é uma rota pública ou o usuário está autenticado e autorizado, renderiza os filhos
-  if (PUBLIC_ROUTES.includes(router.pathname) || (isAuthenticated && user && allowedRoles.includes(user.tipo))) {
-    return <>{children}</>;
+  // Se não está autenticado e não é rota pública, não renderiza nada (vai redirecionar)
+  if (!isAuthenticated && !PUBLIC_ROUTES.includes(router.pathname)) {
+    return null;
   }
 
-  // Se não está autorizado e não está carregando, não renderiza nada
-  return null;
+  // Se está autenticado mas não tem permissão, não renderiza nada (vai redirecionar)
+  if (isAuthenticated && user && !allowedRoles.includes(user.tipo)) {
+    return null;
+  }
+
+  return <>{children}</>;
 }

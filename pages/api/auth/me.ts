@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import * as jwt from 'jsonwebtoken';
+import { PrismaClient } from '@prisma/client';
+import jwt from 'jsonwebtoken';
 import { parseCookies } from 'nookies';
-import prisma from '@/lib/prisma';
 
 // Lista de origens permitidas
 const ALLOWED_ORIGINS = [
@@ -72,14 +72,11 @@ const allowCors = (fn: any) => async (req: NextApiRequest, res: NextApiResponse)
   }
 };
 
-
-// Constantes de configuração
-const JWT_SECRET = process.env.JWT_SECRET || 'seu_segredo_secreto';
+const prisma = new PrismaClient();
 
 interface TokenPayload {
   id: string;
   email: string;
-  nome: string;
   tipo: string;
   iat: number;
   exp: number;
@@ -128,10 +125,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     // Verificar o token
     try {
-      const decoded = jwt.verify(token, JWT_SECRET) as TokenPayload;
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'seu_segredo_secreto') as TokenPayload;
       
-      // Buscar usuário no banco de dados para obter dados atualizados (incluindo foto)
-      const usuario = await prisma.usuario.findUnique({
+      // Buscar usuário
+      const user = await prisma.usuario.findUnique({
         where: { id: decoded.id },
         select: {
           id: true,
@@ -139,22 +136,27 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           email: true,
           tipo: true,
           ativo: true,
-          foto: true,
           dataCriacao: true,
           ultimoAcesso: true
         }
       });
 
-      if (!usuario) {
-        return res.status(404).json({
+      if (!user) {
+        return res.status(404).json({ 
           success: false,
-          message: 'Usuário não encontrado'
+          message: 'Usuário não encontrado' 
         });
       }
 
+      // Atualizar último acesso
+      await prisma.usuario.update({
+        where: { id: user.id },
+        data: { ultimoAcesso: new Date() }
+      });
+
       return res.status(200).json({ 
-        success: true, 
-        user: usuario
+        success: true,
+        user 
       });
       
     } catch (error) {
@@ -171,6 +173,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       success: false,
       message: 'Erro interno do servidor' 
     });
+  } finally {
+    await prisma.$disconnect();
   }
 }
 
@@ -184,4 +188,3 @@ export const config = {
 };
 
 export default allowCors(handler);
-

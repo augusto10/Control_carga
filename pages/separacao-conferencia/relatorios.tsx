@@ -32,9 +32,9 @@ import {
 } from '@mui/icons-material';
 import { useRouter } from 'next/router';
 
-const MotionBox = motion(Box);
-const MotionPaper = motion(Paper);
-const MotionTableRow = motion(TableRow);
+const MotionBox = motion.create(Box);
+const MotionPaper = motion.create(Paper);
+const MotionTableRow = motion.create(TableRow);
 
 interface NotaFiscal {
   id: string;

@@ -33,7 +33,7 @@ import {
   Assignment as AssignmentIcon
 } from '@mui/icons-material';
  
-import ResponsiveContainer from '@/components/ResponsiveContainer';
+import { AppLayout } from '@/components/layout/AppLayout';
 import { useSnackbar } from 'notistack';
 import api from '@/lib/api';
 import { format } from 'date-fns';
@@ -41,9 +41,9 @@ import { ptBR } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'framer-motion';
 import ProtectedRoute from '@/components/ProtectedRoute';
 
-const MotionBox = motion(Box);
-const MotionPaper = motion(Paper);
-const MotionTableRow = motion(TableRow);
+const MotionBox = motion.create(Box);
+const MotionPaper = motion.create(Paper);
+const MotionTableRow = motion.create(TableRow);
 
 interface TotalPorMaterial {
   materialId: string;
@@ -137,48 +137,19 @@ export default function RelatoriosMateriais() {
 
   return (
     <ProtectedRoute>
-      <ResponsiveContainer
-        breadcrumb={[
-          { label: 'Dashboard', path: '/' },
-          { label: 'Materiais', path: '/materiais' },
+      <AppLayout
+        title="Relatórios de Materiais"
+        subtitle="Analise o consumo e distribuição de materiais"
+        breadcrumbs={[
+          { label: 'Dashboard', href: '/' },
+          { label: 'Materiais', href: '/materiais' },
           { label: 'Relatórios' }
         ]}
       >
-        <MotionBox
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          sx={{ mb: 4 }}
-        >
-            <Stack 
-              direction={{ xs: 'column', md: 'row' }} 
-              justifyContent="space-between" 
-              alignItems={{ xs: 'flex-start', md: 'center' }}
-              spacing={2}
-            >
-              <Stack direction="row" alignItems="center" spacing={2}>
-                <Avatar sx={{ 
-                  bgcolor: 'primary.main', 
-                  width: 56, 
-                  height: 56, 
-                  boxShadow: '0 8px 16px rgba(37, 99, 235, 0.2)',
-                  background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)'
-                }}>
-                  <AssessmentIcon sx={{ fontSize: 32 }} />
-                </Avatar>
-                <Box>
-                  <Typography variant="h4" fontWeight="800" color="#1e293b" sx={{ fontSize: { xs: '1.5rem', md: '2.125rem' } }}>
-                    Relatórios de Materiais
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" fontWeight="500">
-                    Analise o consumo e distribuição de materiais
-                  </Typography>
-                </Box>
-              </Stack>
-            </Stack>
-          </MotionBox>
-
-          {/* Filtros */}
-          <MotionPaper
+        <Container maxWidth="xl" sx={{ p: 0 }}>
+          <Stack spacing={3}>
+            {/* Filtros */}
+            <MotionPaper
             elevation={0}
             sx={{
               p: { xs: 2, md: 3 },
@@ -508,7 +479,10 @@ export default function RelatoriosMateriais() {
               </MotionBox>
             )}
           </AnimatePresence>
-      </ResponsiveContainer>
+          </Stack>
+        </Container>
+      </AppLayout>
     </ProtectedRoute>
   );
 }
+RelatoriosMateriais.usesAppLayout = true;

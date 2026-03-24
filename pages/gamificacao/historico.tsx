@@ -38,9 +38,9 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../../services/api';
 
-const MotionBox = motion(Box);
-const MotionPaper = motion(Paper);
-const MotionCard = motion(Card);
+const MotionBox = motion.create(Box);
+const MotionPaper = motion.create(Paper);
+const MotionCard = motion.create(Card);
 
 const glassStyles = {
   background: 'rgba(255, 255, 255, 0.8)',

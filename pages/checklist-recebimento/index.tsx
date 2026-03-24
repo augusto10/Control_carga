@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/router';
 import { useDeviceDetect } from '../../hooks/useDeviceDetect';
 import {
@@ -20,32 +20,27 @@ import {
   CircularProgress,
   Card,
   CardContent,
+  Alert,
   IconButton,
   Divider,
   Chip,
   Stack,
-  Container,
   alpha,
-  useTheme,
-  Fade
+  useTheme
 } from '@mui/material';
 import {
   Assignment as AssignmentIcon,
   PhotoCamera as PhotoCameraIcon,
   Save as SaveIcon,
-  CheckCircle as CheckCircleIcon,
   Add as AddIcon,
   Delete as DeleteIcon,
   QrCodeScanner as QrCodeScannerIcon,
-  CameraAlt as CameraAltIcon,
   ArrowBack as ArrowBackIcon,
   ArrowForward as ArrowForwardIcon,
   Timer as TimerIcon,
   CalendarMonth as CalendarIcon,
   Person as PersonIcon,
   Inventory as InventoryIcon,
-  Rule as RuleIcon,
-  Info as InfoIcon,
   Warning as WarningIcon
 } from '@mui/icons-material';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -57,7 +52,6 @@ import ResponsiveContainer from '../../components/ResponsiveContainer';
 
 import { useSnackbar } from 'notistack';
 
-// Declaração global para scanner Android
 declare global {
   interface Window {
     Android?: {
@@ -70,7 +64,6 @@ declare global {
 const MotionBox = motion(Box);
 const MotionPaper = motion(Paper);
 const MotionCard = motion(Card);
-const MotionGrid = motion(Grid);
 
 interface Produto {
   id: string;
@@ -1172,20 +1165,5 @@ function ChecklistRecebimentoPage() {
     </ProtectedRoute>
   );
 }
-
-const CustomAvatar = ({ children, sx }: any) => {
-  const theme = useTheme();
-  return (
-    <Box sx={{ 
-      display: 'flex', 
-      alignItems: 'center', 
-      justifyContent: 'center', 
-      borderRadius: '12px',
-      ...sx 
-    }}>
-      {children}
-    </Box>
-  );
-};
 
 export default ChecklistRecebimentoPage;

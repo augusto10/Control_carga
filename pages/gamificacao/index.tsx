@@ -51,10 +51,10 @@ import {
 } from '@mui/icons-material';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const MotionBox = motion(Box);
-const MotionPaper = motion(Paper);
-const MotionCard = motion(Card);
-const MotionTableRow = motion(TableRow);
+const MotionBox = motion.create(Box);
+const MotionPaper = motion.create(Paper);
+const MotionCard = motion.create(Card);
+const MotionTableRow = motion.create(TableRow);
 
 const getMedalColor = (index: number) => {
   switch (index) {

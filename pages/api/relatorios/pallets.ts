@@ -1,240 +1,156 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
-import { getTokenFromCookies, verifyToken } from '@/lib/auth';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'seu_segredo_secreto';
-
-interface RelatorioPallets {
-  motorista: string;
-  transportadora: string;
-  totalPalletsLevados: number;
-  totalPalletsDevolvidos: number;
-  totalPalletsLiquido: number; // Mantém o nome original para compatibilidade da API
-  totalControles: number;
-}
-
-interface ResumoTransportadora {
-  transportadora: string;
-  totalPalletsLevados: number;
-  totalPalletsDevolvidos: number;
-  totalPalletsLiquido: number; // Mantém o nome original para compatibilidade da API
-  totalControles: number;
-  totalMotoristas: number;
-}
+const getString = (value: string | string[] | undefined) => {
+  if (!value) return undefined;
+  return Array.isArray(value) ? value[0] : value;
+};
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Método não permitido' });
-  }
-
-  // Verificar autenticação
-  const token = getTokenFromCookies(req);
-  if (!token) {
-    return res.status(401).json({ error: 'Não autenticado' });
-  }
-
-  const decoded = await verifyToken(token, JWT_SECRET);
-  if (!decoded || !decoded.id) {
-    return res.status(401).json({ error: 'Token inválido' });
+    return res.status(405).json({ message: 'Method not allowed' });
   }
 
   try {
-    const { dataInicio, dataFim, transportadora, motorista } = req.query;
+    const dataInicio = getString(req.query.dataInicio);
+    const dataFim = getString(req.query.dataFim);
+    const transportadora = getString(req.query.transportadora);
+    const motorista = getString(req.query.motorista);
 
-    // Construir filtros
-    const filtros: any = {};
-
-    if (dataInicio) {
-      // Criar data de início em UTC (00:00:00.000Z)
-      const dataInicioDate = new Date(dataInicio as string + 'T00:00:00.000Z');
-      filtros.dataCriacao = {
-        ...filtros.dataCriacao,
-        gte: dataInicioDate
+    const whereControles: any = {};
+    if (dataInicio && dataFim) {
+      whereControles.dataCriacao = {
+        gte: new Date(`${dataInicio}T00:00:00.000Z`),
+        lte: new Date(`${dataFim}T23:59:59.999Z`)
       };
     }
-
-    if (dataFim) {
-      // Criar data de fim em UTC (23:59:59.999Z)
-      const dataFimDate = new Date(dataFim as string + 'T23:59:59.999Z');
-      filtros.dataCriacao = {
-        ...filtros.dataCriacao,
-        lte: dataFimDate
-      };
+    if (transportadora) {
+      whereControles.transportadora = transportadora;
     }
-
-    if (transportadora && transportadora !== 'TODAS') {
-      filtros.transportadora = transportadora;
-    }
-
     if (motorista) {
-      filtros.motorista = {
-        contains: motorista as string,
+      whereControles.motorista = {
+        contains: motorista,
         mode: 'insensitive'
       };
     }
 
-    console.log('Filtros aplicados:', filtros);
-
-    // Buscar todos os controles com os filtros
     const controles = await prisma.controleCarga.findMany({
-      where: filtros,
+      where: whereControles,
       select: {
         motorista: true,
         transportadora: true,
         qtdPalletsLevados: true,
-        qtdPalletsDevolvidos: true,
-        dataCriacao: true
+        qtdPalletsDevolvidos: true
       }
     });
 
-    console.log(`Encontrados ${controles.length} controles`);
+    let ajustes: Array<{
+      motorista: string | null;
+      transportadora: string | null;
+      quantidade: number;
+    }> = [];
 
-    // Também buscar ajustes de pallets (devoluções avulsas) no período/filters
-    const whereAjustes: any = {};
-    if (filtros.dataCriacao?.gte || filtros.dataCriacao?.lte) {
-      whereAjustes.dataRecebimento = {
-        ...(filtros.dataCriacao?.gte ? { gte: filtros.dataCriacao.gte } : {}),
-        ...(filtros.dataCriacao?.lte ? { lte: filtros.dataCriacao.lte } : {}),
-      };
-    }
-    if (filtros.transportadora) {
-      whereAjustes.transportadora = filtros.transportadora;
-    }
-    if (filtros.motorista) {
-      // filtros.motorista é um objeto { contains, mode }
-      whereAjustes.motorista = filtros.motorista;
-    }
-
-    type AjusteRow = { motorista: string | null; transportadora: string | null; quantidade: number; dataRecebimento: Date };
-    let ajustes: AjusteRow[] = [];
     try {
-      ajustes = await (prisma as any).palletAjuste.findMany({
+      const whereAjustes: any = {};
+      if (dataInicio && dataFim) {
+        whereAjustes.dataRecebimento = {
+          gte: new Date(`${dataInicio}T00:00:00.000Z`),
+          lte: new Date(`${dataFim}T23:59:59.999Z`)
+        };
+      }
+      if (transportadora) {
+        whereAjustes.transportadora = transportadora;
+      }
+      if (motorista) {
+        whereAjustes.motorista = {
+          contains: motorista,
+          mode: 'insensitive'
+        };
+      }
+
+      ajustes = await prisma.palletAjuste.findMany({
         where: whereAjustes,
         select: {
           motorista: true,
           transportadora: true,
-          quantidade: true,
-          dataRecebimento: true,
-        },
+          quantidade: true
+        }
       });
-    } catch (e: any) {
-      // Se a tabela ainda não existir no ambiente (ex.: produção antes da migração), prosseguir sem ajustes
-      console.warn('Ajustes de pallets indisponíveis (tabela ausente). Prosseguindo sem somar ajustes.');
+    } catch (error) {
+      ajustes = [];
     }
 
-    // Agrupar dados por motorista e transportadora
-    const agrupamento = new Map<string, RelatorioPallets>();
+    const dadosMap = new Map<string, any>();
+    const resumoTransportadorasMap = new Map<string, { transportadora: string; totalPalletsLevados: number; totalPalletsDevolvidos: number; totalPalletsLiquido: number; totalControles: number; motoristas: Set<string> }>();
 
-    controles.forEach(controle => {
-      // Verificar se o motorista é VLOG e corrigir a transportadora na exibição
-      let transportadoraParaExibir = controle.transportadora;
-      if (controle.motorista && controle.motorista.toLowerCase().includes('vlog')) {
-        transportadoraParaExibir = 'VLOG';
-      }
-      
-      const chave = `${controle.motorista}|${transportadoraParaExibir}`;
-      
-      if (agrupamento.has(chave)) {
-        const item = agrupamento.get(chave)!;
-        item.totalPalletsLevados += controle.qtdPalletsLevados || 0;
-        item.totalPalletsDevolvidos += controle.qtdPalletsDevolvidos || 0;
-        item.totalPalletsLiquido = item.totalPalletsLevados - item.totalPalletsDevolvidos;
-        item.totalControles += 1;
-      } else {
-        const palletsLevados = controle.qtdPalletsLevados || 0;
-        const palletsDevolvidos = controle.qtdPalletsDevolvidos || 0;
-        
-        agrupamento.set(chave, {
-          motorista: controle.motorista,
-          transportadora: transportadoraParaExibir,
-          totalPalletsLevados: palletsLevados,
-          totalPalletsDevolvidos: palletsDevolvidos,
-          totalPalletsLiquido: palletsLevados - palletsDevolvidos,
-          totalControles: 1
-        });
-      }
+    controles.forEach((controle) => {
+      const key = `${controle.motorista}||${controle.transportadora}`;
+      const atual = dadosMap.get(key) || {
+        motorista: controle.motorista,
+        transportadora: controle.transportadora,
+        totalPalletsLevados: 0,
+        totalPalletsDevolvidos: 0,
+        totalPalletsLiquido: 0,
+        totalControles: 0
+      };
+
+      atual.totalPalletsLevados += controle.qtdPalletsLevados || 0;
+      atual.totalPalletsDevolvidos += controle.qtdPalletsDevolvidos || 0;
+      atual.totalControles += 1;
+      atual.totalPalletsLiquido = atual.totalPalletsDevolvidos - atual.totalPalletsLevados;
+      dadosMap.set(key, atual);
     });
 
-    // Somar ajustes (devoluções avulsas) aos devolvidos
-    ajustes.forEach((aj: AjusteRow) => {
-      const motoristaKey = aj.motorista || 'DESCONHECIDO';
-      // Verificar se o motorista do ajuste é VLOG para usar a transportadora correta
-      let transpKey = aj.transportadora || 'TERCEIRIZADA';
-      if (aj.motorista && aj.motorista.toLowerCase().includes('vlog')) {
-        transpKey = 'VLOG';
-      }
-      const chave = `${motoristaKey}|${transpKey}`;
-      if (agrupamento.has(chave)) {
-        const item = agrupamento.get(chave)!;
-        item.totalPalletsDevolvidos += aj.quantidade || 0;
-        item.totalPalletsLiquido = item.totalPalletsLevados - item.totalPalletsDevolvidos;
-      } else {
-        // Caso não exista controle no período para este par, criar entrada só com ajustes
-        const palletsDevolvidos = aj.quantidade || 0;
-        agrupamento.set(chave, {
-          motorista: motoristaKey,
-          transportadora: transpKey,
-          totalPalletsLevados: 0,
-          totalPalletsDevolvidos: palletsDevolvidos,
-          totalPalletsLiquido: 0 - palletsDevolvidos,
-          totalControles: 0,
-        });
-      }
+    ajustes.forEach((ajuste) => {
+      const motoristaNome = ajuste.motorista || 'Não informado';
+      const transportadoraNome = ajuste.transportadora || 'Não informada';
+      const key = `${motoristaNome}||${transportadoraNome}`;
+      const atual = dadosMap.get(key) || {
+        motorista: motoristaNome,
+        transportadora: transportadoraNome,
+        totalPalletsLevados: 0,
+        totalPalletsDevolvidos: 0,
+        totalPalletsLiquido: 0,
+        totalControles: 0
+      };
+
+      atual.totalPalletsDevolvidos += ajuste.quantidade || 0;
+      atual.totalPalletsLiquido = atual.totalPalletsDevolvidos - atual.totalPalletsLevados;
+      dadosMap.set(key, atual);
     });
 
-    // Converter Map para array e ordenar
-    const dados = Array.from(agrupamento.values()).sort((a, b) => {
-      if (a.transportadora !== b.transportadora) {
-        return a.transportadora.localeCompare(b.transportadora);
-      }
-      return a.motorista.localeCompare(b.motorista);
+    const dados = Array.from(dadosMap.values()).sort((a, b) => a.motorista.localeCompare(b.motorista));
+
+    dados.forEach((item) => {
+      const resumo = resumoTransportadorasMap.get(item.transportadora) || {
+        transportadora: item.transportadora,
+        totalPalletsLevados: 0,
+        totalPalletsDevolvidos: 0,
+        totalPalletsLiquido: 0,
+        totalControles: 0,
+        motoristas: new Set<string>()
+      };
+
+      resumo.totalPalletsLevados += item.totalPalletsLevados;
+      resumo.totalPalletsDevolvidos += item.totalPalletsDevolvidos;
+      resumo.totalPalletsLiquido += item.totalPalletsLiquido;
+      resumo.totalControles += item.totalControles;
+      resumo.motoristas.add(item.motorista);
+      resumoTransportadorasMap.set(item.transportadora, resumo);
     });
 
-    // Criar resumo por transportadora
-    const resumoMap = new Map<string, ResumoTransportadora>();
+    const resumoTransportadoras = Array.from(resumoTransportadorasMap.values()).map((resumo) => ({
+      transportadora: resumo.transportadora,
+      totalPalletsLevados: resumo.totalPalletsLevados,
+      totalPalletsDevolvidos: resumo.totalPalletsDevolvidos,
+      totalPalletsLiquido: resumo.totalPalletsLiquido,
+      totalControles: resumo.totalControles,
+      totalMotoristas: resumo.motoristas.size
+    }));
 
-    dados.forEach(item => {
-      if (resumoMap.has(item.transportadora)) {
-        const resumo = resumoMap.get(item.transportadora)!;
-        resumo.totalPalletsLevados += item.totalPalletsLevados;
-        resumo.totalPalletsDevolvidos += item.totalPalletsDevolvidos;
-        resumo.totalPalletsLiquido += item.totalPalletsLiquido;
-        resumo.totalControles += item.totalControles;
-        resumo.totalMotoristas += 1;
-      } else {
-        resumoMap.set(item.transportadora, {
-          transportadora: item.transportadora,
-          totalPalletsLevados: item.totalPalletsLevados,
-          totalPalletsDevolvidos: item.totalPalletsDevolvidos,
-          totalPalletsLiquido: item.totalPalletsLiquido,
-          totalControles: item.totalControles,
-          totalMotoristas: 1
-        });
-      }
-    });
-
-    const resumoTransportadoras = Array.from(resumoMap.values()).sort((a, b) => 
-      a.transportadora.localeCompare(b.transportadora)
-    );
-
-    console.log(`Retornando ${dados.length} registros agrupados`);
-    console.log(`Resumo de ${resumoTransportadoras.length} transportadoras`);
-
-    return res.status(200).json({
-      dados,
-      resumoTransportadoras,
-      totalRegistros: dados.length,
-      periodo: {
-        inicio: dataInicio || 'Sem limite',
-        fim: dataFim || 'Sem limite'
-      }
-    });
-
+    return res.status(200).json({ dados, resumoTransportadoras });
   } catch (error) {
-    console.error('Erro ao gerar relatório de pallets:', error);
-    return res.status(500).json({ 
-      error: 'Erro interno do servidor',
-      details: error instanceof Error ? error.message : 'Erro desconhecido'
-    });
+    console.error('Erro ao buscar relatório de pallets:', error);
+    return res.status(500).json({ message: 'Erro interno do servidor' });
   }
 }

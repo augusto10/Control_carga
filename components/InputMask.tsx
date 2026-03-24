@@ -1,111 +1,76 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
+import ReactInputMask from 'react-input-mask';
 import { TextField, TextFieldProps } from '@mui/material';
+import { Input } from './ui/Input';
 
-interface InputMaskProps extends Omit<TextFieldProps, 'onChange' | 'value'> {
-  mask: 'cpf' | 'telefone' | 'cnh';
+interface InputMaskProps {
+  mask: string | 'cpf' | 'telefone' | 'cnpj';
   value: string;
   onChange: (value: string) => void;
+  placeholder?: string;
+  className?: string;
+  required?: boolean;
+  disabled?: boolean;
+  name?: string;
+  id?: string;
+  label?: string;
+  error?: boolean;
+  helperText?: string;
+  fullWidth?: boolean;
 }
 
-const InputMask: React.FC<InputMaskProps> = ({ mask, value, onChange, ...props }) => {
-  const [displayValue, setDisplayValue] = useState('');
+const masks = {
+  cpf: '999.999.999-99',
+  cnpj: '99.999.999/9999-99',
+  telefone: '(99) 99999-9999',
+};
 
-  // Função para remover formatação
-  const removeFormatting = (text: string): string => {
-    return text.replace(/\D/g, '');
+const InputMask: React.FC<InputMaskProps> = ({ 
+  mask, 
+  value, 
+  onChange, 
+  ...props 
+}) => {
+  const maskString = masks[mask as keyof typeof masks] || mask;
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    onChange(e.target.value);
   };
 
-  // Função para aplicar máscara de CPF
-  const applyCpfMask = (text: string): string => {
-    const numbers = removeFormatting(text);
-    if (numbers.length <= 3) return numbers;
-    if (numbers.length <= 6) return `${numbers.slice(0, 3)}.${numbers.slice(3)}`;
-    if (numbers.length <= 9) return `${numbers.slice(0, 3)}.${numbers.slice(3, 6)}.${numbers.slice(6)}`;
-    return `${numbers.slice(0, 3)}.${numbers.slice(3, 6)}.${numbers.slice(6, 9)}-${numbers.slice(9, 11)}`;
-  };
-
-  // Função para aplicar máscara de telefone
-  const applyTelefoneMask = (text: string): string => {
-    const numbers = removeFormatting(text);
-    if (numbers.length <= 2) return numbers;
-    if (numbers.length <= 7) return `(${numbers.slice(0, 2)}) ${numbers.slice(2)}`;
-    if (numbers.length <= 11) {
-      return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7)}`;
-    }
-    return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7, 11)}`;
-  };
-
-  // Função para aplicar máscara de CNH
-  const applyCnhMask = (text: string): string => {
-    const numbers = removeFormatting(text);
-    return numbers.slice(0, 11); // CNH tem 11 dígitos
-  };
-
-  // Aplicar máscara baseada no tipo
-  const applyMask = (text: string): string => {
-    switch (mask) {
-      case 'cpf':
-        return applyCpfMask(text);
-      case 'telefone':
-        return applyTelefoneMask(text);
-      case 'cnh':
-        return applyCnhMask(text);
-      default:
-        return text;
-    }
-  };
-
-  // Atualizar display value quando value prop mudar
-  useEffect(() => {
-    setDisplayValue(applyMask(value));
-  }, [value, mask]);
-
-  // Handler para mudanças no input
-  const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const inputValue = event.target.value;
-    const maskedValue = applyMask(inputValue);
-    const cleanValue = removeFormatting(inputValue);
-    
-    setDisplayValue(maskedValue);
-    onChange(cleanValue); // Sempre retorna valor limpo para o parent
-  };
-
-  // Configurações específicas por tipo de máscara
-  const getMaskConfig = () => {
-    switch (mask) {
-      case 'cpf':
-        return {
-          placeholder: '000.000.000-00',
-          inputProps: { maxLength: 14 }
-        };
-      case 'telefone':
-        return {
-          placeholder: '(11) 99999-9999',
-          inputProps: { maxLength: 15 }
-        };
-      case 'cnh':
-        return {
-          placeholder: '00000000000',
-          inputProps: { maxLength: 11 }
-        };
-      default:
-        return {};
-    }
-  };
-
-  const maskConfig = getMaskConfig();
+  // Se tiver label ou error, assume que é para usar o TextField do MUI
+  if (props.label || props.error || props.helperText || props.fullWidth) {
+    return (
+      <ReactInputMask
+        mask={maskString}
+        value={value}
+        onChange={handleChange}
+        disabled={props.disabled}
+      >
+        {(inputProps: any) => (
+          <TextField
+            {...inputProps}
+            {...(props as TextFieldProps)}
+            variant="outlined"
+          />
+        )}
+      </ReactInputMask>
+    );
+  }
 
   return (
-    <TextField
-      {...props}
-      value={displayValue}
+    <ReactInputMask
+      mask={maskString}
+      value={value}
       onChange={handleChange}
-      placeholder={maskConfig.placeholder}
-      inputProps={{
-        ...props.inputProps,
-        ...maskConfig.inputProps
-      }}
-    />
+      disabled={props.disabled}
+    >
+      {(inputProps: any) => (
+        <Input 
+          {...inputProps} 
+          {...props}
+        />
+      )}
+    </ReactInputMask>
   );
 };
 

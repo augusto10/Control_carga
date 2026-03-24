@@ -27,7 +27,7 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { cn } from '@/utils/cn';
 
-const MotionCard = motion(Card);
+const MotionCard = motion.create(Card);
 
 interface PedidoStatus {
   ORCAMENTO_ID: number;

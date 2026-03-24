@@ -30,7 +30,7 @@ import {
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRouter } from 'next/router';
-import ResponsiveContainer from '../../components/ResponsiveContainer';
+import { AppLayout } from '../../components/layout/AppLayout';
 import ProtectedRoute from '../../components/ProtectedRoute';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 
@@ -440,16 +440,16 @@ const RelatorioPalletsPage: React.FC = () => {
 
   return (
     <ProtectedRoute>
-      <ResponsiveContainer
-        breadcrumb={[
-          { label: 'Dashboard', path: '/' },
-          { label: 'Relatórios', path: '/relatorios' },
+      <AppLayout
+        title="Relatório de Pallets"
+        subtitle="Acompanhamento de pallets levados e devolvidos"
+        breadcrumbs={[
+          { label: 'Dashboard', href: '/' },
+          { label: 'Relatórios', href: '/relatorios' },
           { label: 'Pallets' }
         ]}
       >
-        <Typography variant="h4" component="h1" gutterBottom>
-          Relatório de Pallets por Motorista e Transportadora
-        </Typography>
+        <Box sx={{ mb: 4 }}>
 
       {/* Filtros e Ações */}
       <Paper sx={{ p: 3, mb: 3 }}>
@@ -697,9 +697,11 @@ const RelatorioPalletsPage: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
-      </ResponsiveContainer>
-    </ProtectedRoute>
-  );
+      </Box>
+    </AppLayout>
+  </ProtectedRoute>
+);
 };
 
 export default RelatorioPalletsPage;
+RelatorioPalletsPage.usesAppLayout = true;

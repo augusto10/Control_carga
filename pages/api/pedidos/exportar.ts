@@ -29,7 +29,7 @@ export default async function handler(
 
     let offset = 0;
     const limit = 200;
-    let todosPedidos: any[] = [];
+    const todosPedidos: any[] = [];
 
     while (true) {
       const filtrosApi: any = {

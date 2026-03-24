@@ -93,7 +93,7 @@ export default function GerenciarUsuariosPage() {
   const carregarUsuarios = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/api/admin/usuarios');
+      const response = await api.get('/api/usuarios');
       setUsuarios(response.data);
     } catch (error: any) {
       console.error('Erro ao carregar usuários:', error);

@@ -13,7 +13,7 @@ import {
   EmojiEvents as GamificacaoIcon
 } from '@mui/icons-material';
 
-const MotionBox = motion(Box);
+const MotionBox = motion.create(Box);
 
 export default function PaginaGerentes() {
   const theme = useTheme();

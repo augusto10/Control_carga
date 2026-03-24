@@ -53,7 +53,7 @@ const ListarNotas = () => {
   useEffect(() => {
     const loadStats = async () => {
       try {
-        const res = await fetch('/api/dashboard/stats');
+        const res = await fetch('/api/notas/stats');
         if (res.ok) {
           const data = await res.json();
           setStats({
@@ -353,6 +353,6 @@ const ListarNotas = () => {
   );
 };
 
-export default ListarNotas;
-
 (ListarNotas as any).usesAppLayout = true;
+
+export default ListarNotas;

@@ -27,11 +27,11 @@ import {
   ArrowForward as ArrowForwardIcon
 } from '@mui/icons-material';
 import { motion } from 'framer-motion';
-import ResponsiveContainer from '../components/ResponsiveContainer';
+import { AppLayout } from '@/components/layout/AppLayout';
 import ProtectedRoute from '../components/ProtectedRoute';
 
-const MotionPaper = motion(Paper);
-const MotionCard = motion(Card);
+const MotionPaper = motion.create(Paper);
+const MotionCard = motion.create(Card);
 
 export default function Relatorios() {
   const theme = useTheme();
@@ -93,29 +93,21 @@ export default function Relatorios() {
 
   return (
     <ProtectedRoute>
-      <ResponsiveContainer
+      <AppLayout
+        title="Relatórios"
+        subtitle="Consulte e gere documentos detalhados sobre as operações do sistema"
         breadcrumb={[
           { label: 'Dashboard', path: '/' },
           { label: 'Relatórios' }
         ]}
       >
-        {/* Header Section */}
-        <Box mb={4}>
-          <Typography variant="h4" fontWeight="800" color="#1e293b" gutterBottom>
-            Relatórios
-          </Typography>
-          <Typography variant="body1" color="text.secondary">
-            Consulte e gere documentos detalhados sobre as operações do sistema.
-          </Typography>
-        </Box>
-
         <Grid container spacing={3}>
           <Grid item xs={12} md={4}>
             <RelatorioCard 
               title="Pallets por Motorista" 
               description="Totais de pallets levados, devolvidos e diferença, agrupados por motorista e período."
               icon={<TruckIcon />}
-              href="/relatorios/pallets-motorista"
+              href="/relatorios/pallets"
               color="primary"
               delay={0.1}
             />
@@ -125,7 +117,7 @@ export default function Relatorios() {
               title="Controles de Carga" 
               description="Resumo completo de todos os controles de carga realizados no período selecionado."
               icon={<AssignmentIcon />}
-              href="#"
+              href="/relatorios/controles-carga"
               color="info"
               delay={0.2}
             />
@@ -166,7 +158,9 @@ export default function Relatorios() {
             </MotionPaper>
           </Grid>
         </Grid>
-      </ResponsiveContainer>
+      </AppLayout>
     </ProtectedRoute>
   );
 }
+
+(Relatorios as any).usesAppLayout = true;

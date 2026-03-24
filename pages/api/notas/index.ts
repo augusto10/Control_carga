@@ -1,129 +1,86 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 
-// API temporária para notas que funciona com enum antigo
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  // Configurar CORS
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
+  if (req.method !== 'GET') {
+    return res.status(405).json({ message: 'Method not allowed' });
   }
 
-  if (req.method === 'GET') {
-    try {
-      const { start, end, numeroNota, codigo } = req.query;
-      console.log('🔄 [TEMP] Listando notas com compatibilidade');
-      console.log('📅 [TEMP] Filtros recebidos:', { start, end, numeroNota, codigo });
-      
-      // Construir filtros de data
-      const where: any = {};
-      if (start || end) {
-        where.dataCriacao = {};
-        if (start) {
-          where.dataCriacao.gte = new Date(`${start}T00:00:00`);
-          console.log('📅 [TEMP] Data início:', where.dataCriacao.gte);
-        }
-        if (end) {
-          where.dataCriacao.lte = new Date(`${end}T23:59:59`);
-          console.log('📅 [TEMP] Data fim:', where.dataCriacao.lte);
-        }
-      }
-      
-      // Filtro por número da nota
-      if (numeroNota) {
-        where.numeroNota = {
-          contains: numeroNota as string,
-          mode: 'insensitive'
-        };
-        console.log('📝 [TEMP] Filtro de número da nota:', numeroNota);
-      }
-      
-      // Filtro por código
-      if (codigo) {
-        where.codigo = {
-          contains: codigo as string,
-          mode: 'insensitive'
-        };
-        console.log('📝 [TEMP] Filtro de código:', codigo);
-      }
-      
-      // Buscar notas com filtros aplicados
-      const notas = await prisma.notaFiscal.findMany({
-        where,
-        orderBy: { dataCriacao: 'desc' },
-        take: 500 // Aumentar limite para permitir mais resultados
-      });
+  try {
+    const start = req.query.start as string | undefined;
+    const end = req.query.end as string | undefined;
+    const numeroNota = req.query.numeroNota as string | undefined;
+    const codigo = req.query.codigo as string | undefined;
 
-      console.log(`📊 [TEMP] Encontradas ${notas.length} notas com filtros:`, where);
-      
-      if (notas.length > 0) {
-        console.log('📅 [TEMP] Primeira nota:', {
-          id: notas[0].id,
-          numeroNota: notas[0].numeroNota,
-          dataCriacao: notas[0].dataCriacao
-        });
-        console.log('📅 [TEMP] Última nota:', {
-          id: notas[notas.length - 1].id,
-          numeroNota: notas[notas.length - 1].numeroNota,
-          dataCriacao: notas[notas.length - 1].dataCriacao
-        });
-      }
+    console.log('[API Notas] Parâmetros recebidos:', { start, end, numeroNota, codigo });
 
-      // Buscar controles separadamente para evitar erro de enum
-      const notasComControles = await Promise.all(
-        notas.map(async (nota) => {
-          if (nota.controleId) {
-            try {
-              const controle = await prisma.controleCarga.findUnique({
-                where: { id: nota.controleId },
-                select: {
-                  id: true,
-                  motorista: true,
-                  transportadora: true,
-                  finalizado: true
-                }
-              });
-              
-              // Mapear ACERT para ACCERT se necessário
-              if (controle && (controle.transportadora as string) === 'ACERT') {
-                (controle as any).transportadora = 'ACCERT';
-              }
-              
-              return {
-                ...nota,
-                controle
-              };
-            } catch (error) {
-              console.warn(`⚠️ [TEMP] Erro ao buscar controle ${nota.controleId}:`, error);
-              return {
-                ...nota,
-                controle: null
-              };
-            }
-          }
-          
-          return {
-            ...nota,
-            controle: null
+    const where: any = {};
+
+    if (start && end) {
+      try {
+        // Garante que start e end sejam strings simples
+        const s = Array.isArray(start) ? start[0] : start;
+        const e = Array.isArray(end) ? end[0] : end;
+
+        const startDate = new Date(`${s}T00:00:00.000Z`);
+        const endDate = new Date(`${e}T23:59:59.999Z`);
+        
+        if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
+          where.dataCriacao = {
+            gte: startDate,
+            lte: endDate,
           };
-        })
-      );
-
-      console.log(`✅ [TEMP] Retornando ${notasComControles.length} notas processadas`);
-      return res.status(200).json(notasComControles);
-      
-    } catch (error: any) {
-      console.error('❌ [TEMP] Erro ao listar notas:', error);
-      return res.status(500).json({ 
-        error: 'Erro interno do servidor',
-        message: error.message,
-        code: error.code
-      });
+        } else {
+          console.warn('[API Notas] Datas inválidas:', { s, e });
+        }
+      } catch (dateError) {
+        console.error('[API Notas] Erro ao processar datas:', dateError);
+      }
     }
-  }
 
-  return res.status(405).json({ error: `Método ${req.method} não permitido` });
+    if (numeroNota) {
+      const n = Array.isArray(numeroNota) ? numeroNota[0] : numeroNota;
+      where.numeroNota = {
+        contains: String(n),
+        mode: 'insensitive',
+      };
+    }
+
+    if (codigo) {
+      const c = Array.isArray(codigo) ? codigo[0] : codigo;
+      where.codigo = {
+        contains: String(c),
+        mode: 'insensitive',
+      };
+    }
+
+    console.log('[API Notas] Filtro where:', JSON.stringify(where));
+
+    const notas = await prisma.notaFiscal.findMany({
+      where,
+      include: {
+        controle: {
+          select: {
+            id: true,
+            dataCriacao: true
+          }
+        },
+        usuario: {
+          select: {
+            id: true,
+            nome: true,
+            email: true
+          }
+        }
+      },
+      orderBy: {
+        dataCriacao: 'desc',
+      },
+    });
+
+    return res.status(200).json(notas);
+  } catch (error) {
+    console.error('Erro ao buscar notas:', error);
+    return res.status(500).json({ message: 'Erro interno do servidor' });
+  }
 }

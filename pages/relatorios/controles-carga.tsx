@@ -29,7 +29,7 @@ import {
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRouter } from 'next/router';
-import ResponsiveContainer from '../../components/ResponsiveContainer';
+import { AppLayout } from '../../components/layout/AppLayout';
 import ProtectedRoute from '../../components/ProtectedRoute';
 import {
   Chart as ChartJS,
@@ -297,17 +297,15 @@ const RelatorioControlesCargaPage: React.FC = () => {
 
   return (
     <ProtectedRoute>
-      <ResponsiveContainer
-        breadcrumb={[
-          { label: 'Dashboard', path: '/' },
-          { label: 'Relatórios', path: '/relatorios' },
+      <AppLayout
+        title="Relatório de Controles de Carga"
+        breadcrumbs={[
+          { label: 'Dashboard', href: '/' },
+          { label: 'Relatórios', href: '/relatorios' },
           { label: 'Controles de Carga' }
         ]}
       >
-        <Typography variant="h4" component="h1" gutterBottom>
-          Relatório de Controles de Carga
-        </Typography>
-
+        <Box>
       {/* Filtros */}
       <Paper sx={{ p: 3, mb: 3 }}>
         <Typography variant="h6" gutterBottom>
@@ -696,9 +694,11 @@ const RelatorioControlesCargaPage: React.FC = () => {
           </Box>
         )}
       </Paper>
-      </ResponsiveContainer>
+</Box>
+      </AppLayout>
     </ProtectedRoute>
   );
 };
 
 export default RelatorioControlesCargaPage;
+RelatorioControlesCargaPage.usesAppLayout = true;

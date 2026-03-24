@@ -41,15 +41,15 @@ import {
   Warning as WarningIcon
 } from '@mui/icons-material';
  
-import ResponsiveContainer from '@/components/ResponsiveContainer';
+import { AppLayout } from '@/components/layout/AppLayout';
 import { useSnackbar } from 'notistack';
 import api from '@/lib/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import ProtectedRoute from '@/components/ProtectedRoute';
 
-const MotionBox = motion(Box);
-const MotionPaper = motion(Paper);
-const MotionTableRow = motion(TableRow);
+const MotionBox = motion.create(Box);
+const MotionPaper = motion.create(Paper);
+const MotionTableRow = motion.create(TableRow);
 
 interface Material {
   id: string;
@@ -246,61 +246,65 @@ export default function CadastroMateriais() {
 
   return (
     <ProtectedRoute>
-      <ResponsiveContainer
+      <AppLayout
+        title="Cadastro de Materiais"
+        subtitle="Gerencie o catálogo de materiais disponíveis"
         breadcrumbs={[
           { label: 'Dashboard', href: '/' },
           { label: 'Materiais', href: '/materiais' },
           { label: 'Cadastro' }
         ]}
       >
-        <MotionBox
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          sx={{ mb: 4 }}
-        >
-          <Stack 
-            direction={{ xs: 'column', md: 'row' }} 
-            justifyContent="space-between" 
-            alignItems={{ xs: 'flex-start', md: 'center' }}
-            spacing={2}
-          >
-            <Stack direction="row" alignItems="center" spacing={2}>
-              <Avatar sx={{ 
-                bgcolor: theme.palette.primary.main, 
-                width: 56, 
-                height: 56, 
-                boxShadow: theme.shadows[4],
-                background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`
-              }}>
-                <InventoryIcon sx={{ fontSize: 32 }} />
-              </Avatar>
-              <Box>
-                <Typography variant="h4" fontWeight="800" color={theme.palette.text.primary} sx={{ fontSize: { xs: '1.5rem', md: '2.125rem' } }}>
-                  Gestão de Materiais
-                </Typography>
-                <Typography variant="body2" color="text.secondary" fontWeight="500">
-                  Cadastre e gerencie o estoque de materiais e EPIs
-                </Typography>
-              </Box>
-            </Stack>
-
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={() => handleAbrirDialog()}
-              sx={{ 
-                borderRadius: '12px', 
-                px: 3, 
-                py: 1,
-                fontWeight: 700,
-                background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
-                boxShadow: theme.shadows[4]
-              }}
+        <Container maxWidth="xl" sx={{ p: 0 }}>
+          <Stack spacing={3}>
+            <MotionBox
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
             >
-              Novo Material
-            </Button>
-          </Stack>
-        </MotionBox>
+              <Stack 
+                direction={{ xs: 'column', md: 'row' }} 
+                justifyContent="space-between" 
+                alignItems={{ xs: 'flex-start', md: 'center' }}
+                spacing={2}
+              >
+                <Stack direction="row" alignItems="center" spacing={2}>
+                  <Avatar sx={{ 
+                    bgcolor: 'primary.main', 
+                    width: 56, 
+                    height: 56, 
+                    boxShadow: '0 8px 16px rgba(37, 99, 235, 0.2)',
+                    background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)'
+                  }}>
+                    <InventoryIcon sx={{ fontSize: 32 }} />
+                  </Avatar>
+                  <Box>
+                    <Typography variant="h4" fontWeight="800" color="#1e293b" sx={{ fontSize: { xs: '1.5rem', md: '2.125rem' } }}>
+                      Cadastro de Materiais
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" fontWeight="500">
+                      Gerencie o catálogo de materiais disponíveis
+                    </Typography>
+                  </Box>
+                </Stack>
+
+                <Button
+                  variant="contained"
+                  startIcon={<AddIcon />}
+                  onClick={() => handleAbrirDialog()}
+                  sx={{
+                    borderRadius: '12px',
+                    textTransform: 'none',
+                    fontWeight: 600,
+                    px: 3,
+                    py: 1.5,
+                    boxShadow: '0 4px 12px rgba(37, 99, 235, 0.2)',
+                    background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                  }}
+                >
+                  Novo Material
+                </Button>
+              </Stack>
+            </MotionBox>
 
         <MotionPaper
           elevation={0}
@@ -735,7 +739,10 @@ export default function CadastroMateriais() {
             animation: spin 1s linear infinite;
           }
         `}</style>
-      </ResponsiveContainer>
-    </ProtectedRoute>
+      </Stack>
+    </Container>
+  </AppLayout>
+</ProtectedRoute>
   );
 }
+CadastroMateriais.usesAppLayout = true;

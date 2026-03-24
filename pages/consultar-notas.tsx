@@ -50,7 +50,7 @@ const ConsultarNotas = () => {
   useEffect(() => {
     const loadStats = async () => {
       try {
-        const res = await fetch('/api/dashboard/stats');
+        const res = await fetch('/api/notas/stats');
         if (res.ok) {
           const data = await res.json();
           setStats({
@@ -361,6 +361,6 @@ const ConsultarNotas = () => {
   );
 };
 
-export default ConsultarNotas;
-
 (ConsultarNotas as any).usesAppLayout = true;
+
+export default ConsultarNotas;

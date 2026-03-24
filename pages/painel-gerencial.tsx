@@ -37,13 +37,13 @@ import {
   Settings as SettingsIcon,
   Refresh as RefreshIcon
 } from '@mui/icons-material';
-import ResponsiveContainer from '../components/ResponsiveContainer';
+import { AppLayout } from '../components/layout/AppLayout';
 import ProtectedRoute from '../components/ProtectedRoute';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const MotionBox = motion(Box);
-const MotionPaper = motion(Paper);
-const MotionCard = motion(Card);
+const MotionBox = motion.create(Box);
+const MotionPaper = motion.create(Paper);
+const MotionCard = motion.create(Card);
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -206,33 +206,24 @@ const PainelGerencial: React.FC = () => {
 
   return (
     <ProtectedRoute>
-      <ResponsiveContainer
-        breadcrumb={[
-          { label: 'Dashboard', path: '/' },
+      <AppLayout
+        title="Painel Gerencial"
+        subtitle="Visão estratégica e monitoramento de atividades em tempo real."
+        breadcrumbs={[
+          { label: 'Dashboard', href: '/' },
           { label: 'Painel Gerencial' }
         ]}
+        actions={
+          <Button 
+            variant="outlined" 
+            startIcon={<RefreshIcon />}
+            sx={{ borderRadius: 3, textTransform: 'none', fontWeight: 'bold' }}
+          >
+            Atualizar Dados
+          </Button>
+        }
       >
-        {/* Header Section */}
-        <Box mb={4}>
-          <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }} spacing={2}>
-            <Box>
-              <Typography variant="h4" fontWeight="800" color="#1e293b" gutterBottom>
-                Painel Gerencial
-              </Typography>
-              <Typography variant="body1" color="text.secondary">
-                Visão estratégica e monitoramento de atividades em tempo real.
-              </Typography>
-            </Box>
-            <Button 
-              variant="outlined" 
-              startIcon={<RefreshIcon />}
-              sx={{ borderRadius: 3, textTransform: 'none', fontWeight: 'bold' }}
-            >
-              Atualizar Dados
-            </Button>
-          </Stack>
-        </Box>
-
+        <Container maxWidth="xl" sx={{ p: 0 }}>
         {/* Tabs Section */}
         <MotionPaper
           initial={{ opacity: 0, y: -20 }}
@@ -491,9 +482,11 @@ const PainelGerencial: React.FC = () => {
             </Stack>
           </MotionPaper>
         </TabPanel>
-      </ResponsiveContainer>
+        </Container>
+      </AppLayout>
     </ProtectedRoute>
   );
 };
 
 export default PainelGerencial;
+PainelGerencial.usesAppLayout = true;

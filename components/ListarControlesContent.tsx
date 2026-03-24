@@ -119,12 +119,14 @@ const ListarControlesContent: React.FC = () => {
   
   // Opções fixas de transportadoras
   const transportadorasFixas = [
+    { id: 'ACERT', nome: 'ACERT', descricao: 'ACERT Transportes' },
     { id: 'ACCERT', nome: 'ACCERT', descricao: 'ACCERT Transportes' },
     { id: 'EXPRESSO_GOIAS', nome: 'EXPRESSO_GOIAS', descricao: 'Expresso Goiás' },
     { id: 'TERCEIRIZADA', nome: 'TERCEIRIZADA', descricao: 'Terceirizada' },
     { id: 'DETAFRA_TRANSPORTES', nome: 'DETAFRA_TRANSPORTES', descricao: 'Detafra Transportes' },
     { id: 'RETIRA_VENDEDOR', nome: 'RETIRA_VENDEDOR', descricao: 'Retira Vendedor' },
-    { id: 'RETIRA_CLIENTE', nome: 'RETIRA_CLIENTE', descricao: 'Retira Cliente' }
+    { id: 'RETIRA_CLIENTE', nome: 'RETIRA_CLIENTE', descricao: 'Retira Cliente' },
+    { id: 'VLOG', nome: 'VLOG', descricao: 'VLOG Transportes' }
   ];
 
   // Função para obter o objeto da transportadora pelo ID
@@ -579,6 +581,32 @@ const ListarControlesContent: React.FC = () => {
         }
         return null;
       };
+      const pickTexto = (...values: Array<unknown>) => {
+        for (const value of values) {
+          if (typeof value === 'string') {
+            const trimmed = value.trim();
+            if (trimmed) return trimmed;
+          }
+          if (typeof value === 'number') {
+            return String(value);
+          }
+        }
+        return null;
+      };
+      const resolveCnpj = (nota: any) => {
+        return pickTexto(
+          nota?.CNPJ_CPF,
+          nota?.cnpj,
+          nota?.CNPJ,
+          nota?.CNPJ_DESTINATARIO,
+          nota?.CNPJ_EMITENTE,
+          nota?.CNPJ_CLIENTE,
+          nota?.CNPJ_CPF_DESTINATARIO,
+          nota?.CPF_CNPJ,
+          nota?.cliente?.cnpj,
+          nota?.emitente?.cnpj
+        );
+      };
       const notasParaPdf = await Promise.all(
         (controleCompleto.notas || []).map(async (nota) => {
           const base = { ...nota };
@@ -616,10 +644,13 @@ const ListarControlesContent: React.FC = () => {
                 ...base,
                 volumes: String(base.volumes ?? d.volumes ?? '1'),
                 valorPedido: valorFinal,
-                razaoSocial: (base as any).razaoSocial ?? d.razaoSocial,
+                razaoSocial: (base as any).razaoSocial ?? d.razaoSocial ?? d.cliente?.nome ?? d.cliente?.razaoSocial ?? d.NOME_RAZAO_SOCIAL,
                 pesoBruto: pesoFinal,
-                dataEmissao: (base as any).dataEmissao ?? d.dataEmissao,
-                cnpj: (base as any).cnpj ?? d.cnpj,
+                dataEmissao: (base as any).dataEmissao ?? d.dataEmissao ?? d.DATA_EMISSAO,
+                cnpj: resolveCnpj({
+                  ...(base as any),
+                  ...(d || {})
+                }) || undefined,
               };
             }
             if (base.numeroNota) {
@@ -654,10 +685,13 @@ const ListarControlesContent: React.FC = () => {
                 ...base,
                 volumes: String(base.volumes ?? d.volumes ?? '1'),
                 valorPedido: valorFinal,
-                razaoSocial: (base as any).razaoSocial ?? d.razaoSocial,
+                razaoSocial: (base as any).razaoSocial ?? d.razaoSocial ?? d.cliente?.nome ?? d.cliente?.razaoSocial ?? d.NOME_RAZAO_SOCIAL,
                 pesoBruto: pesoFinal,
-                dataEmissao: (base as any).dataEmissao ?? d.dataEmissao,
-                cnpj: (base as any).cnpj ?? d.cnpj,
+                dataEmissao: (base as any).dataEmissao ?? d.dataEmissao ?? d.DATA_EMISSAO,
+                cnpj: resolveCnpj({
+                  ...(base as any),
+                  ...(d || {})
+                }) || undefined,
               };
             }
           } catch (_) {}
@@ -685,11 +719,15 @@ const ListarControlesContent: React.FC = () => {
         const col1 = baseX;       // Qtd
         const col2 = baseX + 30;  // Nota Fiscal
         const col3 = baseX + 110; // Data
-        const col4 = baseX + 220; // Volumes
+        const col4 = baseX + 200; // Valor
+        const col5 = baseX + 300; // Peso
+        const col6 = baseX + 400; // Volumes
         page.drawText('Qtd', { x: col1, y: headerY, size: fontSize, font, color: rgb(0, 0, 0) });
         page.drawText('Nota Fiscal', { x: col2, y: headerY, size: fontSize, font, color: rgb(0, 0, 0) });
         page.drawText('Data', { x: col3, y: headerY, size: fontSize, font, color: rgb(0, 0, 0) });
-        page.drawText('Volumes', { x: col4, y: headerY, size: fontSize, font, color: rgb(0, 0, 0) });
+        page.drawText('Valor', { x: col4, y: headerY, size: fontSize, font, color: rgb(0, 0, 0) });
+        page.drawText('Peso', { x: col5, y: headerY, size: fontSize, font, color: rgb(0, 0, 0) });
+        page.drawText('Volumes', { x: col6, y: headerY, size: fontSize, font, color: rgb(0, 0, 0) });
         // linha sob o cabeçalho desta coluna
         page.drawLine({
           start: { x: baseX, y: headerY - 5 },
@@ -697,7 +735,7 @@ const ListarControlesContent: React.FC = () => {
           thickness: 1,
           color: rgb(0, 0, 0),
         });
-        return { col1, col2, col3, col4, nextY: headerY - 24 };
+        return { col1, col2, col3, col4, col5, col6, nextY: headerY - 24 };
       };
 
       const addNewPage = () => {
@@ -880,7 +918,7 @@ const ListarControlesContent: React.FC = () => {
       let yRow = header.nextY;
       let rows = 0;
 
-      const drawNota = (idx: number, nota: any, cols: {col1:number,col2:number,col3:number,col4:number}, y: number) => {
+      const drawNota = (idx: number, nota: any, cols: {col1:number,col2:number,col3:number,col4:number,col5:number,col6:number}, y: number) => {
         const volumes = parseInt(nota.volumes) || 1;
         const dataNota = nota.dataCriacao
           ? new Intl.DateTimeFormat('pt-BR', {
@@ -888,10 +926,6 @@ const ListarControlesContent: React.FC = () => {
               day: '2-digit', month: '2-digit', year: 'numeric',
             }).format(new Date(nota.dataCriacao))
           : '-';
-        page.drawText((idx + 1).toString(), { x: cols.col1, y, size: fontSize, font });
-        page.drawText(nota.numeroNota || '-', { x: cols.col2, y, size: fontSize, font });
-        page.drawText(dataNota, { x: cols.col3, y, size: fontSize, font });
-        page.drawText(String(volumes), { x: cols.col4, y, size: fontSize, font });
         
         // Detalhes adicionais (valor, razão social, peso, emissão, CNPJ)
         const nf: any = nota || {};
@@ -906,7 +940,7 @@ const ListarControlesContent: React.FC = () => {
         const valorFmt = (valorNum !== undefined)
           ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valorNum)
           : '-';
-        const razao = nf.razaoSocial ?? nf.cliente?.nome ?? nf.emitente?.razaoSocial ?? '-';
+        
         const rawPeso = nf.pesoBruto ?? nf.peso ?? undefined;
         let pesoNum: number | undefined;
         if (typeof rawPeso === 'number') {
@@ -918,14 +952,23 @@ const ListarControlesContent: React.FC = () => {
         const pesoFmt = (pesoNum !== undefined)
           ? `${new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(pesoNum)} kg`
           : '-';
+
+        page.drawText((idx + 1).toString(), { x: cols.col1, y, size: fontSize, font });
+        page.drawText(nota.numeroNota || '-', { x: cols.col2, y, size: fontSize, font });
+        page.drawText(dataNota, { x: cols.col3, y, size: fontSize, font });
+        page.drawText(valorFmt, { x: cols.col4, y, size: fontSize, font });
+        page.drawText(pesoFmt, { x: cols.col5, y, size: fontSize, font });
+        page.drawText(String(volumes), { x: cols.col6, y, size: fontSize, font });
+        
+        const razao = nf.razaoSocial ?? nf.cliente?.nome ?? nf.emitente?.razaoSocial ?? '-';
         const emRaw = nf.dataEmissao ?? nf.DATA_EMISSAO ?? undefined;
         const emFmt = emRaw ? new Intl.DateTimeFormat('pt-BR', {
           timeZone: 'America/Sao_Paulo',
           day: '2-digit', month: '2-digit', year: 'numeric',
         }).format(new Date(emRaw)) : '-';
-        const cnpj = nf.cnpj ?? nf.cliente?.cnpj ?? nf.emitente?.cnpj ?? '-';
+        const cnpj = resolveCnpj(nf) ?? '-';
         
-        const detalhes = `Valor: ${valorFmt} • Razão: ${String(razao).slice(0, 28)} • Peso: ${pesoFmt} • Emissão: ${emFmt} • CNPJ: ${cnpj}`;
+        const detalhes = `Razão: ${String(razao).slice(0, 45)} • Emissão: ${emFmt} • CNPJ: ${cnpj}`;
         page.drawText(detalhes, { x: cols.col2, y: y - (lineHeight - 2), size: fontSize - 2, font, color: rgb(0.35, 0.35, 0.35) });
       };
 
@@ -959,15 +1002,9 @@ const ListarControlesContent: React.FC = () => {
       });
       
       // Totalizadores
-      yPos -= lineHeight;
-      page.drawLine({
-        start: { x: 50, y: yPos },
-        end: { x: width - 50, y: yPos },
-        thickness: 1,
-        color: rgb(0, 0, 0),
-      });
+      const totalValorFmt = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalValor);
+      const totalPesoFmt = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(totalPeso);
       
-      // posiciona totalizadores considerando a última linha da coluna
       yPos = yRow - 8;
       page.drawLine({
         start: { x: 50, y: yPos },
@@ -976,15 +1013,16 @@ const ListarControlesContent: React.FC = () => {
         color: rgb(0, 0, 0),
       });
       yPos -= lineHeight;
+      
       // Totais alinhados na coluna esquerda
-      page.drawText('TOTAL:', { x: tableBaseX + 80, y: yPos, size: fontSize, font, color: rgb(0, 0, 0) });
-      page.drawText(notasParaPdf.length.toString(), { x: tableBaseX, y: yPos, size: fontSize, font, color: rgb(0, 0, 0) });
-      page.drawText(totalVolumes.toString(), { x: tableBaseX + 220, y: yPos, size: fontSize, font, color: rgb(0, 0, 0) });
+      page.drawText('TOTAL:', { x: header.col2, y: yPos, size: fontSize, font, color: rgb(0, 0, 0) });
+      page.drawText(notasParaPdf.length.toString(), { x: header.col1, y: yPos, size: fontSize, font, color: rgb(0, 0, 0) });
+      page.drawText(totalValorFmt, { x: header.col4, y: yPos, size: fontSize, font, color: rgb(0, 0, 0) });
+      page.drawText(`${totalPesoFmt} kg`, { x: header.col5, y: yPos, size: fontSize, font, color: rgb(0, 0, 0) });
+      page.drawText(totalVolumes.toString(), { x: header.col6, y: yPos, size: fontSize, font, color: rgb(0, 0, 0) });
       
       // Rodapé
       yPos -= lineHeight * 2;
-      const totalValorFmt = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalValor);
-      const totalPesoFmt = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(totalPeso);
       page.drawText(`Nº Controle: ${controleCompleto.numeroManifesto || '-'}`, { x: 50, y: yPos, size: fontSize - 1, font });
       page.drawText(`Total de Volumes: ${totalVolumes}`, { x: 250, y: yPos, size: fontSize - 1, font });
       page.drawText(`Total de Valor: ${totalValorFmt}`, { x: 420, y: yPos, size: fontSize - 1, font });
@@ -1284,8 +1322,10 @@ const ListarControlesContent: React.FC = () => {
       // Data da assinatura do responsável
       const dataResponsavel = controleCompleto.dataAssinaturaResponsavel 
         ? new Date(controleCompleto.dataAssinaturaResponsavel).toLocaleDateString('pt-BR')
-        : '__/__/____';
-      page.drawText(`Data: ${dataResponsavel}`, { x: 350, y: assinaturaY - 45, size: fontSize - 2, font });
+        : '';
+      if (dataResponsavel) {
+        page.drawText(`Data: ${dataResponsavel}`, { x: 350, y: assinaturaY - 45, size: fontSize - 2, font });
+      }
 
       const pdfBytes = await doc.save();
       const blob = new Blob([pdfBytes], { type: 'application/pdf' });

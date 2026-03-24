@@ -38,17 +38,17 @@ import {
   Today as TodayIcon
 } from '@mui/icons-material';
  
+import { AppLayout } from '@/components/layout/AppLayout';
 import { useSnackbar } from 'notistack';
 import api from '@/lib/api';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'framer-motion';
 import ProtectedRoute from '@/components/ProtectedRoute';
-import ResponsiveContainer from '@/components/ResponsiveContainer';
 import { SearchInput } from '@/components/ui/SearchInput';
 
-const MotionBox = motion(Box);
-const MotionPaper = motion(Paper);
+const MotionBox = motion.create(Box);
+const MotionPaper = motion.create(Paper);
 
 interface Material {
   id: string;
@@ -228,51 +228,15 @@ export default function SolicitarMaterial() {
 
   return (
     <ProtectedRoute>
-      <ResponsiveContainer
-        breadcrumb={[
-          { label: 'Dashboard', path: '/' },
-          { label: 'Materiais', path: '/materiais' },
+      <AppLayout
+        title="Solicitar Materiais"
+        subtitle="Solicite itens do estoque para suas atividades"
+        breadcrumbs={[
+          { label: 'Dashboard', href: '/' },
+          { label: 'Materiais', href: '/materiais' },
           { label: 'Solicitar' }
         ]}
-      >
-        <MotionBox
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          sx={{ 
-            display: 'flex', 
-            flexDirection: { xs: 'column', sm: 'row' },
-            justifyContent: 'space-between', 
-            alignItems: { xs: 'flex-start', sm: 'center' }, 
-            mb: 4,
-            gap: 2,
-            p: 3,
-            borderRadius: 4,
-            ...glassStyles
-          }}
-        >
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Box sx={{ 
-              bgcolor: 'primary.main', 
-              p: 1.5, 
-              borderRadius: 3, 
-              boxShadow: '0 8px 16px rgba(37, 99, 235, 0.2)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)'
-            }}>
-              <ShoppingCartIcon sx={{ color: 'white', fontSize: 32 }} />
-            </Box>
-            <Box>
-              <Typography variant="h4" fontWeight="800" color="text.primary" sx={{ letterSpacing: '-0.02em' }}>
-                Solicitar Materiais
-              </Typography>
-              <Typography variant="body2" color="text.secondary" fontWeight="500">
-                Solicite itens do estoque para suas atividades
-              </Typography>
-            </Box>
-          </Box>
+        actions={
           <Button
             variant={mostrarHistorico ? 'contained' : 'outlined'}
             startIcon={mostrarHistorico ? <AddIcon /> : <HistoryIcon />}
@@ -288,17 +252,18 @@ export default function SolicitarMaterial() {
           >
             {mostrarHistorico ? 'Nova Solicitação' : 'Minhas Solicitações'}
           </Button>
-        </MotionBox>
-
-        <AnimatePresence mode="wait">
-          {!mostrarHistorico ? (
-            <MotionBox
-              key="nova-solicitacao"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-              transition={{ duration: 0.3 }}
-            >
+        }
+      >
+        <Container maxWidth="xl" sx={{ p: 0 }}>
+          <AnimatePresence mode="wait">
+            {!mostrarHistorico ? (
+              <MotionBox
+                key="nova-solicitacao"
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 20 }}
+                transition={{ duration: 0.3 }}
+              >
               {/* Formulário de Nova Solicitação */}
               <MotionPaper
                 elevation={0}
@@ -648,7 +613,9 @@ export default function SolicitarMaterial() {
             </MotionBox>
           )}
         </AnimatePresence>
-      </ResponsiveContainer>
-    </ProtectedRoute>
-  );
+      </Container>
+    </AppLayout>
+  </ProtectedRoute>
+);
 }
+SolicitarMaterial.usesAppLayout = true;

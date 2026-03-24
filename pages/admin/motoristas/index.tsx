@@ -27,14 +27,14 @@ import { cn } from '@/utils/cn';
 
 // Mapeamento para exibir nomes amigáveis das transportadoras
 const transportadoraNomes: Record<string, string> = {
-  'ACERT': 'ACERT',
-  'ACCERT': 'ACCERT', 
+  'ACERT': 'ACERT Transportes',
+  'ACCERT': 'ACCERT Transportes', 
   'EXPRESSO_GOIAS': 'Expresso Goiás',
   'TERCEIRIZADA': 'Terceirizada',
   'DETAFRA_TRANSPORTES': 'Detafra Transportes',
   'RETIRA_VENDEDOR': 'Retira Vendedor',
   'RETIRA_CLIENTE': 'Retira Cliente',
-  'VLOG': 'VLOG'
+  'VLOG': 'VLOG Transportes'
 };
 
 interface Motorista {

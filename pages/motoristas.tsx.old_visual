@@ -45,8 +45,8 @@ import {
   Edit as EditIcon
 } from '@mui/icons-material';
 import { api } from '@/services/api';
+import { AppLayout } from '@/components/layout/AppLayout';
 import ProtectedRoute from '@/components/ProtectedRoute';
-import ResponsiveContainer from '@/components/ResponsiveContainer';
 import { useAuth } from '@/contexts/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import InputMask from 'react-input-mask';
@@ -179,48 +179,23 @@ function MotoristasContent() {
   );
 
   return (
-    <ProtectedRoute>
-      <ResponsiveContainer
-        breadcrumb={[
-          { label: 'Dashboard', path: '/' },
-          { label: 'Motoristas' }
-        ]}
-      >
-        {/* Header Section */}
-        <MotionPaper
+    <AppLayout
+      title="Motoristas"
+      subtitle="Gerencie os motoristas cadastrados no sistema"
+    >
+      {/* Header Section - Actions Only */}
+      <MotionBox
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
         sx={{
-          p: 3,
-          mb: 3,
-          background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.05)} 0%, ${alpha(theme.palette.secondary.main, 0.05)} 100%)`,
-          border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
-          borderRadius: 2,
-          backdropFilter: 'blur(10px)'
+          display: 'flex',
+          justifyContent: 'flex-end',
+          mb: 3
         }}
       >
-        <Stack direction={{ xs: 'column', sm: 'row' }} alignItems={{ sm: 'center' }} spacing={2}>
-          <Avatar
-            sx={{
-              width: 56,
-              height: 56,
-              background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
-              boxShadow: `0 8px 32px ${alpha(theme.palette.primary.main, 0.3)}`
-            }}
-          >
-            <ShippingIcon sx={{ fontSize: 32 }} />
-          </Avatar>
-          <Box flex={1}>
-            <Typography variant="h4" fontWeight="bold" color="primary.main" gutterBottom>
-              Motoristas
-            </Typography>
-            <Typography variant="body1" color="text.secondary">
-              Gerencie os motoristas cadastrados no sistema
-            </Typography>
-          </Box>
-          <Stack direction="row" spacing={2}>
-            <Tooltip title="Atualizar lista">
+        <Stack direction="row" spacing={2}>
+          <Tooltip title="Atualizar lista">
               <IconButton
                 onClick={carregar}
                 disabled={loading}
@@ -261,8 +236,7 @@ function MotoristasContent() {
               Novo Motorista
             </Button>
           </Stack>
-        </Stack>
-      </MotionPaper>
+        </MotionBox>
 
       {/* Search Section */}
       <MotionPaper
@@ -696,17 +670,14 @@ function MotoristasContent() {
           {snackbar.message}
         </Alert>
       </Snackbar>
-      </ResponsiveContainer>
-    </ProtectedRoute>
+    </AppLayout>
   );
 }
 
 function MotoristasPage() {
-  return (
-    <ProtectedRoute>
-      <MotoristasContent />
-    </ProtectedRoute>
-  );
+  return <MotoristasContent />;
 }
+
+(MotoristasPage as any).usesAppLayout = true;
 
 export default MotoristasPage;

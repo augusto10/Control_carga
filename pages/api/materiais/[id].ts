@@ -1,95 +1,62 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getTokenFromCookies, verifyToken } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  // CORS
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-
   const { id } = req.query;
 
-  if (!id || typeof id !== 'string') {
-    return res.status(400).json({ error: 'ID inválido' });
+  if (typeof id !== 'string') {
+    return res.status(400).json({ message: 'ID inválido' });
   }
 
-  try {
-    // Autenticação
-    const token = getTokenFromCookies(req);
-    if (!token) {
-      return res.status(401).json({ error: 'Token não fornecido' });
-    }
-
-    const decoded = await verifyToken(token, process.env.JWT_SECRET || 'secret');
-    if (!decoded || !decoded.id) {
-      return res.status(401).json({ error: 'Token inválido' });
-    }
-
-    // GET - Buscar material por ID
-    if (req.method === 'GET') {
+  if (req.method === 'GET') {
+    try {
       const material = await prisma.materialEstoque.findUnique({
         where: { id }
       });
 
       if (!material) {
-        return res.status(404).json({ error: 'Material não encontrado' });
+        return res.status(404).json({ message: 'Material não encontrado' });
       }
 
       return res.status(200).json(material);
+    } catch (error) {
+      console.error('Erro ao buscar material:', error);
+      return res.status(500).json({ message: 'Erro interno do servidor' });
     }
+  }
 
-    // PUT - Atualizar material (apenas ADMIN/GERENTE)
-    if (req.method === 'PUT') {
-      const usuario = await prisma.usuario.findUnique({
-        where: { id: decoded.id }
-      });
-
-      if (!usuario || !['ADMIN', 'GERENTE'].includes(usuario.tipo)) {
-        return res.status(403).json({ error: 'Sem permissão para editar materiais' });
-      }
-
+  if (req.method === 'PUT') {
+    try {
       const { nome, descricao, unidadeMedida, quantidadeEstoque, estoqueMinimo, valor, ativo } = req.body;
 
       const material = await prisma.materialEstoque.update({
         where: { id },
         data: {
-          ...(nome !== undefined && { nome }),
-          ...(descricao !== undefined && { descricao }),
-          ...(unidadeMedida !== undefined && { unidadeMedida }),
-          ...(quantidadeEstoque !== undefined && { quantidadeEstoque }),
-          ...(estoqueMinimo !== undefined && { estoqueMinimo }),
-          ...(valor !== undefined && { valor }),
-          ...(ativo !== undefined && { ativo })
+          nome: nome !== undefined ? String(nome).trim() : undefined,
+          descricao: descricao !== undefined ? String(descricao).trim() : undefined,
+          unidadeMedida: unidadeMedida !== undefined ? String(unidadeMedida).trim() : undefined,
+          quantidadeEstoque: quantidadeEstoque !== undefined ? Number(quantidadeEstoque || 0) : undefined,
+          estoqueMinimo: estoqueMinimo !== undefined ? Number(estoqueMinimo || 0) : undefined,
+          valor: valor !== undefined && valor !== null && String(valor).length > 0 ? Number(valor) : undefined,
+          ativo: typeof ativo === 'boolean' ? ativo : undefined
         }
       });
 
       return res.status(200).json(material);
+    } catch (error) {
+      console.error('Erro ao atualizar material:', error);
+      return res.status(500).json({ message: 'Erro interno do servidor' });
     }
+  }
 
-    // DELETE - Excluir material (apenas ADMIN/GERENTE)
-    if (req.method === 'DELETE') {
-      const usuario = await prisma.usuario.findUnique({
-        where: { id: decoded.id }
-      });
-
-      if (!usuario || !['ADMIN', 'GERENTE'].includes(usuario.tipo)) {
-        return res.status(403).json({ error: 'Sem permissão para excluir materiais' });
-      }
-
-      // Verificar se há solicitações vinculadas
-      const itensVinculados = await prisma.itemSolicitacaoMaterial.count({
+  if (req.method === 'DELETE') {
+    try {
+      const itensCount = await prisma.itemSolicitacaoMaterial.count({
         where: { materialId: id }
       });
 
-      if (itensVinculados > 0) {
-        return res.status(400).json({ 
-          error: 'Não é possível excluir material com solicitações vinculadas. Desative-o ao invés de excluir.' 
-        });
+      if (itensCount > 0) {
+        return res.status(400).json({ message: 'Não é possível excluir material com solicitações' });
       }
 
       await prisma.materialEstoque.delete({
@@ -97,14 +64,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
 
       return res.status(200).json({ message: 'Material excluído com sucesso' });
+    } catch (error) {
+      console.error('Erro ao excluir material:', error);
+      return res.status(500).json({ message: 'Erro interno do servidor' });
     }
-
-    return res.status(405).json({ error: `Método ${req.method} não permitido` });
-
-  } catch (error: any) {
-    console.error('Erro na API de material:', error);
-    return res.status(500).json({ error: 'Erro interno do servidor', details: error.message });
-  } finally {
-    await prisma.$disconnect();
   }
+
+  return res.status(405).json({ message: 'Method not allowed' });
 }

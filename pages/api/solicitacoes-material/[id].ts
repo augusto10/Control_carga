@@ -1,56 +1,34 @@
-import { NextApiRequest, NextApiResponse } from 'next';
-import { getTokenFromCookies, verifyToken } from '@/lib/auth';
+import { NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
+import { withAuth, AuthenticatedRequest } from '@/lib/middleware/withAuth';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  // CORS
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
+  const { id } = req.query;
 
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
+  if (typeof id !== 'string') {
+    return res.status(400).json({ error: 'ID inválido' });
   }
 
-  try {
-    // Autenticação
-    const token = getTokenFromCookies(req);
-    if (!token) {
-      return res.status(401).json({ error: 'Token não fornecido' });
-    }
-
-    const decoded = await verifyToken(token, process.env.JWT_SECRET || 'secret');
-    if (!decoded || !decoded.id) {
-      return res.status(401).json({ error: 'Token inválido' });
-    }
-
-    const usuario = await prisma.usuario.findUnique({
-      where: { id: decoded.id }
-    });
-
-    if (!usuario) {
-      return res.status(404).json({ error: 'Usuário não encontrado' });
-    }
-
-    const { id } = req.query;
-    if (!id || typeof id !== 'string') {
-      return res.status(400).json({ error: 'ID da solicitação é obrigatório' });
-    }
-
-    // GET - Obter solicitação específica
-    if (req.method === 'GET') {
+  if (req.method === 'GET') {
+    try {
       const solicitacao = await prisma.solicitacaoMaterial.findUnique({
         where: { id },
         include: {
-          solicitante: {
-            select: { id: true, nome: true, email: true }
-          },
-          aprovador: {
-            select: { id: true, nome: true, email: true }
-          },
           itens: {
             include: {
               material: true
+            }
+          },
+          aprovador: {
+            select: {
+              nome: true
+            }
+          },
+          solicitante: {
+            select: {
+              id: true,
+              nome: true,
+              email: true
             }
           }
         }
@@ -60,24 +38,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(404).json({ error: 'Solicitação não encontrada' });
       }
 
-      // Verificar se o usuário pode ver esta solicitação
-      if (!['ADMIN', 'GERENTE'].includes(usuario.tipo) && solicitacao.solicitanteId !== decoded.id) {
+      const isAdmin = ['ADMIN', 'GERENTE'].includes(req.user.tipo);
+      if (!isAdmin && solicitacao.solicitanteId !== req.user.id) {
         return res.status(403).json({ error: 'Acesso negado' });
       }
 
       return res.status(200).json(solicitacao);
+    } catch (error) {
+      console.error('Erro ao buscar solicitação:', error);
+      return res.status(500).json({ error: 'Erro interno do servidor' });
     }
+  }
 
-    // DELETE - Excluir solicitação (apenas ADMIN)
-    if (req.method === 'DELETE') {
-      // Verificar se o usuário é ADMIN
-      if (usuario.tipo !== 'ADMIN') {
-        return res.status(403).json({
-          error: 'Acesso negado. Apenas administradores podem excluir solicitações de materiais.'
-        });
-      }
-
-      // Verificar se a solicitação existe
+  if (req.method === 'DELETE') {
+    try {
       const solicitacao = await prisma.solicitacaoMaterial.findUnique({
         where: { id }
       });
@@ -86,27 +60,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(404).json({ error: 'Solicitação não encontrada' });
       }
 
-      // Excluir a solicitação (os itens serão excluídos automaticamente devido às constraints)
+      const isAdmin = ['ADMIN', 'GERENTE'].includes(req.user.tipo);
+      if (!isAdmin && solicitacao.solicitanteId !== req.user.id) {
+        return res.status(403).json({ error: 'Acesso negado' });
+      }
+
+      if (solicitacao.status !== 'PENDENTE') {
+        return res.status(400).json({ error: 'Só é possível excluir solicitações pendentes' });
+      }
+
       await prisma.solicitacaoMaterial.delete({
         where: { id }
       });
 
-      return res.status(200).json({
-        message: 'Solicitação excluída com sucesso'
-      });
+      return res.status(200).json({ success: true });
+    } catch (error) {
+      console.error('Erro ao excluir solicitação:', error);
+      return res.status(500).json({ error: 'Erro interno do servidor' });
     }
-
-    // Método não permitido
-    return res.status(405).json({
-      error: `Método ${req.method} não permitido`
-    });
-
-  } catch (error) {
-    console.error('Erro na API de solicitações de material:', error);
-    return res.status(500).json({
-      error: 'Erro interno do servidor'
-    });
-  } finally {
-    await prisma.$disconnect();
   }
+
+  return res.status(405).json({ error: 'Method not allowed' });
 }
+
+export default withAuth(handler);

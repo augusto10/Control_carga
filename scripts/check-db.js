@@ -1,38 +1,26 @@
+
+require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') });
 const { PrismaClient } = require('@prisma/client');
 
-async function main() {
-  const prisma = new PrismaClient();
+async function run() {
+  console.log('DATABASE_URL is set:', !!process.env.DATABASE_URL);
   
+  const prisma = new PrismaClient();
   try {
-    // Testar a conexão com o banco de dados
-    await prisma.$connect();
-    console.log('✅ Conectado ao banco de dados com sucesso!');
-    
-    // Listar tabelas
-    const result = await prisma.$queryRaw`
-      SELECT table_name 
-      FROM information_schema.tables 
-      WHERE table_schema = 'public';
-    `;
-    
-    console.log('\n📊 Tabelas no banco de dados:');
-    console.table(result);
-    
-    // Verificar se a tabela Usuario existe
-    const usuarioTableExists = result.some(t => t.table_name === 'Usuario');
-    
-    if (usuarioTableExists) {
-      console.log('\n👤 Tabela Usuario encontrada. Buscando usuários...');
-      const usuarios = await prisma.usuario.findMany();
-      console.table(usuarios);
-    } else {
-      console.log('\n❌ Tabela Usuario não encontrada.');
-    }
-  } catch (error) {
-    console.error('❌ Erro ao conectar ao banco de dados:', error);
+    const lastNota = await prisma.notaFiscal.findFirst({ orderBy: { dataCriacao: 'desc' } });
+    const lastControle = await prisma.controleCarga.findFirst({ orderBy: { dataCriacao: 'desc' } });
+    const lastPedido = await prisma.pedido.findFirst({ orderBy: { dataCriacao: 'desc' } });
+
+    console.log('--- Last Record Dates ---');
+    console.log('Last Nota Fiscal:', lastNota ? lastNota.dataCriacao : 'No data');
+    console.log('Last Controle Carga:', lastControle ? lastControle.dataCriacao : 'No data');
+    console.log('Last Pedido:', lastPedido ? lastPedido.dataCriacao : 'No data');
+    console.log('Current Date:', new Date());
+  } catch (err) {
+    console.error('Error querying database:', err);
   } finally {
     await prisma.$disconnect();
   }
 }
 
-main();
+run();

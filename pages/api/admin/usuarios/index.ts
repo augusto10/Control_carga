@@ -1,41 +1,10 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { verify } from 'jsonwebtoken';
-import { parseCookies } from 'nookies';
 import prisma from '@/lib/prisma';
-import { hash } from 'bcryptjs';
-
-const SALT_ROUNDS = 10;
-const JWT_SECRET = process.env.JWT_SECRET || 'seu_segredo_secreto';
+import bcrypt from 'bcryptjs';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  // Verificar autenticação via cookie JWT
-  const cookies = parseCookies({ req });
-  const token = cookies.auth_token;
-
-  if (!token) {
-    return res.status(401).json({ message: 'Não autorizado' });
-  }
-
-  let decoded: any;
-  try {
-    decoded = verify(token, JWT_SECRET) as { id: string; tipo: string; email: string };
-  } catch (error) {
-    return res.status(401).json({ message: 'Token inválido ou expirado' });
-  }
-
-  // Buscar usuário e verificar se é administrador
-  const user = await prisma.usuario.findUnique({
-    where: { id: decoded.id },
-    select: { id: true, tipo: true, ativo: true }
-  });
-
-  if (!user || user.tipo !== 'ADMIN' || !user.ativo) {
-    return res.status(403).json({ message: 'Acesso negado. Permissão de administrador necessária.' });
-  }
-
-  try {
-    // Listar todos os usuários (exceto a senha)
-    if (req.method === 'GET') {
+  if (req.method === 'GET') {
+    try {
       const usuarios = await prisma.usuario.findMany({
         select: {
           id: true,
@@ -43,45 +12,47 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           email: true,
           tipo: true,
           ativo: true,
-          foto: true,
           dataCriacao: true,
-          ultimoAcesso: true
+          ultimoAcesso: true,
+          foto: true,
         },
-        orderBy: { nome: 'asc' }
+        orderBy: {
+          nome: 'asc',
+        },
       });
-      
+
       return res.status(200).json(usuarios);
+    } catch (error) {
+      console.error('Erro ao buscar usuários:', error);
+      return res.status(500).json({ message: 'Erro interno do servidor' });
     }
+  }
 
-    // Criar novo usuário
-    if (req.method === 'POST') {
-      const { nome, email, tipo, senha, ativo = true } = req.body;
+  if (req.method === 'POST') {
+    try {
+      const { nome, email, senha, tipo, ativo } = req.body;
 
-      // Validação dos dados
-      if (!nome || !email || !tipo || !senha) {
-        return res.status(400).json({ message: 'Todos os campos são obrigatórios' });
+      if (!nome || !email || !senha) {
+        return res.status(400).json({ message: 'Dados obrigatórios faltando' });
       }
 
-      // Verificar se o e-mail já existe
-      const usuarioExistente = await prisma.usuario.findUnique({
-        where: { email }
+      const existingUser = await prisma.usuario.findUnique({
+        where: { email },
       });
 
-      if (usuarioExistente) {
-        return res.status(400).json({ message: 'Este e-mail já está em uso' });
+      if (existingUser) {
+        return res.status(400).json({ message: 'Email já cadastrado' });
       }
 
-      // Criptografar a senha
-      const hashedPassword = await hash(senha, SALT_ROUNDS);
+      const hashedPassword = await bcrypt.hash(senha, 10);
 
-      // Criar o usuário
-      const novoUsuario = await prisma.usuario.create({
+      const usuario = await prisma.usuario.create({
         data: {
           nome,
           email,
-          tipo,
           senha: hashedPassword,
-          ativo: Boolean(ativo)
+          tipo: tipo || 'USUARIO',
+          ativo: ativo !== undefined ? ativo : true,
         },
         select: {
           id: true,
@@ -89,22 +60,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           email: true,
           tipo: true,
           ativo: true,
-          foto: true,
-          dataCriacao: true
-        }
+          dataCriacao: true,
+        },
       });
 
-      return res.status(201).json(novoUsuario);
+      return res.status(201).json(usuario);
+    } catch (error) {
+      console.error('Erro ao criar usuário:', error);
+      return res.status(500).json({ message: 'Erro interno do servidor' });
     }
-
-    // Método não suportado
-    res.setHeader('Allow', ['GET', 'POST']);
-    return res.status(405).json({ message: `Método ${req.method} não permitido` });
-  } catch (error: any) {
-    console.error('Erro ao criar usuário:', error);
-    return res.status(500).json({ 
-      message: 'Erro interno do servidor',
-      error: error?.message || 'Erro desconhecido'
-    });
   }
+
+  return res.status(405).json({ message: 'Method not allowed' });
 }

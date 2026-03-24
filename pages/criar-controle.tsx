@@ -3,7 +3,7 @@ import { useRouter } from 'next/router';
 import { useAuth } from '../contexts/AuthContext';
 import { Box, CircularProgress, alpha, useTheme } from '@mui/material';
 import dynamic from 'next/dynamic';
-import ResponsiveContainer from '../components/ResponsiveContainer';
+import { AppLayout } from '../components/layout/AppLayout';
 
 // Carrega o componente de forma dinâmica para evitar problemas de SSR
 const CriarControleContent = dynamic(
@@ -42,16 +42,20 @@ const CriarControlePage = () => {
   }
 
   return (
-    <ResponsiveContainer
+    <AppLayout
+      title="Criar Controle"
+      subtitle="Novo controle de carga"
       breadcrumbs={[
         { label: 'Dashboard', href: '/' },
-        { label: 'Controles de Carga', href: '/controles' },
+        { label: 'Controles', href: '/controles' },
         { label: 'Criar Controle' }
       ]}
     >
       <CriarControleContent />
-    </ResponsiveContainer>
+    </AppLayout>
   );
 };
+
+(CriarControlePage as any).usesAppLayout = true;
 
 export default CriarControlePage;

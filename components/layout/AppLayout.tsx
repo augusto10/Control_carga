@@ -34,9 +34,18 @@ interface AppLayoutProps {
   title: string;
   subtitle?: string;
   showHeader?: boolean;
+  breadcrumbs?: Array<{ label: string; href?: string }>;
+  actions?: React.ReactNode;
 }
 
-export function AppLayout({ children, title, subtitle, showHeader = true }: AppLayoutProps) {
+export function AppLayout({ 
+  children, 
+  title, 
+  subtitle, 
+  showHeader = true,
+  breadcrumbs,
+  actions
+}: AppLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [openSubmenus, setOpenSubmenus] = useState<Record<string, boolean>>({});
   const router = useRouter();
@@ -84,8 +93,8 @@ export function AppLayout({ children, title, subtitle, showHeader = true }: AppL
       children: [
         { name: 'Usuários', href: '/admin/usuarios', adminOnly: true },
         { name: 'Motoristas', href: '/admin/motoristas' },
-        { name: 'Funcionários', href: '/funcionarios', adminOnly: true },
-        { name: 'Clientes', href: '/clientes', adminOnly: true },
+        { name: 'Funcionários', href: '/funcionarios-clientes', adminOnly: true },
+        { name: 'Clientes', href: '/funcionarios-clientes', adminOnly: true },
       ]
     },
     { 
@@ -275,15 +284,39 @@ export function AppLayout({ children, title, subtitle, showHeader = true }: AppL
           <div className="max-w-7xl mx-auto animate-in fade-in duration-500">
             {showHeader && (
               <div className="mb-6 md:mb-8">
-                <div className="rounded-2xl border border-white/40 bg-white/70 backdrop-blur-md shadow-sm px-5 py-4 md:px-6 md:py-5">
-                  <div className="space-y-1">
-                    <h1 className="text-xl md:text-2xl font-extrabold tracking-tight text-slate-900">
-                      {title}
-                    </h1>
-                    {subtitle && (
-                      <p className="text-sm md:text-base text-slate-600">
-                        {subtitle}
-                      </p>
+                <div className="flex flex-col gap-4">
+                  {breadcrumbs && breadcrumbs.length > 0 && (
+                    <nav className="flex items-center text-sm text-slate-500">
+                      {breadcrumbs.map((crumb, index) => (
+                        <React.Fragment key={index}>
+                          {index > 0 && <ChevronRight className="w-4 h-4 mx-2 text-slate-400" />}
+                          {crumb.href ? (
+                            <Link href={crumb.href} className="hover:text-primary transition-colors">
+                              {crumb.label}
+                            </Link>
+                          ) : (
+                            <span className="font-medium text-slate-900">{crumb.label}</span>
+                          )}
+                        </React.Fragment>
+                      ))}
+                    </nav>
+                  )}
+
+                  <div className="rounded-2xl border border-white/40 bg-white/70 backdrop-blur-md shadow-sm px-5 py-4 md:px-6 md:py-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="space-y-1">
+                      <h1 className="text-xl md:text-2xl font-extrabold tracking-tight text-slate-900">
+                        {title}
+                      </h1>
+                      {subtitle && (
+                        <p className="text-sm md:text-base text-slate-600">
+                          {subtitle}
+                        </p>
+                      )}
+                    </div>
+                    {actions && (
+                      <div className="flex items-center gap-2">
+                        {actions}
+                      </div>
                     )}
                   </div>
                 </div>

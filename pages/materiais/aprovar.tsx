@@ -43,7 +43,7 @@ import {
   Search as SearchIcon
 } from '@mui/icons-material';
  
-import ResponsiveContainer from '@/components/ResponsiveContainer';
+import { AppLayout } from '@/components/layout/AppLayout';
 import { useSnackbar } from 'notistack';
 import api from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
@@ -52,9 +52,9 @@ import { ptBR } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'framer-motion';
 import ProtectedRoute from '@/components/ProtectedRoute';
 
-const MotionBox = motion(Box);
-const MotionPaper = motion(Paper);
-const MotionTableRow = motion(TableRow);
+const MotionBox = motion.create(Box);
+const MotionPaper = motion.create(Paper);
+const MotionTableRow = motion.create(TableRow);
 
 interface Material {
   id: string;
@@ -231,13 +231,14 @@ export default function AprovarSolicitacoes() {
 
   return (
     <ProtectedRoute>
-      <ResponsiveContainer
+      <AppLayout
         breadcrumbs={[
           { label: 'Dashboard', href: '/' },
           { label: 'Materiais', href: '/materiais' },
           { label: 'Aprovar Solicitações' }
         ]}
       >
+        <Container>
         <MotionBox
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -749,7 +750,10 @@ export default function AprovarSolicitacoes() {
             animation: spin 1s linear infinite;
           }
         `}</style>
-      </ResponsiveContainer>
+        </Container>
+      </AppLayout>
     </ProtectedRoute>
   );
 }
+
+AprovarSolicitacoes.usesAppLayout = true;

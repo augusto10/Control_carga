@@ -44,7 +44,7 @@ import {
 } from '@mui/icons-material';
 import { useSnackbar } from 'notistack';
 import { useAuth } from '../contexts/AuthContext';
-import ResponsiveContainer from '../components/ResponsiveContainer';
+import { AppLayout } from '../components/layout/AppLayout';
 import ProtectedRoute from '../components/ProtectedRoute';
 import api from '../services/api';
 import InputMask from '../components/InputMask';
@@ -321,17 +321,13 @@ const FuncionariosClientes: React.FC = () => {
 
   return (
     <ProtectedRoute>
-      <ResponsiveContainer
+      <AppLayout
+        title="Funcionários e Clientes"
         breadcrumbs={[
-          { label: 'Dashboard', path: '/' },
+          { label: 'Dashboard', href: '/' },
           { label: 'Funcionários e Clientes' }
         ]}
-      >
-        {/* Cabeçalho */}
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-          <Typography variant="h4" component="h1">
-            Funcionários e Clientes
-          </Typography>
+        actions={
           <Button
             variant="contained"
             color="primary"
@@ -340,8 +336,9 @@ const FuncionariosClientes: React.FC = () => {
           >
             Novo Cadastro
           </Button>
-        </Box>
-
+        }
+      >
+        <Container maxWidth="xl" sx={{ p: 0 }}>
         {/* Filtros */}
         <Paper sx={{ p: 2, mb: 3 }}>
           <Grid container spacing={2} alignItems="center">
@@ -631,9 +628,11 @@ const FuncionariosClientes: React.FC = () => {
             </Button>
           </DialogActions>
         </Dialog>
-      </ResponsiveContainer>
+        </Container>
+      </AppLayout>
     </ProtectedRoute>
   );
 };
 
 export default FuncionariosClientes;
+FuncionariosClientes.usesAppLayout = true;

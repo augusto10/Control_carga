@@ -1,44 +1,18 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getTokenFromCookies, verifyToken } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  // CORS
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-
-  try {
-    // Autenticação
-    const token = getTokenFromCookies(req);
-    if (!token) {
-      return res.status(401).json({ error: 'Token não fornecido' });
-    }
-
-    const decoded = await verifyToken(token, process.env.JWT_SECRET || 'secret');
-    if (!decoded || !decoded.id) {
-      return res.status(401).json({ error: 'Token inválido' });
-    }
-
-    // GET - Listar materiais
-    if (req.method === 'GET') {
-      const { ativo, busca } = req.query;
+  if (req.method === 'GET') {
+    try {
+      const ativoParam = req.query.ativo;
+      const ativo =
+        typeof ativoParam === 'string'
+          ? ativoParam.toLowerCase() === 'true'
+          : undefined;
 
       const where: any = {};
-
-      if (ativo !== undefined) {
-        where.ativo = ativo === 'true';
-      }
-
-      if (busca && typeof busca === 'string') {
-        where.OR = [
-          { nome: { contains: busca, mode: 'insensitive' } },
-          { descricao: { contains: busca, mode: 'insensitive' } }
-        ];
+      if (typeof ativo === 'boolean') {
+        where.ativo = ativo;
       }
 
       const materiais = await prisma.materialEstoque.findMany({
@@ -47,44 +21,38 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
 
       return res.status(200).json(materiais);
+    } catch (error) {
+      console.error('Erro ao buscar materiais:', error);
+      return res.status(500).json({ message: 'Erro interno do servidor' });
     }
+  }
 
-    // POST - Criar material (apenas ADMIN/GERENTE)
-    if (req.method === 'POST') {
-      const usuario = await prisma.usuario.findUnique({
-        where: { id: decoded.id }
-      });
+  if (req.method === 'POST') {
+    try {
+      const { nome, descricao, unidadeMedida, quantidadeEstoque, estoqueMinimo, valor, ativo } = req.body;
 
-      if (!usuario || !['ADMIN', 'GERENTE'].includes(usuario.tipo)) {
-        return res.status(403).json({ error: 'Sem permissão para criar materiais' });
-      }
-
-      const { nome, descricao, unidadeMedida, quantidadeEstoque, estoqueMinimo, valor } = req.body;
-
-      if (!nome) {
-        return res.status(400).json({ error: 'Nome é obrigatório' });
+      if (!nome || !unidadeMedida) {
+        return res.status(400).json({ message: 'Nome e unidade de medida são obrigatórios' });
       }
 
       const material = await prisma.materialEstoque.create({
         data: {
-          nome,
-          descricao: descricao || null,
-          unidadeMedida: unidadeMedida || 'UN',
-          quantidadeEstoque: quantidadeEstoque || 0,
-          estoqueMinimo: estoqueMinimo || 0,
-          valor: valor || null
+          nome: String(nome).trim(),
+          descricao: descricao ? String(descricao).trim() : undefined,
+          unidadeMedida: String(unidadeMedida).trim(),
+          quantidadeEstoque: Number(quantidadeEstoque || 0),
+          estoqueMinimo: Number(estoqueMinimo || 0),
+          valor: valor !== undefined && valor !== null && String(valor).length > 0 ? Number(valor) : undefined,
+          ativo: typeof ativo === 'boolean' ? ativo : true
         }
       });
 
       return res.status(201).json(material);
+    } catch (error) {
+      console.error('Erro ao criar material:', error);
+      return res.status(500).json({ message: 'Erro interno do servidor' });
     }
-
-    return res.status(405).json({ error: `Método ${req.method} não permitido` });
-
-  } catch (error: any) {
-    console.error('Erro na API de materiais:', error);
-    return res.status(500).json({ error: 'Erro interno do servidor', details: error.message });
-  } finally {
-    await prisma.$disconnect();
   }
+
+  return res.status(405).json({ message: 'Method not allowed' });
 }

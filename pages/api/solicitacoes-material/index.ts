@@ -1,133 +1,126 @@
-import { NextApiRequest, NextApiResponse } from 'next';
-import { getTokenFromCookies, verifyToken } from '@/lib/auth';
+import { NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
+import { withAuth, AuthenticatedRequest } from '@/lib/middleware/withAuth';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  // CORS
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-
-  try {
-    // Autenticação
-    const token = getTokenFromCookies(req);
-    if (!token) {
-      return res.status(401).json({ error: 'Token não fornecido' });
-    }
-
-    const decoded = await verifyToken(token, process.env.JWT_SECRET || 'secret');
-    if (!decoded || !decoded.id) {
-      return res.status(401).json({ error: 'Token inválido' });
-    }
-
-    const usuario = await prisma.usuario.findUnique({
-      where: { id: decoded.id }
-    });
-
-    if (!usuario) {
-      return res.status(404).json({ error: 'Usuário não encontrado' });
-    }
-
-    // GET - Listar solicitações
-    if (req.method === 'GET') {
-      const { status, minhas } = req.query;
+async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
+  if (req.method === 'GET') {
+    try {
+      const minhasParam = req.query.minhas;
+      const statusParam = req.query.status;
 
       const where: any = {};
-
-      // Filtro por status
-      if (status && typeof status === 'string') {
-        where.status = status;
+      if (typeof minhasParam === 'string' && minhasParam.toLowerCase() === 'true') {
+        where.solicitanteId = req.user.id;
       }
-
-      // Se for funcionário comum, só vê as próprias solicitações
-      // Se for gerente/admin, vê todas (ou filtra por "minhas")
-      if (!['ADMIN', 'GERENTE'].includes(usuario.tipo) || minhas === 'true') {
-        where.solicitanteId = decoded.id;
+      if (typeof statusParam === 'string' && statusParam.trim().length > 0) {
+        where.status = statusParam;
       }
 
       const solicitacoes = await prisma.solicitacaoMaterial.findMany({
         where,
         include: {
-          solicitante: {
-            select: { id: true, nome: true, email: true }
-          },
-          aprovador: {
-            select: { id: true, nome: true, email: true }
-          },
           itens: {
             include: {
               material: true
             }
+          },
+          aprovador: {
+            select: {
+              nome: true
+            }
+          },
+          solicitante: {
+            select: {
+              id: true,
+              nome: true,
+              email: true
+            }
           }
         },
-        orderBy: { dataCriacao: 'desc' }
+        orderBy: {
+          dataCriacao: 'desc'
+        }
       });
 
       return res.status(200).json(solicitacoes);
+    } catch (error) {
+      console.error('Erro ao carregar solicitações:', error);
+      return res.status(500).json({ error: 'Erro interno do servidor' });
     }
+  }
 
-    // POST - Criar solicitação
-    if (req.method === 'POST') {
-      const { observacao, itens } = req.body;
+  if (req.method === 'POST') {
+    try {
+      const itensBody = Array.isArray(req.body?.itens) ? req.body.itens : [];
+      const observacao = typeof req.body?.observacao === 'string' ? req.body.observacao.trim() : '';
 
-      if (!itens || !Array.isArray(itens) || itens.length === 0) {
-        return res.status(400).json({ error: 'Itens são obrigatórios' });
+      if (itensBody.length === 0) {
+        return res.status(400).json({ error: 'Informe os itens da solicitação' });
       }
 
-      // Validar itens
-      for (const item of itens) {
-        if (!item.materialId || !item.quantidade || item.quantidade <= 0) {
-          return res.status(400).json({ error: 'Todos os itens devem ter materialId e quantidade válida' });
-        }
+      const itens = itensBody.map((item: any) => ({
+        materialId: String(item.materialId || '').trim(),
+        quantidade: Number(item.quantidade || 0),
+        observacao: item.observacao ? String(item.observacao).trim() : null
+      }));
 
-        // Verificar se o material existe
-        const material = await prisma.materialEstoque.findUnique({
-          where: { id: item.materialId }
-        });
-
-        if (!material || !material.ativo) {
-          return res.status(400).json({ error: `Material ${item.materialId} não encontrado ou inativo` });
-        }
+      if (itens.some((item) => !item.materialId || item.quantidade <= 0)) {
+        return res.status(400).json({ error: 'Itens inválidos na solicitação' });
       }
 
-      // Criar solicitação
+      const materiais = await prisma.materialEstoque.findMany({
+        where: {
+          id: { in: itens.map((item) => item.materialId) },
+          ativo: true
+        }
+      });
+
+      if (materiais.length !== itens.length) {
+        return res.status(400).json({ error: 'Um ou mais materiais são inválidos' });
+      }
+
       const solicitacao = await prisma.solicitacaoMaterial.create({
         data: {
-          solicitanteId: decoded.id,
-          observacao: observacao || null,
+          solicitanteId: req.user.id,
+          observacao: observacao || undefined,
+          status: 'PENDENTE',
           itens: {
-            create: itens.map((item: any) => ({
+            create: itens.map((item) => ({
               materialId: item.materialId,
               quantidade: item.quantidade,
-              observacao: item.observacao || null
+              observacao: item.observacao || undefined
             }))
           }
         },
         include: {
-          solicitante: {
-            select: { id: true, nome: true, email: true }
-          },
           itens: {
             include: {
               material: true
+            }
+          },
+          aprovador: {
+            select: {
+              nome: true
+            }
+          },
+          solicitante: {
+            select: {
+              id: true,
+              nome: true,
+              email: true
             }
           }
         }
       });
 
       return res.status(201).json(solicitacao);
+    } catch (error) {
+      console.error('Erro ao criar solicitação:', error);
+      return res.status(500).json({ error: 'Erro interno do servidor' });
     }
-
-    return res.status(405).json({ error: `Método ${req.method} não permitido` });
-
-  } catch (error: any) {
-    console.error('Erro na API de solicitações:', error);
-    return res.status(500).json({ error: 'Erro interno do servidor', details: error.message });
-  } finally {
-    await prisma.$disconnect();
   }
+
+  return res.status(405).json({ error: 'Method not allowed' });
 }
+
+export default withAuth(handler);

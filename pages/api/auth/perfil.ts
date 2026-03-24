@@ -1,12 +1,12 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { Usuario } from '@prisma/client';
-import * as jwt from 'jsonwebtoken';
+import { PrismaClient, Usuario } from '@prisma/client';
+import jwt from 'jsonwebtoken';
 import { parseCookies } from 'nookies';
 import { compare, hash } from 'bcryptjs';
 import { ApiResponse } from '../../../types/api';
-import prisma from '@/lib/prisma';
 
 const SALT_ROUNDS = 10;
+const prisma = new PrismaClient();
 
 interface TokenPayload {
   id: string;
@@ -211,7 +211,6 @@ export default async function handler(
           email: true,
           tipo: true,
           ativo: true,
-          foto: true,
           dataCriacao: true,
           ultimoAcesso: true
         }
@@ -236,4 +235,3 @@ export default async function handler(
     await prisma.$disconnect();
   }
 }
-

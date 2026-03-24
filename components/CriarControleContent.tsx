@@ -56,9 +56,9 @@ import {
   Info as InfoIcon
 } from '@mui/icons-material';
 
-const MotionBox = motion(Box);
-const MotionGrid = motion(Grid);
-const MotionCard = motion(Card);
+const MotionBox = motion.create(Box);
+const MotionGrid = motion.create(Grid);
+const MotionCard = motion.create(Card);
 
 interface Pessoa {
   id: string;
@@ -151,15 +151,15 @@ const CriarControleContent: React.FC = () => {
     return encontrada;
   };
 
-  type Transportadora = 'ACCERT' | 'EXPRESSO_GOIAS' | 'TERCEIRIZADA' | 'DETAFRA_TRANSPORTES' | 'RETIRA_VENDEDOR' | 'RETIRA_CLIENTE' | 'VLOG';
+  type TransportadoraEnum = 'ACERT' | 'ACCERT' | 'EXPRESSO_GOIAS' | 'TERCEIRIZADA' | 'DETAFRA_TRANSPORTES' | 'RETIRA_VENDEDOR' | 'RETIRA_CLIENTE' | 'VLOG';
   
   interface FormData {
     motorista: string;
     cpfMotorista: string;
     telefoneMotorista: string;
-    transportadora: Transportadora;
+    transportadora: TransportadoraEnum;
     responsavel: string;
-    observacao?: string; // Torna opcional para ser compatível com string | undefined
+    observacao?: string;
     qtdPalletsLevados: number;
     qtdPalletsDevolvidos: number;
     placaVeiculo: string;
@@ -169,7 +169,7 @@ const CriarControleContent: React.FC = () => {
     motorista: 'PENDENTE',
     cpfMotorista: '',
     telefoneMotorista: '',
-    transportadora: 'ACCERT' as Transportadora,
+    transportadora: 'ACCERT' as TransportadoraEnum,
     responsavel: 'PENDENTE',
     observacao: '',
     qtdPalletsLevados: 0,
@@ -299,7 +299,7 @@ const CriarControleContent: React.FC = () => {
         motorista: (formData.motorista || 'PENDENTE').trim(),
         cpfMotorista: formData.cpfMotorista ? formData.cpfMotorista.replace(/[^\d]/g, '') : 'PENDENTE',
         responsavel: (formData.responsavel || 'PENDENTE').trim(),
-        transportadora: (['ACCERT', 'EXPRESSO_GOIAS', 'TERCEIRIZADA', 'DETAFRA_TRANSPORTES', 'RETIRA_VENDEDOR', 'RETIRA_CLIENTE', 'VLOG'].includes(formData.transportadora)) 
+        transportadora: (['ACERT', 'ACCERT', 'EXPRESSO_GOIAS', 'TERCEIRIZADA', 'DETAFRA_TRANSPORTES', 'RETIRA_VENDEDOR', 'RETIRA_CLIENTE', 'VLOG'].includes(formData.transportadora)) 
           ? formData.transportadora 
           : 'ACCERT',
         qtdPalletsLevados: Number(formData.qtdPalletsLevados) || 0,
@@ -514,6 +514,7 @@ const CriarControleContent: React.FC = () => {
                         }}
                         renderOption={(props, option) => {
                           const transportadoraMap: Record<string, string> = {
+                            'ACERT': 'ACERT Transportes',
                             'ACCERT': 'ACCERT Transportes',
                             'EXPRESSO_GOIAS': 'Expresso Goiás',
                             'TERCEIRIZADA': 'Terceirizada',
@@ -641,11 +642,18 @@ const CriarControleContent: React.FC = () => {
                           </InputAdornment>
                         }
                       >
-                        {transportadoras.map((t) => (
-                          <MenuItem key={t.id} value={t.id}>
-                            {t.descricao}
-                          </MenuItem>
-                        ))}
+                        {transportadoras.length === 0 ? (
+                          <MenuItem value={formData.transportadora}>Carregando...</MenuItem>
+                        ) : (
+                          transportadoras.map((t) => (
+                            <MenuItem key={t.id} value={t.id}>
+                              {t.descricao}
+                            </MenuItem>
+                          ))
+                        )}
+                        {!transportadoras.some(t => t.id === formData.transportadora) && transportadoras.length > 0 && (
+                          <MenuItem value={formData.transportadora}>{formData.transportadora}</MenuItem>
+                        )}
                       </Select>
                       {errors.transportadora && <FormHelperText>{errors.transportadora}</FormHelperText>}
                     </FormControl>

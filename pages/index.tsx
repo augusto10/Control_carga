@@ -10,17 +10,15 @@ import {
   FilePlus, 
   ClipboardList, 
   ShoppingCart,
-  Clock,
-  TrendingUp, 
   RefreshCw,
   CheckSquare, 
-  AlertTriangle, 
   Plus, 
   Search, 
   Tag, 
   ListChecks, 
   BarChart2
 } from 'lucide-react';
+import { format } from 'date-fns';
 
 function Home() {
   const { user, isAuthenticated, isLoading } = useAuth();
@@ -29,7 +27,6 @@ function Home() {
     notasHoje: 0,
     controlesHoje: 0,
     pedidosHoje: 0,
-    controlesPendentes: 0,
     loading: true
   });
 
@@ -46,11 +43,30 @@ function Home() {
       const res = await fetch('/api/dashboard/resumo-hoje', { credentials: 'include' });
       const data = res.ok ? await res.json() : {};
 
+      let pedidosHoje = data.pedidosHoje || 0;
+      try {
+        const hojeStr = format(new Date(), 'yyyy-MM-dd');
+        const statsUrl = new URL('/api/pedidos/externos', window.location.origin);
+        statsUrl.searchParams.set('stats', '1');
+        statsUrl.searchParams.set('tipo_data', 'recebimento');
+        statsUrl.searchParams.set('data_inicio', hojeStr);
+        statsUrl.searchParams.set('data_fim', hojeStr);
+
+        const resp = await fetch(statsUrl.toString(), { headers: { accept: 'application/json' }, cache: 'no-store' });
+        if (resp.ok) {
+          const json = await resp.json();
+          if (typeof json.total === 'number') {
+            pedidosHoje = json.total;
+          }
+        }
+      } catch (error) {
+        console.error('Erro ao carregar pedidos externos:', error);
+      }
+
       setStats({
         notasHoje: data.notasHoje || 0,
         controlesHoje: data.controlesHoje || 0,
-        pedidosHoje: data.pedidosHoje || 0,
-        controlesPendentes: data.controlesPendentes || 0,
+        pedidosHoje,
         loading: false
       });
     } catch (error) {
@@ -153,8 +169,8 @@ function Home() {
             title="Notas de Hoje" 
             value={stats.notasHoje} 
             icon={FilePlus}
-            color="blue"
-            trend="Registradas hoje"
+            color="orange"
+            trend="Hoje"
             loading={stats.loading}
             delay={0.1}
           />
@@ -162,8 +178,8 @@ function Home() {
             title="Controles de Hoje" 
             value={stats.controlesHoje} 
             icon={ClipboardList}
-            color="green"
-            trend="Gerados hoje"
+            color="cyan"
+            trend="Hoje"
             loading={stats.loading}
             delay={0.2}
           />
@@ -171,8 +187,8 @@ function Home() {
             title="Pedidos de Hoje" 
             value={stats.pedidosHoje} 
             icon={ShoppingCart}
-            color="purple"
-            trend="Recebidos hoje"
+            color="blue"
+            trend="Registrados hoje"
             loading={stats.loading}
             delay={0.3}
           />

@@ -12,7 +12,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const inicio = startOfDay(hoje);
     const fim = endOfDay(hoje);
 
-    const [notasHoje, controlesHoje, pedidosHoje, controlesPendentes] = await Promise.all([
+    const [notasHoje, controlesHoje, pedidosHoje, controlesPendentes, totalNotas, totalControles] = await Promise.all([
       prisma.notaFiscal.count({
         where: {
           dataCriacao: {
@@ -41,14 +41,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         where: {
           finalizado: false
         }
-      })
+      }),
+      prisma.notaFiscal.count(),
+      prisma.controleCarga.count()
     ]);
 
     return res.status(200).json({
       notasHoje,
       controlesHoje,
       pedidosHoje,
-      controlesPendentes
+      controlesPendentes,
+      totalNotas,
+      totalControles
     });
   } catch (error) {
     console.error('Erro ao buscar resumo de hoje:', error);
