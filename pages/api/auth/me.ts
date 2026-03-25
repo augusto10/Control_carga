@@ -3,15 +3,31 @@ import { PrismaClient } from '@prisma/client';
 import jwt from 'jsonwebtoken';
 import { parseCookies } from 'nookies';
 
+// Tipos para origens permitidas
+type AllowedOrigin = string | RegExp;
+
 // Lista de origens permitidas
-const ALLOWED_ORIGINS = [
+const ALLOWED_ORIGINS: AllowedOrigin[] = [
   'http://localhost:3000',
   'http://localhost:3001',
   'http://127.0.0.1:3000',
   'http://127.0.0.1:3001',
   'https://seu-dominio.com',
-  'https://www.seu-dominio.com'
+  'https://www.seu-dominio.com',
+  'https://controle-logistica.vercel.app',
+  /^https:\/\/controle-logistica-.*-augusto10s-projects\.vercel\.app$/,
+  /^https:\/\/.*\.vercel\.app$/
 ];
+
+// Função para verificar se uma origem é permitida
+function isOriginAllowed(origin: string): boolean {
+  return ALLOWED_ORIGINS.some(allowed => {
+    if (typeof allowed === 'string') {
+      return allowed === origin;
+    }
+    return allowed.test(origin);
+  });
+}
 
 // Configurações de CORS padrão
 const DEFAULT_CORS_HEADERS = {
@@ -31,7 +47,8 @@ const allowCors = (fn: any) => async (req: NextApiRequest, res: NextApiResponse)
   const requestHeaders = req.headers['access-control-request-headers'];
   
   // Verificar se a origem é permitida
-  const allowedOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  const originIsAllowed = isOriginAllowed(origin);
+  const allowedOrigin = originIsAllowed ? origin : (typeof ALLOWED_ORIGINS[0] === 'string' ? ALLOWED_ORIGINS[0] : '');
   
   // Aplicar headers CORS padrão
   Object.entries(DEFAULT_CORS_HEADERS).forEach(([key, value]) => {
@@ -47,19 +64,15 @@ const allowCors = (fn: any) => async (req: NextApiRequest, res: NextApiResponse)
   
   // Se for uma requisição OPTIONS (preflight), retornar imediatamente
   if (req.method === 'OPTIONS') {
-    // Adicionar headers específicos para preflight
     if (requestMethod) {
       res.setHeader('Access-Control-Allow-Methods', requestMethod);
     }
-    
     if (requestHeaders) {
       res.setHeader('Access-Control-Allow-Headers', requestHeaders);
     }
-    
     return res.status(204).end();
   }
 
-  // Chamar o handler principal
   try {
     return await fn(req, res);
   } catch (error) {

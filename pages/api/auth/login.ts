@@ -362,80 +362,20 @@ const handler = async (req: LoginRequest, res: NextApiResponse) => {
     }
     
     // Configurar cookie HTTP-only seguro
-    console.log('11. Configurando cookie de autenticação HTTP-only');
     const isProduction = process.env.NODE_ENV === 'production';
-    
-    // Obter origem da requisição e determinar a origem permitida
     const origin = req.headers.origin || '';
-    const allowedOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
     
-    // Log de depuração
-    console.log('11.1. Origem da requisição:', origin);
-    console.log('11.2. Origem permitida:', allowedOrigin);
-    console.log('11.3. Ambiente de produção:', isProduction);
-    
-    // Determinar o domínio do cookie
-    let cookieDomain = '';
-    if (isProduction) {
-      // Em produção, extrair o domínio da origem permitida
-      try {
-        // Encontrar a primeira origem permitida que é uma string
-        const fallbackOrigin = ALLOWED_ORIGINS.find(
-          (origin): origin is string => typeof origin === 'string' && origin.startsWith('http')
-        ) || 'https://controle-logistica.vercel.app';
-        
-        // Garantir que estamos usando uma string (não uma expressão regular)
-        const originToUse = typeof allowedOrigin === 'string' ? allowedOrigin : fallbackOrigin;
-        
-        // Criar URL apenas com uma string válida
-        const domainUrl = new URL(originToUse);
-        const domainParts = domainUrl.hostname.split('.');
-        
-        // Se tiver subdomínios (ex: app.exemplo.com), pega apenas os dois últimos níveis (.exemplo.com)
-        if (domainParts.length > 2) {
-          cookieDomain = `.${domainParts.slice(-2).join('.')}`;
-        } else {
-          cookieDomain = `.${domainUrl.hostname}`;
-        }
-        
-        console.log('11.0. Domínio do cookie em produção:', cookieDomain);
-      } catch (error) {
-        console.error('Erro ao analisar domínio:', error);
-        // Em caso de erro, não define o domínio
-        cookieDomain = '';
-      }
-    }
-    // Em desenvolvimento, não definimos o domínio para que o cookie seja enviado para localhost
-    
-    // Definir opções de cookie baseadas no ambiente
     const cookieOptions: any = {
       httpOnly: true,
-      secure: isProduction, // true em produção, false em desenvolvimento
-      sameSite: 'lax', // Usar 'lax' para melhor compatibilidade
+      secure: isProduction,
+      sameSite: 'lax',
       maxAge: 60 * 60 * 24 * 7, // 7 dias
       path: '/',
     };
     
-    // Configurações específicas para produção
+    // Garantir secure em produção
     if (isProduction) {
-      // Em produção, sempre usar HTTPS e domínio correto
       cookieOptions.secure = true;
-      cookieOptions.sameSite = 'lax';
-      
-      // Apenas definir o domínio se estiver configurado
-      if (cookieDomain) {
-        cookieOptions.domain = cookieDomain;
-        console.log('11.4. Domínio do cookie definido para:', cookieDomain);
-      } else {
-        console.log('11.4. Nenhum domínio de cookie definido para produção!');
-      }
-    } else {
-      // Em desenvolvimento, permitir HTTP e HTTPS
-      cookieOptions.secure = origin.startsWith('https://');
-      cookieOptions.sameSite = 'lax';
-      
-      // Não definir domínio em desenvolvimento para garantir que funcione em localhost
-      delete cookieOptions.domain;
     }
     
     // Criar o cookie
