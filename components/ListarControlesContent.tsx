@@ -2071,7 +2071,7 @@ const ListarControlesContent: React.FC = () => {
                     }
                   }}
                 >
-                  <TableCell>{controle.numeroManifesto || (controle.id ? `ID-${controle.id.substring(0, 6)}` : 'N/A')}</TableCell>
+                  <TableCell>{controle.numeroManifesto?.replace('CTRL-', '') || (controle.id ? `ID-${controle.id.substring(0, 6)}` : 'N/A')}</TableCell>
                   <TableCell>
                     {format(new Date(controle.dataCriacao), "dd/MM/yyyy HH:mm", { locale: ptBR })}
                   </TableCell>
