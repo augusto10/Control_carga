@@ -302,11 +302,12 @@ const CriarControleContent: React.FC = () => {
         transportadora: (['ACERT', 'ACCERT', 'EXPRESSO_GOIAS', 'TERCEIRIZADA', 'DETAFRA_TRANSPORTES', 'RETIRA_VENDEDOR', 'RETIRA_CLIENTE', 'VLOG'].includes(formData.transportadora)) 
           ? formData.transportadora 
           : 'ACCERT',
+        qtdPallets: Number(formData.qtdPalletsLevados) || 0, // Fallback to levados for total pallets
         qtdPalletsLevados: Number(formData.qtdPalletsLevados) || 0,
         qtdPalletsDevolvidos: Number(formData.qtdPalletsDevolvidos) || 0,
-        placaVeiculo: formData.placaVeiculo.trim(),
+        placaVeiculo: (formData.placaVeiculo || '').trim(),
         observacao: formData.observacao?.trim() || undefined,
-        finalizado: false, // Adiciona o campo finalizado
+        finalizado: false,
         notasIds: Array.isArray(selectedNotas) ? selectedNotas : []
       };
       
@@ -332,7 +333,7 @@ const CriarControleContent: React.FC = () => {
       
       // Redireciona para a lista de controles após um pequeno atraso
       setTimeout(() => {
-        router.push('/listar-controles');
+        router.push('/controles');
       }, 1000);
       
     } catch (error) {
@@ -805,9 +806,13 @@ const CriarControleContent: React.FC = () => {
                         multiple
                         options={notasNaoVinculadas}
                         getOptionLabel={(option) => `NF: ${option.numeroNota} - ${option.codigo}`}
-                        value={notasNaoVinculadas.filter(n => selectedNotas.includes(n.id))}
+                        value={selectedNotas.map(id => notasNaoVinculadas.find(n => n.id === id)).filter((n): n is any => !!n)}
                         onChange={(_, newValue) => {
-                          setSelectedNotas(newValue.map(n => n.id));
+                          const newIds = newValue.map(n => n.id);
+                          // Encontra o que foi adicionado para colocar no topo
+                          const added = newIds.filter(id => !selectedNotas.includes(id));
+                          const remaining = selectedNotas.filter(id => newIds.includes(id));
+                          setSelectedNotas([...added, ...remaining]);
                         }}
                         renderInput={(params) => (
                           <TextField
@@ -818,7 +823,7 @@ const CriarControleContent: React.FC = () => {
                           />
                         )}
                         renderTags={(value, getTagProps) =>
-                          value.map((option, index) => (
+                          selectedNotas.map(id => notasNaoVinculadas.find(n => n.id === id)).filter(Boolean).map((option: any, index: number) => (
                             <Chip
                               variant="outlined"
                               label={`${option.numeroNota}`}

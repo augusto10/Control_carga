@@ -1024,9 +1024,15 @@ const ListarControlesContent: React.FC = () => {
       // Rodapé
       yPos -= lineHeight * 2;
       page.drawText(`Nº Controle: ${controleCompleto.numeroManifesto || '-'}`, { x: 50, y: yPos, size: fontSize - 1, font });
-      page.drawText(`Total de Volumes: ${totalVolumes}`, { x: 250, y: yPos, size: fontSize - 1, font });
-      page.drawText(`Total de Valor: ${totalValorFmt}`, { x: 420, y: yPos, size: fontSize - 1, font });
+      page.drawText(`Placa Veículo: ${controleCompleto.placaVeiculo || '-'}`, { x: 250, y: yPos, size: fontSize - 1, font });
+      page.drawText(`Total de Volumes: ${totalVolumes}`, { x: 420, y: yPos, size: fontSize - 1, font });
       yPos -= lineHeight;
+      page.drawText(`Pallets Levados: ${controleCompleto.qtdPalletsLevados || 0}`, { x: 50, y: yPos, size: fontSize - 1, font });
+      page.drawText(`Pallets Devolvidos: ${controleCompleto.qtdPalletsDevolvidos || 0}`, { x: 250, y: yPos, size: fontSize - 1, font });
+      const diferenca = (controleCompleto.qtdPalletsLevados || 0) - (controleCompleto.qtdPalletsDevolvidos || 0);
+      page.drawText(`Diferença: ${diferenca}`, { x: 420, y: yPos, size: fontSize - 1, font });
+      yPos -= lineHeight;
+      page.drawText(`Total de Valor: ${totalValorFmt}`, { x: 50, y: yPos, size: fontSize - 1, font });
       page.drawText(`Total de Peso: ${totalPesoFmt} kg`, { x: 250, y: yPos, size: fontSize - 1, font });
 
       // Seção de Assinaturas
@@ -1352,10 +1358,10 @@ const ListarControlesContent: React.FC = () => {
     setLoadingButtons(prev => ({ ...prev, [deleteKey]: true }));
 
     try {
-      // Usar POST ao invés de DELETE para contornar erro 405
-      const response = await api.post('/api/controles/delete', { id: controle.id });
+      // Corrigido para usar DELETE na rota correta
+      const response = await api.delete(`/api/controles/${controle.id}`);
       
-      if (response.status === 200) {
+      if (response.status === 200 || response.status === 204) {
         enqueueSnackbar('Controle excluído com sucesso!', { 
           variant: 'success',
           autoHideDuration: 3000 
@@ -2065,7 +2071,7 @@ const ListarControlesContent: React.FC = () => {
                     }
                   }}
                 >
-                  <TableCell>{controle.numeroManifesto || 'N/A'}</TableCell>
+                  <TableCell>{controle.numeroManifesto || (controle.id ? `ID-${controle.id.substring(0, 6)}` : 'N/A')}</TableCell>
                   <TableCell>
                     {format(new Date(controle.dataCriacao), "dd/MM/yyyy HH:mm", { locale: ptBR })}
                   </TableCell>
@@ -2255,59 +2261,63 @@ const ListarControlesContent: React.FC = () => {
                                 </Tooltip>
                               ) : (
                                 <>
-                                  {/* Botão Motorista */}
-                                  <Tooltip title={controle.assinaturaMotorista ? 'Assinatura do motorista já registrada' : 'Assinar como motorista'}>
-                                    <Button
-                                      variant="contained"
-                                      color={controle.assinaturaMotorista ? 'success' : 'primary'}
-                                      size="small"
-                                      onClick={() => handleAbrirAssinatura(controle, 'motorista')}
-                                      disabled={loadingButtons[`sign_motorista_${controle.id}`] || !controle.finalizado}
-                                      startIcon={controle.assinaturaMotorista ? 
-                                        <CheckCircleOutlineIcon /> : 
-                                        <EditIcon />
-                                      }
-                                      sx={{
-                                        ...buttonStyles,
-                                        textTransform: 'none',
-                                        fontWeight: 500,
-                                        letterSpacing: '0.5px',
-                                        display: controle.finalizado ? 'inline-flex' : 'none'
-                                      }}
-                                    >
-                                      {loadingButtons[`sign_motorista_${controle.id}`] ? (
-                                        <CircularProgress size={16} color="inherit" sx={{ mr: 1 }} />
-                                      ) : null}
-                                      {controle.assinaturaMotorista ? 'Motorista ✓' : 'Motorista'}
-                                    </Button>
-                                  </Tooltip>
+                                  {/* Botão Motorista - Oculto temporariamente a pedido do usuário */}
+                                  {false && (
+                                    <Tooltip title={controle.assinaturaMotorista ? 'Assinatura do motorista já registrada' : 'Assinar como motorista'}>
+                                      <Button
+                                        variant="contained"
+                                        color={controle.assinaturaMotorista ? 'success' : 'primary'}
+                                        size="small"
+                                        onClick={() => handleAbrirAssinatura(controle, 'motorista')}
+                                        disabled={loadingButtons[`sign_motorista_${controle.id}`] || !controle.finalizado}
+                                        startIcon={controle.assinaturaMotorista ? 
+                                          <CheckCircleOutlineIcon /> : 
+                                          <EditIcon />
+                                        }
+                                        sx={{
+                                          ...buttonStyles,
+                                          textTransform: 'none',
+                                          fontWeight: 500,
+                                          letterSpacing: '0.5px',
+                                          display: controle.finalizado ? 'inline-flex' : 'none'
+                                        }}
+                                      >
+                                        {loadingButtons[`sign_motorista_${controle.id}`] ? (
+                                          <CircularProgress size={16} color="inherit" sx={{ mr: 1 }} />
+                                        ) : null}
+                                        {controle.assinaturaMotorista ? 'Motorista ✓' : 'Motorista'}
+                                      </Button>
+                                    </Tooltip>
+                                  )}
                                   
-                                  {/* Botão Responsável */}
-                                  <Tooltip title={controle.assinaturaResponsavel ? 'Assinatura do responsável já registrada' : 'Assinar como responsável'}>
-                                    <Button
-                                      variant="contained"
-                                      color={controle.assinaturaResponsavel ? 'success' : 'primary'}
-                                      size="small"
-                                      onClick={() => handleAbrirAssinatura(controle, 'responsavel')}
-                                      disabled={loadingButtons[`sign_responsavel_${controle.id}`] || !controle.finalizado}
-                                      startIcon={controle.assinaturaResponsavel ? 
-                                        <CheckCircleOutlineIcon /> : 
-                                        <EditIcon />
-                                      }
-                                      sx={{
-                                        ...buttonStyles,
-                                        textTransform: 'none',
-                                        fontWeight: 500,
-                                        letterSpacing: '0.5px',
-                                        display: controle.finalizado ? 'inline-flex' : 'none'
-                                      }}
-                                    >
-                                      {loadingButtons[`sign_responsavel_${controle.id}`] ? (
-                                        <CircularProgress size={16} color="inherit" sx={{ mr: 1 }} />
-                                      ) : null}
-                                      {controle.assinaturaResponsavel ? 'Responsável ✓' : 'Responsável'}
-                                    </Button>
-                                  </Tooltip>
+                                  {/* Botão Responsável - Oculto temporariamente a pedido do usuário */}
+                                  {false && (
+                                    <Tooltip title={controle.assinaturaResponsavel ? 'Assinatura do responsável já registrada' : 'Assinar como responsável'}>
+                                      <Button
+                                        variant="contained"
+                                        color={controle.assinaturaResponsavel ? 'success' : 'primary'}
+                                        size="small"
+                                        onClick={() => handleAbrirAssinatura(controle, 'responsavel')}
+                                        disabled={loadingButtons[`sign_responsavel_${controle.id}`] || !controle.finalizado}
+                                        startIcon={controle.assinaturaResponsavel ? 
+                                          <CheckCircleOutlineIcon /> : 
+                                          <EditIcon />
+                                        }
+                                        sx={{
+                                          ...buttonStyles,
+                                          textTransform: 'none',
+                                          fontWeight: 500,
+                                          letterSpacing: '0.5px',
+                                          display: controle.finalizado ? 'inline-flex' : 'none'
+                                        }}
+                                      >
+                                        {loadingButtons[`sign_responsavel_${controle.id}`] ? (
+                                          <CircularProgress size={16} color="inherit" sx={{ mr: 1 }} />
+                                        ) : null}
+                                        {controle.assinaturaResponsavel ? 'Responsável ✓' : 'Responsável'}
+                                      </Button>
+                                    </Tooltip>
+                                  )}
                                 </>
                               )}
                             </Box>
@@ -2488,7 +2498,7 @@ const ListarControlesContent: React.FC = () => {
             justifyContent: 'space-between'
           }}>
             <Typography variant="h6">
-              Detalhes do Controle - {detalhesModal.controle.numeroManifesto || 'N/A'}
+              Detalhes do Controle - {detalhesModal.controle.numeroManifesto?.replace('CTRL-', '') || 'N/A'}
             </Typography>
             <IconButton edge="end" color="inherit" onClick={handleFecharDetalhes}>
               <CloseIcon />

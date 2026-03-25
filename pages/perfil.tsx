@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import { AuthContext } from '@/contexts/AuthContext';
 import { AppLayout } from '@/components/layout/AppLayout';
-import AdminRoute from '@/components/admin/AdminRoute';
+import ProtectedRoute from '@/components/ProtectedRoute';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -491,9 +491,9 @@ function PerfilUsuarioContent() {
 
 export default function PerfilUsuario() {
   return (
-    <AdminRoute>
+    <ProtectedRoute>
       <PerfilUsuarioContent />
-    </AdminRoute>
+    </ProtectedRoute>
   );
 }
 

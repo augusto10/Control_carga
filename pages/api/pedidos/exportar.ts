@@ -18,7 +18,11 @@ export default async function handler(
     const password = process.env.API_EXTERNA_PASSWORD;
 
     if (!username || !password) {
-      return res.status(500).json({ message: 'Credenciais da API externa não configuradas' });
+      console.warn('[Exportar Pedidos] Credenciais da API externa não configuradas.');
+      return res.status(200).json({ 
+        message: 'Download indisponível: Credenciais da API externa não configuradas no .env',
+        warning: true 
+      });
     }
 
     const tipoData = typeof tipo_data === 'string' ? tipo_data.toLowerCase() : 'recebimento';

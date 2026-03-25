@@ -16,9 +16,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const password = process.env.API_EXTERNA_PASSWORD;
 
     if (!username || !password) {
-      return res.status(500).json({
-        error: 'Credenciais da API externa não configuradas',
-        details: 'Configure API_EXTERNA_USERNAME e API_EXTERNA_PASSWORD no .env.local'
+      console.warn('[API Apurações] Credenciais da API externa não configuradas. Retornando lista vazia.');
+      return res.status(200).json({
+        data: [],
+        total: 0,
+        warning: 'Credenciais da API externa não configuradas no .env'
       });
     }
 

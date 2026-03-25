@@ -37,9 +37,19 @@ interface DashboardStats {
   }>;
 }
 
+interface ExternalHealth {
+  status: string;
+  api_online: boolean;
+  credentials_configured: boolean;
+  database_connected: boolean;
+  details?: string;
+}
+
 function AdminDashboardContent() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [health, setHealth] = useState<ExternalHealth | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingHealth, setLoadingHealth] = useState(false);
 
   const loadStats = async () => {
     try {
@@ -125,10 +135,26 @@ function AdminDashboardContent() {
     }
   };
 
+  const loadHealth = async () => {
+    try {
+      setLoadingHealth(true);
+      const res = await fetch('/api/admin/health-externo');
+      if (res.ok) {
+        setHealth(await res.json());
+      }
+    } catch (error) {
+      console.error('Erro ao carregar saúde da API:', error);
+    } finally {
+      setLoadingHealth(false);
+    }
+  };
+
   useEffect(() => {
     loadStats();
+    loadHealth();
     const interval = setInterval(() => {
       loadStats();
+      loadHealth();
     }, 3 * 60 * 1000);
     return () => clearInterval(interval);
   }, []);
@@ -303,7 +329,62 @@ function AdminDashboardContent() {
                     O registro detalhado de atividades e logs do sistema será exibido aqui em uma atualização futura.
                   </p>
                 </div>
-                <div className="pt-4">
+                <div className="pt-4 w-full">
+                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 text-left">
+                    <div className="flex items-center justify-between mb-4">
+                      <h4 className="text-sm font-bold text-slate-700">Integração Externa</h4>
+                      {loadingHealth ? (
+                        <RefreshCw size={14} className="animate-spin text-blue-500" />
+                      ) : (
+                        <div className={cn(
+                          "w-2 h-2 rounded-full",
+                          health?.api_online ? "bg-green-500 animate-pulse" : "bg-red-500"
+                        )} />
+                      )}
+                    </div>
+
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-slate-500">Servidor API:</span>
+                        <span className={cn(
+                          "font-bold",
+                          health?.api_online ? "text-green-600" : "text-red-600"
+                        )}>
+                          {health?.api_online ? 'ONLINE' : 'OFFLINE'}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-slate-500">Credenciais:</span>
+                        <span className={cn(
+                          "font-bold",
+                          health?.credentials_configured ? "text-green-600" : "text-amber-600"
+                        )}>
+                          {health?.credentials_configured ? 'CONFIGURADAS' : 'AUSENTES'}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-slate-500">Banco de Dados:</span>
+                        <span className={cn(
+                          "font-bold",
+                          health?.database_connected ? "text-green-600" : "text-red-600"
+                        )}>
+                          {health?.database_connected ? 'CONECTADO' : 'DESCONECTADO'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {!health?.credentials_configured && (
+                      <div className="mt-4 p-3 rounded-xl bg-amber-50 border border-amber-100 flex gap-2">
+                        <AlertCircle size={14} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                        <p className="text-[10px] text-amber-700 leading-tight">
+                          Configure <strong>API_EXTERNA_USERNAME</strong> e <strong>API_EXTERNA_PASSWORD</strong> no arquivo .env para ativar a sincronização.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="pt-6">
                   <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-50 text-amber-700 rounded-full text-[10px] font-bold uppercase tracking-wider border border-amber-100">
                     <AlertCircle size={12} />
                     Funcionalidade em desenvolvimento

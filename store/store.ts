@@ -409,15 +409,28 @@ export const useStore = create<StoreState>((set) => ({
   },
 
   finalizarControle: async (controleId) => {
-    await fetch('/api/controles/finalizar', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ controleId }),
-    });
-    
-    await useStore.getState().fetchControles();
+    try {
+      const response = await fetch(`/api/controles/${controleId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        },
+        body: JSON.stringify({ finalizado: true }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Erro ao finalizar controle');
+      }
+      
+      await useStore.getState().fetchControles();
+    } catch (error) {
+      console.error('Erro ao finalizar controle:', error);
+      throw error;
+    }
   },
 
   atualizarControle: async (controleId, dados): Promise<ControleCarga | null> => {
@@ -474,8 +487,8 @@ export const useStore = create<StoreState>((set) => ({
       // Usando a instância do Axios configurada
       console.log(`[deleteNota] Iniciando requisição DELETE para /api/notas/${notaId}`);
       
-      // Usar POST ao invés de DELETE para contornar erro 405
-      const response = await api.post('/api/notas/delete', { id: notaId });
+      // Corrigido para usar DELETE na rota correta
+      const response = await api.delete(`/api/notas/${notaId}`);
       
       console.log(`[deleteNota] Resposta recebida:`, {
         status: response.status,

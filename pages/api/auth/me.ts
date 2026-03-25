@@ -137,7 +137,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           tipo: true,
           ativo: true,
           dataCriacao: true,
-          ultimoAcesso: true
+          ultimoAcesso: true,
+          foto: true
         }
       });
 

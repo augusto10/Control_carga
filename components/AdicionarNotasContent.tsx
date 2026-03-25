@@ -244,9 +244,9 @@ const AdicionarNotasContent: React.FC = () => {
       
       console.log('Nova nota a ser adicionada:', novaNota);
       
-      // Adicionar à lista de notas
+      // Adicionar à lista de notas no topo
       setNotas(prev => {
-        const novasNotas = [...prev, novaNota];
+        const novasNotas = [novaNota, ...prev];
         console.log('Lista de notas atualizada:', novasNotas);
         return novasNotas;
       });
@@ -357,8 +357,8 @@ const AdicionarNotasContent: React.FC = () => {
       editando: true // Abre para edição dos volumes
     };
     
-    // Adiciona a nova nota
-    setNotas(prev => [...prev, novaNota]);
+    // Adiciona a nova nota no topo
+    setNotas(prev => [novaNota, ...prev]);
     setNotaEditandoValor(novaNota.id);
     
     // Limpa o formulário

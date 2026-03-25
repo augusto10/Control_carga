@@ -71,12 +71,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         qtdPallets,
         observacao,
         cpfMotorista,
+        placaVeiculo,
+        qtdPalletsLevados,
+        qtdPalletsDevolvidos,
         notasIds
       } = req.body;
 
-      // Ensure transportadora is valid enum
-      if (!Object.values(Transportadora).includes(transportadora)) {
-          return res.status(400).json({ message: 'Transportadora inválida' });
+      // Geração de número sequencial se não fornecido
+      let numeroFinal = numeroManifesto;
+      if (!numeroFinal) {
+        const count = await prisma.controleCarga.count();
+        numeroFinal = (count + 1).toString();
       }
 
       const controle = await prisma.controleCarga.create({
@@ -84,10 +89,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           motorista,
           responsavel,
           transportadora: transportadora as Transportadora,
-          numeroManifesto,
-          qtdPallets: Number(qtdPallets),
+          numeroManifesto: numeroFinal,
+          qtdPallets: Number(qtdPallets) || 0,
           observacao,
           cpfMotorista,
+          placaVeiculo,
+          qtdPalletsLevados: Number(qtdPalletsLevados) || 0,
+          qtdPalletsDevolvidos: Number(qtdPalletsDevolvidos) || 0,
           notas: notasIds && Array.isArray(notasIds) && notasIds.length > 0 ? {
             connect: notasIds.map((id: string) => ({ id }))
           } : undefined

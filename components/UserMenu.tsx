@@ -78,7 +78,10 @@ export default function UserMenu({ showInlineLabel = false }: UserMenuProps) {
           aria-haspopup="true"
           aria-expanded={open ? 'true' : undefined}
         >
-          <Avatar sx={{ width: 32, height: 32, bgcolor: 'primary.main' }} src={user.foto || undefined}>
+          <Avatar 
+            sx={{ width: 32, height: 32, bgcolor: 'primary.main', border: '2px solid white' }} 
+            src={user.foto || undefined}
+          >
             {!user.foto && (user.nome?.charAt(0).toUpperCase() || <PersonIcon />)}
           </Avatar>
         </IconButton>

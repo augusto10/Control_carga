@@ -25,7 +25,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (!nota) {
-      return res.status(404).json({ message: 'Nota fiscal não encontrada' });
+      return res.status(200).json(null); // Retornar 200 null para não gerar erros no log do client
     }
 
     return res.status(200).json(nota);
