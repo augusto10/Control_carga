@@ -79,6 +79,7 @@ class APIExternaService {
       headers: {
         'Content-Type': 'application/json',
       },
+      timeout: 30000, // 30 segundos de timeout
     });
 
     this.apiInstance.interceptors.request.use(
@@ -107,6 +108,8 @@ class APIExternaService {
 
   async login(username: string, password: string): Promise<string | null> {
     try {
+      console.log('[API Externa] Tentando login com username:', username);
+      
       const params = new URLSearchParams();
       params.append('username', username);
       params.append('password', password);
@@ -131,7 +134,15 @@ class APIExternaService {
       console.log('[API Externa] Login realizado com sucesso');
       return this.token;
     } catch (error: any) {
-      console.error('[API Externa] Erro no login:', error.response?.data || error.message);
+      console.error('[API Externa] Erro no login:', {
+        message: error.message,
+        response: error.response ? {
+          status: error.response.status,
+          statusText: error.response.statusText,
+          data: error.response.data
+        } : 'Sem resposta',
+        url: `${API_EXTERNA_BASE}/token`
+      });
       return null;
     }
   }
@@ -434,6 +445,10 @@ class APIExternaService {
       data_fim?: string;
       limit?: number;
       offset?: number;
+      tipo_data?: string;
+      tipo_entrega?: string;
+      status?: string;
+      search?: string;
     },
     username: string,
     password: string
@@ -450,9 +465,10 @@ class APIExternaService {
       if (filtros.data_fim) params.append('data_fim', filtros.data_fim);
       if (filtros.limit) params.append('limit', filtros.limit.toString());
       if (filtros.offset) params.append('offset', filtros.offset.toString());
-
-      // Adicionar parâmetro para buscar por data de emissão/cadastro e não alteração
-      // params.append('tipo_data', 'emissao'); // Se a API suportar
+      if (filtros.tipo_data) params.append('tipo_data', filtros.tipo_data);
+      if (filtros.tipo_entrega) params.append('tipo_entrega', filtros.tipo_entrega);
+      if (filtros.status) params.append('status', filtros.status);
+      if (filtros.search) params.append('search', filtros.search);
 
       const url = `/api/v1/pedidos${params.toString() ? `?${params.toString()}` : ''}`;
       console.log('[API Externa] Buscando pedidos:', url);

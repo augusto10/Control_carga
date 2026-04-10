@@ -308,19 +308,14 @@ const menuItems = [
       },
     ]
   },
-  { 
-    text: 'Gestão de Notas', 
+  {
+    text: 'Gestão de Notas',
     icon: <ReceiptModernIcon sx={{ fontSize: 22 }} />,
     subItems: [
-      { 
-        text: 'Adicionar Notas', 
-        icon: <AddIcon sx={{ fontSize: 20 }} />, 
-        path: '/adicionar-notas' 
-      },
-      { 
-        text: 'Consultar Notas', 
-        icon: <SearchModernIcon sx={{ fontSize: 20 }} />, 
-        path: '/listar-notas' 
+      {
+        text: 'Consultar Notas',
+        icon: <SearchModernIcon sx={{ fontSize: 20 }} />,
+        path: '/listar-notas'
       }
     ]
   },

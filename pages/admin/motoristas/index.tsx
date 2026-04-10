@@ -122,12 +122,14 @@ export default function MotoristasPage() {
       return;
     }
 
-    if (!current.cpf || current.cpf.length !== 11) {
+    const cpfDigits = current.cpf.replace(/\D/g, '');
+    if (!cpfDigits || cpfDigits.length !== 11) {
       showToast('CPF deve ter 11 dígitos', 'error');
       return;
     }
 
-    if (!current.telefone || (current.telefone.length !== 10 && current.telefone.length !== 11)) {
+    const telefoneDigits = current.telefone.replace(/\D/g, '');
+    if (!telefoneDigits || (telefoneDigits.length !== 10 && telefoneDigits.length !== 11)) {
       showToast('Telefone deve ter 10 ou 11 dígitos', 'error');
       return;
     }

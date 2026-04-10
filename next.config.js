@@ -8,6 +8,7 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  transpilePackages: ['react-leaflet', 'leaflet-routing-machine'],
   experimental: {
     serverComponentsExternalPackages: ['@prisma/client', 'prisma']
   },

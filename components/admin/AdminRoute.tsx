@@ -24,11 +24,11 @@ export default function AdminRoute({ children }: AdminRouteProps) {
       return;
     }
 
-    // Se está autenticado, verifica se é administrador
+    // Se está autenticado, verifica se é administrador ou gerente
     if (user) {
-      const isAdmin = user.tipo === USER_TYPES.ADMIN;
-      if (!isAdmin) {
-        console.log('[AdminRoute] Acesso negado: usuário não é administrador');
+      const isAuthorized = user.tipo === USER_TYPES.ADMIN || user.tipo === USER_TYPES.GERENTE;
+      if (!isAuthorized) {
+        console.log('[AdminRoute] Acesso negado: usuário não é administrador ou gerente');
         router.push('/acesso-negado');
         return;
       }
@@ -48,8 +48,8 @@ export default function AdminRoute({ children }: AdminRouteProps) {
     );
   }
 
-  // Se o usuário está autenticado e é administrador, renderiza os filhos
-  if (isAuthenticated && user?.tipo === USER_TYPES.ADMIN) {
+  // Se o usuário está autenticado e é administrador ou gerente, renderiza os filhos
+  if (isAuthenticated && (user?.tipo === USER_TYPES.ADMIN || user?.tipo === USER_TYPES.GERENTE)) {
     return <>{children}</>;
   }
 

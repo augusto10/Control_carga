@@ -1,6 +1,7 @@
 import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import '../styles/globals.css';
+import 'leaflet/dist/leaflet.css';
 import Alert from '@mui/material/Alert';
 import { alpha } from '@mui/material/styles';
 import { useTheme } from '@mui/material/styles';

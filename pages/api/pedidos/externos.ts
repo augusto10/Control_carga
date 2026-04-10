@@ -6,6 +6,14 @@ export default async function handler(
   res: NextApiResponse
 ) {
   res.setHeader('Cache-Control', 'no-store, max-age=0');
+  
+  console.log('[API Pedidos Externos] Nova requisição recebida:', {
+    method: req.method,
+    url: req.url,
+    query: req.query,
+    timestamp: new Date().toISOString()
+  });
+  
   if (req.method !== 'GET') {
     return res.status(405).json({ message: 'Método não permitido' });
   }
@@ -30,6 +38,11 @@ export default async function handler(
     const username = process.env.API_EXTERNA_USERNAME;
     const password = process.env.API_EXTERNA_PASSWORD;
 
+    console.log('[API Pedidos Externos] Credenciais:', {
+      username: username ? 'Configurado' : 'NÃO CONFIGURADO',
+      password: password ? 'Configurado' : 'NÃO CONFIGURADO'
+    });
+
     if (!username || !password) {
       console.warn('[API Pedidos Externos] Credenciais da API externa não configuradas. Retornando lista vazia.');
       return res.status(200).json({
@@ -44,15 +57,23 @@ export default async function handler(
       data_inicio,
       data_fim,
       limit,
-      offset
+      offset,
+      tipo_entrega,
+      status,
+      search,
+      tipo_data,
+      stats
     });
 
     const requestedLimit = limit ? parseInt(limit as string, 10) : 100;
     const safeLimit = Number.isFinite(requestedLimit) ? Math.min(requestedLimit, 100) : 100;
+    const fetchLimit = safeLimit;
     const filtrosApi: any = {
-      limit: safeLimit,
-      offset: offset ? parseInt(offset as string, 10) : 0
+      limit: fetchLimit,
+      offset: stats === '1' ? 0 : (offset ? parseInt(offset as string, 10) : 0)
     };
+
+
 
     if (data_inicio && typeof data_inicio === 'string' && data_inicio !== 'undefined') {
       filtrosApi.data_inicio = data_inicio;
@@ -67,13 +88,22 @@ export default async function handler(
       filtrosApi.tipo_data = 'recebimento';
     }
 
+    if (typeof tipo_entrega === 'string') {
+      filtrosApi.tipo_entrega = tipo_entrega;
+    }
+    if (typeof status === 'string') {
+      filtrosApi.status = status;
+    }
+    if (typeof search === 'string' && search.trim()) {
+      filtrosApi.search = search.trim();
+    }
+
     console.log('[API Pedidos Externos] Filtros para a API:', filtrosApi);
 
     const inicio = data_inicio && typeof data_inicio === 'string' ? new Date(`${data_inicio}T00:00:00`) : null;
     const fim = data_fim && typeof data_fim === 'string' ? new Date(`${data_fim}T23:59:59`) : null;
-    const tiposEntrega = typeof tipo_entrega === 'string' ? tipo_entrega.split(',').map(s => s.trim().toUpperCase()) : null;
-    const statusFechado = typeof status === 'string' ? status.toUpperCase() : null;
-    const searchTerm = typeof search === 'string' ? search.trim().toLowerCase() : '';
+
+    console.log('[API Pedidos Externos] Datas parseadas:', { inicio, fim });
 
     const pickString = (...values: Array<unknown>) => {
       for (const value of values) {
@@ -105,66 +135,77 @@ export default async function handler(
       if (!v) return null;
       const s = String(v).trim();
       if (!s) return null;
+      // Timestamp numérico
       if (/^\d+$/.test(s)) {
         const d = new Date(Number(s));
         return isNaN(d.getTime()) ? null : d;
       }
+      // ISO com T
       if (s.includes('T')) {
         const d = new Date(s);
         return isNaN(d.getTime()) ? null : d;
       }
-      if (/^\d{2}\/\d{2}\/\d{4}/.test(s)) {
+      // DD/MM/YYYY [HH:MM[:SS]]
+      if (/^\d{1,2}\/\d{1,2}\/\d{4}/.test(s)) {
         const [datePart, timePart] = s.split(' ');
         const [day, month, year] = datePart.split('/').map((n) => Number(n));
         const [hh = 0, mm = 0, ss = 0] = (timePart || '').split(':').map((n) => Number(n));
-        const d = new Date(year, (month || 1) - 1, day || 1, hh || 0, mm || 0, ss || 0);
+        const d = new Date(year, month - 1, day, hh, mm, ss);
         return isNaN(d.getTime()) ? null : d;
       }
-      if (/^\d{2}-\d{2}-\d{4}/.test(s)) {
+      // DD-MM-YYYY [HH:MM[:SS]]
+      if (/^\d{1,2}-\d{1,2}-\d{4}/.test(s)) {
         const [datePart, timePart] = s.split(' ');
         const [day, month, year] = datePart.split('-').map((n) => Number(n));
         const [hh = 0, mm = 0, ss = 0] = (timePart || '').split(':').map((n) => Number(n));
-        const d = new Date(year, (month || 1) - 1, day || 1, hh || 0, mm || 0, ss || 0);
+        const d = new Date(year, month - 1, day, hh, mm, ss);
         return isNaN(d.getTime()) ? null : d;
       }
-    if (/^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}/.test(s)) {
-      const [datePart, timePart] = s.split(' ');
-      const [year, month, day] = datePart.split('-').map((n) => Number(n));
-      const [hh = 0, mm = 0, ss = 0] = timePart.split(':').map((n) => Number(n));
-      const d = new Date(year, (month || 1) - 1, day || 1, hh || 0, mm || 0, ss || 0);
-      return isNaN(d.getTime()) ? null : d;
-    }
+      // YYYY-MM-DD HH:MM[:SS]
+      if (/^\d{4}-\d{2}-\d{2}\s+\d{1,2}:\d{1,2}/.test(s)) {
+        const [datePart, timePart] = s.split(' ');
+        const [year, month, day] = datePart.split('-').map((n) => Number(n));
+        const [hh = 0, mm = 0, ss = 0] = (timePart || '').split(':').map((n) => Number(n));
+        const d = new Date(year, month - 1, day, hh, mm, ss);
+        return isNaN(d.getTime()) ? null : d;
+      }
+      // YYYY/MM/DD [HH:MM[:SS]]
       if (/^\d{4}\/\d{2}\/\d{2}/.test(s)) {
         const [datePart, timePart] = s.split(' ');
         const [year, month, day] = datePart.split('/').map((n) => Number(n));
         const [hh = 0, mm = 0, ss = 0] = (timePart || '').split(':').map((n) => Number(n));
-        const d = new Date(year, (month || 1) - 1, day || 1, hh || 0, mm || 0, ss || 0);
+        const d = new Date(year, month - 1, day, hh, mm, ss);
         return isNaN(d.getTime()) ? null : d;
       }
-    if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
-        const d = new Date(s);
+      // YYYY-MM-DD
+      if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+        const d = new Date(s + 'T00:00:00');
         return isNaN(d.getTime()) ? null : d;
       }
+      // Última tentativa com Date
       const d = new Date(s);
       return isNaN(d.getTime()) ? null : d;
     };
     const getRef = (p: any) => {
-      if (tipoData === 'entrega') {
-        return (
-          parseDate(p.DATA_ENTREGA) ||
-          parseDate(p.data_entrega) ||
-          null
-        );
-      }
+      try {
+        if (tipoData === 'entrega') {
+          return (
+            parseDate(p.DATA_ENTREGA) ||
+            parseDate(p.data_entrega)
+          );
+        }
 
-      // padrão = recebimento
-      return (
-        parseDate(p.DATA_HORA_RECEBIMENTO) ||
-        parseDate(p.data_hora_recebimento) ||
-        parseDate(p.DATA_RECEBIMENTO) ||
-        parseDate(p.data_recebimento) ||
-        null
-      );
+        // padrão = recebimento
+        return (
+          parseDate(p.DATA_HORA_RECEBIMENTO) ||
+          parseDate(p.data_hora_recebimento) ||
+          parseDate(p.DATA_RECEBIMENTO) ||
+          parseDate(p.data_recebimento)
+        );
+      } catch (error) {
+        console.error('[API Pedidos Externos] Erro ao parsear data:', error, p);
+        return null;
+      }
     };
 
     const EMPRESA_ID_ALVO = 1;
@@ -187,18 +228,19 @@ export default async function handler(
     };
 
     const normalizePedido = (p: any) => {
-      const cliente = p?.CLIENTE ?? p?.cliente ?? null;
-      const numeroNota = pickString(
-        p.NUMERO_NOTA,
-        p.NUMERO_NOTA_FISCAL,
-        p.NOTA_FISCAL_NUMERO,
-        p.NOTAFISCAL_NUMERO,
-        p.NF_NUMERO,
-        p.NF,
-        p.NUMERO_NF,
-        p.NUMERO,
-        p.NOTA_FISCAL
-      );
+      try {
+        const cliente = p?.CLIENTE ?? p?.cliente ?? null;
+        const numeroNota = pickString(
+          p.NUMERO_NOTA,
+          p.NUMERO_NOTA_FISCAL,
+          p.NOTA_FISCAL_NUMERO,
+          p.NOTAFISCAL_NUMERO,
+          p.NF_NUMERO,
+          p.NF,
+          p.NUMERO_NF,
+          p.NUMERO,
+          p.NOTA_FISCAL
+        );
       const cnpjCpf = pickString(
         p.CNPJ_CPF,
         p.CNPJCPF,
@@ -235,6 +277,7 @@ export default async function handler(
         cliente?.BAIRRO,
         cliente?.bairro
       );
+
       const nomeCidade = pickString(
         p.NOME_CIDADE,
         p.nome_cidade,
@@ -245,6 +288,7 @@ export default async function handler(
         cliente?.CIDADE,
         cliente?.cidade
       );
+
       const estadoDestino = pickString(
         p.ESTADO_DESTINO,
         p.estado_destino,
@@ -255,8 +299,11 @@ export default async function handler(
         cliente?.ESTADO,
         cliente?.estado,
         cliente?.UF,
-        cliente?.uf
+        cliente?.uf,
+        p.ESTADO_NOTA_ID
       );
+
+
       const logradouroEntrega = pickString(
         p.LOGRADOURO_ENTREGA,
         p.LOGRADOURO,
@@ -264,9 +311,12 @@ export default async function handler(
         p.ENDERECO,
         p.ENDERECO_ENTREGA,
         p.ENDERECO_COMPLETO,
+        p.logradouro,
         cliente?.ENDERECO,
-        cliente?.endereco
+        cliente?.endereco,
+        cliente?.logradouro
       );
+
       const complementoEntrega = pickString(
         p.COMPLEMENTO_ENTREGA,
         p.COMPLEMENTO,
@@ -280,6 +330,12 @@ export default async function handler(
         cliente?.CEP,
         cliente?.cep
       );
+
+      // Log para debug interno no servidor se necessário
+      if (p.NUMERO_NOTA === '186911' || !nomeCidade) {
+        console.log(`[API Debug] Nota ${p.NUMERO_NOTA}: Bairro=${nomeBairroNota}, Cidade=${nomeCidade}, Estado=${estadoDestino}`);
+      }
+
       return {
         ...p,
         NUMERO_NOTA: numeroNota ?? p.NUMERO_NOTA ?? null,
@@ -290,8 +346,17 @@ export default async function handler(
         ESTADO_DESTINO: estadoDestino ?? p.ESTADO_DESTINO ?? null,
         LOGRADOURO_ENTREGA: logradouroEntrega ?? p.LOGRADOURO_ENTREGA ?? null,
         COMPLEMENTO_ENTREGA: complementoEntrega ?? p.COMPLEMENTO_ENTREGA ?? null,
-        CEP: cep ?? p.CEP ?? p.CEP_ENTREGA ?? p.CEP_CONS_FINAL ?? null
+        CEP: cep ?? p.CEP ?? p.CEP_ENTREGA ?? p.CEP_CONS_FINAL ?? null,
+        _DEBUG_RAW: {
+          b: p.NOME_BAIRRO_NOTA || p.BAIRRO || '(vazio)',
+          c: p.NOME_CIDADE || p.CIDADE || '(vazio)',
+          e: p.ESTADO_DESTINO || p.UF || '(vazio)'
+        }
       };
+      } catch (error) {
+        console.error('[API Pedidos Externos] Erro no normalizePedido:', error);
+        return p; // Retorna o pedido original em caso de erro
+      }
     };
 
     const getApuracaoId = (a: any) => {
@@ -419,32 +484,25 @@ export default async function handler(
         // Se houver filtro de data (inicio ou fim), aplicamos rigorosamente
         if (inicio || fim) {
           if (!ref) return false;
-          
+
           if (inicio && ref < inicio) return false;
           if (fim && ref > fim) return false;
         }
 
-        if (tiposEntrega && tiposEntrega.length > 0) {
-          const te = String(p.TIPO_ENTREGA || '').toUpperCase();
-          const isEntrega = tiposEntrega.includes(te);
-          if (!isEntrega) return false;
+        // Aplicar filtro de tipo_entrega manualmente se existir
+        if (tipo_entrega && typeof tipo_entrega === 'string') {
+          const tiposPermitidos = tipo_entrega.split(',').map(t => t.trim().toUpperCase());
+          const tipoDoPedido = String(p.TIPO_ENTREGA || '').toUpperCase();
+          if (!tiposPermitidos.includes(tipoDoPedido)) {
+            return false;
+          }
         }
-        if (statusFechado) {
-          const fechado = String(p.PEDIDO_FECHADO || '').toUpperCase() === 'S';
-          const cancelado = String(p.CANCELADO || '').toUpperCase() === 'S';
-          if (statusFechado === 'FECHADO' && (!fechado || cancelado)) return false;
+
+        // Aplicar filtro de status manualmente se existir
+        if (status === 'FECHADO' && String(p.PEDIDO_FECHADO).toUpperCase() !== 'S') {
+          return false;
         }
-        if (searchTerm) {
-          const campos = [
-            p.CLIENTE_NOME,
-            p.NOME_FANTASIA,
-            p.VENDEDOR_NOME,
-            p.NUMERO_NOTA || '',
-            p.IDENTIFICACAO_NFE || '',
-            String(p.ORCAMENTO_ID || '')
-          ].map((x: any) => String(x || '').toLowerCase());
-          if (!campos.some((c: string) => c.includes(searchTerm))) return false;
-        }
+
         return true;
       });
 
@@ -471,8 +529,6 @@ export default async function handler(
         return res.status(200).json({ total: 0, totalValor: 0 });
       }
 
-      // IMPORTANTE: Para o card mostrar o valor correto do dia/período, 
-      // precisamos aplicar o filtro local de empresa e qualquer outro filtro de negócio
       const data = (resultado.data || []).map(normalizePedido);
       const filtered = applyFilters(data);
       
@@ -486,30 +542,88 @@ export default async function handler(
         return sum;
       }, 0);
 
+      console.log(`[API Pedidos Externos] Stats: ${filtered.length} pedidos filtrados de ${data.length} retornados`);
       return res.status(200).json({
-        total: filtered.length, // Usar o tamanho do array filtrado localmente
+        total: filtered.length,
         totalValor
       });
     }
 
-    const resultado = await apiExternaService.listarPedidos(
-      filtrosApi,
-      username,
-      password
-    );
-
-    if (!resultado || typeof resultado !== 'object' || !Array.isArray((resultado as any).data)) {
-      return res.status(500).json({ error: 'Resposta inválida da API externa' });
+    console.log('[API Pedidos Externos] Chamando listarPedidos com filtros:', filtrosApi);
+    let resultado;
+    try {
+      resultado = await apiExternaService.listarPedidos(
+        filtrosApi,
+        username,
+        password
+      );
+      console.log('[API Pedidos Externos] Resposta listarPedidos:', resultado ? 'OK' : 'NULL', resultado?.total, Array.isArray(resultado?.data) ? resultado.data.length : 'N/A');
+    } catch (apiError: any) {
+      console.error('[API Pedidos Externos] Erro na API externa:', {
+        message: apiError.message,
+        response: apiError.response ? {
+          status: apiError.response.status,
+          statusText: apiError.response.statusText,
+          data: apiError.response.data
+        } : 'Sem resposta',
+        config: apiError.config ? {
+          url: apiError.config.url,
+          method: apiError.config.method,
+          params: apiError.config.params
+        } : 'Sem configuração',
+        stack: apiError.stack
+      });
+      return res.status(500).json({ 
+        error: 'Erro na API externa', 
+        details: apiError.message,
+        status: apiError.response?.status,
+        data: apiError.response?.data
+      });
     }
 
+    console.log('[API Pedidos Externos] Resultado recebido, processando...');
+
+    if (!resultado || typeof resultado !== 'object' || !Array.isArray((resultado as any).data)) {
+      console.error('[API Pedidos Externos] Resposta inválida:', resultado);
+      return res.status(500).json({ error: 'Resposta inválida da API externa', resultado });
+    }
+
+    console.log('[API Pedidos Externos] Normalizando pedidos...');
     const baseData = (resultado.data || []).map(normalizePedido);
     const totalExterno = typeof resultado.total === 'number' ? resultado.total : null;
+    
+    console.log('[API Pedidos Externos] Aplicando filtros...');
+    console.log('[API Pedidos Externos] Dados recebidos da API externa:', {
+      totalExterno,
+      dataLength: resultado.data.length,
+      firstItem: resultado.data[0] ? Object.keys(resultado.data[0]).slice(0, 10) : 'Nenhum item'
+    });
+    
     filtrados = applyFilters(baseData);
 
-    const lim = filtrosApi.limit ?? 100;
+    console.log(`[API Pedidos Externos] Após filtros: ${filtrados.length} de ${baseData.length} itens passaram (total externo: ${totalExterno}, fetchLimit: ${fetchLimit}, safeLimit: ${safeLimit})`);
+    if (filtrados.length < baseData.length) {
+      console.log('[API Pedidos Externos] Itens removidos pelos filtros:', baseData.length - filtrados.length);
+    }
+
+    // Ordenar por data (mais antiga primeiro)
+    try {
+      filtrados.sort((a, b) => {
+        const refA = getRef(a);
+        const refB = getRef(b);
+        if (!refA && !refB) return 0;
+        if (!refA) return 1;
+        if (!refB) return -1;
+        return refA.getTime() - refB.getTime();
+      });
+    } catch (error) {
+      console.error('[API Pedidos Externos] Erro ao ordenar:', error);
+    }
+
+    const lim = safeLimit;
     const off = filtrosApi.offset ?? 0;
     let page = filtrados;
-    
+
     const pageNeedsEnrich = page.some((p: any) => {
       const numeroNota = pickString(p.NUMERO_NOTA, p.IDENTIFICACAO_NFE);
       const cep = pickString(p.CEP, p.CEP_ENTREGA, p.CEP_CONS_FINAL);
@@ -572,7 +686,7 @@ export default async function handler(
 
     const payload = {
       data: page,
-      total: totalExterno ?? page.length,
+      total: filtrados.length,
       limit: lim,
       offset: off
     };
@@ -581,11 +695,13 @@ export default async function handler(
 
   } catch (error: any) {
     console.error('[API Pedidos Externos] Erro interno:', error.message || error);
+    console.error('[API Pedidos Externos] Stack:', error.stack);
     
     return res.status(500).json({
       error: 'Erro interno ao processar requisição',
       message: error.message || 'Erro desconhecido',
-      details: error.response?.data || error.stack
+      details: error.response?.data || error.stack,
+      stack: error.stack
     });
   }
 }

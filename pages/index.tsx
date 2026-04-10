@@ -16,7 +16,8 @@ import {
   Search, 
   Tag, 
   ListChecks, 
-  BarChart2
+  BarChart2,
+  Map
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -90,13 +91,6 @@ function Home() {
 
   const menuCards = [
     {
-      title: 'Adicionar Notas',
-      description: 'Entrada de novas NFs',
-      icon: FilePlus,
-      href: '/adicionar-notas',
-      color: 'blue',
-    },
-    {
       title: 'Criar Controle',
       description: 'Novo controle de carga',
       icon: Plus,
@@ -144,6 +138,13 @@ function Home() {
       icon: BarChart2,
       href: '/relatorios',
       color: 'cyan',
+    },
+    {
+      title: 'Roteirização',
+      description: 'Otimização de entregas',
+      icon: Map,
+      href: '/roteirizacao',
+      color: 'indigo',
     },
   ];
 

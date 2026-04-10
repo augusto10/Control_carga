@@ -23,7 +23,10 @@ import {
   CheckCircle2,
   XCircle,
   AlertCircle,
-  ShoppingCart
+  ShoppingCart,
+  Navigation,
+  Share2,
+  ExternalLink
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { format, parse, parseISO, subDays } from 'date-fns';
@@ -38,6 +41,7 @@ import { SearchInput } from '@/components/ui/SearchInput';
 import { Modal } from '@/components/ui/Modal';
 import { StatCard } from '@/components/ui/StatCard';
 import { cn } from '@/utils/cn';
+import { CEPService } from '@/services/cep';
 import { Label } from '@/components/ui/Label';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
@@ -205,7 +209,7 @@ const getEnderecoResumo = (p: Pedido) => {
     cliente?.UF,
     cliente?.uf
   );
-  const cep = pickString(
+  let cep = pickString(
     (p as any).CEP,
     p.CEP_ENTREGA,
     p.CEP_CONS_FINAL,
@@ -213,6 +217,8 @@ const getEnderecoResumo = (p: Pedido) => {
     cliente?.CEP,
     cliente?.cep
   );
+  if (cep) cep = cep.replace(/\s+/g, '');
+
   const cidadeUf = [cidade, uf].filter(Boolean).join('/');
   return [logradouro, numero, complemento, bairro, cep, cidadeUf].filter(Boolean).join(', ');
 };
@@ -316,7 +322,7 @@ const getEnderecoCampos = (p: Pedido) => {
     cliente?.UF,
     cliente?.uf
   );
-  const cep = pickString(
+  let cep = pickString(
     (p as any).CEP,
     p.CEP_ENTREGA,
     p.CEP_CONS_FINAL,
@@ -324,6 +330,8 @@ const getEnderecoCampos = (p: Pedido) => {
     cliente?.CEP,
     cliente?.cep
   );
+  if (cep) cep = cep.replace(/\s+/g, '');
+
   return { logradouro, numero, complemento, bairro, cidade, uf, cep };
 };
 
@@ -481,10 +489,52 @@ export default function CicloPedidoPage() {
   const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({ show: false, message: '', type: 'success' });
   const [pedidoSelecionado, setPedidoSelecionado] = useState<Pedido | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [enriquecendoCep, setEnriquecendoCep] = useState(false);
 
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     setToast({ show: true, message, type });
     setTimeout(() => setToast(prev => ({ ...prev, show: false })), 3000);
+  };
+
+  // Enriquecer endereços via consulta CEP (ViaCEP)
+  const enriquecerViaCEP = async (lista: Pedido[]): Promise<Pedido[]> => {
+    const precisam = lista.filter(p => {
+      const campos = getEnderecoCampos(p);
+      return campos.cep && (!campos.cidade || !campos.uf);
+    });
+    if (precisam.length === 0) return lista;
+
+    setEnriquecendoCep(true);
+    const resultados = [...lista];
+    let count = 0;
+    for (const p of precisam) {
+      const campos = getEnderecoCampos(p);
+      if (!campos.cep) continue;
+      try {
+        const cepData = await CEPService.buscarCEP(campos.cep);
+        if (cepData) {
+          const idx = resultados.findIndex(x => x.ORCAMENTO_ID === p.ORCAMENTO_ID);
+          if (idx >= 0) {
+            const pAny = resultados[idx] as any;
+            if (!pAny.NOME_CIDADE && cepData.localidade) pAny.NOME_CIDADE = cepData.localidade;
+            if (!pAny.ESTADO_DESTINO && cepData.uf) pAny.ESTADO_DESTINO = cepData.uf;
+            if (!pAny.NOME_BAIRRO_NOTA && cepData.bairro) pAny.NOME_BAIRRO_NOTA = cepData.bairro;
+            if (!pAny.LOGRADOURO_ENTREGA && cepData.logradouro) pAny.LOGRADOURO_ENTREGA = cepData.logradouro;
+            pAny._cepEnriquecido = true;
+            pAny._cepData = cepData;
+            count++;
+          }
+        }
+      } catch (err) {
+        console.error('[CEP Enrich] Erro ao buscar CEP:', campos.cep, err);
+      }
+      await new Promise(r => setTimeout(r, 150));
+    }
+    setEnriquecendoCep(false);
+    if (count > 0) {
+      console.log(`[CEP Enrich] ${count} pedidos enriquecidos via CEP`);
+    }
+    return resultados;
   };
 
   const showCnpjColumn = useMemo(() => pedidos.some((p) => Boolean(getCnpjPedido(p))), [pedidos]);
@@ -745,9 +795,9 @@ export default function CicloPedidoPage() {
       params.set('tipo_data', tipoData);
 
       if (filtroEntrega === 'entrega') {
-        params.set('tipo_entrega', 'EPG,ENT');
+        params.set('tipo_entrega', 'EPG');
       } else if (filtroEntrega === 'entrega_fechados') {
-        params.set('tipo_entrega', 'EPG,ENT');
+        params.set('tipo_entrega', 'EPG');
         params.set('status', 'FECHADO');
       } else if (filtroEntrega === 'nao_entrega') {
         params.set('tipo_entrega', 'NDF,ATO');
@@ -780,9 +830,9 @@ export default function CicloPedidoPage() {
       }
 
       if (filtroEntrega === 'entrega') {
-        url += '&tipo_entrega=EPG,ENT';
+        url += '&tipo_entrega=EPG';
       } else if (filtroEntrega === 'entrega_fechados') {
-        url += '&tipo_entrega=EPG,ENT&status=FECHADO';
+        url += '&tipo_entrega=EPG&status=FECHADO';
       } else if (filtroEntrega === 'nao_entrega') {
         url += '&tipo_entrega=NDF,ATO';
       }
@@ -836,6 +886,18 @@ export default function CicloPedidoPage() {
         valorHoje: valorTotal,
       }));
 
+      // Enriquecer via CEP em background
+      void (async () => {
+        try {
+          const comCep = await enriquecerViaCEP(base);
+          if (reqId === pedidosRequestId.current) {
+            setPedidos([...comCep]);
+          }
+        } catch (err) {
+          console.error('[CEP Enrich] Erro:', err);
+        }
+      })();
+
       const statsId = ++statsRequestId.current;
       void (async () => {
         try {
@@ -845,9 +907,9 @@ export default function CicloPedidoPage() {
           if (periodo.inicio) statsUrl.searchParams.set('data_inicio', periodo.inicio);
           if (periodo.fim) statsUrl.searchParams.set('data_fim', periodo.fim);
           if (filtroEntrega === 'entrega') {
-            statsUrl.searchParams.set('tipo_entrega', 'EPG,ENT');
+            statsUrl.searchParams.set('tipo_entrega', 'EPG');
           } else if (filtroEntrega === 'entrega_fechados') {
-            statsUrl.searchParams.set('tipo_entrega', 'EPG,ENT');
+            statsUrl.searchParams.set('tipo_entrega', 'EPG');
             statsUrl.searchParams.set('status', 'FECHADO');
           } else if (filtroEntrega === 'nao_entrega') {
             statsUrl.searchParams.set('tipo_entrega', 'NDF,ATO');
@@ -942,7 +1004,10 @@ export default function CicloPedidoPage() {
             });
 
             if (reqId !== pedidosRequestId.current) return;
-            const ordenados = enriquecidos.slice().sort((a, b) => {
+            // Enriquecer via CEP após apurações
+            const comCep = await enriquecerViaCEP(enriquecidos);
+            if (reqId !== pedidosRequestId.current) return;
+            const ordenados = comCep.slice().sort((a, b) => {
               const da = getDataReferenciaPedido(a, tipoData)?.getTime() ?? 0;
               const db = getDataReferenciaPedido(b, tipoData)?.getTime() ?? 0;
               return da - db;
@@ -1352,20 +1417,30 @@ export default function CicloPedidoPage() {
                       </td>
                       {showBairroColumn && (
                         <td className="px-6 py-4 hidden xl:table-cell">
-                          <span className="text-textMain">
-                            {enderecoCampos.bairro || '---'}
-                          </span>
+                          <div className="flex items-center gap-1">
+                            <span className="text-textMain">
+                              {enderecoCampos.bairro || '---'}
+                            </span>
+                            {(p as any)._cepEnriquecido && (
+                              <span className="text-[8px] bg-sky-100 text-sky-600 px-1 py-0.5 rounded font-bold">CEP</span>
+                            )}
+                          </div>
                         </td>
                       )}
                       {showCidadeColumn && (
                         <td className="px-6 py-4 hidden xl:table-cell">
-                          <span className="text-textMain">
-                            {cidadeUf || '---'}
-                          </span>
+                          <div className="flex items-center gap-1">
+                            <span className="text-textMain">
+                              {cidadeUf || '---'}
+                            </span>
+                            {(p as any)._cepEnriquecido && (
+                              <span className="text-[8px] bg-sky-100 text-sky-600 px-1 py-0.5 rounded font-bold">CEP</span>
+                            )}
+                          </div>
                         </td>
                       )}
                       <td className="px-6 py-4 hidden xl:table-cell">
-                        <span className="text-textMain text-xs leading-tight">
+                        <span className="text-textMain text-xs leading-tight whitespace-nowrap">
                           {enderecoCampos.cep || '---'}
                         </span>
                       </td>
@@ -1540,14 +1615,64 @@ export default function CicloPedidoPage() {
                       <Badge variant="warning">Aberto</Badge>
                     )}
                   </div>
-                  <div className="col-span-2">
-                    <p className="text-[10px] text-textMuted uppercase font-bold">Endereço de Entrega</p>
-                    <p className="text-sm font-medium flex items-center gap-1">
-                      <MapPin className="w-3 h-3 text-textMuted" />
-                      {getEnderecoResumo(pedidoSelecionado) || 'Não informado'}
-                    </p>
-                  </div>
                 </div>
+              </div>
+
+              {/* Endereço de Entrega Detalhado */}
+              <div className="col-span-2 space-y-3">
+                <h4 className="text-sm font-bold text-textMain uppercase tracking-wider border-b border-slate-100 pb-2 flex items-center gap-2">
+                  <MapPin className="w-4 h-4" />
+                  Endereço de Entrega
+                  {(pedidoSelecionado as any)._cepEnriquecido && (
+                    <span className="text-[9px] bg-sky-100 text-sky-600 px-1.5 py-0.5 rounded-full font-bold normal-case tracking-normal">Enriquecido via CEP</span>
+                  )}
+                </h4>
+                {(() => {
+                  const ec = getEnderecoCampos(pedidoSelecionado);
+                  const cepData = (pedidoSelecionado as any)._cepData;
+                  return (
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4 p-4 bg-slate-50/80 rounded-xl border border-slate-100">
+                      <div className="col-span-2">
+                        <p className="text-[10px] text-textMuted uppercase font-bold">Logradouro</p>
+                        <p className="text-sm font-medium">{ec.logradouro || 'Não informado'}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-textMuted uppercase font-bold">Número</p>
+                        <p className="text-sm font-medium">{ec.numero || '---'}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-textMuted uppercase font-bold">Complemento</p>
+                        <p className="text-sm font-medium">{ec.complemento || '---'}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-textMuted uppercase font-bold">Bairro</p>
+                        <p className="text-sm font-medium">{ec.bairro || '---'}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-textMuted uppercase font-bold">CEP</p>
+                        <p className="text-sm font-medium">{ec.cep || '---'}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-textMuted uppercase font-bold">Cidade</p>
+                        <p className="text-sm font-medium flex items-center gap-1">
+                          {ec.cidade || cepData?.localidade || '---'}
+                          {cepData?.localidade && !ec.cidade && (
+                            <span className="text-[8px] bg-sky-100 text-sky-600 px-1 py-0.5 rounded font-bold">CEP</span>
+                          )}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-textMuted uppercase font-bold">Estado</p>
+                        <p className="text-sm font-medium flex items-center gap-1">
+                          {ec.uf || cepData?.uf || '---'}
+                          {cepData?.uf && !ec.uf && (
+                            <span className="text-[8px] bg-sky-100 text-sky-600 px-1 py-0.5 rounded font-bold">CEP</span>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
 

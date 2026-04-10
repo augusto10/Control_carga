@@ -18,7 +18,8 @@ import {
   User,
   ClipboardList,
   AlertTriangle,
-  History
+  History,
+  Map
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { clsx, type ClassValue } from 'clsx';
@@ -59,13 +60,14 @@ export function AppLayout({
       icon: ShoppingCart, 
       children: [
         { name: 'Pedidos Entregas', href: '/admin/pedidos' },
+        { name: 'Kanban de Pedidos', href: '/kanban-pedidos' },
+        { name: 'Logística SSW Accert', href: '/ssw-accert' },
       ]
     },
-    { 
-      name: 'Gestão de Notas', 
+    {
+      name: 'Gestão de Notas',
       icon: FileText,
       children: [
-        { name: 'Adicionar Notas', href: '/adicionar-notas' },
         { name: 'Consultar Notas', href: '/consultar-notas' },
       ]
     },
@@ -77,6 +79,8 @@ export function AppLayout({
         { name: 'Listar Controles', href: '/controles' },
       ]
     },
+    { name: 'Roteirização', icon: Map, href: '/roteirizacao' },
+
     { 
       name: 'Checklist Recebimento', 
       icon: History,
