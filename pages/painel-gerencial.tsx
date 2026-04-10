@@ -10,8 +10,6 @@ import {
   Tab,
   Chip,
   Button,
-  useTheme,
-  useMediaQuery,
   Avatar,
   List,
   ListItem,
@@ -21,9 +19,8 @@ import {
   Alert,
   Container,
   Stack,
-  alpha,
   Paper,
-  Tooltip
+  useMediaQuery
 } from '@mui/material';
 import {
   TrendingUp as TrendingUpIcon,
@@ -39,11 +36,8 @@ import {
 } from '@mui/icons-material';
 import { AppLayout } from '../components/layout/AppLayout';
 import ProtectedRoute from '../components/ProtectedRoute';
-import { motion, AnimatePresence } from 'framer-motion';
 
-const MotionBox = motion.create(Box);
-const MotionPaper = motion.create(Paper);
-const MotionCard = motion.create(Card);
+
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -62,19 +56,11 @@ function TabPanel(props: TabPanelProps) {
       aria-labelledby={`simple-tab-${index}`}
       {...other}
     >
-      <AnimatePresence mode="wait">
-        {value === index && (
-          <MotionBox
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.3 }}
-            sx={{ py: 4 }}
-          >
-            {children}
-          </MotionBox>
-        )}
-      </AnimatePresence>
+      {value === index && (
+        <Box sx={{ py: 4 }}>
+          {children}
+        </Box>
+      )}
     </div>
   );
 }
@@ -88,8 +74,7 @@ function a11yProps(index: number) {
 
 const PainelGerencial: React.FC = () => {
   const { user } = useAuth();
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const isMobile = useMediaQuery('(max-width:900px)');
   const [tabValue, setTabValue] = useState(0);
   const [loading, setLoading] = useState(true);
 
@@ -140,11 +125,7 @@ const PainelGerencial: React.FC = () => {
     return (
       
         <Container maxWidth="md" sx={{ mt: 8 }}>
-          <MotionPaper
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            sx={{ p: 4, textAlign: 'center', borderRadius: 4 }}
-          >
+          <Paper sx={{ p: 4, textAlign: 'center', borderRadius: 2 }}>
             <WarningIcon sx={{ fontSize: 64, color: 'error.main', mb: 2 }} />
             <Typography variant="h5" fontWeight="bold" gutterBottom>
               Acesso Restrito
@@ -155,53 +136,37 @@ const PainelGerencial: React.FC = () => {
             <Button variant="contained" href="/" sx={{ borderRadius: 2 }}>
               Voltar ao Início
             </Button>
-          </MotionPaper>
+            </Paper>
         </Container>
       
     );
   }
 
-  const StatCard = ({ title, value, icon, color, delay }: any) => (
-    <MotionCard
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay, duration: 0.5 }}
-      whileHover={{ y: -5 }}
-      sx={{
-        height: '100%',
-        borderRadius: 4,
-        background: 'rgba(255, 255, 255, 0.8)',
-        backdropFilter: 'blur(10px)',
-        border: '1px solid rgba(255, 255, 255, 0.3)',
-        boxShadow: '0 8px 32px rgba(0,0,0,0.05)',
-        position: 'relative',
-        overflow: 'hidden'
-      }}
-    >
-      <Box sx={{ position: 'absolute', top: 0, left: 0, width: 4, height: '100%', bgcolor: `${color}.main` }} />
-      <CardContent sx={{ p: 3 }}>
-        <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
-          <Typography variant="overline" color="text.secondary" fontWeight="700" sx={{ letterSpacing: 1 }}>
-            {title}
-          </Typography>
-          <Avatar sx={{ bgcolor: alpha(theme.palette[color].main, 0.1), color: `${color}.main`, borderRadius: 2 }}>
-            {icon}
-          </Avatar>
-        </Stack>
-        <Typography variant="h3" fontWeight="800" color="#1e293b">
-          {loading ? '...' : value}
+const StatCard = ({ title, value, icon, color }: any) => (
+  <Card sx={{ height: '100%', borderRadius: 2 }}>
+    <CardContent sx={{ p: 3 }}>
+      <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
+        <Typography variant="overline" color="text.secondary" fontWeight="700" sx={{ letterSpacing: 1 }}>
+          {title}
         </Typography>
-        {!loading && (
-          <Stack direction="row" spacing={0.5} alignItems="center" mt={1}>
-            <TrendingUpIcon sx={{ fontSize: 16, color: 'success.main' }} />
-            <Typography variant="caption" color="success.main" fontWeight="600">
-              Atualizado agora
-            </Typography>
-          </Stack>
-        )}
-      </CardContent>
-    </MotionCard>
-  );
+        <Avatar sx={{ bgcolor: `${color}.main`, color: 'white', borderRadius: 2 }}>
+          {icon}
+        </Avatar>
+      </Stack>
+      <Typography variant="h3" fontWeight="800" color="text.primary">
+        {loading ? '...' : value}
+      </Typography>
+      {!loading && (
+        <Stack direction="row" spacing={0.5} alignItems="center" mt={1}>
+          <TrendingUpIcon sx={{ fontSize: 16, color: 'success.main' }} />
+          <Typography variant="caption" color="success.main" fontWeight="600">
+            Atualizado agora
+          </Typography>
+        </Stack>
+      )}
+    </CardContent>
+  </Card>
+);
 
   return (
     <ProtectedRoute>
@@ -218,7 +183,7 @@ const PainelGerencial: React.FC = () => {
             startIcon={<RefreshIcon />}
             onClick={loadDashboardData}
             disabled={loading}
-            sx={{ borderRadius: 3, textTransform: 'none', fontWeight: 'bold' }}
+            sx={{ textTransform: 'none', fontWeight: 'bold' }}
           >
             {loading ? 'Atualizando...' : 'Atualizar Dados'}
           </Button>
@@ -226,26 +191,13 @@ const PainelGerencial: React.FC = () => {
       >
         <Container maxWidth="xl" sx={{ p: 0 }}>
         {/* Tabs Section */}
-        <MotionPaper
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          sx={{
-            borderRadius: 4,
-            mb: 4,
-            background: 'rgba(255, 255, 255, 0.8)',
-            backdropFilter: 'blur(10px)',
-            border: '1px solid rgba(255, 255, 255, 0.3)',
-            boxShadow: '0 8px 32px rgba(0,0,0,0.05)',
-            overflow: 'hidden'
-          }}
-        >
-          <Tabs 
-            value={tabValue} 
-            onChange={handleTabChange} 
+        <Paper sx={{ mb: 4, borderRadius: 2 }}>
+          <Tabs
+            value={tabValue}
+            onChange={handleTabChange}
             variant={isMobile ? "scrollable" : "fullWidth"}
             scrollButtons="auto"
             sx={{
-              '& .MuiTabs-indicator': { height: 3, borderRadius: '3px 3px 0 0' },
               '& .MuiTab-root': { py: 2.5, fontWeight: '700', fontSize: '0.9rem', textTransform: 'none' }
             }}
           >
@@ -254,84 +206,60 @@ const PainelGerencial: React.FC = () => {
             <Tab label="Relatórios" icon={<DescriptionIcon />} iconPosition="start" {...a11yProps(2)} />
             <Tab label="Configurações" icon={<SettingsIcon />} iconPosition="start" {...a11yProps(3)} />
           </Tabs>
-        </MotionPaper>
+        </Paper>
 
         <TabPanel value={tabValue} index={0}>
           <Grid container spacing={3}>
             <Grid item xs={12} sm={6} md={3}>
-              <StatCard 
-                title="Controles Finalizados" 
-                value={dashboardData.controlesFinalizados} 
-                icon={<CheckCircleIcon />} 
-                color="success" 
-                delay={0.1}
+              <StatCard
+                title="Controles Finalizados"
+                value={dashboardData.controlesFinalizados}
+                icon={<CheckCircleIcon />}
+                color="success"
               />
             </Grid>
             <Grid item xs={12} sm={6} md={3}>
-              <StatCard 
-                title="Controles Pendentes" 
-                value={dashboardData.controlesPendentes} 
-                icon={<WarningIcon />} 
-                color="warning" 
-                delay={0.2}
+              <StatCard
+                title="Controles Pendentes"
+                value={dashboardData.controlesPendentes}
+                icon={<WarningIcon />}
+                color="warning"
               />
             </Grid>
             <Grid item xs={12} sm={6} md={3}>
-              <StatCard 
-                title="Total de Usuários" 
-                value={dashboardData.totalUsuarios} 
-                icon={<PersonIcon />} 
-                color="primary" 
-                delay={0.3}
+              <StatCard
+                title="Total de Usuários"
+                value={dashboardData.totalUsuarios}
+                icon={<PersonIcon />}
+                color="primary"
               />
             </Grid>
             <Grid item xs={12} sm={6} md={3}>
-              <StatCard 
-                title="Etiquetas Geradas" 
-                value={dashboardData.etiquetasGeradas} 
-                icon={<AssignmentIcon />} 
-                color="info" 
-                delay={0.4}
+              <StatCard
+                title="Etiquetas Geradas"
+                value={dashboardData.etiquetasGeradas}
+                icon={<AssignmentIcon />}
+                color="info"
               />
             </Grid>
 
             {/* Additional Charts or Info could go here */}
             <Grid item xs={12}>
-              <MotionPaper
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.5 }}
-                sx={{
-                  p: 4,
-                  borderRadius: 4,
-                  textAlign: 'center',
-                  background: alpha(theme.palette.primary.main, 0.02),
-                  border: `1px dashed ${alpha(theme.palette.primary.main, 0.2)}`
-                }}
-              >
-                <Typography variant="h6" color="primary.main" fontWeight="bold">
+              <Paper sx={{ p: 4, borderRadius: 2, textAlign: 'center' }}>
+                <Typography variant="h6" fontWeight="bold">
                   Métricas de Produtividade
                 </Typography>
                 <Typography color="text.secondary" sx={{ mt: 1 }}>
                   Gráficos detalhados de desempenho por período serão exibidos nesta seção em breve.
                 </Typography>
-              </MotionPaper>
+              </Paper>
             </Grid>
           </Grid>
         </TabPanel>
 
         <TabPanel value={tabValue} index={1}>
-          <MotionPaper
-            sx={{
-              borderRadius: 4,
-              overflow: 'hidden',
-              background: 'rgba(255, 255, 255, 0.8)',
-              backdropFilter: 'blur(10px)',
-              border: '1px solid rgba(255, 255, 255, 0.3)',
-              boxShadow: '0 8px 32px rgba(0,0,0,0.05)'
-            }}
-          >
-            <Box p={3} bgcolor={alpha(theme.palette.primary.main, 0.03)} borderBottom={`1px solid ${alpha(theme.palette.divider, 0.5)}`}>
+          <Paper sx={{ borderRadius: 2 }}>
+            <Box p={3} borderBottom={1} borderColor="divider">
               <Typography variant="h6" fontWeight="bold">Fluxo de Atividades</Typography>
             </Box>
             <List disablePadding>
@@ -344,17 +272,11 @@ const PainelGerencial: React.FC = () => {
                   <Typography color="text.secondary">Nenhuma atividade recente encontrada.</Typography>
                 </Box>
               ) : (
-                <AnimatePresence>
-                  {recentActivity.map((activity, index) => (
-                  <motion.div
-                    key={activity.id}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: index * 0.1 }}
-                  >
-                    <ListItem sx={{ py: 2.5, px: 3, '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.02) } }}>
+                recentActivity.map((activity, index) => (
+                  <div key={activity.id}>
+                    <ListItem sx={{ py: 2.5, px: 3 }}>
                       <ListItemAvatar>
-                        <Avatar sx={{ bgcolor: alpha(theme.palette[activity.type === 'success' ? 'success' : 'info'].main, 0.1), color: `${activity.type === 'success' ? 'success' : 'info'}.main` }}>
+                        <Avatar sx={{ bgcolor: `${activity.type === 'success' ? 'success' : 'info'}.main`, color: 'white' }}>
                           <PersonIcon />
                         </Avatar>
                       </ListItemAvatar>
@@ -362,43 +284,32 @@ const PainelGerencial: React.FC = () => {
                         primary={<Typography fontWeight="700">{activity.action}</Typography>}
                         secondary={<Typography variant="caption" color="text.secondary">{activity.user} • {activity.time}</Typography>}
                       />
-                      <Chip 
-                        label={activity.type === 'success' ? 'Concluído' : 'Processando'} 
+                      <Chip
+                        label={activity.type === 'success' ? 'Concluído' : 'Processando'}
                         color={activity.type === 'success' ? 'success' : 'info'}
                         size="small"
-                        sx={{ fontWeight: 'bold', borderRadius: 1.5 }}
+                        sx={{ fontWeight: 'bold' }}
                       />
                     </ListItem>
-                    {index < recentActivity.length - 1 && <Divider sx={{ opacity: 0.5 }} />}
-                  </motion.div>
-                  ))}
-                </AnimatePresence>
+                    {index < recentActivity.length - 1 && <Divider />}
+                  </div>
+                ))
               )}
             </List>
-          </MotionPaper>
+          </Paper>
         </TabPanel>
 
         <TabPanel value={tabValue} index={2}>
           <Grid container spacing={3}>
             <Grid item xs={12} md={6}>
-              <MotionPaper
-                sx={{
-                  p: 3,
-                  borderRadius: 4,
-                  height: '100%',
-                  background: 'rgba(255, 255, 255, 0.8)',
-                  backdropFilter: 'blur(10px)',
-                  border: '1px solid rgba(255, 255, 255, 0.3)',
-                  boxShadow: '0 8px 32px rgba(0,0,0,0.05)'
-                }}
-              >
+              <Paper sx={{ p: 3, borderRadius: 2, height: '100%' }}>
                 <Typography variant="h6" fontWeight="bold" gutterBottom>Exportação de Dados</Typography>
                 <Stack spacing={2} mt={2}>
                   <Button
                     variant="outlined"
                     startIcon={<DownloadIcon />}
                     fullWidth
-                    sx={{ py: 1.5, borderRadius: 3, justifyContent: 'flex-start', px: 3 }}
+                    sx={{ justifyContent: 'flex-start', px: 3 }}
                   >
                     Relatório de Controles (PDF/Excel)
                   </Button>
@@ -406,7 +317,7 @@ const PainelGerencial: React.FC = () => {
                     variant="outlined"
                     startIcon={<DownloadIcon />}
                     fullWidth
-                    sx={{ py: 1.5, borderRadius: 3, justifyContent: 'flex-start', px: 3 }}
+                    sx={{ justifyContent: 'flex-start', px: 3 }}
                   >
                     Relatório de Usuários (CSV)
                   </Button>
@@ -414,67 +325,31 @@ const PainelGerencial: React.FC = () => {
                     variant="outlined"
                     startIcon={<DownloadIcon />}
                     fullWidth
-                    sx={{ py: 1.5, borderRadius: 3, justifyContent: 'flex-start', px: 3 }}
+                    sx={{ justifyContent: 'flex-start', px: 3 }}
                   >
                     Logs de Acesso do Sistema
                   </Button>
                 </Stack>
-              </MotionPaper>
+              </Paper>
             </Grid>
 
             <Grid item xs={12} md={6}>
-              <MotionPaper
-                sx={{
-                  p: 3,
-                  borderRadius: 4,
-                  height: '100%',
-                  background: 'rgba(255, 255, 255, 0.8)',
-                  backdropFilter: 'blur(10px)',
-                  border: '1px solid rgba(255, 255, 255, 0.3)',
-                  boxShadow: '0 8px 32px rgba(0,0,0,0.05)'
-                }}
-              >
+              <Paper sx={{ p: 3, borderRadius: 2, height: '100%' }}>
                 <Typography variant="h6" fontWeight="bold" gutterBottom>Resumo Mensal</Typography>
-                <Alert 
-                  severity="info" 
-                  variant="standard"
-                  sx={{ 
-                    borderRadius: '16px',
-                    backdropFilter: 'blur(12px)',
-                    backgroundColor: alpha(theme.palette.info.main, 0.15),
-                    color: theme.palette.info.dark,
-                    border: `1px solid ${alpha(theme.palette.info.main, 0.3)}`,
-                    '& .MuiAlert-icon': {
-                      color: theme.palette.info.main,
-                    },
-                    boxShadow: `0 8px 32px 0 ${alpha(theme.palette.common.black, 0.1)}`,
-                    fontWeight: 600,
-                    mb: 3
-                  }}
-                >
+                <Alert severity="info" sx={{ mb: 3 }}>
                   Consolidação automática de dados ativa.
                 </Alert>
                 <Typography variant="body2" color="text.secondary">
                   O sistema gera automaticamente resumos estatísticos ao final de cada mês para auxiliar na tomada de decisão.
                 </Typography>
-              </MotionPaper>
+              </Paper>
             </Grid>
           </Grid>
         </TabPanel>
 
         <TabPanel value={tabValue} index={3}>
-          <MotionPaper
-            sx={{
-              p: 4,
-              borderRadius: 4,
-              textAlign: 'center',
-              background: 'rgba(255, 255, 255, 0.8)',
-              backdropFilter: 'blur(10px)',
-              border: '1px solid rgba(255, 255, 255, 0.3)',
-              boxShadow: '0 8px 32px rgba(0,0,0,0.05)'
-            }}
-          >
-            <Avatar sx={{ width: 64, height: 64, bgcolor: alpha(theme.palette.info.main, 0.1), color: 'info.main', mx: 'auto', mb: 2 }}>
+          <Paper sx={{ p: 4, borderRadius: 2, textAlign: 'center' }}>
+            <Avatar sx={{ width: 64, height: 64, bgcolor: 'info.main', color: 'white', mx: 'auto', mb: 2 }}>
               <SettingsIcon sx={{ fontSize: 32 }} />
             </Avatar>
             <Typography variant="h6" fontWeight="bold" gutterBottom>
@@ -484,14 +359,14 @@ const PainelGerencial: React.FC = () => {
               Utilize o menu lateral para acessar as configurações detalhadas de usuários, motoristas e parâmetros globais do sistema.
             </Typography>
             <Stack direction="row" spacing={2} justifyContent="center">
-              <Button variant="contained" href="/admin/configuracoes" sx={{ borderRadius: 2, px: 4 }}>
+              <Button variant="contained" href="/admin/configuracoes">
                 Acessar Configurações
               </Button>
-              <Button variant="outlined" href="/admin/usuarios" sx={{ borderRadius: 2, px: 4 }}>
+              <Button variant="outlined" href="/admin/usuarios">
                 Gerenciar Usuários
               </Button>
             </Stack>
-          </MotionPaper>
+          </Paper>
         </TabPanel>
         </Container>
       </AppLayout>
