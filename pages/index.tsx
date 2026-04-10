@@ -119,10 +119,10 @@ function Home() {
       color: 'amber',
     },
     {
-      title: 'Gerar Etiquetas',
-      description: 'ZPL e Código de Barras',
-      icon: Tag,
-      href: '/gerar-etiquetas',
+      title: 'Adicionar Notas',
+      description: 'Adicionar novas notas fiscais',
+      icon: FilePlus,
+      href: '/adicionar-notas',
       color: 'red',
     },
     {

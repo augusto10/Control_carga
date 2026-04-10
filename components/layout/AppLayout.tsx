@@ -68,6 +68,7 @@ export function AppLayout({
       name: 'Gestão de Notas',
       icon: FileText,
       children: [
+        { name: 'Adicionar Notas', href: '/adicionar-notas' },
         { name: 'Consultar Notas', href: '/consultar-notas' },
       ]
     },
