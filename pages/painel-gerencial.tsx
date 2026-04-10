@@ -93,46 +93,43 @@ const PainelGerencial: React.FC = () => {
   const [tabValue, setTabValue] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  // Dados mockados para demonstração
   const [dashboardData, setDashboardData] = useState({
-    controlesFinalizados: 45,
-    controlesPendentes: 12,
-    totalUsuarios: 28,
-    totalMotoristas: 15,
-    notasProcessadas: 234,
-    etiquetasGeradas: 156
+    controlesFinalizados: 0,
+    controlesPendentes: 0,
+    totalUsuarios: 0,
+    totalMotoristas: 0,
+    notasProcessadas: 0,
+    etiquetasGeradas: 0
   });
 
-  const [recentActivity, setRecentActivity] = useState([
-    {
-      id: 1,
-      user: 'João Silva',
-      action: 'Finalizou controle de carga',
-      time: '2 horas atrás',
-      type: 'success'
-    },
-    {
-      id: 2,
-      user: 'Maria Santos',
-      action: 'Criou novo checklist',
-      time: '3 horas atrás',
-      type: 'info'
-    },
-    {
-      id: 3,
-      user: 'Pedro Costa',
-      action: 'Gerou etiquetas',
-      time: '5 horas atrás',
-      type: 'info'
+  const [recentActivity, setRecentActivity] = useState([]);
+
+  const loadDashboardData = async () => {
+    try {
+      setLoading(true);
+      const [dashboardRes, activitiesRes] = await Promise.all([
+        fetch('/api/admin/dashboard'),
+        fetch('/api/admin/atividades-recentes')
+      ]);
+
+      if (dashboardRes.ok) {
+        const dashboard = await dashboardRes.json();
+        setDashboardData(dashboard);
+      }
+
+      if (activitiesRes.ok) {
+        const activities = await activitiesRes.json();
+        setRecentActivity(activities);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar dados do dashboard:', error);
+    } finally {
+      setLoading(false);
     }
-  ]);
+  };
 
   useEffect(() => {
-    // Simular carregamento de dados
-    const timer = setTimeout(() => {
-      setLoading(false);
-    }, 1000);
-    return () => clearTimeout(timer);
+    loadDashboardData();
   }, []);
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
@@ -192,14 +189,16 @@ const PainelGerencial: React.FC = () => {
           </Avatar>
         </Stack>
         <Typography variant="h3" fontWeight="800" color="#1e293b">
-          {value}
+          {loading ? '...' : value}
         </Typography>
-        <Stack direction="row" spacing={0.5} alignItems="center" mt={1}>
-          <TrendingUpIcon sx={{ fontSize: 16, color: 'success.main' }} />
-          <Typography variant="caption" color="success.main" fontWeight="600">
-            +5% desde ontem
-          </Typography>
-        </Stack>
+        {!loading && (
+          <Stack direction="row" spacing={0.5} alignItems="center" mt={1}>
+            <TrendingUpIcon sx={{ fontSize: 16, color: 'success.main' }} />
+            <Typography variant="caption" color="success.main" fontWeight="600">
+              Atualizado agora
+            </Typography>
+          </Stack>
+        )}
       </CardContent>
     </MotionCard>
   );
@@ -214,12 +213,14 @@ const PainelGerencial: React.FC = () => {
           { label: 'Painel Gerencial' }
         ]}
         actions={
-          <Button 
-            variant="outlined" 
+          <Button
+            variant="outlined"
             startIcon={<RefreshIcon />}
+            onClick={loadDashboardData}
+            disabled={loading}
             sx={{ borderRadius: 3, textTransform: 'none', fontWeight: 'bold' }}
           >
-            Atualizar Dados
+            {loading ? 'Atualizando...' : 'Atualizar Dados'}
           </Button>
         }
       >
@@ -334,8 +335,17 @@ const PainelGerencial: React.FC = () => {
               <Typography variant="h6" fontWeight="bold">Fluxo de Atividades</Typography>
             </Box>
             <List disablePadding>
-              <AnimatePresence>
-                {recentActivity.map((activity, index) => (
+              {loading ? (
+                <Box sx={{ p: 4, textAlign: 'center' }}>
+                  <Typography color="text.secondary">Carregando atividades...</Typography>
+                </Box>
+              ) : recentActivity.length === 0 ? (
+                <Box sx={{ p: 4, textAlign: 'center' }}>
+                  <Typography color="text.secondary">Nenhuma atividade recente encontrada.</Typography>
+                </Box>
+              ) : (
+                <AnimatePresence>
+                  {recentActivity.map((activity, index) => (
                   <motion.div
                     key={activity.id}
                     initial={{ opacity: 0, x: -20 }}
@@ -361,8 +371,9 @@ const PainelGerencial: React.FC = () => {
                     </ListItem>
                     {index < recentActivity.length - 1 && <Divider sx={{ opacity: 0.5 }} />}
                   </motion.div>
-                ))}
-              </AnimatePresence>
+                  ))}
+                </AnimatePresence>
+              )}
             </List>
           </MotionPaper>
         </TabPanel>
