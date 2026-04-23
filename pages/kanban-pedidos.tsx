@@ -1,314 +1,484 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/router';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Box,
-  Card,
-  CardContent,
-  CardHeader,
-  Typography,
-  Chip,
-  Grid,
-  CircularProgress,
-  IconButton,
   Alert,
-  Tooltip,
-  Paper,
-  Divider,
+  Box,
   Button,
+  Chip,
+  CircularProgress,
+  Divider,
+  Paper,
+  Stack,
+  TextField,
+  Typography,
 } from '@mui/material';
-import AccessTimeIcon from '@mui/icons-material/AccessTime';
-import CloseIcon from '@mui/icons-material/Close';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import Inventory2Icon from '@mui/icons-material/Inventory2';
-import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
-import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
+import LocalShippingIcon from '@mui/icons-material/LocalShipping';
+import RouteIcon from '@mui/icons-material/Route';
+import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
+import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
+import { AppLayout } from '@/components/layout/AppLayout';
 
-interface Pedido {
-  ORCAMENTO_ID?: number;
-  PEDIDO_ID?: number;
-  ID?: number;
-  CADASTRO_ID?: number;
-  VENDEDOR_ID?: number;
-  VALOR_PEDIDO?: number;
-  VALOR_PRODUTOS?: number;
-  VALOR_DUPLICATA?: number;
-  VALOR_TOTAL?: number;
-  VALOR_FRETE_PROCESSADO?: number;
-  VALOR_DESCONTO?: number;
-  CLIENTE_NOME?: string;
-  NOME_RAZAO_SOCIAL?: string;
-  NOME_FANTASIA?: string;
-  VENDEDOR_NOME?: string;
-  NOME?: string;
-  DATA_HORA_CADASTRO?: string;
-  DATA_HORA_ALTERACAO?: string;
-  DATA_HORA_FECHAMENTO?: string;
-  DATA_ENTREGA?: string;
-  DATA_HORA_RECEBIMENTO?: string;
-  DATA_HORA_LIBERACAO_BLOQ?: string;
-  DATA_VALIDADE_ORCAMENTO?: string;
-  PEDIDO_FECHADO?: "S" | "N";
-  BLOQUEADO?: "S" | "N";
-  SISTEMA_ORIGEM_PEDIDO?: string;
-  CODIGO_PEDIDO_WEB?: string;
-  LOGRADOURO_ENTREGA?: string;
-  COMPLEMENTO_ENTREGA?: string;
-  CEP_ENTREGA?: string;
-  TIPO_ENTREGA?: string;
-  PRAZO_MEDIO_VENDA?: number;
-}
+type KanbanStatus =
+  | 'EM_PREPARACAO'
+  | 'ENVIADO_TRANSPORTADORA'
+  | 'EM_ROTA_ENTREGA'
+  | 'PEDIDO_ENTREGUE';
 
-interface OrderDetail {
+type PedidoKanban = {
+  id: string;
   pedidoId: number;
   clienteId: number;
   clienteNome: string;
-  valor: number;
-  valorFrete?: number;
-  valorDesconto?: number;
-  dataHora: string;
-  dataEntrega: string | null;
-  sistemaOrigem?: string;
-  codigoPedidoWeb?: string;
-  enderecoEntrega?: string;
-  tipoEntrega?: string;
-  bloqueado?: boolean;
-}
-
-interface RepresentanteAgrupado {
-  id: string;
-  representanteNome: string;
   vendedorId: number;
-  title: string;
-  priority: "High" | "Medium" | "Low";
-  status: "Abertos" | "Bloqueados" | "Fechados";
-  count: number;
-  date: string;
-  orders: OrderDetail[];
-}
+  vendedorNome: string;
+  valor: number;
+  dataHoraCadastro: string | null;
+  dataEntrega: string | null;
+  tipoEntrega: string | null;
+  status: KanbanStatus;
+  statusLabel: string;
+  numeroNota: string | null;
+  identificacaoNfe: string | null;
+  controleId: string | null;
+  controleDataCriacao: string | null;
+  controleTransportadora: string | null;
+  sswStatus: string | null;
+  sswMensagem: string | null;
+  observacaoStatus: string | null;
+};
 
-type PedidoStatus = 'Abertos' | 'Bloqueados' | 'Fechados';
+type KanbanResponse = {
+  dataReferencia: string;
+  dataInicio: string;
+  generatedAt: string;
+  totals: Record<KanbanStatus, number>;
+  columns: Record<KanbanStatus, PedidoKanban[]>;
+};
 
-function formatMoney(value: number | undefined): string {
-  if (typeof value !== 'number' || Number.isNaN(value)) return '-';
-  return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-}
-
-function getColumnColor(status: string) {
-  switch (status) {
-    case 'Abertos': return '#f59e0b';
-    case 'Bloqueados': return '#ef4444';
-    case 'Fechados': return '#10b981';
-    default: return '#ccc';
+const STATUS_META: Record<
+  KanbanStatus,
+  {
+    title: string;
+    color: string;
+    bg: string;
+    icon: typeof Inventory2Icon;
   }
+> = {
+  EM_PREPARACAO: {
+    title: 'Em preparacao',
+    color: '#f59e0b',
+    bg: '#fff7e6',
+    icon: Inventory2Icon,
+  },
+  ENVIADO_TRANSPORTADORA: {
+    title: 'Enviado para transportadora',
+    color: '#2563eb',
+    bg: '#eff6ff',
+    icon: LocalShippingIcon,
+  },
+  EM_ROTA_ENTREGA: {
+    title: 'Em rota de entrega',
+    color: '#ea580c',
+    bg: '#fff7ed',
+    icon: RouteIcon,
+  },
+  PEDIDO_ENTREGUE: {
+    title: 'Pedido entregue',
+    color: '#16a34a',
+    bg: '#f0fdf4',
+    icon: AssignmentTurnedInIcon,
+  },
+};
+
+const STATUS_ORDER: KanbanStatus[] = [
+  'EM_PREPARACAO',
+  'ENVIADO_TRANSPORTADORA',
+  'EM_ROTA_ENTREGA',
+  'PEDIDO_ENTREGUE',
+];
+
+function formatMoney(value: number | null | undefined): string {
+  const safeValue = typeof value === 'number' && Number.isFinite(value) ? value : 0;
+  return safeValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
-function RepresentanteCard({ representante }: { representante: RepresentanteAgrupado }) {
-  const [isExpanded, setIsExpanded] = useState(false);
-  const displayOrders = isExpanded ? representante.orders : representante.orders.slice(0, 3);
-  const remainingCount = representante.count - 3;
-  const totalValue = representante.orders.reduce((sum, order) => sum + order.valor, 0);
+function formatDateTime(value: string | null | undefined): string {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString('pt-BR');
+}
 
+function getTodayLocal(): string {
+  const now = new Date();
+  const offset = now.getTimezoneOffset();
+  const localDate = new Date(now.getTime() - offset * 60 * 1000);
+  return localDate.toISOString().slice(0, 10);
+}
+
+function PedidoCard({ pedido }: { pedido: PedidoKanban }) {
   return (
-    <Card sx={{ mb: 2, borderLeft: `4px solid ${getColumnColor(representante.status)}`, boxShadow: 2 }}>
-      <CardHeader
-        sx={{ pb: 1, backgroundColor: 'background.default' }}
-        title={
-          <Typography variant="subtitle2" sx={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Inventory2Icon fontSize="small" /> {representante.title}
-          </Typography>
-        }
-        subheader={
-          <Box sx={{ mt: 0.5 }}>
-            <Typography variant="caption" display="block">
-              {representante.count} {representante.count === 1 ? 'pedido' : 'pedidos'}
+    <Paper
+      variant="outlined"
+      sx={{
+        p: 2,
+        borderRadius: 3,
+        borderColor: 'rgba(15, 23, 42, 0.08)',
+        backgroundColor: '#fff',
+      }}
+    >
+      <Stack spacing={1.25}>
+        <Stack direction="row" justifyContent="space-between" alignItems="flex-start" gap={1}>
+          <Box>
+            <Typography variant="subtitle2" fontWeight={800}>
+              Pedido #{pedido.pedidoId}
             </Typography>
-            <Typography variant="body2" color="success.main" fontWeight="bold">
-              Total: {formatMoney(totalValue)}
+            <Typography variant="caption" color="text.secondary">
+              {pedido.statusLabel}
             </Typography>
           </Box>
-        }
-      />
-      <Divider />
-      <CardContent sx={{ p: 1, '&:last-child': { pb: 1 } }}>
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-          {displayOrders.map((order, idx) => (
-            <Paper key={idx} variant="outlined" sx={{ p: 1, backgroundColor: 'grey.50' }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                <Typography variant="caption" fontWeight="bold" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <Inventory2Icon sx={{ fontSize: 12 }} /> Pedido #{order.pedidoId}
-                </Typography>
-              </Box>
-              <Typography variant="caption" color="text.secondary" display="block" noWrap>
-                👤 #{order.clienteId} - {order.clienteNome}
-              </Typography>
-              {order.enderecoEntrega && (
-               <Typography variant="caption" color="text.disabled" display="block" noWrap sx={{ mt: 0.5 }}>
-                 📍 {order.enderecoEntrega}
-               </Typography>
-              )}
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1, pt: 1, borderTop: '1px solid #e0e0e0' }}>
-                 <Typography variant="caption" color="text.secondary">Total do Pedido</Typography>
-                 <Typography variant="caption" color="success.main" fontWeight="bold">{formatMoney(order.valor)}</Typography>
-              </Box>
-            </Paper>
-          ))}
-          {!isExpanded && remainingCount > 0 && (
-            <Button size="small" onClick={() => setIsExpanded(true)} endIcon={<KeyboardArrowDownIcon />}>
-              Ver todos (+{remainingCount})
-            </Button>
-          )}
-          {isExpanded && representante.count > 3 && (
-            <Button size="small" color="inherit" onClick={() => setIsExpanded(false)} endIcon={<KeyboardArrowUpIcon />}>
-              Recolher
-            </Button>
-          )}
+          <Chip
+            size="small"
+            label={formatMoney(pedido.valor)}
+            sx={{
+              fontWeight: 700,
+              backgroundColor: 'rgba(22, 163, 74, 0.12)',
+              color: '#166534',
+            }}
+          />
+        </Stack>
+
+        <Box>
+          <Typography variant="body2" fontWeight={700}>
+            {pedido.clienteNome}
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            Cliente #{pedido.clienteId || '-'}
+          </Typography>
         </Box>
-      </CardContent>
-    </Card>
+
+        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+          <PersonOutlineIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
+          <Typography variant="caption" color="text.secondary">
+            Representante: {pedido.vendedorNome}
+          </Typography>
+        </Stack>
+
+        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+          <ReceiptLongIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
+          <Typography variant="caption" color="text.secondary">
+            NFe: {pedido.numeroNota || 'sem numero'}
+          </Typography>
+        </Stack>
+
+        {pedido.identificacaoNfe && (
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ wordBreak: 'break-all', display: 'block' }}
+          >
+            Chave NFe: {pedido.identificacaoNfe}
+          </Typography>
+        )}
+
+        {pedido.controleId && (
+          <Box
+            sx={{
+              p: 1.25,
+              borderRadius: 2,
+              backgroundColor: 'rgba(37, 99, 235, 0.06)',
+              border: '1px solid rgba(37, 99, 235, 0.12)',
+            }}
+          >
+            <Typography variant="caption" display="block" color="text.secondary">
+              Controle vinculado
+            </Typography>
+            <Typography variant="caption" fontWeight={700}>
+              {pedido.controleTransportadora || 'Transportadora nao informada'}
+            </Typography>
+            <Typography variant="caption" display="block" color="text.secondary">
+              {pedido.controleDataCriacao
+                ? `Vinculado em ${formatDateTime(pedido.controleDataCriacao)}`
+                : 'Carga vinculada na aplicacao'}
+            </Typography>
+          </Box>
+        )}
+
+        {pedido.sswMensagem && (
+          <Box
+            sx={{
+              p: 1.25,
+              borderRadius: 2,
+              backgroundColor: 'rgba(234, 88, 12, 0.06)',
+              border: '1px solid rgba(234, 88, 12, 0.12)',
+            }}
+          >
+            <Typography variant="caption" display="block" color="text.secondary">
+              Mensagem SSW
+            </Typography>
+            <Typography variant="caption" fontWeight={700}>
+              {pedido.sswMensagem}
+            </Typography>
+            {pedido.sswStatus && (
+              <Typography variant="caption" display="block" color="text.secondary">
+                Status: {pedido.sswStatus}
+              </Typography>
+            )}
+          </Box>
+        )}
+
+        {pedido.observacaoStatus && (
+          <Typography variant="caption" color="text.secondary">
+            {pedido.observacaoStatus}
+          </Typography>
+        )}
+
+        <Divider />
+
+        <Stack direction="row" justifyContent="space-between" flexWrap="wrap" gap={1}>
+          <Typography variant="caption" color="text.secondary">
+            Cadastro: {formatDateTime(pedido.dataHoraCadastro)}
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            Entrega: {formatDateTime(pedido.dataEntrega)}
+          </Typography>
+        </Stack>
+      </Stack>
+    </Paper>
   );
 }
 
-function KanbanColumn({ columnId, representantes }: { columnId: PedidoStatus, representantes: RepresentanteAgrupado[] }) {
-  const totalValue = representantes.reduce((sum, rep) => sum + rep.orders.reduce((oSum, o) => oSum + o.valor, 0), 0);
-  const columnTitle = columnId === 'Abertos' ? 'Rodando' : columnId === 'Bloqueados' ? 'Bloqueados' : 'Fechados';
-  
-  const ColumnIcon = columnId === 'Abertos' ? AccessTimeIcon : columnId === 'Bloqueados' ? CloseIcon : CheckCircleIcon;
+function StatusColumn({ status, pedidos }: { status: KanbanStatus; pedidos: PedidoKanban[] }) {
+  const meta = STATUS_META[status];
+  const Icon = meta.icon;
+  const totalValor = useMemo(
+    () => pedidos.reduce((sum, pedido) => sum + (pedido.valor || 0), 0),
+    [pedidos]
+  );
 
   return (
-    <Box sx={{ width: '100%', minWidth: { xs: '100%', sm: 300 }, maxWidth: 400, display: 'flex', flexDirection: 'column' }}>
-      <Paper sx={{ p: 2, borderRadius: '8px 8px 0 0', borderTop: `4px solid ${getColumnColor(columnId)}`, backgroundColor: 'grey.100' }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-          <Typography variant="subtitle1" fontWeight="bold" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-             <ColumnIcon fontSize="small" sx={{ color: getColumnColor(columnId) }} /> {columnTitle}
+    <Box
+      sx={{
+        minWidth: { xs: '100%', md: 320 },
+        maxWidth: { xs: '100%', md: 360 },
+        flex: 1,
+      }}
+    >
+      <Paper
+        elevation={0}
+        sx={{
+          borderRadius: 4,
+          overflow: 'hidden',
+          border: '1px solid rgba(15, 23, 42, 0.08)',
+          backgroundColor: '#fff',
+        }}
+      >
+        <Box sx={{ p: 2.25, backgroundColor: meta.bg, borderTop: `4px solid ${meta.color}` }}>
+          <Stack direction="row" justifyContent="space-between" alignItems="center" gap={1}>
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Icon sx={{ color: meta.color }} />
+              <Box>
+                <Typography variant="subtitle1" fontWeight={800}>
+                  {meta.title}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {pedidos.length} pedido{pedidos.length === 1 ? '' : 's'}
+                </Typography>
+              </Box>
+            </Stack>
+            <Chip
+              label={pedidos.length}
+              size="small"
+              sx={{ fontWeight: 700, backgroundColor: '#fff' }}
+            />
+          </Stack>
+          <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
+            Total da coluna
           </Typography>
-          <Chip label={representantes.length} size="small" />
+          <Typography variant="body2" fontWeight={800} sx={{ color: meta.color }}>
+            {formatMoney(totalValor)}
+          </Typography>
         </Box>
-        <Typography variant="caption" color="text.secondary">Total:</Typography>{' '}
-        <Typography variant="caption" color="success.main" fontWeight="bold">{formatMoney(totalValue)}</Typography>
+
+        <Stack spacing={1.5} sx={{ p: 2, minHeight: 520, backgroundColor: '#f8fafc' }}>
+          {pedidos.length === 0 ? (
+            <Box
+              sx={{
+                flex: 1,
+                minHeight: 140,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: 3,
+                border: '1px dashed rgba(15, 23, 42, 0.18)',
+                backgroundColor: '#fff',
+              }}
+            >
+              <Typography variant="caption" color="text.secondary">
+                Nenhum pedido nesta coluna
+              </Typography>
+            </Box>
+          ) : (
+            pedidos.map((pedido) => <PedidoCard key={pedido.id} pedido={pedido} />)
+          )}
+        </Stack>
       </Paper>
-      
-      <Box sx={{ flex: 1, p: 2, backgroundColor: 'grey.200', borderRadius: '0 0 8px 8px', minHeight: 600 }}>
-        {representantes.map(rep => (
-          <RepresentanteCard key={rep.id} representante={rep} />
-        ))}
-        {representantes.length === 0 && (
-          <Box sx={{ height: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px dashed #ccc', borderRadius: 2 }}>
-            <Typography variant="caption" color="text.secondary">Nenhum representante</Typography>
-          </Box>
-        )}
-      </Box>
     </Box>
   );
 }
 
-export default function PedidosKanban() {
-  const [columns, setColumns] = useState<Record<PedidoStatus, RepresentanteAgrupado[]>>({
-    Abertos: [], Bloqueados: [], Fechados: []
-  });
+export default function PedidosKanbanPage() {
+  const [selectedDate, setSelectedDate] = useState(getTodayLocal());
+  const [data, setData] = useState<KanbanResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchPedidos = useCallback(async () => {
+  const fetchKanban = useCallback(async (dateRef: string, silent = false) => {
     try {
-      setIsLoading(true);
+      if (silent) {
+        setIsRefreshing(true);
+      } else {
+        setIsLoading(true);
+      }
+
       setError(null);
-
-      // Usando API de pedidos externos existente no sistema que proxyia para a Santri
-      const today = new Date().toISOString().split('T')[0];
-      // Buscando de hoje
-      const url = `/api/pedidos/externos?data_inicio=${today}&data_fim=${today}&limit=500`;
-      const response = await fetch(url);
-      
-      if (!response.ok) throw new Error('Falha ao buscar pedidos');
-      
-      const apiResponse = await response.json();
-      const pedidos: Pedido[] = Array.isArray(apiResponse.data) ? apiResponse.data : [];
-
-      // Process and Group
-      const representantesMap = new Map<string, {
-        abertos: number; bloqueados: number; fechados: number;
-        nome: string; vendedorId: number;
-        ordersAbertos: OrderDetail[]; ordersBloqueados: OrderDetail[]; ordersFechados: OrderDetail[];
-      }>();
-
-      pedidos.forEach(pedido => {
-        const vendedorNome = pedido.VENDEDOR_NOME || pedido.NOME || 'Sem Representante';
-        const vendedorId = pedido.VENDEDOR_ID ?? 0;
-
-        if (!representantesMap.has(vendedorNome)) {
-          representantesMap.set(vendedorNome, {
-            abertos: 0, bloqueados: 0, fechados: 0, nome: vendedorNome, vendedorId,
-            ordersAbertos: [], ordersBloqueados: [], ordersFechados: []
-          });
-        }
-
-        const repData = representantesMap.get(vendedorNome)!;
-        const pedidoId = pedido.ORCAMENTO_ID ?? pedido.PEDIDO_ID ?? pedido.ID ?? 0;
-        const clienteId = pedido.CADASTRO_ID ?? 0;
-        const valor = pedido.VALOR_TOTAL ?? pedido.VALOR_PEDIDO ?? pedido.VALOR_PRODUTOS ?? pedido.VALOR_DUPLICATA ?? 0;
-        const clienteNome = pedido.CLIENTE_NOME || pedido.NOME_RAZAO_SOCIAL || pedido.NOME_FANTASIA || 'Cliente Diversos';
-        
-        const orderDetail: OrderDetail = {
-          pedidoId, clienteId, clienteNome, valor,
-          valorFrete: pedido.VALOR_FRETE_PROCESSADO,
-          valorDesconto: pedido.VALOR_DESCONTO,
-          dataHora: pedido.DATA_HORA_CADASTRO || '',
-          dataEntrega: pedido.DATA_ENTREGA || null,
-          bloqueado: pedido.BLOQUEADO === 'S'
-        };
-
-        if (pedido.BLOQUEADO === "S") {
-          repData.bloqueados++; repData.ordersBloqueados.push(orderDetail);
-        } else if (pedido.PEDIDO_FECHADO === "S") {
-          repData.fechados++; repData.ordersFechados.push(orderDetail);
-        } else {
-          repData.abertos++; repData.ordersAbertos.push(orderDetail);
-        }
+      const response = await fetch(`/api/kanban-pedidos?data=${encodeURIComponent(dateRef)}`, {
+        headers: { accept: 'application/json' },
+        cache: 'no-store',
       });
 
-      const cols: Record<PedidoStatus, RepresentanteAgrupado[]> = { Abertos: [], Bloqueados: [], Fechados: [] };
-      const dateStr = new Date().toLocaleDateString("pt-BR");
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error || 'Erro ao carregar o kanban');
+      }
 
-      representantesMap.forEach((data, nome) => {
-        if (data.abertos > 0) cols.Abertos.push({ id: `aberto-${nome}`, representanteNome: nome, vendedorId: data.vendedorId, title: nome, priority: "Medium", status: "Abertos", count: data.abertos, date: dateStr, orders: data.ordersAbertos });
-        if (data.bloqueados > 0) cols.Bloqueados.push({ id: `bloq-${nome}`, representanteNome: nome, vendedorId: data.vendedorId, title: nome, priority: "Medium", status: "Bloqueados", count: data.bloqueados, date: dateStr, orders: data.ordersBloqueados });
-        if (data.fechados > 0) cols.Fechados.push({ id: `fechado-${nome}`, representanteNome: nome, vendedorId: data.vendedorId, title: nome, priority: "Medium", status: "Fechados", count: data.fechados, date: dateStr, orders: data.ordersFechados });
-      });
-
-      setColumns(cols);
-
+      setData(payload as KanbanResponse);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro genérico');
+      setError(err instanceof Error ? err.message : 'Erro ao carregar o kanban');
     } finally {
       setIsLoading(false);
+      setIsRefreshing(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchPedidos();
-  }, [fetchPedidos]);
+    fetchKanban(selectedDate);
+  }, [fetchKanban, selectedDate]);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      fetchKanban(selectedDate, true);
+    }, 5 * 60 * 1000);
+
+    return () => window.clearInterval(interval);
+  }, [fetchKanban, selectedDate]);
+
+  const totalPedidos = useMemo(() => {
+    if (!data) return 0;
+    return STATUS_ORDER.reduce((sum, status) => sum + data.totals[status], 0);
+  }, [data]);
+
+  const totalValorGeral = useMemo(() => {
+    if (!data) return 0;
+    return STATUS_ORDER.reduce((sum, status) => {
+      return sum + data.columns[status].reduce((columnSum, pedido) => columnSum + pedido.valor, 0);
+    }, 0);
+  }, [data]);
 
   return (
-    <Box sx={{ p: { xs: 2, md: 4 } }}>
-      <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Typography variant="h5" fontWeight="bold">Kanban de Pedidos (ERP)</Typography>
-      </Box>
+    <AppLayout
+      title="Kanban de Pedidos"
+      subtitle="Acompanhamento automatico dos pedidos de entrega do dia selecionado"
+      actions={
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+          <TextField
+            label="Data"
+            type="date"
+            size="small"
+            value={selectedDate}
+            onChange={(event) => setSelectedDate(event.target.value)}
+            InputLabelProps={{ shrink: true }}
+          />
+          <Button
+            variant="contained"
+            onClick={() => fetchKanban(selectedDate, true)}
+            disabled={isRefreshing || isLoading}
+            startIcon={isRefreshing ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
+          >
+            Atualizar
+          </Button>
+        </Stack>
+      }
+    >
+      <Stack spacing={3}>
+        {error && <Alert severity="error">{error}</Alert>}
 
-      {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
+        <Paper
+          elevation={0}
+          sx={{
+            p: 2.5,
+            borderRadius: 4,
+            border: '1px solid rgba(15, 23, 42, 0.08)',
+          }}
+        >
+          <Stack
+            direction={{ xs: 'column', md: 'row' }}
+            spacing={2}
+            justifyContent="space-between"
+            alignItems={{ xs: 'flex-start', md: 'center' }}
+          >
+            <Box>
+              <Typography variant="h6" fontWeight={800}>
+                Resumo do dia
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Pedidos de entrega em {selectedDate.split('-').reverse().join('/')}
+              </Typography>
+              {data?.generatedAt && (
+                <Typography variant="caption" color="text.secondary">
+                  Atualizado em {formatDateTime(data.generatedAt)}
+                </Typography>
+              )}
+            </Box>
 
-      {isLoading ? (
-        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 10 }}>
-          <CircularProgress />
-        </Box>
-      ) : (
-        <Box sx={{ display: 'flex', gap: 3, flexWrap: { xs: 'wrap', md: 'nowrap' }, overflowX: 'auto', pb: 2 }}>
-           <KanbanColumn columnId="Abertos" representantes={columns.Abertos} />
-           <KanbanColumn columnId="Bloqueados" representantes={columns.Bloqueados} />
-           <KanbanColumn columnId="Fechados" representantes={columns.Fechados} />
-        </Box>
-      )}
-    </Box>
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+              <Chip
+                label={`${totalPedidos} pedido${totalPedidos === 1 ? '' : 's'}`}
+                sx={{ fontWeight: 700 }}
+              />
+              <Chip
+                label={formatMoney(totalValorGeral)}
+                sx={{
+                  fontWeight: 700,
+                  backgroundColor: 'rgba(22, 163, 74, 0.12)',
+                  color: '#166534',
+                }}
+              />
+            </Stack>
+          </Stack>
+        </Paper>
+
+        {isLoading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}>
+            <CircularProgress />
+          </Box>
+        ) : (
+          <Box sx={{ display: 'flex', gap: 2.5, overflowX: 'auto', pb: 2 }}>
+            {STATUS_ORDER.map((status) => (
+              <StatusColumn
+                key={status}
+                status={status}
+                pedidos={data?.columns[status] || []}
+              />
+            ))}
+          </Box>
+        )}
+      </Stack>
+    </AppLayout>
   );
 }
 
-PedidosKanban.usesAppLayout = false;
+(PedidosKanbanPage as any).usesAppLayout = true;

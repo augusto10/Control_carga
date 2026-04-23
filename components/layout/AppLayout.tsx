@@ -61,7 +61,7 @@ export function AppLayout({
       children: [
         { name: 'Pedidos Entregas', href: '/admin/pedidos' },
         { name: 'Kanban de Pedidos', href: '/kanban-pedidos' },
-        { name: 'Logística SSW Accert', href: '/ssw-accert' },
+        { name: 'Rastrear Pedidos Entrega', href: '/ssw-accert' },
       ]
     },
     {
@@ -80,7 +80,14 @@ export function AppLayout({
         { name: 'Listar Controles', href: '/controles' },
       ]
     },
-    { name: 'Roteirização', icon: Map, href: '/roteirizacao' },
+    {
+      name: 'Roteirização',
+      icon: Map,
+      children: [
+        { name: 'Roteirização', href: '/roteirizacao' },
+        { name: 'Teste de Rota', href: '/test-route' },
+      ]
+    },
 
     { 
       name: 'Checklist Recebimento', 

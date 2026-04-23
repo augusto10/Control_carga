@@ -424,12 +424,18 @@ class APIExternaService {
       if (filtros.dataFim) params.append('dataFim', filtros.dataFim);
       if (filtros.clienteId) params.append('clienteId', filtros.clienteId);
 
-      const response = await this.apiInstance.get<NotaFiscalExterna[]>(
+      const response = await this.apiInstance.get<NotaFiscalExterna[] | { data?: NotaFiscalExterna[] }>(
         `/api/v1/notas-fiscais?${params.toString()}`
       );
 
-      console.log('[API Externa] Notas fiscais encontradas:', response.data.length);
-      return response.data;
+      const notas = Array.isArray(response.data)
+        ? response.data
+        : Array.isArray(response.data?.data)
+          ? response.data.data
+          : [];
+
+      console.log('[API Externa] Notas fiscais encontradas:', notas.length);
+      return notas;
     } catch (error: any) {
       console.error(
         '[API Externa] Erro ao listar notas fiscais:',

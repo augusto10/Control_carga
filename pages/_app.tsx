@@ -111,7 +111,7 @@ function MyApp({ Component, pageProps }: AppProps) {
 
     return (
       <ProtectedRoute>
-        <AppLayout title={path}>
+        <AppLayout title={Comp.pageTitle || path}>
           {page}
         </AppLayout>
       </ProtectedRoute>
