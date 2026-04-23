@@ -152,6 +152,18 @@ function getBaseUrl(req: NextApiRequest): string {
   return `${proto}://${host}`;
 }
 
+function buildInternalRequestHeaders(req: NextApiRequest): HeadersInit {
+  const headers: Record<string, string> = {
+    accept: 'application/json',
+  };
+
+  if (typeof req.headers.cookie === 'string' && req.headers.cookie.trim()) {
+    headers.cookie = req.headers.cookie;
+  }
+
+  return headers;
+}
+
 function extractPedidoId(pedido: Record<string, unknown>): number {
   return (
     pickNumber(pedido.ORCAMENTO_ID, pedido.PEDIDO_ID, pedido.ID) ||
@@ -477,7 +489,7 @@ async function fetchPedidosDoDia(
     url.searchParams.set('tipo_entrega', 'EPG');
 
     const response = await fetch(url.toString(), {
-      headers: { accept: 'application/json' },
+      headers: buildInternalRequestHeaders(req),
       cache: 'no-store',
     });
 
@@ -641,7 +653,7 @@ async function fetchApuracoesPorPedidoFallback(
       try {
         const url = new URL(`/api/pedidos/apuracao/${pedidoId}`, baseUrl);
         const response = await fetch(url.toString(), {
-          headers: { accept: 'application/json' },
+          headers: buildInternalRequestHeaders(req),
           cache: 'no-store',
         });
 
