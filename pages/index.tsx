@@ -6,20 +6,17 @@ import { Card } from '@/components/ui/Card';
 import { StatCard } from '@/components/ui/StatCard';
 import { cn } from '@/utils/cn';
 import { motion } from 'framer-motion';
+import { format } from 'date-fns';
 import { 
   FilePlus, 
   ClipboardList, 
   ShoppingCart,
   RefreshCw,
-  CheckSquare, 
   Plus, 
   Search, 
-  Tag, 
-  ListChecks, 
   BarChart2,
   Map
 } from 'lucide-react';
-import { format } from 'date-fns';
 
 function Home() {
   const { user, isAuthenticated, isLoading } = useAuth();
@@ -53,7 +50,11 @@ function Home() {
         statsUrl.searchParams.set('data_inicio', hojeStr);
         statsUrl.searchParams.set('data_fim', hojeStr);
 
-        const resp = await fetch(statsUrl.toString(), { headers: { accept: 'application/json' }, cache: 'no-store' });
+        const resp = await fetch(statsUrl.toString(), {
+          credentials: 'include',
+          headers: { accept: 'application/json' },
+          cache: 'no-store'
+        });
         if (resp.ok) {
           const json = await resp.json();
           if (typeof json.total === 'number') {
@@ -112,10 +113,10 @@ function Home() {
       color: 'purple',
     },
     {
-      title: 'Checklist Empilhadeiras',
-      description: 'Inspeção obrigatória',
-      icon: CheckSquare,
-      href: '/checklist-empilhadeiras',
+      title: 'Pedidos Entregas',
+      description: 'Acompanhar pedidos de entrega',
+      icon: ShoppingCart,
+      href: '/admin/pedidos',
       color: 'amber',
     },
     {
@@ -126,10 +127,10 @@ function Home() {
       color: 'red',
     },
     {
-      title: 'Recebimento',
-      description: 'Checklist e Regras de Ouro',
-      icon: ListChecks,
-      href: '/checklist-recebimento/regras-ouro',
+      title: 'Kanban de Pedidos',
+      description: 'Status dos pedidos do dia',
+      icon: ShoppingCart,
+      href: '/kanban-pedidos',
       color: 'indigo',
     },
     {

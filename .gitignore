@@ -20,6 +20,7 @@ node_modules/
 # Build
 dist/
 out/
+tsconfig.tsbuildinfo
 
 # Testes
 coverage/
@@ -43,3 +44,9 @@ prisma/test-*.sql
 *.swp
 *.swo
 .vercel
+.kilo/
+.kilocode/
+data/
+nul
+map-api.js
+scripts/output*.json

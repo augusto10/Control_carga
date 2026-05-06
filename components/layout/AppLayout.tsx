@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { 
@@ -10,6 +10,7 @@ import {
   Settings, 
   Menu, 
   X, 
+  ChevronLeft,
   ChevronRight,
   ChevronDown,
   Bell,
@@ -37,6 +38,7 @@ interface AppLayoutProps {
   showHeader?: boolean;
   breadcrumbs?: Array<{ label: string; href?: string }>;
   actions?: React.ReactNode;
+  fluid?: boolean;
 }
 
 export function AppLayout({ 
@@ -45,12 +47,16 @@ export function AppLayout({
   subtitle, 
   showHeader = true,
   breadcrumbs,
-  actions
+  actions,
+  fluid = false
 }: AppLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [openSubmenus, setOpenSubmenus] = useState<Record<string, boolean>>({});
   const router = useRouter();
   const { user, logout } = useAuth();
+  const SIDEBAR_COLLAPSED_KEY = 'app_layout_sidebar_collapsed';
+  const SIDEBAR_AUTO_CLOSE_MS = 30000;
 
   const menuItems = [
     { name: 'Início', icon: LayoutDashboard, href: '/', exact: true },
@@ -85,7 +91,6 @@ export function AppLayout({
       icon: Map,
       children: [
         { name: 'Roteirização', href: '/roteirizacao' },
-        { name: 'Teste de Rota', href: '/test-route' },
       ]
     },
 
@@ -139,6 +144,44 @@ export function AppLayout({
     setOpenSubmenus((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(SIDEBAR_COLLAPSED_KEY, sidebarCollapsed ? '1' : '0');
+  }, [sidebarCollapsed]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (sidebarCollapsed && !sidebarOpen) return;
+
+    let timeoutId = window.setTimeout(() => {
+      setSidebarCollapsed(true);
+      setSidebarOpen(false);
+    }, SIDEBAR_AUTO_CLOSE_MS);
+
+    const resetAutoClose = () => {
+      window.clearTimeout(timeoutId);
+      timeoutId = window.setTimeout(() => {
+        setSidebarCollapsed(true);
+        setSidebarOpen(false);
+      }, SIDEBAR_AUTO_CLOSE_MS);
+    };
+
+    const events: Array<keyof WindowEventMap> = ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart'];
+    events.forEach((event) => window.addEventListener(event, resetAutoClose, { passive: true }));
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      events.forEach((event) => window.removeEventListener(event, resetAutoClose));
+    };
+  }, [sidebarCollapsed, sidebarOpen]);
+
+  const handleToggleSidebarCollapsed = () => {
+    setSidebarCollapsed((prev) => !prev);
+    if (sidebarOpen) {
+      setSidebarOpen(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-app-bg flex text-textMain">
       {/* Mobile Sidebar Overlay */}
@@ -151,13 +194,18 @@ export function AppLayout({
 
       {/* Sidebar */}
       <aside className={cn(
-        "fixed inset-y-0 left-0 w-64 bg-white border-r border-slate-200 z-50 transition-transform duration-300 md:translate-x-0 md:static md:block",
+        "fixed inset-y-0 left-0 bg-white border-r border-slate-200 z-50 transition-all duration-300 md:translate-x-0 md:static md:block",
+        sidebarCollapsed ? "w-64 md:w-20" : "w-64 md:w-64",
         sidebarOpen ? "translate-x-0" : "-translate-x-full"
       )}>
         <div className="flex flex-col h-full">
           {/* Logo */}
           <div className="h-16 flex items-center px-6">
-            {/* Logo will be moved to header */}
+            {!sidebarCollapsed && (
+              <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+                Navegação
+              </span>
+            )}
           </div>
 
           {/* Navigation */}
@@ -179,28 +227,41 @@ export function AppLayout({
                         href={item.href}
                         className={cn(
                           "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group",
+                          sidebarCollapsed && "md:justify-center md:px-2",
                           activeTop ? "bg-primary text-white" : "text-textMuted hover:bg-slate-50 hover:text-textMain"
                         )}
+                        title={sidebarCollapsed ? item.name : undefined}
                       >
                         <ItemIcon className={cn("w-5 h-5", activeTop ? "text-white" : "text-textMuted group-hover:text-primary")} />
-                        <span className="truncate">{item.name}</span>
-                        {activeTop && <ChevronRight className="w-4 h-4 ml-auto" />}
+                        <span className={cn("truncate", sidebarCollapsed && "md:hidden")}>{item.name}</span>
+                        {activeTop && !sidebarCollapsed && <ChevronRight className="w-4 h-4 ml-auto" />}
                       </Link>
                     ) : (
                       <button
                         type="button"
-                        onClick={() => toggleSubmenu(item.name)}
+                        onClick={() => {
+                          if (sidebarCollapsed) {
+                            setSidebarCollapsed(false);
+                            setOpenSubmenus((prev) => ({ ...prev, [item.name]: true }));
+                            return;
+                          }
+                          toggleSubmenu(item.name);
+                        }}
                         className={cn(
                           "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200",
+                          sidebarCollapsed && "md:justify-center md:px-2",
                           activeTop ? "bg-primary text-white" : "text-textMuted hover:bg-slate-50 hover:text-textMain"
                         )}
+                        title={sidebarCollapsed ? item.name : undefined}
                       >
                         <ItemIcon className={cn("w-5 h-5", activeTop ? "text-white" : "text-textMuted group-hover:text-primary")} />
-                        <span className="truncate">{item.name}</span>
-                        <ChevronDown className={cn("w-4 h-4 ml-auto transition-transform", open ? "rotate-180" : "")} />
+                        <span className={cn("truncate", sidebarCollapsed && "md:hidden")}>{item.name}</span>
+                        {!sidebarCollapsed && (
+                          <ChevronDown className={cn("w-4 h-4 ml-auto transition-transform", open ? "rotate-180" : "")} />
+                        )}
                       </button>
                     )}
-                    {hasChildren && open && (
+                    {hasChildren && open && !sidebarCollapsed && (
                       <div className="pl-8 space-y-1">
                         {item.children
                           .filter((c: any) => {
@@ -233,7 +294,10 @@ export function AppLayout({
 
           {/* User Profile Footer */}
           <div className="p-4 border-t border-slate-100">
-            <div className="flex items-center gap-3 p-2 rounded-xl bg-slate-50 border border-slate-100">
+            <div className={cn(
+              "p-2 rounded-xl bg-slate-50 border border-slate-100",
+              sidebarCollapsed ? "flex justify-center" : "flex items-center gap-3"
+            )}>
               <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center overflow-hidden border-2 border-white">
                 {user?.avatar_url ? (
                   <img src={user.avatar_url} alt={user.nome} className="w-full h-full object-cover" />
@@ -241,17 +305,21 @@ export function AppLayout({
                   <User className="w-6 h-6 text-slate-400" />
                 )}
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold truncate">{user?.nome || 'Usuário'}</p>
-                <p className="text-xs text-textMuted truncate">{user?.email || 'admin@sistema.com'}</p>
-              </div>
-              <button 
-                onClick={logout}
-                className="p-1.5 rounded-lg text-textMuted hover:text-danger hover:bg-danger/5 transition-colors"
-                title="Sair"
-              >
-                <LogOut className="w-4 h-4" />
-              </button>
+              {!sidebarCollapsed && (
+                <>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold truncate">{user?.nome || 'Usuário'}</p>
+                    <p className="text-xs text-textMuted truncate">{user?.email || 'admin@sistema.com'}</p>
+                  </div>
+                  <button
+                    onClick={logout}
+                    className="p-1.5 rounded-lg text-textMuted hover:text-danger hover:bg-danger/5 transition-colors"
+                    title="Sair"
+                  >
+                    <LogOut className="w-4 h-4" />
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -267,6 +335,17 @@ export function AppLayout({
               onClick={() => setSidebarOpen(true)}
             >
               <Menu className="w-6 h-6" />
+            </button>
+            <button
+              className="hidden md:inline-flex p-2 rounded-lg hover:bg-slate-100 transition-colors"
+              onClick={handleToggleSidebarCollapsed}
+              title={sidebarCollapsed ? 'Expandir menu' : 'Recolher menu'}
+            >
+              {sidebarCollapsed ? (
+                <ChevronRight className="w-5 h-5 text-textMuted" />
+              ) : (
+                <ChevronLeft className="w-5 h-5 text-textMuted" />
+              )}
             </button>
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center shadow-primary/20 shadow-lg">
@@ -293,7 +372,10 @@ export function AppLayout({
 
         {/* Main Content */}
         <main className="flex-1 p-4 md:p-8 overflow-y-auto">
-          <div className="max-w-7xl mx-auto animate-in fade-in duration-500">
+          <div className={cn(
+            "mx-auto animate-in fade-in duration-500",
+            fluid ? "max-w-none" : "max-w-7xl"
+          )}>
             {showHeader && (
               <div className="mb-6 md:mb-8">
                 <div className="flex flex-col gap-4">

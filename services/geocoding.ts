@@ -24,16 +24,20 @@ class GeocodingService {
   }
 
   static async geocode(address: string, retryCount = 0): Promise<Coordenadas | null> {
+    const normalizedAddress = address
+      .replace(/\s+/g, ' ')
+      .replace(/\bBrasilia\b/gi, 'Brasília')
+      .trim();
     const cache = this.getCache();
 
-    if (cache[address]) {
-      console.log(`[Geocoding] Cache hit for: ${address}`);
-      return cache[address];
+    if (cache[normalizedAddress]) {
+      console.log(`[Geocoding] Cache hit for: ${normalizedAddress}`);
+      return cache[normalizedAddress];
     }
 
     try {
-      console.log(`[Geocoding] Fetching with OpenCage: ${address}`);
-      let searchAddress = address.includes('Brasil') ? address : `${address}, Brasil`;
+      console.log(`[Geocoding] Fetching with OpenCage: ${normalizedAddress}`);
+      let searchAddress = normalizedAddress.includes('Brasil') ? normalizedAddress : `${normalizedAddress}, Brasil`;
 
       // Normalizar CEP
       searchAddress = searchAddress.replace(/(\d{5})-(\d{3})/, '$1$2');
@@ -43,7 +47,10 @@ class GeocodingService {
           q: searchAddress,
           key: this.OPENCAGE_API_KEY,
           limit: 1,
-          language: 'pt-BR', // Para respostas em português
+          language: 'pt-BR',
+          countrycode: 'br',
+          bounds: '-48.35,-16.15,-47.25,-15.35',
+          no_annotations: 1,
         },
         timeout: 15000,
       });
@@ -55,13 +62,13 @@ class GeocodingService {
           lng: result.geometry.lng,
           display_name: result.formatted,
         };
-        this.setCache(address, coords);
+        this.setCache(normalizedAddress, coords);
         return coords;
       }
 
       // Fallbacks similares
-      const cepMatch = address.match(/\d{5}-?\d{3}/);
-      const numeroMatch = address.match(/, (\d+),/);
+      const cepMatch = normalizedAddress.match(/\d{5}-?\d{3}/);
+      const numeroMatch = normalizedAddress.match(/, (\d+),/);
 
       if (retryCount === 0 && cepMatch) {
         if (numeroMatch) {
@@ -75,8 +82,8 @@ class GeocodingService {
         return await this.geocode(cepMatch[0], 1);
       }
 
-      if (retryCount === 0 && address.includes(',')) {
-        const parts = address.split(',');
+      if (retryCount === 0 && normalizedAddress.includes(',')) {
+        const parts = normalizedAddress.split(',');
         if (parts.length > 3) {
           const fallbackAddr = [parts[0], parts[2], parts[3], parts[4], parts[5]].filter(Boolean).join(', ');
           console.log(`[Geocoding] Retrying without number/lote: ${fallbackAddr}`);
@@ -90,12 +97,12 @@ class GeocodingService {
       if (error.response?.status === 429 && retryCount < 3) {
         console.log(`[Geocoding] Rate limit hit (429), retrying (${retryCount + 1}/3)...`);
         await new Promise(resolve => setTimeout(resolve, 2000));
-        return this.geocode(address, retryCount + 1);
+        return this.geocode(normalizedAddress, retryCount + 1);
       }
 
       if (retryCount < 2) {
         console.log(`[Geocoding] Request failed, retrying...`);
-        return this.geocode(address, retryCount + 1);
+        return this.geocode(normalizedAddress, retryCount + 1);
       }
 
       console.error('[Geocoding] Error:', error);

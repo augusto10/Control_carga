@@ -1,5 +1,78 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { apiExternaService } from '../../../services/api-externa';
+import prisma from '@/lib/prisma';
+import { createHash } from 'crypto';
+
+const FULL_SCAN_CACHE_TTL_MS = 60_000;
+const fullScanCache = new Map<string, { expiresAt: number; data: any[]; totalValor: number }>();
+const FAST_QUERY_CACHE_TTL_MS = 120_000;
+const FAST_QUERY_STALE_TTL_MS = 15 * 60_000;
+const fastQueryCache = new Map<string, { expiresAt: number; staleAt: number; payload: any }>();
+const PERSISTED_QUERY_CACHE_TTL_MS = 5 * 60_000;
+const PERSISTED_QUERY_CACHE_STALE_MS = 60 * 60_000;
+
+type PersistedQueryCacheRow = {
+  payload: any;
+  expiresAt: Date;
+  staleAt: Date;
+};
+
+const getPersistedCacheConfigKey = (cacheKey: string) => {
+  const hash = createHash('sha1').update(cacheKey).digest('hex');
+  return `pedidos_query_cache:${hash}`;
+};
+
+const readPersistedQueryCache = async (cacheKey: string) => {
+  try {
+    const cache = await prisma.configuracaoSistema.findUnique({
+      where: { chave: getPersistedCacheConfigKey(cacheKey) }
+    });
+
+    if (!cache?.valor) return null;
+
+    const parsed = JSON.parse(cache.valor);
+    if (parsed?.cacheKey !== cacheKey) return null;
+
+    return {
+      payload: parsed.payload,
+      expiresAt: new Date(parsed.expiresAt),
+      staleAt: new Date(parsed.staleAt)
+    } as PersistedQueryCacheRow;
+  } catch (error: any) {
+    console.error('[Pedidos Cache] Falha ao ler cache persistente:', error?.message || error);
+    return null;
+  }
+};
+
+const writePersistedQueryCache = async (
+  cacheKey: string,
+  payload: any,
+  ttlMs = PERSISTED_QUERY_CACHE_TTL_MS,
+  staleMs = PERSISTED_QUERY_CACHE_STALE_MS
+) => {
+  try {
+    const valor = JSON.stringify({
+      cacheKey,
+      payload,
+      expiresAt: new Date(Date.now() + ttlMs).toISOString(),
+      staleAt: new Date(Date.now() + staleMs).toISOString()
+    });
+
+    await prisma.configuracaoSistema.upsert({
+      where: { chave: getPersistedCacheConfigKey(cacheKey) },
+      create: {
+        chave: getPersistedCacheConfigKey(cacheKey),
+        valor,
+        descricao: 'Cache persistente de consultas de pedidos externos',
+        tipo: 'json',
+        editavel: false
+      },
+      update: { valor }
+    });
+  } catch (error: any) {
+    console.error('[Pedidos Cache] Falha ao gravar cache persistente:', error?.message || error);
+  }
+};
 
 export default async function handler(
   req: NextApiRequest,
@@ -28,7 +101,10 @@ export default async function handler(
       status,
       search,
       stats,
-      tipo_data
+      tipo_data,
+      cidade,
+      bairro,
+      ordenacao_valor
     } = req.query;
 
     const tipoData = typeof tipo_data === 'string' 
@@ -67,10 +143,12 @@ export default async function handler(
 
     const requestedLimit = limit ? parseInt(limit as string, 10) : 100;
     const safeLimit = Number.isFinite(requestedLimit) ? Math.min(requestedLimit, 100) : 100;
+    const requestedOffset = offset ? parseInt(offset as string, 10) : 0;
+    const safeOffset = Number.isFinite(requestedOffset) && requestedOffset > 0 ? requestedOffset : 0;
     const fetchLimit = safeLimit;
     const filtrosApi: any = {
       limit: fetchLimit,
-      offset: stats === '1' ? 0 : (offset ? parseInt(offset as string, 10) : 0)
+      offset: 0
     };
 
 
@@ -130,6 +208,20 @@ export default async function handler(
     };
 
     const formatDate = (d: Date) => d.toISOString().slice(0, 10);
+
+    const addDays = (date: Date, days: number) => {
+      const next = new Date(date);
+      next.setDate(next.getDate() + days);
+      return next;
+    };
+
+    const dateOnly = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+    const diffDays = (start: Date, end: Date) => {
+      const startTime = dateOnly(start).getTime();
+      const endTime = dateOnly(end).getTime();
+      return Math.max(0, Math.round((endTime - startTime) / 86400000));
+    };
 
     const parseDate = (v: any) => {
       if (!v) return null;
@@ -200,7 +292,15 @@ export default async function handler(
           parseDate(p.DATA_HORA_RECEBIMENTO) ||
           parseDate(p.data_hora_recebimento) ||
           parseDate(p.DATA_RECEBIMENTO) ||
-          parseDate(p.data_recebimento)
+          parseDate(p.data_recebimento) ||
+          parseDate(p.DATA_HORA_CADASTRO) ||
+          parseDate(p.data_hora_cadastro) ||
+          parseDate(p.DATA_CADASTRO) ||
+          parseDate(p.data_cadastro) ||
+          parseDate(p.DATA_FECHAMENTO) ||
+          parseDate(p.data_fechamento) ||
+          parseDate(p.DATA_ENTREGA) ||
+          parseDate(p.data_entrega)
         );
       } catch (error) {
         console.error('[API Pedidos Externos] Erro ao parsear data:', error, p);
@@ -332,10 +432,6 @@ export default async function handler(
       );
 
       // Log para debug interno no servidor se necessário
-      if (p.NUMERO_NOTA === '186911' || !nomeCidade) {
-        console.log(`[API Debug] Nota ${p.NUMERO_NOTA}: Bairro=${nomeBairroNota}, Cidade=${nomeCidade}, Estado=${estadoDestino}`);
-      }
-
       return {
         ...p,
         NUMERO_NOTA: numeroNota ?? p.NUMERO_NOTA ?? null,
@@ -476,6 +572,29 @@ export default async function handler(
       });
     };
 
+    const normalizeText = (value: unknown) => {
+      return String(value ?? '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .trim();
+    };
+
+    const cidadeFiltro = typeof cidade === 'string' ? normalizeText(cidade) : '';
+    const bairroFiltro = typeof bairro === 'string' ? normalizeText(bairro) : '';
+    const searchFiltro = typeof search === 'string' ? normalizeText(search) : '';
+    const ordenacaoValor = typeof ordenacao_valor === 'string' ? ordenacao_valor : '';
+
+    const getValorPedido = (p: any) => {
+      const v = p.VALOR_PEDIDO ?? p.VALOR_TOTAL ?? p.VALOR ?? p.valor ?? p.valor_total ?? 0;
+      if (typeof v === 'number' && Number.isFinite(v)) return v;
+      if (typeof v === 'string') {
+        const n = Number(v.replace(/\./g, '').replace(',', '.'));
+        return Number.isFinite(n) ? n : 0;
+      }
+      return 0;
+    };
+
     const applyFilters = (items: any[]) => {
       const results = (items || []).map(normalizePedido).filter((p: any) => {
         if (getEmpresaId(p) !== EMPRESA_ID_ALVO) return false;
@@ -503,6 +622,33 @@ export default async function handler(
           return false;
         }
 
+        if (cidadeFiltro) {
+          const cidadePedido = normalizeText(p.NOME_CIDADE ?? p.CIDADE ?? p.cidade);
+          if (!cidadePedido.includes(cidadeFiltro)) return false;
+        }
+
+        if (bairroFiltro) {
+          const bairroPedido = normalizeText(
+            p.NOME_BAIRRO_NOTA ?? p.BAIRRO ?? p.bairro ?? p.NOME_BAIRRO ?? p.BAIRRO_ENTREGA
+          );
+          if (!bairroPedido.includes(bairroFiltro)) return false;
+        }
+
+        if (searchFiltro) {
+          const searchable = normalizeText([
+            p.ORCAMENTO_ID,
+            p.CLIENTE_NOME,
+            p.NOME_FANTASIA,
+            p.VENDEDOR_NOME,
+            p.NUMERO_NOTA,
+            p.IDENTIFICACAO_NFE,
+            p.CNPJ_CPF,
+            p.NOME_CIDADE,
+            p.NOME_BAIRRO_NOTA
+          ].filter(Boolean).join(' '));
+          if (!searchable.includes(searchFiltro)) return false;
+        }
+
         return true;
       });
 
@@ -515,6 +661,448 @@ export default async function handler(
 
       return results;
     };
+
+    const queryCacheKey = JSON.stringify({
+      v: 3,
+      data_inicio,
+      data_fim,
+      tipo_entrega,
+      status,
+      search,
+      tipoData,
+      cidade: cidadeFiltro,
+      bairro: bairroFiltro,
+      ordenacaoValor,
+      stats,
+      limit: safeLimit,
+      offset: safeOffset
+    });
+    const isSimpleStatsRequest = stats === '1'
+      && !cidadeFiltro
+      && !bairroFiltro
+      && !ordenacaoValor
+      && !searchFiltro;
+    const precisaVarreduraCompleta = stats === '1' || Boolean(cidadeFiltro || bairroFiltro || ordenacaoValor);
+    const fastCacheKey = queryCacheKey;
+    if (!precisaVarreduraCompleta || isSimpleStatsRequest) {
+      const cachedFast = fastQueryCache.get(fastCacheKey);
+      if (cachedFast && cachedFast.expiresAt > Date.now()) {
+        return res.status(200).json({ ...cachedFast.payload, cached: true });
+      }
+    }
+
+    const persistedQueryCache = await readPersistedQueryCache(queryCacheKey);
+    if (persistedQueryCache && persistedQueryCache.expiresAt.getTime() > Date.now()) {
+      if (!precisaVarreduraCompleta || isSimpleStatsRequest) {
+        fastQueryCache.set(fastCacheKey, {
+          expiresAt: persistedQueryCache.expiresAt.getTime(),
+          staleAt: persistedQueryCache.staleAt.getTime(),
+          payload: persistedQueryCache.payload
+        });
+      }
+      return res.status(200).json({ ...persistedQueryCache.payload, cached: true, persistedCache: true });
+    }
+
+    const getFastFallbackPayload = () => {
+      const cached = fastQueryCache.get(fastCacheKey);
+      if (cached && cached.staleAt > Date.now()) {
+        return {
+          ...cached.payload,
+          stale: true,
+          warning: 'API externa demorou para responder. Exibindo ultimo resultado em cache.'
+        };
+      }
+
+      if (persistedQueryCache && persistedQueryCache.staleAt.getTime() > Date.now()) {
+        return {
+          ...persistedQueryCache.payload,
+          stale: true,
+          persistedCache: true,
+          warning: 'API externa demorou para responder. Exibindo ultimo resultado persistido em cache.'
+        };
+      }
+
+      return {
+        data: [],
+        total: 0,
+        totalValor: 0,
+        limit: safeLimit,
+        offset: safeOffset,
+        warning: 'API externa demorou para responder. Tente novamente em alguns instantes.'
+      };
+    };
+
+    if (isSimpleStatsRequest) {
+      try {
+        const batchLimit = 100;
+        const maxStatsRecords = 1000;
+        let currentOffset = 0;
+        let totalStats = 0;
+        let totalValorStats = 0;
+
+        while (currentOffset < maxStatsRecords) {
+          const resultadoStats = await apiExternaService.listarPedidos(
+            {
+              ...filtrosApi,
+              limit: batchLimit,
+              offset: currentOffset
+            },
+            username,
+            password
+          );
+
+          if (!resultadoStats || !Array.isArray((resultadoStats as any).data)) {
+            throw new Error('API externa nao respondeu pedidos para estatistica diaria');
+          }
+
+          const dataBatch = resultadoStats.data || [];
+          const filtradosStats = applyFilters(dataBatch);
+          totalStats += filtradosStats.length;
+          totalValorStats += filtradosStats.reduce((sum: number, p: any) => sum + getValorPedido(p), 0);
+
+          const hasOlderRecord = Boolean(inicio) && dataBatch.some((item: any) => {
+            const ref = getRef(item);
+            return ref ? ref < inicio! : false;
+          });
+
+          if (dataBatch.length < batchLimit || hasOlderRecord) {
+            break;
+          }
+
+          currentOffset += dataBatch.length;
+        }
+
+        const statsPayload = {
+          total: totalStats,
+          totalValor: totalValorStats
+        };
+
+        fastQueryCache.set(fastCacheKey, {
+          expiresAt: Date.now() + FAST_QUERY_CACHE_TTL_MS,
+          staleAt: Date.now() + FAST_QUERY_STALE_TTL_MS,
+          payload: statsPayload
+        });
+        void writePersistedQueryCache(queryCacheKey, statsPayload);
+
+        return res.status(200).json(statsPayload);
+      } catch (apiError: any) {
+        console.error('[API Pedidos Externos] Falha ao carregar estatistica diaria:', apiError?.message || apiError);
+        return res.status(200).json(getFastFallbackPayload());
+      }
+    }
+
+    if (!precisaVarreduraCompleta) {
+      const shouldSliceDates = inicio && fim && diffDays(inicio, fim) > 2;
+      let resultadoRapido: { data: any[]; total: number; limit: number; offset: number } | null = null;
+
+      try {
+        if (shouldSliceDates) {
+          const collected: any[] = [];
+          let skipped = 0;
+          let cursor = dateOnly(inicio);
+          const endDate = dateOnly(fim);
+          let hasMoreAfterPage = false;
+
+          while (cursor <= endDate && collected.length < safeLimit) {
+            const day = formatDate(cursor);
+            const chunkEnd = dateOnly(addDays(cursor, 2));
+            const chunkEndSafe = chunkEnd > endDate ? endDate : chunkEnd;
+            const chunkEndDay = formatDate(chunkEndSafe);
+            const dayResult = await apiExternaService.listarPedidos(
+              {
+                ...filtrosApi,
+                data_inicio: day,
+                data_fim: chunkEndDay,
+                limit: 100,
+                offset: 0
+              },
+              username,
+              password
+            );
+
+            if (!dayResult || !Array.isArray((dayResult as any).data)) {
+              throw new Error('API externa nao respondeu pedidos no periodo solicitado');
+            }
+
+            const dayItems = applyFilters(dayResult?.data || []);
+
+            for (const item of dayItems) {
+              if (skipped < safeOffset) {
+                skipped += 1;
+                continue;
+              }
+              if (collected.length < safeLimit) {
+                collected.push(item);
+              } else {
+                hasMoreAfterPage = true;
+                break;
+              }
+            }
+
+            if (hasMoreAfterPage) break;
+            cursor = addDays(chunkEndSafe, 1);
+          }
+
+          resultadoRapido = {
+            data: collected,
+            total: safeOffset + collected.length + (hasMoreAfterPage || cursor <= endDate ? safeLimit : 0),
+            limit: safeLimit,
+            offset: safeOffset
+          };
+        } else {
+          resultadoRapido = await apiExternaService.listarPedidos(
+            {
+              ...filtrosApi,
+              limit: safeLimit,
+              offset: safeOffset
+            },
+            username,
+            password
+          );
+        }
+      } catch (apiError: any) {
+        console.error('[API Pedidos Externos] Falha no caminho rapido:', apiError?.message || apiError);
+        return res.status(200).json(getFastFallbackPayload());
+      }
+
+      if (!resultadoRapido || typeof resultadoRapido !== 'object' || !Array.isArray((resultadoRapido as any).data)) {
+        return res.status(200).json(getFastFallbackPayload());
+      }
+
+      const dataRapida = applyFilters(resultadoRapido.data || []).sort((a, b) => {
+        const refA = getRef(a);
+        const refB = getRef(b);
+        if (!refA && !refB) return 0;
+        if (!refA) return 1;
+        if (!refB) return -1;
+        return refA.getTime() - refB.getTime();
+      });
+      const totalRapido = safeOffset + dataRapida.length;
+
+      const payloadRapido = {
+        data: dataRapida,
+        total: totalRapido,
+        totalValor: dataRapida.reduce((sum: number, p: any) => sum + getValorPedido(p), 0),
+        limit: safeLimit,
+        offset: safeOffset
+      };
+
+      fastQueryCache.set(fastCacheKey, {
+        expiresAt: Date.now() + FAST_QUERY_CACHE_TTL_MS,
+        staleAt: Date.now() + FAST_QUERY_STALE_TTL_MS,
+        payload: payloadRapido
+      });
+      void writePersistedQueryCache(queryCacheKey, payloadRapido);
+
+      return res.status(200).json(payloadRapido);
+    }
+
+    const sortPedidosFiltrados = (items: any[]) => {
+      return items.sort((a, b) => {
+        if (ordenacaoValor === 'valor_asc') {
+          return getValorPedido(a) - getValorPedido(b);
+        }
+        if (ordenacaoValor === 'valor_desc') {
+          return getValorPedido(b) - getValorPedido(a);
+        }
+
+        const refA = getRef(a);
+        const refB = getRef(b);
+        if (!refA && !refB) return 0;
+        if (!refA) return 1;
+        if (!refB) return -1;
+        return refA.getTime() - refB.getTime();
+      });
+    };
+
+    const listarTodosPedidosPeriodo = async () => {
+      const allData: any[] = [];
+      const batchLimit = 100;
+      const maxRecords = 20000;
+      let currentOffset = 0;
+      let totalExterno: number | null = null;
+      let guard = 0;
+
+      while (currentOffset < maxRecords) {
+        const resultado = await apiExternaService.listarPedidos(
+          {
+            ...filtrosApi,
+            limit: batchLimit,
+            offset: currentOffset
+          },
+          username,
+          password
+        );
+
+        if (!resultado || typeof resultado !== 'object' || !Array.isArray((resultado as any).data)) {
+          if (currentOffset === 0) {
+            throw new Error('Resposta invalida da API externa');
+          }
+          break;
+        }
+
+        const dataBatch = resultado.data || [];
+        if (typeof resultado.total === 'number') {
+          totalExterno = resultado.total;
+        }
+        if (dataBatch.length === 0) break;
+
+        allData.push(...dataBatch);
+        currentOffset += dataBatch.length;
+        guard += 1;
+
+        if (dataBatch.length < batchLimit) break;
+        if (totalExterno !== null && currentOffset >= totalExterno) break;
+        if (guard >= 200) break;
+      }
+
+      console.log('[API Pedidos Externos] Lotes carregados:', {
+        recebidos: allData.length,
+        totalExterno,
+        maxRecords
+      });
+
+      return allData;
+    };
+
+    const enriquecerPedidosComApuracoes = async (items: any[]) => {
+      if (items.length === 0) return items;
+
+      try {
+        const refs = items.map((p: any) => getRef(p)).filter(Boolean) as Date[];
+        const minRef = refs.length ? new Date(Math.min(...refs.map(r => r.getTime()))) : null;
+        const maxRef = refs.length ? new Date(Math.max(...refs.map(r => r.getTime()))) : null;
+        const inicioAp = data_inicio && typeof data_inicio === 'string'
+          ? data_inicio
+          : minRef
+            ? formatDate(minRef)
+            : formatDate(new Date(Date.now() - 365 * 24 * 60 * 60 * 1000));
+        const fimAp = data_fim && typeof data_fim === 'string'
+          ? data_fim
+          : maxRef
+            ? formatDate(maxRef)
+            : formatDate(new Date());
+
+        const apMap = new Map<number, any>();
+        const batchLimit = 200;
+        const maxRecords = 5000;
+        let currentOffset = 0;
+        let guard = 0;
+
+        while (currentOffset < maxRecords) {
+          const apBatch = await apiExternaService.listarApuracoes(
+            {
+              data_inicio: inicioAp,
+              data_fim: fimAp,
+              limit: batchLimit,
+              offset: currentOffset
+            },
+            username,
+            password
+          );
+          const dataBatch = apBatch?.data || [];
+          if (dataBatch.length === 0) break;
+          dataBatch.forEach((a: any) => {
+            const id = getApuracaoId(a);
+            if (id !== null && !apMap.has(id)) {
+              apMap.set(id, a);
+            }
+          });
+          currentOffset += dataBatch.length;
+          guard += 1;
+          if (dataBatch.length < batchLimit) break;
+          if (guard >= 50) break;
+        }
+
+        return items.map((p: any) => {
+          const ap = apMap.get(parseNumber(p.ORCAMENTO_ID) ?? -1);
+          return enrichWithApuracao(p, ap);
+        });
+      } catch (error: any) {
+        console.error('[API Pedidos Externos] Falha ao enriquecer apuracoes:', error?.message || error);
+        return items;
+      }
+    };
+
+    const cacheKey = JSON.stringify({
+      data_inicio,
+      data_fim,
+      tipo_entrega,
+      status,
+      search,
+      tipoData,
+      cidade: cidadeFiltro,
+      bairro: bairroFiltro,
+      ordenacaoValor
+    });
+    const cached = fullScanCache.get(cacheKey);
+    let filtradosCorrigidos: any[] = [];
+    let totalValorCorrigido = 0;
+
+    if (cached && cached.expiresAt > Date.now()) {
+      filtradosCorrigidos = cached.data;
+      totalValorCorrigido = cached.totalValor;
+    } else {
+      let baseDataCorrigida: any[] = [];
+      try {
+        const pedidosBrutos = await listarTodosPedidosPeriodo();
+        baseDataCorrigida = pedidosBrutos.map(normalizePedido);
+      } catch (apiError: any) {
+        console.error('[API Pedidos Externos] Erro na API externa:', apiError?.message || apiError);
+        return res.status(500).json({
+          error: 'Erro na API externa',
+          details: apiError.message
+        });
+      }
+
+      const precisaEnriquecer = cidadeFiltro || bairroFiltro || baseDataCorrigida.some((p: any) => {
+        const numeroNota = pickString(p.NUMERO_NOTA, p.IDENTIFICACAO_NFE);
+        const cep = pickString(p.CEP, p.CEP_ENTREGA, p.CEP_CONS_FINAL);
+        return !numeroNota || !p.NOME_BAIRRO_NOTA || !p.NOME_CIDADE || !p.ESTADO_DESTINO || !cep;
+      });
+
+      if (precisaEnriquecer) {
+        baseDataCorrigida = await enriquecerPedidosComApuracoes(baseDataCorrigida);
+      }
+
+      filtradosCorrigidos = sortPedidosFiltrados(applyFilters(baseDataCorrigida));
+      totalValorCorrigido = filtradosCorrigidos.reduce((sum: number, p: any) => sum + getValorPedido(p), 0);
+      fullScanCache.set(cacheKey, {
+        expiresAt: Date.now() + FULL_SCAN_CACHE_TTL_MS,
+        data: filtradosCorrigidos,
+        totalValor: totalValorCorrigido
+      });
+    }
+
+    console.log('[API Pedidos Externos] Resultado final filtrado:', {
+      total: filtradosCorrigidos.length,
+      offset: safeOffset,
+      limit: safeLimit,
+      stats
+    });
+
+    if (stats === '1') {
+      const statsPayload = {
+        total: filtradosCorrigidos.length,
+        totalValor: totalValorCorrigido
+      };
+      void writePersistedQueryCache(queryCacheKey, statsPayload);
+      return res.status(200).json(statsPayload);
+    }
+
+    const pagePayload = {
+      data: filtradosCorrigidos.slice(safeOffset, safeOffset + safeLimit),
+      total: filtradosCorrigidos.length,
+      limit: safeLimit,
+      offset: safeOffset
+    };
+    void writePersistedQueryCache(queryCacheKey, pagePayload);
+    return res.status(200).json(pagePayload);
+
+    /*
+     * Implementacao legada mantida apenas no historico do arquivo.
+     * O fluxo acima retorna antes deste ponto; deixar esse trecho ativo fazia
+     * o TypeScript validar codigo morto e gerar falsos erros.
 
     let filtrados: any[] = [];
 
@@ -692,6 +1280,7 @@ export default async function handler(
     };
     
     return res.status(200).json(payload);
+    */
 
   } catch (error: any) {
     console.error('[API Pedidos Externos] Erro interno:', error.message || error);

@@ -1,19 +1,16 @@
-import React, { useState, useEffect, useMemo } from 'react';
+﻿import React, { useState, useEffect, useMemo } from 'react';
 import { format, subDays } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
 
 import {
   Box,
   Container,
   Typography,
-  Paper,
   Grid,
   TextField,
   Button,
   List,
   ListItem,
   ListItemText,
-  ListItemIcon,
   Checkbox,
   IconButton,
   Divider,
@@ -24,7 +21,8 @@ import {
   Tooltip as MuiTooltip,
   ListSubheader,
   ToggleButtonGroup,
-  ToggleButton
+  ToggleButton,
+  MenuItem
 } from '@mui/material';
 
 
@@ -33,26 +31,49 @@ import {
   LocationOn as LocationOnIcon,
   Route as RouteIcon,
   LocalShipping as ShippingIcon,
-  FilterList as FilterIcon,
-  Info as InfoIcon,
-  Print as PrintIcon,
   Share as ShareIcon,
-  OpenInNew as OpenInNewIcon,
-  ContentCopy as CopyIcon,
   Refresh as RefreshIcon,
-  BugReport as BugIcon,
-  Warning as WarningIcon,
-  Map as MapIcon
+  Map as MapIcon,
+  DragIndicator as DragIndicatorIcon,
+  KeyboardArrowDown as KeyboardArrowDownIcon,
+  KeyboardArrowUp as KeyboardArrowUpIcon
 } from '@mui/icons-material';
+
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import {
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 
 
 import { useSnackbar } from 'notistack';
 import Map, { MapMarker } from '../components/Map';
 import { GeocodingService } from '../services/geocoding';
+import { RoutingService } from '../services/routing';
 import axios from 'axios';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { CEPService } from '../services/cep';
+
+const cores = ['red', 'blue', 'green', 'purple', 'orange', 'black'];
+
+const perfil6mOrange = '#f97316';
+const perfil6mOrangeDark = '#c2410c';
+const perfil6mOrangeBg = '#fff7ed';
 
 
 
@@ -71,9 +92,32 @@ interface NotaExterna {
   numeroEndereco?: string;
   complemento?: string;
   peso?: number;
+  valor?: number;
+  orcamentoId?: number;
+  tipoEntrega?: string;
+  coords?: { lat: number; lng: number } | null;
   statusGeocoding?: 'loading' | 'success' | 'error' | null;
   erroMensagem?: string;
   _debugRaw?: { b: string, c: string, e: string };
+}
+
+interface Perfil6mPedidoAlerta {
+  pedidoId: number;
+  hasPerfil6m: boolean;
+  totalQuantidade: number;
+  totalItensPedido: number;
+  itens: Array<{
+    produtoNome: string;
+    quantidade: number;
+    codigoBarras: string | null;
+    codigoOriginal: string | null;
+  }>;
+  error?: string;
+  loading?: boolean;
+}
+
+interface Perfil6mPedidosResponse {
+  data?: Record<string, Perfil6mPedidoAlerta>;
 }
 
 
@@ -82,6 +126,29 @@ interface NotaExterna {
 
 
 
+
+const SortableItem = ({ id, children }: { id: string; children: React.ReactNode }) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+      {children}
+    </div>
+  );
+};
 
 const RoteirizacaoPage = () => {
   const { enqueueSnackbar } = useSnackbar();
@@ -92,15 +159,155 @@ const RoteirizacaoPage = () => {
   const [selecionadas, setSelecionadas] = useState<string[]>([]);
   const [markers, setMarkers] = useState<MapMarker[]>([]);
   const [routeWaypoints, setRouteWaypoints] = useState<[number, number][]>([]);
+  const [routeGeometry, setRouteGeometry] = useState<any[]>([]);
   const [loadingEntregas, setLoadingEntregas] = useState(false);
   const [mostrarApenasFalhas, setMostrarApenasFalhas] = useState(false);
   const [daysToLoad, setDaysToLoad] = useState<number>(7);
   const [selectedBairro, setSelectedBairro] = useState<string | null>(null);
-  // Centro de Distribuição Esplendor (Sobradinho - DF) - CEP 73.050-624
-  const [baseCoords, setBaseCoords] = useState<[number, number]>([-15.6507, -47.77347]);
+  const [expandedBairros, setExpandedBairros] = useState<Set<string>>(new Set());
+  const [manualOrder, setManualOrder] = useState<string[]>([]);
+  const [nomeGrupo, setNomeGrupo] = useState('');
+  const [grupoSelecionado, setGrupoSelecionado] = useState('');
+  const [gruposPedidos, setGruposPedidos] = useState<Record<string, string[]>>({});
+  const [modoRota, setModoRota] = useState<'manual' | 'proximidade'>('manual');
+  const [perfil6mAlertas, setPerfil6mAlertas] = useState<Record<number, Perfil6mPedidoAlerta>>({});
+  const [loadingPerfil6m, setLoadingPerfil6m] = useState(false);
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+  // Centro de Distribuicao Esplendor (Sobradinho - DF) - CEP 73.050-624
+  const [baseCoords, setBaseCoords] = useState<[number, number]>([-15.6505305, -47.7724339]);
+  const STORAGE_GRUPOS_KEY = 'roteirizacao_grupos_pedidos_v1';
+  const [grupoAtivo, setGrupoAtivo] = useState('');
+
+  const formatCurrency = (value?: number) => {
+    const amount = Number.isFinite(value as number) ? Number(value) : 0;
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    }).format(amount);
+  };
+
+  const formatPeso = (value?: number) => {
+    const peso = Number.isFinite(value as number) ? Number(value) : 0;
+    return `${new Intl.NumberFormat('pt-BR', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2
+    }).format(peso)} kg`;
+  };
+
+  const parseNumber = (value: unknown) => {
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    if (typeof value === 'string') {
+      const cleaned = value.trim().replace(/\./g, '').replace(',', '.');
+      const parsed = Number(cleaned);
+      return Number.isFinite(parsed) ? parsed : 0;
+    }
+    return 0;
+  };
+
+  const formatQuantidade = (value: number) => {
+    return new Intl.NumberFormat('pt-BR', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 3,
+    }).format(Number.isFinite(value) ? value : 0);
+  };
+
+  const getPerfil6mAlerta = (nota: NotaExterna) => {
+    return nota.orcamentoId ? perfil6mAlertas[nota.orcamentoId] : undefined;
+  };
+
+  const carregarAlertasPerfil6m = async (notasParaValidar: NotaExterna[]) => {
+    const ids = Array.from(new Set(
+      notasParaValidar
+        .map((nota) => nota.orcamentoId)
+        .filter((id): id is number => Number.isFinite(id))
+    ));
+
+    if (ids.length === 0) return;
+
+    setLoadingPerfil6m(true);
+    setPerfil6mAlertas((prev) => {
+      const next = { ...prev };
+      ids.forEach((id) => {
+        next[id] = {
+          pedidoId: id,
+          hasPerfil6m: next[id]?.hasPerfil6m ?? false,
+          totalQuantidade: next[id]?.totalQuantidade ?? 0,
+          totalItensPedido: next[id]?.totalItensPedido ?? 0,
+          itens: next[id]?.itens ?? [],
+          loading: true
+        };
+      });
+      return next;
+    });
+
+    try {
+      const chunkSize = 20;
+      const chunks: number[][] = [];
+      for (let i = 0; i < ids.length; i += chunkSize) {
+        chunks.push(ids.slice(i, i + chunkSize));
+      }
+
+      const merged: Record<string, Perfil6mPedidoAlerta> = {};
+      for (const chunk of chunks) {
+        const query = new URLSearchParams({ orcamento_ids: chunk.join(',') });
+        const response = await fetch(`/api/pedidos/perfil-6m?${query}`, {
+          headers: { accept: 'application/json' },
+          cache: 'no-store'
+        });
+
+        if (!response.ok) {
+          throw new Error(`Falha ao consultar perfil 6m (${response.status})`);
+        }
+
+        const payload: Perfil6mPedidosResponse = await response.json();
+        Object.assign(merged, payload.data || {});
+      }
+
+      setPerfil6mAlertas((prev) => {
+        const next = { ...prev };
+        ids.forEach((id) => {
+          next[id] = merged[String(id)]
+            ? { ...merged[String(id)], loading: false }
+            : {
+                pedidoId: id,
+                hasPerfil6m: false,
+                totalQuantidade: 0,
+                totalItensPedido: 0,
+                itens: [],
+                loading: false
+              };
+        });
+        return next;
+      });
+    } catch (error) {
+      console.error('Erro ao validar perfil 6m:', error);
+      setPerfil6mAlertas((prev) => {
+        const next = { ...prev };
+        ids.forEach((id) => {
+          next[id] = {
+            pedidoId: id,
+            hasPerfil6m: next[id]?.hasPerfil6m ?? false,
+            totalQuantidade: next[id]?.totalQuantidade ?? 0,
+            totalItensPedido: next[id]?.totalItensPedido ?? 0,
+            itens: next[id]?.itens ?? [],
+            error: 'Não foi possível validar perfil 6m',
+            loading: false
+          };
+        });
+        return next;
+      });
+    } finally {
+      setLoadingPerfil6m(false);
+    }
+  };
 
 
-  const notasAgrupadas = React.useMemo(() => {
+  const notasAgrupadas = useMemo(() => {
     const grupos: Record<string, NotaExterna[]> = {};
     const notasFiltradas = mostrarApenasFalhas
       ? notas.filter(n => n.statusGeocoding === 'error')
@@ -114,9 +321,50 @@ const RoteirizacaoPage = () => {
     return grupos;
   }, [notas, mostrarApenasFalhas]);
 
-  const mapCenterZoom = React.useMemo(() => {
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const saved = window.localStorage.getItem(STORAGE_GRUPOS_KEY);
+    if (!saved) return;
+    try {
+      const parsed = JSON.parse(saved) as Record<string, string[]>;
+      if (parsed && typeof parsed === 'object') {
+        setGruposPedidos(parsed);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar grupos salvos:', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(STORAGE_GRUPOS_KEY, JSON.stringify(gruposPedidos));
+  }, [gruposPedidos]);
+
+  useEffect(() => {
+    setManualOrder((prev) => {
+      const next = [
+        ...prev.filter((numero) => selecionadas.includes(numero)),
+        ...selecionadas.filter((numero) => !prev.includes(numero)),
+      ];
+      return next;
+    });
+  }, [selecionadas]);
+
+  const resumoSelecionadas = useMemo(() => {
+    const selecionadasSet = new Set(selecionadas);
+    const itens = notas.filter((nota) => selecionadasSet.has(nota.numero));
+    return {
+      quantidade: itens.length,
+      valorTotal: itens.reduce((sum, nota) => sum + parseNumber(nota.valor), 0),
+      pesoTotal: itens.reduce((sum, nota) => sum + parseNumber(nota.peso), 0),
+    };
+  }, [selecionadas, notas]);
+
+  const mapCenterZoom = useMemo<{ center: [number, number]; zoom: number }>(() => {
     if (!selectedBairro || !notasAgrupadas[selectedBairro]) {
-      return markers.length > 0 ? { center: [markers[0].lat, markers[0].lng], zoom: 12 } : { center: baseCoords, zoom: 11 };
+      return markers.length > 0
+        ? { center: [markers[0].lat, markers[0].lng] as [number, number], zoom: 12 }
+        : { center: baseCoords, zoom: 11 };
     }
 
     const bairroNotas = notasAgrupadas[selectedBairro];
@@ -126,55 +374,43 @@ const RoteirizacaoPage = () => {
       return { center: baseCoords, zoom: 11 };
     }
 
-    // Calcular centro médio
+    // Calcular centro medio
     const avgLat = bairroMarkers.reduce((sum, m) => sum + m.lat, 0) / bairroMarkers.length;
     const avgLng = bairroMarkers.reduce((sum, m) => sum + m.lng, 0) / bairroMarkers.length;
 
-    // Calcular zoom baseado na dispersão (simples)
+    // Calcular zoom baseado na dispersao (simples)
     const maxDist = Math.max(
       ...bairroMarkers.map(m => Math.sqrt((m.lat - avgLat) ** 2 + (m.lng - avgLng) ** 2))
     );
-    const zoom = maxDist > 0.01 ? 14 : 16; // Ajustar conforme necessário
+    const zoom = maxDist > 0.01 ? 14 : 16; // Ajustar conforme necessario
 
-    return { center: [avgLat, avgLng], zoom };
+    return { center: [avgLat, avgLng] as [number, number], zoom };
   }, [selectedBairro, notasAgrupadas, markers, baseCoords]);
 
+  const markersComRegiao = useMemo(() => {
+    const novos = [...markers];
 
-
-
-  
-  const handleBuscar = async () => {
-    if (!busca) return;
-    setLoading(true);
-    try {
-      // Usando a API existente de buscar-nota-externa
-      const response = await axios.get(`/api/buscar-nota-externa?numero=${busca}`);
-      if (response.data) {
-        // Se retornar uma única nota, transformamos em array
-        const novaNota = response.data;
-        if (!notas.find(n => n.numero === novaNota.numero)) {
-          const notaMapeada: NotaExterna = {
-            ...novaNota,
-            numero: novaNota.NUMERO_NOTA || novaNota.numero,
-            numeroEndereco: novaNota.NUMERO_ENTREGA || novaNota.NUMERO,
-            complemento: novaNota.COMPLEMENTO_ENTREGA || novaNota.COMPLEMENTO,
-          };
-          setNotas(prev => [...prev, notaMapeada]);
-          enqueueSnackbar('Nota encontrada e adicionada à lista.', { variant: 'success' });
-
-        } else {
-          enqueueSnackbar('Nota já está na lista.', { variant: 'info' });
+    Object.entries(gruposPedidos).forEach(([grupo, pedidos], idx) => {
+      pedidos.forEach((numero) => {
+        const marker = novos.find(m => m.id === numero);
+        if (marker) {
+          marker.color = cores[(idx + 2) % cores.length];
+          marker.groupName = grupo;
         }
-      } else {
-        enqueueSnackbar('Nota não encontrada.', { variant: 'warning' });
-      }
-    } catch (error) {
-      console.error('Erro ao buscar nota:', error);
-      enqueueSnackbar('Erro ao buscar nota.', { variant: 'error' });
-    } finally {
-      setLoading(false);
-    }
-  };
+      });
+    });
+
+    return novos;
+  }, [markers, gruposPedidos]);
+
+  const resumoRota = useMemo(() => {
+    const entregas = markers.filter((marker) => marker.type === 'delivery');
+    return {
+      totalEntregas: entregas.length,
+      valorTotal: entregas.reduce((sum, marker) => sum + parseNumber(marker.valorPedido), 0),
+      pesoTotal: entregas.reduce((sum, marker) => sum + parseNumber(marker.pesoPedido), 0),
+    };
+  }, [markers]);
 
   const handleCarregarEntregas = async (daysToLoad: number = 7) => {
     setLoadingEntregas(true);
@@ -205,6 +441,7 @@ const RoteirizacaoPage = () => {
       const novasNotas: NotaExterna[] = pedidos.map((p: any) => ({
         numero: p.NUMERO_NOTA || String(p.ORCAMENTO_ID),
         serie: p.SERIE_NOTA || '1',
+        orcamentoId: parseNumber(p.ORCAMENTO_ID || p.PEDIDO_ID || p.ID) || undefined,
         cliente: {
           nome: String(p.CLIENTE_NOME || p.NOME_FANTASIA || p.NOME || '').trim(),
           endereco: String(p.LOGRADOURO_ENTREGA || p.ENDERECO || p.LOGRADOURO || '').trim(),
@@ -215,7 +452,9 @@ const RoteirizacaoPage = () => {
         },
         numeroEndereco: String(p.NUMERO_ENTREGA || p.NUMERO || '').trim(),
         complemento: String(p.COMPLEMENTO_ENTREGA || p.COMPLEMENTO || '').trim(),
-        peso: p.PESO || p.PESO_NOTA
+        peso: parseNumber(p.PESO || p.PESO_NOTA || p.PESO_TOTAL || p.PESO_BRUTO),
+        valor: parseNumber(p.VALOR_PEDIDO || p.VALOR_TOTAL || p.VALOR),
+        tipoEntrega: String(p.TIPO_ENTREGA || '').trim()
       }));
 
       const notasSemBairro = novasNotas.filter(n => !n.cliente?.bairro || !n.cliente?.cidade);
@@ -245,6 +484,8 @@ const RoteirizacaoPage = () => {
         return [...prev, ...paraAdicionar];
       });
 
+      void carregarAlertasPerfil6m(novasNotas);
+
       const novosNumeros = novasNotas.map(n => n.numero);
       setSelecionadas(prev => {
         const s = new Set([...prev, ...novosNumeros]);
@@ -260,11 +501,181 @@ const RoteirizacaoPage = () => {
     }
   };
 
+  const handleBuscar = async () => {
+    if (!busca) return;
+    setLoading(true);
+    try {
+      // Usando a API existente de buscar-nota-externa
+      const response = await axios.get(`/api/buscar-nota-externa?numero=${busca}`);
+      if (response.data) {
+        // Se retornar uma unica nota, transformamos em array
+        const novaNota = response.data;
+        if (!notas.find(n => n.numero === novaNota.numero)) {
+          const notaMapeada: NotaExterna = {
+            ...novaNota,
+            numero: novaNota.NUMERO_NOTA || novaNota.numero,
+            numeroEndereco: novaNota.NUMERO_ENTREGA || novaNota.NUMERO,
+            complemento: novaNota.COMPLEMENTO_ENTREGA || novaNota.COMPLEMENTO,
+          };
+          setNotas(prev => [...prev, notaMapeada]);
+          enqueueSnackbar('Nota encontrada e adicionada à lista.', { variant: 'success' });
 
-  const handleToggleNota = (numero: string) => {
-    setSelecionadas(prev => 
-      prev.includes(numero) ? prev.filter(n => n !== numero) : [...prev, numero]
-    );
+        } else {
+          enqueueSnackbar('Nota já está na lista.', { variant: 'info' });
+        }
+      } else {
+        enqueueSnackbar('Nota não encontrada.', { variant: 'warning' });
+      }
+    } catch (error) {
+      console.error('Erro ao buscar nota:', error);
+      enqueueSnackbar('Erro ao buscar nota.', { variant: 'error' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleToggleNota = (numeroNota: string) => {
+    setSelecionadas((prev) => {
+      const exists = prev.includes(numeroNota);
+      if (exists) {
+        const updated = prev.filter((item) => item !== numeroNota);
+        setManualOrder((current) => current.filter((item) => item !== numeroNota));
+        return updated;
+      }
+      const updated = [...prev, numeroNota];
+      setManualOrder((current) => (current.includes(numeroNota) ? current : [...current, numeroNota]));
+      return updated;
+    });
+  };
+
+  const handleSalvarGrupoSelecionado = () => {
+    const nome = nomeGrupo.trim();
+    if (!nome) {
+      enqueueSnackbar('Informe um nome para o grupo.', { variant: 'warning' });
+      return;
+    }
+    if (selecionadas.length === 0) {
+      enqueueSnackbar('Selecione pedidos antes de salvar o grupo.', { variant: 'warning' });
+      return;
+    }
+    setGruposPedidos((prev) => ({
+      ...prev,
+      [nome]: [...selecionadas],
+    }));
+    setGrupoSelecionado(nome);
+    setGrupoAtivo(nome);
+    enqueueSnackbar(`Grupo "${nome}" salvo com ${selecionadas.length} pedidos.`, { variant: 'success' });
+  };
+
+  const handleAplicarGrupo = (nomeGrupoParam = grupoSelecionado) => {
+    if (!nomeGrupoParam || !gruposPedidos[nomeGrupoParam]) {
+      enqueueSnackbar('Selecione um grupo válido para aplicar.', { variant: 'warning' });
+      return;
+    }
+    const itens = gruposPedidos[nomeGrupoParam];
+    setSelecionadas(itens);
+    setManualOrder(itens);
+    setGrupoSelecionado(nomeGrupoParam);
+    setGrupoAtivo(nomeGrupoParam);
+    setExpandedBairros(new Set(notas
+      .filter((nota) => itens.includes(nota.numero))
+      .map((nota) => nota.cliente?.bairro || 'Não Informado')));
+    enqueueSnackbar(`Grupo "${nomeGrupoParam}" aberto com ${itens.length} pedidos.`, { variant: 'success' });
+  };
+
+  const handleRemoverGrupo = () => {
+    if (!grupoSelecionado || !gruposPedidos[grupoSelecionado]) {
+      enqueueSnackbar('Selecione um grupo para remover.', { variant: 'warning' });
+      return;
+    }
+    const nome = grupoSelecionado;
+    setGruposPedidos((prev) => {
+      const next = { ...prev };
+      delete next[nome];
+      return next;
+    });
+    setGrupoSelecionado('');
+    if (grupoAtivo === nome) {
+      setGrupoAtivo('');
+    }
+    enqueueSnackbar(`Grupo "${nome}" removido.`, { variant: 'info' });
+  };
+
+  const handleMapMarkerClick = (mapMarkers: MapMarker[]) => {
+    const ids = mapMarkers
+      .filter((marker) => marker.type === 'delivery' && marker.id)
+      .map((marker) => marker.id as string);
+
+    if (ids.length === 0) return;
+
+    setSelecionadas(ids);
+    setManualOrder(ids);
+    setExpandedBairros(new Set(notas
+      .filter((nota) => ids.includes(nota.numero))
+      .map((nota) => nota.cliente?.bairro || 'Não Informado')));
+  };
+
+  const handleMarkerMove = (id: string, lat: number, lng: number) => {
+    if (id === 'base') {
+      setBaseCoords([lat, lng]);
+      setMarkers((prev) => prev.map((marker) => marker.id === id ? { ...marker, lat, lng } : marker));
+      setRouteWaypoints((prev) => prev.length ? [[lat, lng], ...prev.slice(1)] : prev);
+      setRouteGeometry([]);
+      enqueueSnackbar('Ponto de partida ajustado. Gere a rota novamente para recalcular o trajeto.', { variant: 'info' });
+      return;
+    }
+
+    setMarkers((prev) => {
+      const updated = prev.map((marker) => marker.id === id ? { ...marker, lat, lng } : marker);
+      const orderedDeliveries = updated.filter((marker) => marker.type === 'delivery');
+      setRouteWaypoints([
+        baseCoords,
+        ...orderedDeliveries.map((marker) => [marker.lat, marker.lng] as [number, number])
+      ]);
+      return updated;
+    });
+
+    setNotas((prev) => prev.map((nota) => nota.numero === id
+      ? { ...nota, coords: { lat, lng }, statusGeocoding: 'success' }
+      : nota));
+    setRouteGeometry([]);
+    enqueueSnackbar('Ponto de entrega ajustado. Gere a rota novamente para recalcular o trajeto.', { variant: 'info' });
+  };
+
+  const haversineDistanceKm = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  };
+
+  const ordenarPorProximidade = (entregas: MapMarker[]) => {
+    const unvisited = [...entregas];
+    const ordered: MapMarker[] = [];
+    let current: [number, number] = baseCoords;
+
+    while (unvisited.length > 0) {
+      let nearestIndex = 0;
+      let minDist = Infinity;
+
+      for (let i = 0; i < unvisited.length; i++) {
+        const d = haversineDistanceKm(current[0], current[1], unvisited[i].lat, unvisited[i].lng);
+        if (d < minDist) {
+          minDist = d;
+          nearestIndex = i;
+        }
+      }
+
+      const nearest = unvisited.splice(nearestIndex, 1)[0];
+      ordered.push(nearest);
+      current = [nearest.lat, nearest.lng];
+    }
+
+    return ordered;
   };
 
   const handleGerarRota = async () => {
@@ -272,125 +683,173 @@ const RoteirizacaoPage = () => {
       enqueueSnackbar('Selecione pelo menos uma nota.', { variant: 'warning' });
       return;
     }
-
     setGeocoding(true);
     const novasMarkers: MapMarker[] = [];
     const waypoints: [number, number][] = [];
-
-    const selecionadasOrdenadas = [...selecionadas].sort((a, b) => {
-      const notaA = notas.find(n => n.numero === a);
-      const notaB = notas.find(n => n.numero === b);
-      return (notaA?.cliente?.cep || '').localeCompare(notaB?.cliente?.cep || '');
-    });
-
+    const manualSequence = [
+      ...manualOrder.filter((numero) => selecionadas.includes(numero)),
+      ...selecionadas.filter((numero) => !manualOrder.includes(numero)),
+    ];
+    const selecionadasOrdenadas = modoRota === 'manual' ? manualSequence : [...selecionadas];
+    if (modoRota === 'manual') {
+      setManualOrder(manualSequence);
+    }
     waypoints.push(baseCoords);
-
     novasMarkers.push({
       lat: baseCoords[0],
       lng: baseCoords[1],
       label: 'CD: Esplendor Atacadista',
-      details: 'Ponto de Partida (Águas Lindas)',
+      details: 'Ponto de partida: Área Especial para Indústria 11, Lote 11 a 14, Galpão 03 - Sobradinho, Brasília - DF',
       id: 'base',
       type: 'start'
     });
-
     let successCount = 0;
     let errorCount = 0;
-
     try {
       for (let i = 0; i < selecionadasOrdenadas.length; i++) {
         const numero = selecionadasOrdenadas[i];
-        const nota = notas.find(n => n.numero === numero);
-
-
-        if (nota && nota.cliente) {
-          setNotas(prev => prev.map(n => n.numero === nota.numero ? { ...n, statusGeocoding: 'loading' } : n));
-
-          if (i % 5 === 0) {
-            enqueueSnackbar(`Localizando endereços... ${i + 1}/${selecionadasOrdenadas.length}`, { variant: 'info', autoHideDuration: 2000 });
-          }
-
-          let bairro = nota.cliente.bairro;
-          let cidade = nota.cliente.cidade;
-
-          // Automatic CEP Enrichment if data is missing
-          if (nota.cliente.cep && (!bairro || !cidade)) {
-
-            console.log(`[Roteirizacao] CEP Enrichment for note ${nota.numero}`);
-            const cepData = await CEPService.buscarCEP(nota.cliente.cep);
-            if (cepData) {
-              bairro = bairro || cepData.bairro || '';
-              cidade = cidade || cepData.localidade || '';
-              if (!nota.cliente.estado) nota.cliente.estado = cepData.uf || '';
-
-              // Atualizar para o usuário ver e corrigir endereço
-              setNotas(prev => prev.map(n => n.numero === nota.numero ? {
-                ...n,
-                cliente: {
-                  ...n.cliente,
-                  endereco: n.cliente?.endereco || cepData.logradouro || '',
-                  bairro: bairro,
-                  cidade: cidade,
-                  estado: n.cliente?.estado || cepData.uf || ''
-                }
-              } : n));
-            }
-          }
-
-          // Rescue logic: se cidade/bairro em branco, assumir Brasília/DF se for o contexto
-          if (!cidade && (nota.cliente.estado === 'DF' || !nota.cliente.estado)) {
-            cidade = 'Brasília';
-            if (!nota.cliente.estado) nota.cliente.estado = 'DF';
-          }
-
-
-          const logradouroComNumero = `${nota.cliente.endereco}${nota.numeroEndereco ? ' ' + nota.numeroEndereco : ''}`;
-          const enderecoStr = [
-            nota.cliente.endereco,
-            nota.numeroEndereco,
-            bairro,
-            cidade,
-            nota.cliente.estado,
-            nota.cliente.cep
-          ].filter(Boolean).map(s => String(s).trim()).filter(s => s !== '' && s !== 'undefined').join(', ');
-
-
-
-          
-          console.log(`[Roteirizacao] Geocodificando (${i + 1}/${selecionadasOrdenadas.length}): ${enderecoStr}`);
-
-          const coords = await GeocodingService.geocode(enderecoStr);
-          
-          if (coords) {
-            setNotas(prev => prev.map(n => n.numero === nota.numero ? { ...n, statusGeocoding: 'success' } : n));
-            novasMarkers.push({
-              lat: coords.lat,
-              lng: coords.lng,
-              label: `NFe ${nota.numero}`,
-              details: `Cliente: ${nota.cliente.nome}\nEndereço: ${logradouroComNumero}\nBairro: ${nota.cliente.bairro}\nCidade: ${nota.cliente.cidade}\nEstado: ${nota.cliente.estado}\nCEP: ${nota.cliente.cep}`,
-              id: nota.numero,
-              type: 'delivery'
-            });
-            waypoints.push([coords.lat, coords.lng]);
-            successCount++;
-          } else {
-            setNotas(prev => prev.map(n => n.numero === nota.numero ? { ...n, statusGeocoding: 'error', erroMensagem: 'Endereço não encontrado (tentado: Completo, Sem Número e CEP)' } : n));
-            console.warn(`[Roteirizacao] Não foi possível encontrar coordenadas para: ${enderecoStr}`);
-            errorCount++;
-          }
-
-
-
-          if (i < selecionadasOrdenadas.length - 1) {
-            await new Promise(resolve => setTimeout(resolve, 1100));
+        const nota = notas.find((n) => n.numero === numero);
+        if (!nota || !nota.cliente) {
+          continue;
+        }
+        setNotas((prev) => prev.map((n) => n.numero === nota.numero ? { ...n, statusGeocoding: 'loading' } : n));
+        if (i % 5 === 0) {
+          enqueueSnackbar(`Localizando endereços... ${i + 1}/${selecionadasOrdenadas.length}`, { variant: 'info', autoHideDuration: 2000 });
+        }
+        let bairro = nota.cliente.bairro;
+        let cidade = nota.cliente.cidade;
+        if (nota.cliente.cep && (!bairro || !cidade)) {
+          console.log(`[Roteirizacao] CEP enrichment for note ${nota.numero}`);
+          const cepData = await CEPService.buscarCEP(nota.cliente.cep);
+          if (cepData) {
+            bairro = bairro || cepData.bairro || '';
+            cidade = cidade || cepData.localidade || '';
+            if (!nota.cliente.estado) nota.cliente.estado = cepData.uf || '';
+            setNotas((prev) => prev.map((n) => n.numero === nota.numero ? {
+              ...n,
+              cliente: {
+                ...n.cliente,
+                endereco: n.cliente?.endereco || cepData.logradouro || '',
+                bairro,
+                cidade,
+                estado: n.cliente?.estado || cepData.uf || ''
+              }
+            } : n));
           }
         }
+        if (!cidade && (nota.cliente.estado === 'DF' || !nota.cliente.estado)) {
+          cidade = 'Brasilia';
+          if (!nota.cliente.estado) nota.cliente.estado = 'DF';
+        }
+
+        const logradouroComNumero = `${nota.cliente.endereco}${nota.numeroEndereco ? ' ' + nota.numeroEndereco : ''}`;
+        const cidadeBusca = cidade ? cidade.replace(/^Brasilia$/i, 'Brasília') : cidade;
+        const enderecoStr = [
+          logradouroComNumero,
+          bairro,
+          cidadeBusca,
+          nota.cliente.estado,
+          nota.cliente.cep
+        ]
+          .filter(Boolean)
+          .map((s) => String(s).trim())
+          .filter((s) => s !== '' && s !== 'undefined')
+          .join(', ');
+
+        console.log(`[Roteirizacao] Geocodificando (${i + 1}/${selecionadasOrdenadas.length}): ${enderecoStr}`);
+
+        const coords = await GeocodingService.geocode(enderecoStr);
+        if (coords) {
+          const valorPedido = parseNumber(nota.valor);
+          const pesoPedido = parseNumber(nota.peso);
+          const alertaPerfil6m = getPerfil6mAlerta(nota);
+          const perfil6mResumo = alertaPerfil6m?.loading
+            ? '\nATENÇÃO Perfil 6m: validando...'
+            : alertaPerfil6m?.hasPerfil6m
+              ? `\nATENÇÃO Perfil 6m: ${formatQuantidade(alertaPerfil6m.totalQuantidade)} un.`
+              : '';
+
+          setNotas((prev) => prev.map((n) => n.numero === nota.numero ? {
+            ...n,
+            statusGeocoding: 'success',
+            coords: { lat: coords.lat, lng: coords.lng }
+          } : n));
+
+          novasMarkers.push({
+            lat: coords.lat,
+            lng: coords.lng,
+            label: `NFe ${nota.numero}`,
+            details: `Cliente: ${nota.cliente.nome}\nPedido: ${nota.orcamentoId || '---'}\nEndereço: ${logradouroComNumero}\nBairro: ${nota.cliente.bairro}\nCidade: ${nota.cliente.cidade}\nEstado: ${nota.cliente.estado}\nCEP: ${nota.cliente.cep}\nValor: ${formatCurrency(valorPedido)}\nPeso: ${formatPeso(pesoPedido)}${perfil6mResumo}\nLocalização: ${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`,
+            id: nota.numero,
+            type: 'delivery',
+            valorPedido,
+            pesoPedido,
+            clienteNome: nota.cliente.nome || '',
+            bairro: nota.cliente.bairro || '',
+            cidade: nota.cliente.cidade || '',
+            orcamentoId: nota.orcamentoId
+          });
+
+          waypoints.push([coords.lat, coords.lng]);
+          successCount++;
+        } else {
+          setNotas((prev) => prev.map((n) => n.numero === nota.numero ? {
+            ...n,
+            statusGeocoding: 'error',
+            erroMensagem: 'Endereco nao encontrado (tentado: completo, sem numero e CEP)'
+          } : n));
+          console.warn(`[Roteirizacao] Não foi possível encontrar coordenadas para: ${enderecoStr}`);
+          errorCount++;
+        }
+        if (i < selecionadasOrdenadas.length - 1) {
+          await new Promise((resolve) => setTimeout(resolve, 1100));
+        }
       }
-
-      setMarkers(novasMarkers);
-      setRouteWaypoints(waypoints);
-
-      if (waypoints.length > 1) {
+      const markerBase = novasMarkers.find((marker) => marker.type === 'start');
+      const entregas = novasMarkers.filter((marker) => marker.type === 'delivery');
+      const entregasOrdenadas = modoRota === 'proximidade' ? ordenarPorProximidade(entregas) : entregas;
+      const entregasComSequencia = entregasOrdenadas.map((marker, index) => ({
+        ...marker,
+        sequence: index + 1,
+      }));
+      const markersFinais = markerBase ? [markerBase, ...entregasComSequencia] : entregasComSequencia;
+      const waypointsFinais: [number, number][] = [
+        baseCoords,
+        ...entregasComSequencia.map((marker) => [marker.lat, marker.lng] as [number, number])
+      ];
+      setMarkers(markersFinais);
+      setRouteWaypoints(waypointsFinais);
+      const ordemAtualizada = entregasComSequencia
+        .map((marker) => marker.id)
+        .filter(Boolean) as string[];
+      if (ordemAtualizada.length > 0) {
+        setManualOrder(ordemAtualizada);
+        if (modoRota === 'proximidade') {
+          setSelecionadas(ordemAtualizada);
+        }
+      }
+      if (waypointsFinais.length >= 2) {
+        try {
+          const routeResult = await RoutingService.calculateRoute(waypointsFinais);
+          setRouteGeometry([{
+            geometry: routeResult.geometry.map((c: [number, number]) => [c[1], c[0]]),
+            regiao: 0,
+            distance: routeResult.distance,
+            duration: routeResult.duration
+          }]);
+        } catch (routeError: any) {
+          console.error('Erro ao calcular rota:', routeError);
+          if (routeError.message.includes('25 waypoints')) {
+            enqueueSnackbar('Rota muito grande. Selecione no máximo 25 pontos para otimização.', { variant: 'warning' });
+          } else {
+            enqueueSnackbar('Erro ao calcular rota otimizada. Usando linhas retas.', { variant: 'error' });
+          }
+          setRouteGeometry([]);
+        }
+      } else {
+        setRouteGeometry([]);
+      }
+      if (waypointsFinais.length > 1) {
         if (errorCount > 0) {
           enqueueSnackbar(`Rota gerada! ${successCount} entregas localizadas, ${errorCount} com erro.`, { variant: 'warning', autoHideDuration: 5000 });
         } else {
@@ -404,8 +863,6 @@ const RoteirizacaoPage = () => {
       setGeocoding(false);
     }
   };
-
-
 
   const handleRoutingError = (error: any) => {
     console.error('Erro de roteirização capturado:', error);
@@ -421,77 +878,18 @@ const RoteirizacaoPage = () => {
   };
 
 
-  const handleSelecionarProximas = () => {
-    if (notas.length === 0) return;
-    
-    // Calcular distância de todas as notas para a base
-    const comDistancia = notas.map(n => {
-      // Se não tiver markers (não foi geocodificada), não podemos calcular proximidade real
-      // mas podemos tentar pelo CEP ou apenas deixar pro final
-      const marker = markers.find(m => m.id === n.numero);
-      if (marker) {
-        const dist = Math.sqrt(Math.pow(marker.lat - baseCoords[0], 2) + Math.pow(marker.lng - baseCoords[1], 2));
-        return { numero: n.numero, dist };
-      }
-      return { numero: n.numero, dist: Infinity };
-    });
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
 
-    // Ordenar por distância
-    comDistancia.sort((a, b) => a.dist - b.dist);
-    
-    // Pegar as 15 primeiras (que não sejam a base)
-    const proximas = comDistancia.slice(0, 15).map(x => x.numero);
-    setSelecionadas(proximas);
-    enqueueSnackbar('Selecionadas as 15 entregas mais próximas localizadas.', { variant: 'success' });
-  };
-
-  const handleOtimizarRota = () => {
-    if (markers.length <= 2) {
-      if (markers.length === 2) {
-        setRouteWaypoints(markers.map(m => [m.lat, m.lng]));
-      }
-      return;
+    if (over && active.id !== over.id) {
+      setManualOrder((items) => {
+        const oldIndex = items.indexOf(active.id as string);
+        const newIndex = items.indexOf(over.id as string);
+        const newItems = arrayMove(items, oldIndex, newIndex);
+        setSelecionadas(newItems);
+        return newItems;
+      });
     }
-
-    const haversineDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-      const R = 6371;
-      const dLat = (lat2 - lat1) * Math.PI / 180;
-      const dLon = (lon2 - lon1) * Math.PI / 180;
-      const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-                Math.sin(dLon/2) * Math.sin(dLon/2);
-      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-      return R * c;
-    };
-
-    const unvisited = [...markers.filter(m => m.type !== 'start')];
-    let currentPos: [number, number] = baseCoords;
-    const optimizedWaypoints: [number, number][] = [baseCoords];
-    let totalDistance = 0;
-
-    while (unvisited.length > 0) {
-      let nearestIdx = 0;
-      let minDistance = Infinity;
-
-      for (let i = 0; i < unvisited.length; i++) {
-        const d = haversineDistance(
-          currentPos[0], currentPos[1],
-          unvisited[i].lat, unvisited[i].lng
-        );
-        if (d < minDistance) {
-          minDistance = d;
-          nearestIdx = i;
-        }
-      }
-
-      const nearest = unvisited.splice(nearestIdx, 1)[0];
-      optimizedWaypoints.push([nearest.lat, nearest.lng]);
-      totalDistance += minDistance;
-      currentPos = [nearest.lat, nearest.lng];
-    }
-
-    setRouteWaypoints(optimizedWaypoints);
-    enqueueSnackbar(`Rota otimizada! Distância total: ~${Math.round(totalDistance)} km`, { variant: 'success' });
   };
 
   const handleImprimir = () => {
@@ -509,6 +907,8 @@ const RoteirizacaoPage = () => {
     setSelecionadas([]);
     setMarkers([]);
     setRouteWaypoints([]);
+    setRouteGeometry([]);
+    setPerfil6mAlertas({});
     setBusca('');
     setSelectedBairro(null);
   };
@@ -532,113 +932,85 @@ const RoteirizacaoPage = () => {
           url: googleMapsUrl
         });
         return;
-      } catch (err) {
-        // Usuário cancelou ou não suportado, tentar copiar
+      } catch {
+        // Usuario cancelou ou nao suportado, tentar copiar
       }
     }
 
-    // Fallback: copiar para a área de transferência
+    // Fallback: copiar para a area de transferencia
     try {
       await navigator.clipboard.writeText(shareText);
       enqueueSnackbar('Link de localização copiado!', { variant: 'success' });
-    } catch (err) {
-      // Fallback final: abrir no Google Maps
-      window.open(googleMapsUrl, '_blank');
+    } catch {
+      enqueueSnackbar('Não foi possível compartilhar a localização.', { variant: 'error' });
     }
-  };
-
-  const handleOpenGoogleMaps = (nota: NotaExterna) => {
-    const marker = markers.find(m => m.id === nota.numero);
-    if (!marker) {
-      enqueueSnackbar('Localização não disponível. Gere a rota primeiro.', { variant: 'warning' });
-      return;
-    }
-    const url = `https://www.google.com/maps?q=${marker.lat},${marker.lng}`;
-    window.open(url, '_blank');
   };
 
   return (
-    <AppLayout title="Roteirização Inteligente" subtitle="Otimização de rotas para entregas">
+    <AppLayout title="Roteirização Inteligente" subtitle="Otimização de rotas para entregas" fluid>
       <Container maxWidth="xl" sx={{ py: 2 }}>
 
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
 
-        <Box display="flex" alignItems="center" gap={2}>
-          <Box display="flex" alignItems="center" gap={1}>
-            <Typography variant="body2" color="text.secondary">Carregar:</Typography>
+        <Box display="flex" alignItems="center" gap={1} flexWrap="wrap" sx={{ '& .MuiButton-root': { minHeight: 34 } }}>
+          <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
+            <Typography variant="caption" color="text.secondary" fontWeight={700}>Carregar:</Typography>
             <ToggleButtonGroup
               value={daysToLoad}
               exclusive
               onChange={(e, val) => val && setDaysToLoad(val)}
               size="small"
+              sx={{
+                '& .MuiToggleButton-root': {
+                  px: 1,
+                  py: 0.45,
+                  fontSize: '0.72rem',
+                  lineHeight: 1.1
+                }
+              }}
             >
               <ToggleButton value={1}>Hoje</ToggleButton>
               <ToggleButton value={3}>3 dias</ToggleButton>
               <ToggleButton value={7}>7 dias</ToggleButton>
-              <ToggleButton value={14}>14 dias</ToggleButton>
-              <ToggleButton value={30}>30 dias</ToggleButton>
             </ToggleButtonGroup>
           </Box>
           <Button
             variant="contained"
             color="primary"
-            size="large"
-            startIcon={loadingEntregas ? <CircularProgress size={20} color="inherit" /> : <ShippingIcon />}
+            size="small"
+            startIcon={loadingEntregas ? <CircularProgress size={16} color="inherit" /> : <ShippingIcon fontSize="small" />}
             onClick={() => handleCarregarEntregas(daysToLoad)}
             disabled={loadingEntregas}
             sx={{
-              borderRadius: '12px',
-              px: 4,
-              py: 1.5,
-              fontWeight: 'bold',
-              boxShadow: '0 4px 14px 0 rgba(37, 99, 235, 0.39)',
-              '&:hover': {
-                boxShadow: '0 6px 20px rgba(37, 99, 235, 0.23)',
-              }
+              borderRadius: '9px',
+              px: 1.5,
+              py: 0.7,
+              fontWeight: 800,
+              fontSize: '0.76rem',
+              boxShadow: '0 3px 10px rgba(37, 99, 235, 0.22)'
             }}
           >
-            {loadingEntregas ? 'Carregando...' : `Carregar Entregas (${daysToLoad} dia${daysToLoad > 1 ? 's' : ''})`}
+            {loadingEntregas ? 'Carregando...' : `Entregas (${daysToLoad}d)`}
           </Button>
-          {/* <Button
-            variant="outlined"
-            color="primary"
-            startIcon={<LocationOnIcon />}
-            onClick={handleSelecionarProximas}
-            disabled={markers.length === 0}
-            sx={{ borderRadius: '12px' }}
-          >
-            Selecionar 15 Próximas
-          </Button>
-
           <Button
             variant="outlined"
             size="small"
-            startIcon={<SearchIcon />}
-            onClick={() => {
-              console.log('DEBUG Pedidos:', notas);
-              enqueueSnackbar('Dados dos pedidos logados no console (F12)', { variant: 'info' });
-            }}
-            sx={{ borderRadius: '12px' }}
-          >
-            Debug Dados
-          </Button> */}
-          <Button 
-            variant="outlined" 
-            startIcon={<RefreshIcon />} 
+            startIcon={<RefreshIcon fontSize="small" />}
             onClick={limparTudo}
-            sx={{ borderRadius: '12px' }}
+            sx={{ borderRadius: '9px', px: 1.25, fontSize: '0.75rem' }}
           >
-            Limpar Tudo
+            Limpar
           </Button>
-          <Button 
-            variant="contained" 
+          <Button
+            variant="contained"
             color="secondary"
-            startIcon={<RouteIcon />} 
+            size="small"
+            startIcon={<RouteIcon fontSize="small" />}
             onClick={handleImprimir}
             disabled={markers.length <= 1}
-            sx={{ borderRadius: '12px' }}
+            sx={{ borderRadius: '9px', px: 1.25, fontSize: '0.75rem' }}
           >
-            Imprimir Rota (PDF)
+            PDF
           </Button>
         </Box>
       </Box>
@@ -646,15 +1018,23 @@ const RoteirizacaoPage = () => {
 
 
       <Grid container spacing={3}>
-        {/* Lado Esquerdo: Busca e Lista */}
-        <Grid item xs={12} md={4}>
+        {/* Painel de seleção abaixo do mapa */}
+        <Grid item xs={12} md={12} sx={{ order: { xs: 2, md: 2 } }}>
           <Card sx={{ height: '100%', borderRadius: '16px', boxShadow: 3 }}>
-            <CardContent>
-              <Typography variant="h6" gutterBottom fontWeight="600">
-                Selecionar Entregas
-              </Typography>
+            <CardContent sx={{ p: { xs: 1.5, md: 2 }, '&:last-child': { pb: { xs: 1.5, md: 2 } } }}>
+              <Box display="flex" alignItems="center" justifyContent="space-between" gap={1} mb={1.5} flexWrap="wrap">
+                <Typography variant="subtitle1" fontWeight="700">
+                  Selecionar Entregas
+                </Typography>
+                <Chip
+                  size="small"
+                  variant="outlined"
+                  label={`${selecionadas.length}/${notas.length} selecionadas`}
+                  sx={{ fontWeight: 700 }}
+                />
+              </Box>
               
-              <Box display="flex" gap={1} mb={3}>
+              <Box display="flex" gap={1} mb={1.5}>
                 <TextField
                   fullWidth
                   size="small"
@@ -668,20 +1048,36 @@ const RoteirizacaoPage = () => {
                 />
                 <Button 
                   variant="contained" 
+                  size="small"
                   onClick={handleBuscar}
                   disabled={loading}
+                  sx={{ minWidth: 64, borderRadius: '9px', fontWeight: 800 }}
                 >
-                  {loading ? <CircularProgress size={24} /> : 'Add'}
+                  {loading ? <CircularProgress size={18} color="inherit" /> : 'Add'}
                 </Button>
               </Box>
 
-              <Divider sx={{ mb: 2 }} />
+              <Divider sx={{ mb: 1.5 }} />
 
               <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
                 <Typography variant="subtitle2" color="text.secondary">
-                  {selecionadas.length} de {notas.length} selecionadas
+                  Resumo da seleção
                 </Typography>
-                <Box>
+                <Box display="flex" gap={1} alignItems="center">
+                  {loadingPerfil6m && (
+                    <Chip
+                      size="small"
+                      label="Atenção: validando perfil 6m..."
+                      variant="outlined"
+                      sx={{
+                        fontSize: '10px',
+                        color: perfil6mOrangeDark,
+                        borderColor: perfil6mOrange,
+                        bgcolor: perfil6mOrangeBg,
+                        fontWeight: 800
+                      }}
+                    />
+                  )}
                   <Chip 
                     size="small" 
                     label="Falhas" 
@@ -693,6 +1089,156 @@ const RoteirizacaoPage = () => {
                   />
 
                 </Box>
+              </Box>
+
+              <Box display="flex" gap={1} flexWrap="wrap" mb={2}>
+                <Chip
+                  size="small"
+                  color="primary"
+                  variant="outlined"
+                  label={`Selecionadas: ${resumoSelecionadas.quantidade}`}
+                />
+                <Chip
+                  size="small"
+                  color="success"
+                  variant="outlined"
+                  label={`Valor: ${formatCurrency(resumoSelecionadas.valorTotal)}`}
+                />
+                <Chip
+                  size="small"
+                  color="info"
+                  variant="outlined"
+                  label={`Peso: ${formatPeso(resumoSelecionadas.pesoTotal)}`}
+                />
+              </Box>
+
+              <Box
+                sx={{
+                  mb: 2,
+                  p: 1.5,
+                  borderRadius: '10px',
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  bgcolor: 'background.default'
+                }}
+              >
+                <Typography variant="caption" fontWeight="bold" sx={{ display: 'block', mb: 1 }}>
+                  Planejamento de rota
+                </Typography>
+
+                <TextField
+                  select
+                  fullWidth
+                  size="small"
+                  label="Modo da rota"
+                  value={modoRota}
+                  onChange={(e) => setModoRota(e.target.value as 'manual' | 'proximidade')}
+                  sx={{ mb: 1 }}
+                >
+                  <MenuItem value="manual">Manual (ordem definida pelo usuário)</MenuItem>
+                  <MenuItem value="proximidade">Automática por proximidade</MenuItem>
+                </TextField>
+
+                <Box display="flex" gap={1} mb={1}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Nome do grupo"
+                    value={nomeGrupo}
+                    onChange={(e) => setNomeGrupo(e.target.value)}
+                  />
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={handleSalvarGrupoSelecionado}
+                  >
+                    Salvar
+                  </Button>
+                </Box>
+
+                <Box display="flex" gap={1}>
+                  <TextField
+                    select
+                    fullWidth
+                    size="small"
+                    label="Grupo salvo"
+                    value={grupoSelecionado}
+                    onChange={(e) => setGrupoSelecionado(e.target.value)}
+                  >
+                    <MenuItem value="">Selecione</MenuItem>
+                    {Object.keys(gruposPedidos).map((grupo) => (
+                      <MenuItem key={grupo} value={grupo}>
+                        {grupo} ({gruposPedidos[grupo]?.length || 0})
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={() => handleAplicarGrupo()}
+                    disabled={!grupoSelecionado}
+                  >
+                    Aplicar
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    color="error"
+                    size="small"
+                    onClick={handleRemoverGrupo}
+                    disabled={!grupoSelecionado}
+                  >
+                    Excluir
+                  </Button>
+                </Box>
+
+                {Object.keys(gruposPedidos).length > 0 && (
+                  <Box mt={1.5}>
+                    <Typography variant="caption" fontWeight="bold" sx={{ display: 'block', mb: 1 }}>
+                      Agrupamentos
+                    </Typography>
+                    <Box display="flex" gap={1} flexWrap="wrap">
+                      {Object.entries(gruposPedidos).map(([grupo, pedidos]) => (
+                        <Chip
+                          key={grupo}
+                          size="small"
+                          clickable
+                          color={grupoAtivo === grupo ? 'primary' : 'default'}
+                          variant={grupoAtivo === grupo ? 'filled' : 'outlined'}
+                          label={`${grupo} (${pedidos.length})`}
+                          onClick={() => handleAplicarGrupo(grupo)}
+                          sx={{ fontWeight: 700 }}
+                        />
+                      ))}
+                    </Box>
+                    {grupoAtivo && gruposPedidos[grupoAtivo] && (
+                      <Box mt={1.5} sx={{ maxHeight: 150, overflowY: 'auto' }}>
+                        {gruposPedidos[grupoAtivo].map((numero) => {
+                          const pedido = notas.find((nota) => nota.numero === numero);
+                          return (
+                            <Box
+                              key={numero}
+                              sx={{
+                                p: 1,
+                                mb: 0.75,
+                                borderRadius: '8px',
+                                bgcolor: 'background.paper',
+                                border: '1px solid',
+                                borderColor: 'divider'
+                              }}
+                            >
+                              <Typography variant="caption" fontWeight={800} display="block">
+                                Pedido {pedido?.orcamentoId || numero}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary" display="block" noWrap>
+                                {pedido?.cliente?.nome || 'Cliente não informado'}
+                              </Typography>
+                            </Box>
+                          );
+                        })}
+                      </Box>
+                    )}
+                  </Box>
+                )}
               </Box>
 
               <List sx={{ maxHeight: '420px', overflowY: 'auto', pr: 1 }}>
@@ -708,13 +1254,30 @@ const RoteirizacaoPage = () => {
                         borderBottom: '1px solid #f0f0f0',
                         mb: 1,
                         cursor: 'pointer',
-                        '&:hover': { bgcolor: 'action.hover' }
+                        '&:hover': { bgcolor: 'action.hover' },
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between'
                       }}
-                      onClick={() => setSelectedBairro(selectedBairro === bairro ? null : bairro)}
+                      onClick={() => {
+                        setSelectedBairro(selectedBairro === bairro ? null : bairro);
+                        setExpandedBairros(prev => {
+                          const newSet = new Set(prev);
+                          if (newSet.has(bairro)) {
+                            newSet.delete(bairro);
+                          } else {
+                            newSet.add(bairro);
+                          }
+                          return newSet;
+                        });
+                      }}
                     >
-                      {bairro} ({notasDoBairro.length})
+                      <span>{bairro} ({notasDoBairro.length})</span>
+                      {expandedBairros.has(bairro) ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
                     </ListSubheader>
-                    {notasDoBairro.map((nota) => (
+                    {expandedBairros.has(bairro) && notasDoBairro.map((nota) => {
+                      const alertaPerfil6m = getPerfil6mAlerta(nota);
+                      return (
                       <ListItem 
                         key={nota.numero} 
                         disablePadding
@@ -739,6 +1302,51 @@ const RoteirizacaoPage = () => {
                               <Typography variant="caption" color="text.secondary" display="block">
                                 {nota.cliente?.bairro} {nota.cliente?.cidade ? ` - ${nota.cliente.cidade}` : ''}
                               </Typography>
+                              <Typography variant="caption" color="text.secondary" display="block" sx={{ fontWeight: 500 }}>
+                                Valor: {formatCurrency(nota.valor)} | Peso: {formatPeso(nota.peso)}
+                              </Typography>
+                              {nota.coords && (
+                                <Typography variant="caption" color="text.secondary" display="block" sx={{ fontSize: '10px' }}>
+                                  Lat/Lng: {nota.coords.lat.toFixed(5)}, {nota.coords.lng.toFixed(5)}
+                                </Typography>
+                              )}
+                              {alertaPerfil6m?.loading && (
+                                <Chip
+                                  size="small"
+                                  label="Atenção: validando perfil 6m..."
+                                  variant="outlined"
+                                  sx={{
+                                    mt: 0.5,
+                                    height: 18,
+                                    fontSize: '10px',
+                                    color: perfil6mOrangeDark,
+                                    borderColor: perfil6mOrange,
+                                    bgcolor: perfil6mOrangeBg,
+                                    fontWeight: 800
+                                  }}
+                                />
+                              )}
+                              {!alertaPerfil6m?.loading && alertaPerfil6m?.hasPerfil6m && (
+                                <Box mt={0.5}>
+                                  <Chip
+                                    size="small"
+                                    label={`Atenção perfil 6m: ${formatQuantidade(alertaPerfil6m.totalQuantidade)}`}
+                                    sx={{
+                                      height: 20,
+                                      fontSize: '10px',
+                                      fontWeight: 900,
+                                      color: '#fff',
+                                      bgcolor: perfil6mOrange,
+                                      '& .MuiChip-label': { px: 1 }
+                                    }}
+                                  />
+                                  {alertaPerfil6m.itens.slice(0, 2).map((item, idx) => (
+                                    <Typography key={`${item.produtoNome}-${idx}`} variant="caption" display="block" sx={{ fontSize: '10px', mt: 0.25, color: perfil6mOrangeDark, fontWeight: 700 }}>
+                                      {item.produtoNome} ({formatQuantidade(item.quantidade)})
+                                    </Typography>
+                                  ))}
+                                </Box>
+                              )}
 
 
                               {nota.statusGeocoding === 'error' && (
@@ -760,11 +1368,6 @@ const RoteirizacaoPage = () => {
                         {nota.statusGeocoding === 'success' && (
                           <Box display="flex" alignItems="center" gap={0.5} ml={1}>
                             <Chip size="small" label="OK" color="success" variant="outlined" sx={{ fontSize: '9px', height: '18px' }} />
-                            <MuiTooltip title="Abrir no Google Maps">
-                              <IconButton size="small" onClick={() => handleOpenGoogleMaps(nota)} sx={{ p: 0.3 }}>
-                                <OpenInNewIcon sx={{ fontSize: '14px', color: 'primary.main' }} />
-                              </IconButton>
-                            </MuiTooltip>
                             <MuiTooltip title="Compartilhar localização">
                               <IconButton size="small" onClick={() => handleShareLocation(nota)} sx={{ p: 0.3 }}>
                                 <ShareIcon sx={{ fontSize: '14px', color: 'secondary.main' }} />
@@ -774,7 +1377,8 @@ const RoteirizacaoPage = () => {
                         )}
                         {nota.statusGeocoding === 'error' && <Chip size="small" label="Erro" color="error" variant="outlined" sx={{ ml: 1, fontSize: '9px', height: '18px' }} />}
                       </ListItem>
-                    ))}
+                    );
+                    })}
                   </React.Fragment>
                 ))}
                 
@@ -786,52 +1390,68 @@ const RoteirizacaoPage = () => {
               </List>
 
 
+              {selecionadas.length > 0 && (
+                <Box mt={3}>
+                  <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+                    Ordem da Rota (Arraste para reordenar)
+                  </Typography>
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleDragEnd}
+                  >
+                    <SortableContext items={manualOrder} strategy={verticalListSortingStrategy}>
+                      <List sx={{ maxHeight: '200px', overflowY: 'auto', pr: 1 }}>
+                        {manualOrder.map((numero) => {
+                          const nota = notas.find(n => n.numero === numero);
+                          return (
+                            <SortableItem key={numero} id={numero}>
+                              <ListItem
+                                sx={{
+                                  mb: 1,
+                                  borderRadius: '8px',
+                                  bgcolor: 'action.selected',
+                                  '&:hover': { bgcolor: 'action.hover' },
+                                  cursor: 'grab',
+                                  '&:active': { cursor: 'grabbing' }
+                                }}
+                              >
+                                <DragIndicatorIcon sx={{ mr: 1, color: 'text.secondary' }} />
+                                <ListItemText
+                                  primary={`Nota ${nota?.numero}`}
+                                  secondary={`${nota?.cliente?.nome} - ${nota?.cliente?.bairro}`}
+                                />
+                              </ListItem>
+                            </SortableItem>
+                          );
+                        })}
+                      </List>
+                    </SortableContext>
+                  </DndContext>
+                </Box>
+              )}
+
               <Box mt={3}>
                 <Button
                   fullWidth
                   variant="contained"
                   color="primary"
-                  size="large"
-                  startIcon={geocoding ? <CircularProgress size={20} color="inherit" /> : <MapIcon />}
+                  size="medium"
+                  startIcon={geocoding ? <CircularProgress size={18} color="inherit" /> : <MapIcon fontSize="small" />}
                   onClick={handleGerarRota}
                   disabled={selecionadas.length === 0 || geocoding}
-                  sx={{ borderRadius: '12px', py: 1.5 }}
+                  sx={{ borderRadius: '10px', py: 1, fontWeight: 800 }}
                 >
                   {geocoding ? 'Localizando...' : 'Visualizar no Mapa'}
                 </Button>
-                {/* <Button
-                  fullWidth
-                  variant="outlined"
-                  color="secondary"
-                  size="medium"
-                  startIcon={<RouteIcon />}
-                  onClick={handleOtimizarRota}
-                  disabled={markers.length <= 1 || geocoding}
-                  sx={{ borderRadius: '12px', mt: 1 }}
-                >
-                  Roteirizar por Proximidade
-                </Button> */}
-                <Box display="flex" gap={1} mt={1}>
-                      <Button
-                        variant="outlined"
-                        startIcon={<ShippingIcon />}
-                        onClick={() => handleCarregarEntregas(7)}
-                        disabled={loadingEntregas}
-                        sx={{ borderRadius: '8px' }}
-                      >
-                        Carregar Entregas
-                      </Button>
-
-                </Box>
-
               </Box>
 
             </CardContent>
           </Card>
         </Grid>
 
-        {/* Lado Direito: Mapa */}
-        <Grid item xs={12} md={8}>
+        {/* Mapa */}
+        <Grid item xs={12} md={12} sx={{ order: { xs: 1, md: 1 } }}>
           <Card sx={{ height: '100%', borderRadius: '16px', boxShadow: 3, overflow: 'hidden' }}>
             <Box p={2} bgcolor="primary.main" color="white" display="flex" justifyContent="space-between" alignItems="center">
               <Box display="flex" alignItems="center" gap={1}>
@@ -845,22 +1465,37 @@ const RoteirizacaoPage = () => {
                   <CircularProgress size={16} sx={{ color: 'white' }} />
                 )}
                 {routeWaypoints.length > 0 && (
-                  <Chip
-                    label={`${routeWaypoints.length - 1} entregas`}
-                    size="small"
-                    sx={{ bgcolor: 'rgba(255,255,255,0.2)', color: 'white', fontWeight: 'bold' }}
-                  />
+                  <>
+                    <Chip
+                      label={`${resumoRota.totalEntregas} entregas`}
+                      size="small"
+                      sx={{ bgcolor: 'rgba(255,255,255,0.2)', color: 'white', fontWeight: 'bold' }}
+                    />
+                    <Chip
+                      label={formatCurrency(resumoRota.valorTotal)}
+                      size="small"
+                      sx={{ bgcolor: 'rgba(16,185,129,0.25)', color: 'white', fontWeight: 'bold' }}
+                    />
+                    <Chip
+                      label={formatPeso(resumoRota.pesoTotal)}
+                      size="small"
+                      sx={{ bgcolor: 'rgba(59,130,246,0.25)', color: 'white', fontWeight: 'bold' }}
+                    />
+                  </>
                 )}
               </Box>
             </Box>
             <Box sx={{ height: '600px', position: 'relative' }}>
               <Map
-                markers={markers}
+                markers={markersComRegiao}
                 routeWaypoints={routeWaypoints}
+                routeGeometry={routeGeometry}
                 height="600px"
                 center={mapCenterZoom.center}
                 zoom={mapCenterZoom.zoom}
                 onRoutingError={handleRoutingError}
+                onMarkerMove={handleMarkerMove}
+                onMarkerClick={handleMapMarkerClick}
               />
             </Box>
 

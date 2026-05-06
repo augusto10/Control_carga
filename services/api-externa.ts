@@ -1,6 +1,8 @@
 import axios, { AxiosInstance } from 'axios';
 
 const API_EXTERNA_BASE = 'http://ec2-15-229-152-29.sa-east-1.compute.amazonaws.com';
+const API_EXTERNA_TIMEOUT_MS = 45_000;
+const API_EXTERNA_LOGIN_TIMEOUT_MS = 30_000;
 
 interface LoginResponse {
   access_token: string;
@@ -59,6 +61,17 @@ interface PedidoExterno {
   [key: string]: any;
 }
 
+interface PedidoItemExterno {
+  ORCAMENTO_ID?: number;
+  ITEM_ID?: number;
+  PRODUTO_ID?: number;
+  PRODUTO_NOME?: string;
+  CODIGO_BARRAS?: string | null;
+  CODIGO_ORIGINAL?: string | null;
+  QUANTIDADE?: number;
+  [key: string]: any;
+}
+
 interface ApuracaoExterna {
   ORCAMENTO_BASE_ID?: number;
   NUMERO_NOTA?: string;
@@ -79,7 +92,7 @@ class APIExternaService {
       headers: {
         'Content-Type': 'application/json',
       },
-      timeout: 30000, // 30 segundos de timeout
+      timeout: API_EXTERNA_TIMEOUT_MS,
     });
 
     this.apiInstance.interceptors.request.use(
@@ -122,6 +135,7 @@ class APIExternaService {
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
           },
+          timeout: API_EXTERNA_LOGIN_TIMEOUT_MS,
         }
       );
 
@@ -499,6 +513,63 @@ class APIExternaService {
     }
   }
 
+  async listarItensPedido(
+    pedidoId: number | string,
+    username: string,
+    password: string,
+    filtros?: {
+      limit?: number;
+      offset?: number;
+    }
+  ): Promise<{ data: PedidoItemExterno[]; total: number; limit: number; offset: number } | null> {
+    try {
+      const authenticated = await this.ensureAuthenticated(username, password);
+      if (!authenticated) {
+        console.error('[API Externa] Falha na autenticação');
+        return null;
+      }
+
+      const params = new URLSearchParams();
+      if (typeof filtros?.limit === 'number') params.append('limit', String(filtros.limit));
+      if (typeof filtros?.offset === 'number') params.append('offset', String(filtros.offset));
+
+      const url = `/api/v1/pedidos/${pedidoId}/itens${params.toString() ? `?${params.toString()}` : ''}`;
+      console.log('[API Externa] Buscando itens do pedido:', url);
+
+      const response = await this.apiInstance.get<{
+        data?: PedidoItemExterno[];
+        total?: number;
+        limit?: number;
+        offset?: number;
+      }>(url, {
+        validateStatus: (status) => status < 500
+      });
+
+      if (response.status >= 400) {
+        console.warn(
+          `[API Externa] Falha ao buscar itens do pedido ${pedidoId}:`,
+          response.status,
+          response.statusText
+        );
+        return null;
+      }
+
+      const itens = Array.isArray(response.data?.data) ? response.data.data : [];
+      return {
+        data: itens,
+        total: typeof response.data?.total === 'number' ? response.data.total : itens.length,
+        limit: typeof response.data?.limit === 'number' ? response.data.limit : itens.length,
+        offset: typeof response.data?.offset === 'number' ? response.data.offset : filtros?.offset || 0,
+      };
+    } catch (error: any) {
+      console.error(
+        '[API Externa] Erro ao listar itens do pedido:',
+        error.response?.data || error.message
+      );
+      return null;
+    }
+  }
+
   async listarApuracoes(
     filtros: {
       data_inicio?: string;
@@ -547,4 +618,4 @@ class APIExternaService {
 }
 
 export const apiExternaService = new APIExternaService();
-export type { NotaFiscalExterna, ClienteExterna, PedidoExterno, ApuracaoExterna };
+export type { NotaFiscalExterna, ClienteExterna, PedidoExterno, PedidoItemExterno, ApuracaoExterna };
