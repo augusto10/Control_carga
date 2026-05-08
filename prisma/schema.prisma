@@ -29,6 +29,9 @@ model ControleCarga {
   imagens                   String[]       // Array de imagens em base64
   notas                     NotaFiscal[]
   pedidos                   Pedido[]
+
+  @@index([dataCriacao])
+  @@index([finalizado])
 }
 
 model Pedido {
@@ -38,6 +41,8 @@ model Pedido {
   controleId   String?
   controle     ControleCarga?   @relation(fields: [controleId], references: [id])
   conferido    PedidoConferido?
+
+  @@index([dataCriacao])
 }
 
 model NotaFiscal {
@@ -50,6 +55,8 @@ model NotaFiscal {
   volumes     String         @default("1")
   controle    ControleCarga? @relation(fields: [controleId], references: [id])
   usuario     Usuario?       @relation(fields: [usuarioId], references: [id])
+
+  @@index([dataCriacao])
 }
 
 model Usuario {

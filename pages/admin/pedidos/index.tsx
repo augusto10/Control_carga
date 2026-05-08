@@ -23,6 +23,7 @@ import {
   CheckCircle2,
   XCircle,
   AlertCircle,
+  AlertTriangle,
   ShoppingCart,
   Navigation,
   Share2,
@@ -81,6 +82,7 @@ interface PedidosResponse {
   total: number;
   limit: number;
   offset: number;
+  totalValor?: number;
   data: Pedido[];
 }
 
@@ -111,6 +113,42 @@ interface ApuracoesResponse {
   data: ApuracaoItem[];
 }
 
+interface Perfil6mItemEncontrado {
+  itemId: number | null;
+  produtoId: number | null;
+  produtoNome: string;
+  quantidade: number;
+  codigoBarras: string | null;
+  codigoOriginal: string | null;
+  referencia: {
+    codigoCatalogo: string;
+    descricao: string;
+    codigoBarras: string;
+    codigoInterno: string;
+  };
+  matchBy: 'codigo_barras' | 'codigo_original' | 'descricao';
+}
+
+interface Perfil6mPedidoAlerta {
+  pedidoId: number;
+  hasPerfil6m: boolean;
+  totalQuantidade: number;
+  totalItensPedido: number;
+  itens: Perfil6mItemEncontrado[];
+  error?: string;
+  loading?: boolean;
+}
+
+interface Perfil6mPedidosResponse {
+  data?: Record<string, Perfil6mPedidoAlerta>;
+  meta?: {
+    totalPedidos?: number;
+    pedidosComPerfil6m?: number;
+    itensPerfil6m?: number;
+    generatedAt?: string;
+  };
+}
+
 const parseValorNumero = (v: any) => {
   if (typeof v === 'number') return v;
   if (typeof v === 'string') {
@@ -119,6 +157,13 @@ const parseValorNumero = (v: any) => {
     return Number.isNaN(n) ? 0 : n;
   }
   return 0;
+};
+
+const formatQuantidade = (value: number) => {
+  return new Intl.NumberFormat('pt-BR', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 3,
+  }).format(Number.isFinite(value) ? value : 0);
 };
 
 const pickString = (...values: Array<unknown>) => {
@@ -452,11 +497,13 @@ export default function CicloPedidoPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const pedidosRequestId = useRef(0);
-  const statsRequestId = useRef(0);
   
   // Filtros
   const [filtroPeriodo, setFiltroPeriodo] = useState('hoje');
   const [filtroEntrega, setFiltroEntrega] = useState('entrega_fechados');
+  const [filtroCidade, setFiltroCidade] = useState('');
+  const [filtroBairro, setFiltroBairro] = useState('');
+  const [ordenacaoValor, setOrdenacaoValor] = useState('');
   const [tipoData, setTipoData] = useState<'recebimento' | 'entrega'>('recebimento');
   const [dataInicio, setDataInicio] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [dataFim, setDataFim] = useState(format(new Date(), 'yyyy-MM-dd'));
@@ -483,13 +530,29 @@ export default function CicloPedidoPage() {
   // Paginação
   const [paginaAtual, setPaginaAtual] = useState(1);
   const [totalPedidos, setTotalPedidos] = useState(0);
+  const [valorPedidosFiltrados, setValorPedidosFiltrados] = useState(0);
   const pedidosPorPagina = 50;
-  const totalPaginas = Math.ceil(totalPedidos / pedidosPorPagina) || 1;
+  const totalPedidosCard = Math.max(0, Number(totalPedidos) || 0);
+  const totalPaginas = Math.ceil(totalPedidosCard / pedidosPorPagina) || 1;
+  const primeiroResultado = totalPedidosCard === 0 ? 0 : (paginaAtual - 1) * pedidosPorPagina + 1;
+  const ultimoResultado = totalPedidosCard === 0 ? 0 : Math.min(paginaAtual * pedidosPorPagina, totalPedidosCard);
+
+  const pedidosExibidos = useMemo(() => {
+    if (paginaAtual !== 1) return pedidos;
+    if (totalPedidosCard > 0 && pedidos.length > totalPedidosCard) {
+      return pedidos.slice(0, totalPedidosCard);
+    }
+    return pedidos;
+  }, [pedidos, paginaAtual, totalPedidosCard]);
 
   const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({ show: false, message: '', type: 'success' });
   const [pedidoSelecionado, setPedidoSelecionado] = useState<Pedido | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [abrirDetalhesNoPerfil6m, setAbrirDetalhesNoPerfil6m] = useState(false);
   const [enriquecendoCep, setEnriquecendoCep] = useState(false);
+  const [perfil6mAlertas, setPerfil6mAlertas] = useState<Record<number, Perfil6mPedidoAlerta>>({});
+  const perfil6mRequestId = useRef(0);
+  const perfil6mDetalhesRef = useRef<HTMLDivElement | null>(null);
 
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     setToast({ show: true, message, type });
@@ -537,13 +600,170 @@ export default function CicloPedidoPage() {
     return resultados;
   };
 
+  const carregarAlertasPerfil6m = async (
+    pedidoIds: number[],
+    pedidoReqId: number,
+    alertaReqId: number
+  ) => {
+    const ids = Array.from(
+      new Set(
+        pedidoIds.filter((id) => Number.isFinite(id) && id > 0)
+      )
+    );
+
+    if (ids.length === 0) return;
+
+    setPerfil6mAlertas((prev) => {
+      const next = { ...prev };
+      for (const id of ids) {
+        const atual = next[id];
+        next[id] = {
+          pedidoId: id,
+          hasPerfil6m: atual?.hasPerfil6m ?? false,
+          totalQuantidade: atual?.totalQuantidade ?? 0,
+          totalItensPedido: atual?.totalItensPedido ?? 0,
+          itens: atual?.itens ?? [],
+          error: undefined,
+          loading: true,
+        };
+      }
+      return next;
+    });
+
+    try {
+      const chunkSize = 20;
+      const chunks: number[][] = [];
+      for (let i = 0; i < ids.length; i += chunkSize) {
+        chunks.push(ids.slice(i, i + chunkSize));
+      }
+
+      const merged: Record<number, Perfil6mPedidoAlerta> = {};
+      for (const chunk of chunks) {
+        const query = new URLSearchParams({ orcamento_ids: chunk.join(',') }).toString();
+        const response = await fetch(`/api/pedidos/perfil-6m?${query}`, {
+          headers: { accept: 'application/json' },
+          cache: 'no-store',
+        });
+
+        if (!response.ok) {
+          throw new Error(`Falha ao consultar perfil 6m (${response.status})`);
+        }
+
+        const payload: Perfil6mPedidosResponse = await response.json();
+        const data = payload?.data || {};
+        for (const [pedidoId, alerta] of Object.entries(data)) {
+          const id = Number(pedidoId);
+          if (Number.isFinite(id) && alerta) {
+            merged[id] = alerta;
+          }
+        }
+      }
+
+      if (
+        pedidoReqId !== pedidosRequestId.current ||
+        alertaReqId !== perfil6mRequestId.current
+      ) {
+        return;
+      }
+
+      setPerfil6mAlertas((prev) => {
+        const next = { ...prev };
+        for (const id of ids) {
+          const alerta = merged[id];
+          if (alerta) {
+            next[id] = { ...alerta, loading: false };
+          } else {
+            next[id] = {
+              pedidoId: id,
+              hasPerfil6m: false,
+              totalQuantidade: 0,
+              totalItensPedido: 0,
+              itens: [],
+              loading: false,
+            };
+          }
+        }
+        return next;
+      });
+    } catch (error: any) {
+      console.error('[Perfil 6M] Erro ao carregar alertas:', error);
+      if (
+        pedidoReqId !== pedidosRequestId.current ||
+        alertaReqId !== perfil6mRequestId.current
+      ) {
+        return;
+      }
+      setPerfil6mAlertas((prev) => {
+        const next = { ...prev };
+        for (const id of ids) {
+          const atual = next[id];
+          next[id] = {
+            pedidoId: id,
+            hasPerfil6m: atual?.hasPerfil6m ?? false,
+            totalQuantidade: atual?.totalQuantidade ?? 0,
+            totalItensPedido: atual?.totalItensPedido ?? 0,
+            itens: atual?.itens ?? [],
+            error: 'Nao foi possivel validar perfil 6m',
+            loading: false,
+          };
+        }
+        return next;
+      });
+    }
+  };
+
   const showCnpjColumn = useMemo(() => pedidos.some((p) => Boolean(getCnpjPedido(p))), [pedidos]);
   const showBairroColumn = useMemo(() => pedidos.some((p) => Boolean(getEnderecoCampos(p).bairro)), [pedidos]);
   const showCidadeColumn = useMemo(() => pedidos.some((p) => {
     const endereco = getEnderecoCampos(p);
     return Boolean(endereco.cidade || endereco.uf);
   }), [pedidos]);
-  const tableColumnCount = 9 + (showCnpjColumn ? 1 : 0) + (showBairroColumn ? 1 : 0) + (showCidadeColumn ? 1 : 0);
+  const tableColumnCount = 11 + (showCnpjColumn ? 1 : 0) + (showBairroColumn ? 1 : 0) + (showCidadeColumn ? 1 : 0);
+  const alertaPerfil6mSelecionado = pedidoSelecionado ? perfil6mAlertas[pedidoSelecionado.ORCAMENTO_ID] : null;
+
+  const abrirDetalhesPerfil6m = (pedido: Pedido) => {
+    setPedidoSelecionado(pedido);
+    setAbrirDetalhesNoPerfil6m(true);
+    setIsDetailModalOpen(true);
+  };
+
+  useEffect(() => {
+    if (!isDetailModalOpen || !abrirDetalhesNoPerfil6m) return;
+
+    const timeoutId = window.setTimeout(() => {
+      perfil6mDetalhesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      setAbrirDetalhesNoPerfil6m(false);
+    }, 120);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [isDetailModalOpen, abrirDetalhesNoPerfil6m, pedidoSelecionado?.ORCAMENTO_ID]);
+
+  const renderPerfil6mAlertButton = (pedido: Pedido, alerta?: Perfil6mPedidoAlerta) => {
+    const quantidade = formatQuantidade(alerta?.totalQuantidade || 0);
+
+    return (
+      <button
+        type="button"
+        onClick={(event) => {
+          event.stopPropagation();
+          abrirDetalhesPerfil6m(pedido);
+        }}
+        className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-semibold text-rose-600 transition-colors hover:bg-rose-50 focus:outline-none focus:ring-2 focus:ring-rose-300"
+        title={`Perfil 6m: ${quantidade}. Clique para ver os produtos`}
+        aria-label={`Pedido ${pedido.ORCAMENTO_ID} com perfil 6m. Clique para ver os produtos`}
+      >
+        <AlertTriangle className="h-4 w-4 text-rose-600" strokeWidth={1.7} />
+        <span className="whitespace-nowrap">Alerta perfil 6m</span>
+      </button>
+    );
+  };
+
+  const renderSemPerfil6m = () => (
+    <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-600">
+      <CheckCircle2 className="h-4 w-4" strokeWidth={1.8} />
+      <span className="whitespace-nowrap">Sem perfil 6metros</span>
+    </span>
+  );
 
   const getPeriodoConfig = () => {
     const hoje = new Date();
@@ -557,13 +777,12 @@ export default function CicloPedidoPage() {
       return { label: 'Ontem', inicio: dataFormatada, fim: dataFormatada };
     }
     if (filtroPeriodo === 'semana') {
-      const inicioSemana = subDays(hoje, 7);
+      const inicioSemana = subDays(hoje, 6);
       return { label: 'Última semana', inicio: format(inicioSemana, 'yyyy-MM-dd'), fim: format(hoje, 'yyyy-MM-dd') };
     }
     if (filtroPeriodo === 'mes') {
-      const primeiroDiaMes = format(new Date(hoje.getFullYear(), hoje.getMonth(), 1), 'yyyy-MM-dd');
-      const ultimoDiaMes = format(new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0), 'yyyy-MM-dd');
-      return { label: 'Este mês', inicio: primeiroDiaMes, fim: ultimoDiaMes };
+      const inicioUltimos30Dias = subDays(hoje, 29);
+      return { label: 'Último mês', inicio: format(inicioUltimos30Dias, 'yyyy-MM-dd'), fim: format(hoje, 'yyyy-MM-dd') };
     }
     if (filtroPeriodo === 'ano') {
       const ano = Number(anoSelecionado) || hoje.getFullYear();
@@ -577,6 +796,26 @@ export default function CicloPedidoPage() {
     return { label: 'Tudo', inicio: '', fim: '' };
   };
 
+  const appendPedidosFiltros = (params: URLSearchParams, periodo = getPeriodoConfig()) => {
+    params.set('tipo_data', tipoData);
+    if (periodo.inicio) params.set('data_inicio', periodo.inicio);
+    if (periodo.fim) params.set('data_fim', periodo.fim);
+
+    if (filtroEntrega === 'entrega') {
+      params.set('tipo_entrega', 'EPG,ENT');
+    } else if (filtroEntrega === 'entrega_fechados') {
+      params.set('tipo_entrega', 'EPG,ENT');
+      params.set('status', 'FECHADO');
+    } else if (filtroEntrega === 'nao_entrega') {
+      params.set('tipo_entrega', 'NDF,ATO');
+    }
+
+    if (searchTerm.trim()) params.set('search', searchTerm.trim());
+    if (filtroCidade.trim()) params.set('cidade', filtroCidade.trim());
+    if (filtroBairro.trim()) params.set('bairro', filtroBairro.trim());
+    if (ordenacaoValor) params.set('ordenacao_valor', ordenacaoValor);
+  };
+
   const fetchAllFilteredPedidos = async () => {
     try {
       const periodo = getPeriodoConfig();
@@ -586,26 +825,12 @@ export default function CicloPedidoPage() {
       let hasMore = true;
 
       while (hasMore) {
-        let url = `/api/pedidos/externos?limit=${limit}&offset=${offset}`;
-        
-        if (periodo.inicio) {
-          url += `&data_inicio=${periodo.inicio}`;
-        }
-        if (periodo.fim) {
-          url += `&data_fim=${periodo.fim}`;
-        }
-
-        if (filtroEntrega === 'entrega') {
-          url += '&tipo_entrega=EPG,ENT';
-        } else if (filtroEntrega === 'entrega_fechados') {
-          url += '&tipo_entrega=EPG,ENT&status=FECHADO';
-        } else if (filtroEntrega === 'nao_entrega') {
-          url += '&tipo_entrega=NDF,ATO';
-        }
-
-        if (searchTerm.trim()) {
-          url += `&search=${encodeURIComponent(searchTerm.trim())}`;
-        }
+        const params = new URLSearchParams({
+          limit: String(limit),
+          offset: String(offset),
+        });
+        appendPedidosFiltros(params, periodo);
+        const url = `/api/pedidos/externos?${params.toString()}`;
 
         const response = await fetch(url);
         if (!response.ok) throw new Error('Erro ao carregar dados para exportação');
@@ -818,28 +1043,21 @@ export default function CicloPedidoPage() {
     const reqId = ++pedidosRequestId.current;
     try {
       setLoading(true);
-      const offset = (paginaAtual - 1) * pedidosPorPagina;
-      let url = `/api/pedidos/externos?limit=${pedidosPorPagina}&offset=${offset}&tipo_data=${tipoData}`;
+      if (filtroPeriodo === 'personalizado' && dataInicio && dataFim && dataInicio > dataFim) {
+        showToast('Período personalizado inválido: a data inicial não pode ser maior que a final.', 'error');
+        setPedidos([]);
+        setTotalPedidos(0);
+        return;
+      }
+
       const periodo = getPeriodoConfig();
-      
-      if (periodo.inicio) {
-        url += `&data_inicio=${periodo.inicio}`;
-      }
-      if (periodo.fim) {
-        url += `&data_fim=${periodo.fim}`;
-      }
-
-      if (filtroEntrega === 'entrega') {
-        url += '&tipo_entrega=EPG';
-      } else if (filtroEntrega === 'entrega_fechados') {
-        url += '&tipo_entrega=EPG&status=FECHADO';
-      } else if (filtroEntrega === 'nao_entrega') {
-        url += '&tipo_entrega=NDF,ATO';
-      }
-
-      if (searchTerm.trim()) {
-        url += `&search=${encodeURIComponent(searchTerm.trim())}`;
-      }
+      const offset = (paginaAtual - 1) * pedidosPorPagina;
+      const params = new URLSearchParams({
+        limit: String(pedidosPorPagina),
+        offset: String(offset),
+      });
+      appendPedidosFiltros(params, periodo);
+      const url = `/api/pedidos/externos?${params.toString()}`;
 
       console.log('[Pedidos] Carregando URL:', url);
 
@@ -857,11 +1075,13 @@ export default function CicloPedidoPage() {
         periodo: getPeriodoConfig()
       });
       
-      const base = (data.data || []).slice().sort((a, b) => {
-        const da = getDataReferenciaPedido(a, tipoData)?.getTime() ?? 0;
-        const db = getDataReferenciaPedido(b, tipoData)?.getTime() ?? 0;
-        return da - db;
-      });
+      const base = ordenacaoValor
+        ? (data.data || []).slice()
+        : (data.data || []).slice().sort((a, b) => {
+            const da = getDataReferenciaPedido(a, tipoData)?.getTime() ?? 0;
+            const db = getDataReferenciaPedido(b, tipoData)?.getTime() ?? 0;
+            return da - db;
+          });
       
       // Log de amostra dos dados brutos da API
       if (base.length > 0) {
@@ -877,12 +1097,22 @@ export default function CicloPedidoPage() {
         });
       }
 
-      const valorTotal = (base || []).reduce((sum, p) => sum + parseValorNumero(p.VALOR_PEDIDO), 0);
+      const valorTotal = typeof data.totalValor === 'number'
+        ? data.totalValor
+        : (base || []).reduce((sum, p) => sum + parseValorNumero(p.VALOR_PEDIDO), 0);
       setPedidos(base);
-      setTotalPedidos(data.total || 0);
+      setTotalPedidos(typeof data.total === 'number' ? data.total : base.length || 0);
+      setValorPedidosFiltrados(valorTotal);
+      const alertaReqId = ++perfil6mRequestId.current;
+      void carregarAlertasPerfil6m(
+        base.map((pedido) => pedido.ORCAMENTO_ID),
+        reqId,
+        alertaReqId
+      );
+      // Mantém paginação estável na primeira página enquanto o total filtrado é calculado.
       setStats(prev => ({
         ...prev,
-        hoje: base.length || 0,
+        hoje: typeof data.total === 'number' ? data.total : base.length || 0,
         valorHoje: valorTotal,
       }));
 
@@ -895,40 +1125,6 @@ export default function CicloPedidoPage() {
           }
         } catch (err) {
           console.error('[CEP Enrich] Erro:', err);
-        }
-      })();
-
-      const statsId = ++statsRequestId.current;
-      void (async () => {
-        try {
-          const statsUrl = new URL('/api/pedidos/externos', window.location.origin);
-          statsUrl.searchParams.set('stats', '1');
-          statsUrl.searchParams.set('tipo_data', tipoData);
-          if (periodo.inicio) statsUrl.searchParams.set('data_inicio', periodo.inicio);
-          if (periodo.fim) statsUrl.searchParams.set('data_fim', periodo.fim);
-          if (filtroEntrega === 'entrega') {
-            statsUrl.searchParams.set('tipo_entrega', 'EPG');
-          } else if (filtroEntrega === 'entrega_fechados') {
-            statsUrl.searchParams.set('tipo_entrega', 'EPG');
-            statsUrl.searchParams.set('status', 'FECHADO');
-          } else if (filtroEntrega === 'nao_entrega') {
-            statsUrl.searchParams.set('tipo_entrega', 'NDF,ATO');
-          }
-          if (searchTerm.trim()) statsUrl.searchParams.set('search', searchTerm.trim());
-
-          const statsResp = await fetch(statsUrl.toString(), { headers: { accept: 'application/json' }, cache: 'no-store' });
-          if (!statsResp.ok) return;
-          const statsData = await statsResp.json();
-          if (statsId !== statsRequestId.current) return;
-          const total = typeof statsData.total === 'number' ? statsData.total : base.length || 0;
-          const totalValor = typeof statsData.totalValor === 'number' ? statsData.totalValor : valorTotal;
-          setStats(prev => ({
-            ...prev,
-            hoje: total,
-            valorHoje: totalValor
-          }));
-        } catch (err) {
-          console.error('[Pedidos] Erro ao validar cards:', err);
         }
       })();
 
@@ -1007,11 +1203,13 @@ export default function CicloPedidoPage() {
             // Enriquecer via CEP após apurações
             const comCep = await enriquecerViaCEP(enriquecidos);
             if (reqId !== pedidosRequestId.current) return;
-            const ordenados = comCep.slice().sort((a, b) => {
-              const da = getDataReferenciaPedido(a, tipoData)?.getTime() ?? 0;
-              const db = getDataReferenciaPedido(b, tipoData)?.getTime() ?? 0;
-              return da - db;
-            });
+            const ordenados = ordenacaoValor
+              ? comCep.slice()
+              : comCep.slice().sort((a, b) => {
+                  const da = getDataReferenciaPedido(a, tipoData)?.getTime() ?? 0;
+                  const db = getDataReferenciaPedido(b, tipoData)?.getTime() ?? 0;
+                  return da - db;
+                });
             setPedidos(ordenados);
           } catch (err) {
             console.error('[Pedidos] Erro ao enriquecer apurações:', err);
@@ -1033,7 +1231,13 @@ export default function CicloPedidoPage() {
       carregarPedidos();
     }, 250);
     return () => clearTimeout(handle);
-  }, [paginaAtual, filtroPeriodo, filtroEntrega, tipoData, dataInicio, dataFim, anoSelecionado]);
+  }, [paginaAtual, filtroPeriodo, filtroEntrega, filtroCidade, filtroBairro, ordenacaoValor, tipoData, dataInicio, dataFim, anoSelecionado]);
+
+  useEffect(() => {
+    if (paginaAtual > totalPaginas) {
+      setPaginaAtual(totalPaginas);
+    }
+  }, [paginaAtual, totalPaginas]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1054,8 +1258,6 @@ export default function CicloPedidoPage() {
              const resumoHojeData = await resumoHojeResp.json();
              setStats(s => ({ 
                ...s, 
-               hoje: resumoHojeData.pedidosHoje || 0,
-               valorHoje: resumoHojeData.valorHoje || 0,
                notasHoje: resumoHojeData.notasHoje || 0,
                controlesHoje: resumoHojeData.controlesHoje || 0,
                totalNotas: resumoHojeData.totalNotas || 0,
@@ -1065,6 +1267,9 @@ export default function CicloPedidoPage() {
         } catch (e) {
           console.error('Erro ao carregar resumo de hoje:', e);
         }
+
+        setStats(s => ({ ...s, loading: false }));
+        return;
 
         const hoje = new Date();
         const primeiroDiaMes = format(new Date(hoje.getFullYear(), hoje.getMonth(), 1), 'yyyy-MM-dd');
@@ -1078,7 +1283,14 @@ export default function CicloPedidoPage() {
           statsHojeUrl.searchParams.set('tipo_data', tipoData);
           statsHojeUrl.searchParams.set('data_inicio', hojeStr);
           statsHojeUrl.searchParams.set('data_fim', hojeStr);
-          statsHojeUrl.searchParams.set('status', 'FECHADO');
+          if (filtroEntrega === 'entrega') {
+            statsHojeUrl.searchParams.set('tipo_entrega', 'EPG,ENT');
+          } else if (filtroEntrega === 'entrega_fechados') {
+            statsHojeUrl.searchParams.set('tipo_entrega', 'EPG,ENT');
+            statsHojeUrl.searchParams.set('status', 'FECHADO');
+          } else if (filtroEntrega === 'nao_entrega') {
+            statsHojeUrl.searchParams.set('tipo_entrega', 'NDF,ATO');
+          }
 
           const respHoje = await fetch(statsHojeUrl.toString(), { headers: { accept: 'application/json' }, cache: 'no-store' });
           if (respHoje.ok) {
@@ -1100,7 +1312,14 @@ export default function CicloPedidoPage() {
         statsUrl.searchParams.set('tipo_data', tipoData);
         statsUrl.searchParams.set('data_inicio', primeiroDiaMes);
         statsUrl.searchParams.set('data_fim', ultimoDiaMes);
-        statsUrl.searchParams.set('status', 'FECHADO');
+        if (filtroEntrega === 'entrega') {
+          statsUrl.searchParams.set('tipo_entrega', 'EPG,ENT');
+        } else if (filtroEntrega === 'entrega_fechados') {
+          statsUrl.searchParams.set('tipo_entrega', 'EPG,ENT');
+          statsUrl.searchParams.set('status', 'FECHADO');
+        } else if (filtroEntrega === 'nao_entrega') {
+          statsUrl.searchParams.set('tipo_entrega', 'NDF,ATO');
+        }
 
         const respMes = await fetch(statsUrl.toString(), { headers: { accept: 'application/json' }, cache: 'no-store' });
         if (!respMes.ok) {
@@ -1117,12 +1336,13 @@ export default function CicloPedidoPage() {
       }
     };
     carregarResumos();
-  }, [tipoData]);
+  }, [tipoData, filtroEntrega]);
 
   return (
     <AppLayout 
       title="Pedidos Entregas" 
       subtitle="Entregas fechadas do dia e resumo do mês"
+      fluid
     >
       <Head>
         <title>Pedidos Entregas | ControlCarga</title>
@@ -1132,21 +1352,21 @@ export default function CicloPedidoPage() {
         {/* Resumo em Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4 gap-4">
           <StatCard
-            title="Pedidos do Dia"
-            value={stats.hoje}
+            title="Pedidos Filtrados"
+            value={totalPedidos}
             icon={ShoppingCart}
             color="blue"
-            trend="Sincronizado em tempo real"
+            trend="Total do filtro atual"
             loading={stats.loading}
             size="sm"
           />
 
           <StatCard
-            title="Valor Total do Dia"
-            value={new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(stats.valorHoje)}
+            title="Valor Filtrado"
+            value={new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valorPedidosFiltrados)}
             icon={TrendingUp}
             color="green"
-            trend="Atualizado agora"
+            trend="Soma do filtro atual"
             loading={stats.loading}
             size="sm"
           />
@@ -1215,7 +1435,7 @@ export default function CicloPedidoPage() {
                   <option value="hoje">Hoje</option>
                   <option value="ontem">Ontem</option>
                   <option value="semana">Última Semana</option>
-                  <option value="mes">Este Mês</option>
+                  <option value="mes">Último Mês</option>
                   <option value="ano">Este Ano</option>
                   <option value="personalizado">Personalizado</option>
                 </Select>
@@ -1226,12 +1446,54 @@ export default function CicloPedidoPage() {
                 <Select 
                   className="pl-10"
                   value={filtroEntrega}
-                  onChange={(e) => setFiltroEntrega(e.target.value)}
+                  onChange={(e) => { setFiltroEntrega(e.target.value); setPaginaAtual(1); }}
                 >
                   <option value="entrega_fechados">Entrega e Fechados</option>
                   <option value="entrega">Somente Entrega</option>
                   <option value="nao_entrega">Não Entrega</option>
                   <option value="todos">Todos os Pedidos</option>
+                </Select>
+              </div>
+
+              <div className="relative">
+                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                <Input
+                  className="pl-10 w-40"
+                  placeholder="Cidade"
+                  value={filtroCidade}
+                  onChange={(e) => {
+                    setFiltroCidade(e.target.value);
+                    setPaginaAtual(1);
+                  }}
+                />
+              </div>
+
+              <div className="relative">
+                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                <Input
+                  className="pl-10 w-40"
+                  placeholder="Bairro"
+                  value={filtroBairro}
+                  onChange={(e) => {
+                    setFiltroBairro(e.target.value);
+                    setPaginaAtual(1);
+                  }}
+                />
+              </div>
+
+              <div className="relative">
+                <TrendingUp className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                <Select
+                  className="pl-10"
+                  value={ordenacaoValor}
+                  onChange={(e) => {
+                    setOrdenacaoValor(e.target.value);
+                    setPaginaAtual(1);
+                  }}
+                >
+                  <option value="">Mais antigos primeiro</option>
+                  <option value="valor_asc">Valor menor para maior</option>
+                  <option value="valor_desc">Valor maior para menor</option>
                 </Select>
               </div>
 
@@ -1285,7 +1547,7 @@ export default function CicloPedidoPage() {
                     type="date" 
                     className="pl-10"
                     value={dataInicio}
-                    onChange={(e) => setDataInicio(e.target.value)}
+                    onChange={(e) => { setDataInicio(e.target.value); setPaginaAtual(1); }}
                   />
                 </div>
               </div>
@@ -1297,7 +1559,7 @@ export default function CicloPedidoPage() {
                     type="date" 
                     className="pl-10"
                     value={dataFim}
-                    onChange={(e) => setDataFim(e.target.value)}
+                    onChange={(e) => { setDataFim(e.target.value); setPaginaAtual(1); }}
                   />
                 </div>
               </div>
@@ -1311,6 +1573,7 @@ export default function CicloPedidoPage() {
             <table className="w-full text-sm text-left">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200">
+                  <th className="px-3 py-4 font-semibold text-textMain text-center w-14">Nº</th>
                   <th className="px-6 py-4 font-semibold text-textMain">Pedido / Nota</th>
                   <th className="px-6 py-4 font-semibold text-textMain">Cliente</th>
                   <th className="px-6 py-4 font-semibold text-textMain hidden md:table-cell">Data</th>
@@ -1328,6 +1591,7 @@ export default function CicloPedidoPage() {
                   <th className="px-6 py-4 font-semibold text-textMain hidden xl:table-cell">CEP</th>
                   <th className="px-6 py-4 font-semibold text-textMain">Valor</th>
                   <th className="px-6 py-4 font-semibold text-textMain hidden sm:table-cell">Status</th>
+                  <th className="px-6 py-4 font-semibold text-textMain hidden md:table-cell">Perfil 6m</th>
                   <th className="px-6 py-4 font-semibold text-textMain text-right">Detalhes</th>
                 </tr>
               </thead>
@@ -1340,7 +1604,7 @@ export default function CicloPedidoPage() {
                       </td>
                     </tr>
                   ))
-                ) : pedidos.length === 0 ? (
+                ) : pedidosExibidos.length === 0 ? (
                   <tr>
                     <td colSpan={tableColumnCount} className="px-6 py-12 text-center">
                       <div className="flex flex-col items-center gap-2 text-textMuted">
@@ -1350,22 +1614,39 @@ export default function CicloPedidoPage() {
                     </td>
                   </tr>
                 ) : (
-                  pedidos.map((p) => {
+                  pedidosExibidos.map((p, index) => {
                     const enderecoCampos = getEnderecoCampos(p);
                     const logradouroCompleto = [enderecoCampos.logradouro, enderecoCampos.numero, enderecoCampos.complemento]
                       .filter(Boolean)
                       .join(', ');
                     const cidadeUf = [enderecoCampos.cidade, enderecoCampos.uf].filter(Boolean).join('/');
                     const numeroNota = getIdentificacaoNfeReduzida(p.IDENTIFICACAO_NFE) || getNumeroNota(p);
+                    const numeroLinha = (paginaAtual - 1) * pedidosPorPagina + index + 1;
+                    const alertaPerfil6m = perfil6mAlertas[p.ORCAMENTO_ID];
+                    const temPerfil6m = Boolean(alertaPerfil6m?.hasPerfil6m);
 
                     return (
                     <tr key={p.ORCAMENTO_ID} className="hover:bg-slate-50/50 transition-colors group">
+                      <td className="px-3 py-4 text-center">
+                        <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-slate-100 text-[11px] font-bold text-slate-700 px-1.5">
+                          {numeroLinha}
+                        </span>
+                      </td>
                       <td className="px-6 py-4">
                         <div className="flex flex-col">
-                          <span className="font-bold text-textMain">#{p.ORCAMENTO_ID}</span>
-                          <span className="text-[10px] text-textMuted font-medium uppercase tracking-wider">
-                            {numeroNota ? `NF: ${numeroNota}` : 'Pendente'}
-                          </span>
+                          <span className="font-bold text-textMain">{p.ORCAMENTO_ID}</span>
+                          {numeroNota && (
+                            <span className="text-[10px] text-textMuted font-medium uppercase tracking-wider">
+                              NF: {numeroNota}
+                            </span>
+                          )}
+                          {alertaPerfil6m?.loading ? (
+                            <span className="text-[10px] text-slate-400 mt-1">Validando perfil 6m...</span>
+                          ) : temPerfil6m ? (
+                            <div className="mt-1">
+                              {renderPerfil6mAlertButton(p, alertaPerfil6m)}
+                            </div>
+                          ) : null}
                         </div>
                       </td>
                       <td className="px-6 py-4">
@@ -1471,12 +1752,24 @@ export default function CicloPedidoPage() {
                           )}
                         </div>
                       </td>
+                      <td className="px-6 py-4 hidden md:table-cell">
+                        {alertaPerfil6m?.loading ? (
+                          <Badge variant="neutral">Validando...</Badge>
+                        ) : temPerfil6m ? (
+                          <div className="flex justify-start">
+                            {renderPerfil6mAlertButton(p, alertaPerfil6m)}
+                          </div>
+                        ) : (
+                          renderSemPerfil6m()
+                        )}
+                      </td>
                       <td className="px-6 py-4 text-right">
                         <Button
                           size="sm"
                           variant="outline"
                           onClick={() => {
                             setPedidoSelecionado(p);
+                            setAbrirDetalhesNoPerfil6m(false);
                             setIsDetailModalOpen(true);
                           }}
                         >
@@ -1494,7 +1787,7 @@ export default function CicloPedidoPage() {
           {/* Paginação Estilo SaaS */}
           <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-4">
             <p className="text-xs text-textMuted font-medium">
-              Mostrando <span className="text-textMain font-bold">{(paginaAtual - 1) * pedidosPorPagina + 1}</span> a <span className="text-textMain font-bold">{Math.min(paginaAtual * pedidosPorPagina, totalPedidos)}</span> de <span className="text-textMain font-bold">{totalPedidos}</span> resultados
+              Mostrando <span className="text-textMain font-bold">{primeiroResultado}</span> a <span className="text-textMain font-bold">{ultimoResultado}</span> de <span className="text-textMain font-bold">{totalPedidosCard}</span> resultados (50 por página)
             </p>
             
             <div className="flex items-center gap-1">
@@ -1563,7 +1856,10 @@ export default function CicloPedidoPage() {
       {/* Modal de Detalhes */}
       <Modal
         isOpen={isDetailModalOpen}
-        onClose={() => setIsDetailModalOpen(false)}
+        onClose={() => {
+          setIsDetailModalOpen(false);
+          setAbrirDetalhesNoPerfil6m(false);
+        }}
         title={`Detalhes do Pedido #${pedidoSelecionado?.ORCAMENTO_ID}`}
         size="lg"
       >
@@ -1674,6 +1970,53 @@ export default function CicloPedidoPage() {
                   );
                 })()}
               </div>
+            </div>
+
+            <div
+              ref={perfil6mDetalhesRef}
+              className={cn(
+              'space-y-3 p-4 rounded-xl border',
+              alertaPerfil6mSelecionado?.hasPerfil6m
+                ? 'bg-amber-50/80 border-amber-200'
+                : 'bg-slate-50 border-slate-100'
+              )}
+            >
+              <h4 className="text-sm font-bold text-textMain uppercase tracking-wider flex items-center gap-2">
+                <AlertCircle className={cn(
+                  'w-4 h-4',
+                  alertaPerfil6mSelecionado?.hasPerfil6m ? 'text-amber-600' : 'text-slate-400'
+                )} />
+                Alerta Perfil 6 Metros
+              </h4>
+
+              {alertaPerfil6mSelecionado?.loading ? (
+                <p className="text-sm text-textMuted">Validando itens deste pedido...</p>
+              ) : alertaPerfil6mSelecionado?.error ? (
+                <p className="text-sm text-rose-600">{alertaPerfil6mSelecionado.error}</p>
+              ) : alertaPerfil6mSelecionado?.hasPerfil6m ? (
+                <div className="space-y-2">
+                  <p className="text-sm text-amber-700 font-medium">
+                    Pedido com itens de perfil 6m. Quantidade total encontrada: {formatQuantidade(alertaPerfil6mSelecionado.totalQuantidade)}
+                  </p>
+                  <div className="space-y-2">
+                    {alertaPerfil6mSelecionado.itens.map((item, idx) => (
+                      <div
+                        key={`${item.itemId ?? item.produtoId ?? idx}-${idx}`}
+                        className="rounded-lg border border-amber-200 bg-white px-3 py-2"
+                      >
+                        <p className="text-sm font-medium text-textMain">{item.produtoNome}</p>
+                        <p className="text-xs text-textMuted">
+                          Qtd: {formatQuantidade(item.quantidade)}
+                          {item.codigoOriginal ? ` | Cod. original: ${item.codigoOriginal}` : ''}
+                          {item.codigoBarras ? ` | EAN: ${item.codigoBarras}` : ''}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-textMuted">Nenhum item de perfil 6 metros encontrado neste pedido.</p>
+              )}
             </div>
 
             {pedidoSelecionado.OBSERVACAO && (

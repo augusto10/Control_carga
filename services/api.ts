@@ -1,5 +1,22 @@
 import axios, { AxiosInstance } from 'axios';
 
+function resolveApiBaseUrl(): string {
+  let baseURL = process.env.NEXT_PUBLIC_API_URL || '';
+
+  if (typeof window !== 'undefined') {
+    const normalized = baseURL.trim().toLowerCase();
+    if (!normalized || normalized.includes('localhost') || normalized.includes('127.0.0.1')) {
+      return '';
+    }
+  }
+
+  if (baseURL.endsWith('/api')) {
+    baseURL = baseURL.slice(0, -4);
+  }
+
+  return baseURL.endsWith('/') ? baseURL.slice(0, -1) : baseURL;
+}
+
 // Cria uma instância do Axios com configurações padrão
 const createApi = (): AxiosInstance => {
   // Define a URL base da API.
@@ -13,7 +30,7 @@ const createApi = (): AxiosInstance => {
   const cleanBaseURL = baseURL.endsWith('/') ? baseURL.slice(0, -1) : baseURL;
   
   const instance = axios.create({
-    baseURL: cleanBaseURL,
+    baseURL: resolveApiBaseUrl(),
     headers: {
       'Content-Type': 'application/json',
       'Accept': 'application/json',

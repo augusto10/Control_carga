@@ -351,31 +351,6 @@ export async function buscarChaveNfePorOrcamento(orcamentoId: number, pedidoInfo
       }
     }
 
-    // Estratégia 3: Buscar em mapeamento específico (novo endpoint)
-    try {
-      const response = await fetch(`http://localhost:3000/api/mapear-nfe?orcamento_id=${orcamentoId}`, {
-        headers: { accept: 'application/json' }
-      });
-
-      if (response.ok) {
-        const dados = await response.json();
-        if (dados.IDENTIFICACAO_NFE && dados.IDENTIFICACAO_NFE.length === 44) {
-          console.log(`✅ Chave NFE encontrada via mapeamento: ${dados.IDENTIFICACAO_NFE}`);
-          return dados.IDENTIFICACAO_NFE;
-        }
-      }
-    } catch (mapError: any) {
-      console.log(`Busca via mapeamento falhou: ${mapError.message}`);
-    }
-
-    // Estratégia 4: Para testes, usar uma chave conhecida se ORCAMENTO_ID específico
-    // Isso é apenas para demonstração - em produção seria substituído por lógica real
-    if (orcamentoId === 186751) {
-      const chaveConhecida = '53260328867081000140550010001009741184773699';
-      console.log(`🔧 Usando chave conhecida para teste: ${chaveConhecida}`);
-      return chaveConhecida;
-    }
-
     console.log(`❌ Não foi possível encontrar chave NFE real para ORCAMENTO_ID: ${orcamentoId}`);
     return null;
 
