@@ -9,6 +9,7 @@ export interface RouteGeometry {
   regiao: number;
   distance?: number;
   duration?: number;
+  label?: string;
 }
 
 // Export types for use in other files

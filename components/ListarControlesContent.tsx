@@ -49,7 +49,9 @@ import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { useRouter } from 'next/router';
 import { useSnackbar } from 'notistack';
 import api from '../services/api';
+import { CEPService } from '../services/cep';
 import { useAuth } from '../contexts/AuthContext';
+import { FRETE_DF_FONTE_REFERENCIA, estimarFreteDfPorRegiao } from '@/lib/freteDf';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
@@ -1472,6 +1474,52 @@ const ListarControlesContent: React.FC = () => {
     return null;
   };
 
+  const aplicarFreteReferenciaNaNota = (nota: any) => {
+    const bairro =
+      nota?.bairro ??
+      nota?.Bairro ??
+      nota?.NOME_BAIRRO_NOTA ??
+      nota?.BAIRRO ??
+      nota?.cliente?.bairro ??
+      null;
+    const cidade =
+      nota?.cidade ??
+      nota?.Cidade ??
+      nota?.NOME_CIDADE ??
+      nota?.CIDADE ??
+      nota?.cliente?.cidade ??
+      null;
+    const estado =
+      nota?.estado ??
+      nota?.UF ??
+      nota?.ESTADO ??
+      nota?.ESTADO_DESTINO ??
+      nota?.cliente?.estado ??
+      'DF';
+    const endereco =
+      nota?.endereco ??
+      nota?.ENDERECO ??
+      nota?.LOGRADOURO ??
+      nota?.LOGRADOURO_ENTREGA ??
+      nota?.cliente?.endereco ??
+      null;
+
+    const frete = estimarFreteDfPorRegiao({ bairro, cidade, estado, endereco });
+
+    return {
+      ...nota,
+      bairro,
+      cidade,
+      estado,
+      endereco,
+      freteRegiao: frete.regiao,
+      freteReferencia: frete.valor,
+      freteOrigem: frete.origem,
+      freteDescricao: frete.descricao,
+      freteObservacao: frete.observacao,
+    };
+  };
+
   const enriquecerNotasDoControle = async (controle: ControleComNotas): Promise<ControleComNotas> => {
     const notas = controle.notas || [];
     const enriquecidas = await Promise.all(notas.map(async (nota: any) => {
@@ -1502,6 +1550,10 @@ const ListarControlesContent: React.FC = () => {
           const valorFromBase = toNumber((base as any).valorPedido ?? (base as any).valor ?? (base as any).VALOR_TOTAL_NOTA ?? (base as any).VALOR_TOTAL ?? (base as any).TOTAL ?? (base as any).valor_total);
           base.valorPedido = (valorFromBase !== undefined) ? valorFromBase : valorFromD;
           base.razaoSocial = (base as any).razaoSocial ?? d.razaoSocial ?? d.NOME_RAZAO_SOCIAL;
+          base.bairro = (base as any).bairro ?? d.bairro ?? d.NOME_BAIRRO_NOTA ?? d.BAIRRO ?? d.cliente?.bairro;
+          base.cidade = (base as any).cidade ?? d.cidade ?? d.NOME_CIDADE ?? d.CIDADE ?? d.cliente?.cidade;
+          base.estado = (base as any).estado ?? d.estado ?? d.ESTADO ?? d.ESTADO_DESTINO ?? d.cliente?.estado ?? 'DF';
+          base.endereco = (base as any).endereco ?? d.endereco ?? d.LOGRADOURO_ENTREGA ?? d.LOGRADOURO ?? d.ENDERECO ?? d.cliente?.endereco;
           const pesoFromD = toNumber(
             (d as any).TOTAL_PESO ?? (d as any).PESO_TOTAL ?? (d as any).PESO_NOTA ??
             d.pesoBruto ?? d.peso ??
@@ -1515,11 +1567,28 @@ const ListarControlesContent: React.FC = () => {
           base.pesoBruto = (pesoFromBase !== undefined && pesoFromBase > 0) ? pesoFromBase : pesoFromD;
           base.dataEmissao = (base as any).dataEmissao ?? d.dataEmissao ?? d.DATA_EMISSAO;
           base.cnpj = (base as any).cnpj ?? d.cnpj ?? d.CNPJ;
+          base.cep = (base as any).cep ?? d.cep ?? d.CEP ?? d.CEP_ENTREGA ?? d.cliente?.cep;
         }
       } catch (e) {
         // silencioso: mantém dados existentes
       }
-      return base;
+
+      if ((!base.bairro || !base.cidade) && base.cep) {
+        try {
+          const cepData = await CEPService.buscarCEP(String(base.cep));
+          if (cepData) {
+            base.endereco = base.endereco || cepData.logradouro || '';
+            base.bairro = base.bairro || cepData.bairro || '';
+            base.cidade = base.cidade || cepData.localidade || '';
+            base.estado = base.estado || cepData.uf || 'DF';
+            base.cep = base.cep || cepData.cep || '';
+          }
+        } catch {
+          // fallback silencioso
+        }
+      }
+
+      return aplicarFreteReferenciaNaNota(base);
     }));
     return { ...controle, notas: enriquecidas };
   };
@@ -1563,6 +1632,21 @@ const ListarControlesContent: React.FC = () => {
       tipo: 'motorista'
     });
   }, [assinaturaAberta, setLoadingButtons]);
+
+  const resumoFreteDetalhes = (detalhesModal.controle?.notas || []).reduce((acc, nota: any) => {
+    const valor = typeof nota?.freteReferencia === 'number' ? nota.freteReferencia : 0;
+    if (valor > 0) {
+      acc.total += valor;
+      if (nota?.freteOrigem === 'referencia_publica') {
+        acc.comFrete += 1;
+      } else {
+        acc.provisorio += 1;
+      }
+    } else {
+      acc.semFrete += 1;
+    }
+    return acc;
+  }, { total: 0, comFrete: 0, provisorio: 0, semFrete: 0 });
 
 
   const handleFinalizarControle = useCallback(async (controle: ControleComNotas) => {
@@ -2691,6 +2775,37 @@ const ListarControlesContent: React.FC = () => {
               }}>
                 Notas Fiscais ({detalhesModal.controle.notas?.length || 0})
               </Typography>
+
+              <Alert severity="info" sx={{ mb: 2 }}>
+                Frete de referência por região do DF exibido apenas neste modal. Fonte temporária: <a href={FRETE_DF_FONTE_REFERENCIA.url} target="_blank" rel="noreferrer">{FRETE_DF_FONTE_REFERENCIA.nome}</a>. Regiões sem tabela exata usam estimativa operacional provisória.
+              </Alert>
+
+              <Grid container spacing={2} sx={{ mb: 2 }}>
+                <Grid item xs={12} md={4}>
+                  <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
+                    <Typography variant="subtitle2" color="text.secondary">Frete estimado total</Typography>
+                    <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(resumoFreteDetalhes.total)}
+                    </Typography>
+                  </Paper>
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
+                    <Typography variant="subtitle2" color="text.secondary">Notas com frete mapeado</Typography>
+                    <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                      {resumoFreteDetalhes.comFrete}
+                    </Typography>
+                  </Paper>
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
+                    <Typography variant="subtitle2" color="text.secondary">Notas com estimativa provisória</Typography>
+                    <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                      {resumoFreteDetalhes.provisorio}
+                    </Typography>
+                  </Paper>
+                </Grid>
+              </Grid>
               
               {detalhesModal.controle.notas && detalhesModal.controle.notas.length > 0 ? (
                 <TableContainer component={Paper} sx={{ mb: 2 }}>
@@ -2704,6 +2819,8 @@ const ListarControlesContent: React.FC = () => {
                         <TableCell sx={{ fontWeight: 600 }}>Peso Bruto</TableCell>
                         <TableCell sx={{ fontWeight: 600 }}>Data da Emissão</TableCell>
                         <TableCell sx={{ fontWeight: 600 }}>CNPJ</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>Região DF</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>Frete Ref.</TableCell>
                         <TableCell sx={{ fontWeight: 600 }}>Volumes</TableCell>
                         <TableCell sx={{ fontWeight: 600 }}>Data de Criação</TableCell>
                       </TableRow>
@@ -2744,6 +2861,23 @@ const ListarControlesContent: React.FC = () => {
                                 : '-'}
                           </TableCell>
                           <TableCell>{nota.cnpj || nota?.cliente?.cnpj || nota?.emitente?.cnpj || '-'}</TableCell>
+                          <TableCell>
+                            <Box>
+                              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                {nota.freteRegiao || nota.bairro || '-'}
+                              </Typography>
+                              {nota.freteDescricao && (
+                                <Typography variant="caption" color="text.secondary">
+                                  {nota.freteDescricao}
+                                </Typography>
+                              )}
+                            </Box>
+                          </TableCell>
+                          <TableCell>
+                            {typeof nota.freteReferencia === 'number'
+                              ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(nota.freteReferencia)
+                              : 'A consultar'}
+                          </TableCell>
                           <TableCell>{nota.volumes}</TableCell>
                           <TableCell>
                             {nota.dataCriacao ? 

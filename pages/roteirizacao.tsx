@@ -120,6 +120,14 @@ interface Perfil6mPedidosResponse {
   data?: Record<string, Perfil6mPedidoAlerta>;
 }
 
+interface RouteMetrics {
+  distanciaIda: number;
+  distanciaVolta: number;
+  distanciaTotal: number;
+  duracaoIda: number;
+  duracaoVolta: number;
+  duracaoTotal: number;
+}
 
 
 
@@ -160,8 +168,12 @@ const RoteirizacaoPage = () => {
   const [markers, setMarkers] = useState<MapMarker[]>([]);
   const [routeWaypoints, setRouteWaypoints] = useState<[number, number][]>([]);
   const [routeGeometry, setRouteGeometry] = useState<any[]>([]);
+  const [routeMetrics, setRouteMetrics] = useState<RouteMetrics | null>(null);
   const [loadingEntregas, setLoadingEntregas] = useState(false);
+  const [gerandoPdf, setGerandoPdf] = useState(false);
   const [mostrarApenasFalhas, setMostrarApenasFalhas] = useState(false);
+  const [mostrarSomenteSelecionadas, setMostrarSomenteSelecionadas] = useState(false);
+  const [filtroSelecao, setFiltroSelecao] = useState('');
   const [daysToLoad, setDaysToLoad] = useState<number>(7);
   const [selectedBairro, setSelectedBairro] = useState<string | null>(null);
   const [expandedBairros, setExpandedBairros] = useState<Set<string>>(new Set());
@@ -214,6 +226,14 @@ const RoteirizacaoPage = () => {
       minimumFractionDigits: 0,
       maximumFractionDigits: 3,
     }).format(Number.isFinite(value) ? value : 0);
+  };
+
+  const formatDistance = (meters?: number) => {
+    return RoutingService.formatDistance(Number.isFinite(meters as number) ? Number(meters) : 0);
+  };
+
+  const formatDuration = (seconds?: number) => {
+    return RoutingService.formatDuration(Number.isFinite(seconds as number) ? Number(seconds) : 0);
   };
 
   const getPerfil6mAlerta = (nota: NotaExterna) => {
@@ -307,11 +327,51 @@ const RoteirizacaoPage = () => {
   };
 
 
+  const selecionadasSet = useMemo(() => new Set(selecionadas), [selecionadas]);
+
+  const notasFiltradas = useMemo(() => {
+    const termo = filtroSelecao.trim().toLowerCase();
+    const base = (mostrarApenasFalhas
+      ? notas.filter((nota) => nota.statusGeocoding === 'error')
+      : notas
+    ).filter((nota) => {
+      if (mostrarSomenteSelecionadas && !selecionadasSet.has(nota.numero)) {
+        return false;
+      }
+
+      if (!termo) return true;
+
+      const textoBusca = [
+        nota.numero,
+        nota.orcamentoId,
+        nota.cliente?.nome,
+        nota.cliente?.bairro,
+        nota.cliente?.cidade,
+        nota.cliente?.endereco,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+
+      return textoBusca.includes(termo);
+    });
+
+    return [...base].sort((a, b) => {
+      const aSelecionada = selecionadasSet.has(a.numero) ? 1 : 0;
+      const bSelecionada = selecionadasSet.has(b.numero) ? 1 : 0;
+      if (aSelecionada !== bSelecionada) return bSelecionada - aSelecionada;
+
+      const bairroA = a.cliente?.bairro || '';
+      const bairroB = b.cliente?.bairro || '';
+      const bairroCompare = bairroA.localeCompare(bairroB, 'pt-BR');
+      if (bairroCompare !== 0) return bairroCompare;
+
+      return (a.cliente?.nome || a.numero).localeCompare(b.cliente?.nome || b.numero, 'pt-BR');
+    });
+  }, [filtroSelecao, mostrarApenasFalhas, mostrarSomenteSelecionadas, notas, selecionadasSet]);
+
   const notasAgrupadas = useMemo(() => {
     const grupos: Record<string, NotaExterna[]> = {};
-    const notasFiltradas = mostrarApenasFalhas
-      ? notas.filter(n => n.statusGeocoding === 'error')
-      : notas;
 
     notasFiltradas.forEach(nota => {
       const bairro = nota.cliente?.bairro || 'Não Informado';
@@ -319,7 +379,7 @@ const RoteirizacaoPage = () => {
       grupos[bairro].push(nota);
     });
     return grupos;
-  }, [notas, mostrarApenasFalhas]);
+  }, [notasFiltradas]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -351,7 +411,6 @@ const RoteirizacaoPage = () => {
   }, [selecionadas]);
 
   const resumoSelecionadas = useMemo(() => {
-    const selecionadasSet = new Set(selecionadas);
     const itens = notas.filter((nota) => selecionadasSet.has(nota.numero));
     return {
       quantidade: itens.length,
@@ -411,6 +470,11 @@ const RoteirizacaoPage = () => {
       pesoTotal: entregas.reduce((sum, marker) => sum + parseNumber(marker.pesoPedido), 0),
     };
   }, [markers]);
+
+  const idsFiltrados = useMemo(
+    () => notasFiltradas.map((nota) => nota.numero),
+    [notasFiltradas]
+  );
 
   const handleCarregarEntregas = async (daysToLoad: number = 7) => {
     setLoadingEntregas(true);
@@ -548,6 +612,51 @@ const RoteirizacaoPage = () => {
     });
   };
 
+  const handleSelecionarNotas = (ids: string[], selecionar: boolean) => {
+    const unicos = Array.from(new Set(ids.filter(Boolean)));
+    const targetSet = new Set(unicos);
+
+    setSelecionadas((prev) => {
+      const next = new Set(prev);
+      if (selecionar) {
+        unicos.forEach((id) => next.add(id));
+      } else {
+        unicos.forEach((id) => next.delete(id));
+      }
+      return Array.from(next);
+    });
+
+    setManualOrder((prev) => {
+      if (selecionar) {
+        return [...prev, ...unicos.filter((id) => !prev.includes(id))];
+      }
+      return prev.filter((id) => !targetSet.has(id));
+    });
+  };
+
+  const handleSelecionarFiltradas = () => {
+    if (idsFiltrados.length === 0) {
+      enqueueSnackbar('Nenhuma entrega filtrada para selecionar.', { variant: 'info' });
+      return;
+    }
+    handleSelecionarNotas(idsFiltrados, true);
+  };
+
+  const handleLimparFiltradas = () => {
+    if (idsFiltrados.length === 0) {
+      enqueueSnackbar('Nenhuma entrega filtrada para limpar.', { variant: 'info' });
+      return;
+    }
+    handleSelecionarNotas(idsFiltrados, false);
+  };
+
+  const handleSelecionarTodas = () => handleSelecionarNotas(notas.map((nota) => nota.numero), true);
+
+  const handleLimparSelecao = () => {
+    setSelecionadas([]);
+    setManualOrder([]);
+  };
+
   const handleSalvarGrupoSelecionado = () => {
     const nome = nomeGrupo.trim();
     if (!nome) {
@@ -621,6 +730,7 @@ const RoteirizacaoPage = () => {
       setMarkers((prev) => prev.map((marker) => marker.id === id ? { ...marker, lat, lng } : marker));
       setRouteWaypoints((prev) => prev.length ? [[lat, lng], ...prev.slice(1)] : prev);
       setRouteGeometry([]);
+      setRouteMetrics(null);
       enqueueSnackbar('Ponto de partida ajustado. Gere a rota novamente para recalcular o trajeto.', { variant: 'info' });
       return;
     }
@@ -639,6 +749,7 @@ const RoteirizacaoPage = () => {
       ? { ...nota, coords: { lat, lng }, statusGeocoding: 'success' }
       : nota));
     setRouteGeometry([]);
+    setRouteMetrics(null);
     enqueueSnackbar('Ponto de entrega ajustado. Gere a rota novamente para recalcular o trajeto.', { variant: 'info' });
   };
 
@@ -831,12 +942,40 @@ const RoteirizacaoPage = () => {
       if (waypointsFinais.length >= 2) {
         try {
           const routeResult = await RoutingService.calculateRoute(waypointsFinais);
-          setRouteGeometry([{
+          const ultimoPonto = waypointsFinais[waypointsFinais.length - 1];
+          let routeBackResult: Awaited<ReturnType<typeof RoutingService.calculateRoute>> | null = null;
+
+          if (ultimoPonto) {
+            routeBackResult = await RoutingService.calculateRoute([ultimoPonto, baseCoords]);
+          }
+
+          const geometrias = [{
             geometry: routeResult.geometry.map((c: [number, number]) => [c[1], c[0]]),
             regiao: 0,
             distance: routeResult.distance,
-            duration: routeResult.duration
-          }]);
+            duration: routeResult.duration,
+            label: 'Ida'
+          }];
+
+          if (routeBackResult) {
+            geometrias.push({
+              geometry: routeBackResult.geometry.map((c: [number, number]) => [c[1], c[0]]),
+              regiao: 1,
+              distance: routeBackResult.distance,
+              duration: routeBackResult.duration,
+              label: 'Volta'
+            });
+          }
+
+          setRouteGeometry(geometrias);
+          setRouteMetrics({
+            distanciaIda: routeResult.distance,
+            distanciaVolta: routeBackResult?.distance || 0,
+            distanciaTotal: routeResult.distance + (routeBackResult?.distance || 0),
+            duracaoIda: routeResult.duration,
+            duracaoVolta: routeBackResult?.duration || 0,
+            duracaoTotal: routeResult.duration + (routeBackResult?.duration || 0),
+          });
         } catch (routeError: any) {
           console.error('Erro ao calcular rota:', routeError);
           if (routeError.message.includes('25 waypoints')) {
@@ -845,9 +984,11 @@ const RoteirizacaoPage = () => {
             enqueueSnackbar('Erro ao calcular rota otimizada. Usando linhas retas.', { variant: 'error' });
           }
           setRouteGeometry([]);
+          setRouteMetrics(null);
         }
       } else {
         setRouteGeometry([]);
+        setRouteMetrics(null);
       }
       if (waypointsFinais.length > 1) {
         if (errorCount > 0) {
@@ -892,24 +1033,233 @@ const RoteirizacaoPage = () => {
     }
   };
 
-  const handleImprimir = () => {
+  const handleImprimir = async () => {
+    const entregas = markers
+      .filter((marker): marker is MapMarker & { type: 'delivery' } => marker.type === 'delivery')
+      .sort((a, b) => (a.sequence || 0) - (b.sequence || 0));
 
-    if (markers.length <= 1) {
-      enqueueSnackbar('Gere uma rota no mapa primeiro para imprimir.', { variant: 'info' });
+    if (entregas.length === 0) {
+      enqueueSnackbar('Gere uma rota no mapa primeiro para exportar o PDF.', { variant: 'info' });
       return;
     }
-    window.print();
+
+    if (!routeMetrics) {
+      enqueueSnackbar('A rota precisa ter os quilômetros calculados antes de gerar o PDF.', { variant: 'warning' });
+      return;
+    }
+
+    setGerandoPdf(true);
+
+    try {
+      const { PDFDocument, StandardFonts, rgb } = await import('pdf-lib');
+      const existingBytes = await fetch('/templates/modelo-romaneio.pdf').then((res) => res.arrayBuffer());
+      const doc = await PDFDocument.load(existingBytes);
+      const font = await doc.embedFont(StandardFonts.Helvetica);
+      const fontBold = await doc.embedFont(StandardFonts.HelveticaBold);
+
+      let page = doc.getPage(0);
+      let { width, height } = page.getSize();
+      const fontSize = 9;
+      const smallFontSize = 8;
+      const lineHeight = 12;
+      const topMargin = 40;
+      const bottomMargin = 52;
+      const leftMargin = 35;
+      const rightMargin = 35;
+      let yPos = height - topMargin;
+
+      const drawText = (
+        text: string,
+        x: number,
+        y: number,
+        options?: { bold?: boolean; size?: number; color?: [number, number, number] }
+      ) => {
+        page.drawText(text, {
+          x,
+          y,
+          size: options?.size ?? fontSize,
+          font: options?.bold ? fontBold : font,
+          color: options?.color ? rgb(options.color[0], options.color[1], options.color[2]) : rgb(0, 0, 0),
+        });
+      };
+
+      const truncateToWidth = (text: string, maxWidth: number, size = fontSize, bold = false) => {
+        const selectedFont = bold ? fontBold : font;
+        const normalized = (text || '').replace(/\s+/g, ' ').trim();
+        if (!normalized) return '-';
+        if (selectedFont.widthOfTextAtSize(normalized, size) <= maxWidth) return normalized;
+
+        let truncated = normalized;
+        while (truncated.length > 1 && selectedFont.widthOfTextAtSize(`${truncated}...`, size) > maxWidth) {
+          truncated = truncated.slice(0, -1);
+        }
+        return `${truncated.trim()}...`;
+      };
+
+      const addNewPage = () => {
+        page = doc.addPage([width, height]);
+        ({ width, height } = page.getSize());
+        yPos = height - topMargin;
+      };
+
+      const drawTableHeader = (headerY: number) => {
+        const colSeq = leftMargin;
+        const colNota = colSeq + 28;
+        const colPedido = colNota + 58;
+        const colCliente = colPedido + 56;
+        const colRegiao = colCliente + 156;
+        const colValor = colRegiao + 118;
+        const colPeso = colValor + 64;
+
+        page.drawRectangle({
+          x: leftMargin - 4,
+          y: headerY - 6,
+          width: width - leftMargin - rightMargin + 8,
+          height: 18,
+          color: rgb(0.95, 0.96, 0.98),
+        });
+
+        drawText('Seq', colSeq, headerY, { bold: true, size: smallFontSize });
+        drawText('Nota', colNota, headerY, { bold: true, size: smallFontSize });
+        drawText('Pedido', colPedido, headerY, { bold: true, size: smallFontSize });
+        drawText('Cliente', colCliente, headerY, { bold: true, size: smallFontSize });
+        drawText('Região', colRegiao, headerY, { bold: true, size: smallFontSize });
+        drawText('Valor', colValor, headerY, { bold: true, size: smallFontSize });
+        drawText('Peso', colPeso, headerY, { bold: true, size: smallFontSize });
+
+        page.drawLine({
+          start: { x: leftMargin, y: headerY - 8 },
+          end: { x: width - rightMargin, y: headerY - 8 },
+          thickness: 0.8,
+          color: rgb(0.78, 0.82, 0.88),
+        });
+
+        return { colSeq, colNota, colPedido, colCliente, colRegiao, colValor, colPeso };
+      };
+
+      const dataGeracao = format(new Date(), 'dd/MM/yyyy');
+      const horaGeracao = format(new Date(), 'HH:mm');
+      const tituloModo = modoRota === 'proximidade' ? 'Proximidade' : 'Manual';
+      const valorTotal = entregas.reduce((sum, marker) => sum + parseNumber(marker.valorPedido), 0);
+      const pesoTotal = entregas.reduce((sum, marker) => sum + parseNumber(marker.pesoPedido), 0);
+      const baseDescricao = 'Área Especial para Indústria 11, Lote 11 a 14, Galpão 03 - Sobradinho, Brasília - DF';
+
+      yPos -= lineHeight * 9;
+      drawText('Transportadora: Roteirização Control Carga', 50, yPos);
+      drawText(`Usuário: Operação`, 280, yPos);
+
+      yPos -= lineHeight * 1.5;
+      drawText(`Base: ${truncateToWidth(baseDescricao, 190)}`, 50, yPos);
+      drawText(`Modo de rota: ${tituloModo}`, 280, yPos);
+
+      yPos -= lineHeight * 1.5;
+      drawText(`Entregas: ${entregas.length}`, 50, yPos);
+      drawText(`Horário: ${horaGeracao}`, 280, yPos);
+
+      yPos -= lineHeight * 1.5;
+      drawText(`Km ida: ${formatDistance(routeMetrics.distanciaIda)}`, 50, yPos);
+      drawText(`Km volta: ${formatDistance(routeMetrics.distanciaVolta)}`, 180, yPos);
+      drawText(`Km total: ${formatDistance(routeMetrics.distanciaTotal)}`, 340, yPos);
+
+      yPos -= lineHeight * 1.5;
+      drawText(`Tempo total: ${formatDuration(routeMetrics.duracaoTotal)}`, 50, yPos);
+      drawText(`Data: ${dataGeracao}`, 280, yPos);
+
+      yPos -= lineHeight * 1.5;
+      drawText(`Valor total: ${formatCurrency(valorTotal)}`, 50, yPos);
+      drawText(`Peso total: ${formatPeso(pesoTotal)}`, 280, yPos);
+
+      yPos -= lineHeight * 2;
+      let tableColumns = drawTableHeader(yPos);
+      yPos -= 22;
+
+      for (const marker of entregas) {
+        if (yPos <= bottomMargin + 36) {
+          addNewPage();
+          yPos -= lineHeight * 2;
+          tableColumns = drawTableHeader(yPos);
+          yPos -= 22;
+        }
+
+        const nota = notas.find((item) => item.numero === marker.id);
+        const pedido = marker.orcamentoId ? String(marker.orcamentoId) : '---';
+        const cliente = truncateToWidth(
+          nota?.cliente?.nome || marker.clienteNome || marker.label || '-',
+          150,
+          fontSize,
+          true
+        );
+        const regiao = truncateToWidth(
+          [nota?.cliente?.bairro || marker.bairro, nota?.cliente?.cidade || marker.cidade]
+            .filter(Boolean)
+            .join(' - ') || 'Sem região',
+          112,
+          smallFontSize
+        );
+        const cep = truncateToWidth(nota?.cliente?.cep || '-', 112, smallFontSize);
+
+        drawText(String(marker.sequence || '-'), tableColumns.colSeq, yPos, { bold: true });
+        drawText(String(marker.id || '-'), tableColumns.colNota, yPos);
+        drawText(pedido, tableColumns.colPedido, yPos);
+        drawText(cliente, tableColumns.colCliente, yPos, { bold: true });
+        drawText(regiao, tableColumns.colRegiao, yPos);
+        drawText(formatCurrency(marker.valorPedido), tableColumns.colValor, yPos);
+        drawText(formatPeso(marker.pesoPedido), tableColumns.colPeso, yPos);
+
+        drawText(`CEP: ${cep}`, tableColumns.colCliente, yPos - 10, {
+          size: smallFontSize,
+          color: [0.35, 0.35, 0.35],
+        });
+
+        page.drawLine({
+          start: { x: leftMargin, y: yPos - 15 },
+          end: { x: width - rightMargin, y: yPos - 15 },
+          thickness: 0.5,
+          color: rgb(0.88, 0.9, 0.93),
+        });
+
+        yPos -= 24;
+      }
+
+      const footerY = Math.max(bottomMargin - 4, yPos - 10);
+      drawText('Documento gerado automaticamente pela roteirização.', leftMargin, footerY, {
+        size: smallFontSize,
+        color: [0.38, 0.38, 0.38],
+      });
+
+      const pdfBytes = await doc.save();
+      const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      const openedWindow = window.open(url, '_blank', 'noopener,noreferrer');
+
+      if (!openedWindow) {
+        enqueueSnackbar('O navegador bloqueou a abertura do PDF. Libere o pop-up para visualizar.', { variant: 'warning' });
+        return;
+      }
+
+      window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+      enqueueSnackbar('PDF da rota aberto para visualização.', { variant: 'success' });
+    } catch (error) {
+      console.error('Erro ao gerar PDF da rota:', error);
+      enqueueSnackbar('Erro ao gerar PDF da rota.', { variant: 'error' });
+    } finally {
+      setGerandoPdf(false);
+    }
   };
 
   const limparTudo = () => {
 
     setNotas([]);
     setSelecionadas([]);
+    setManualOrder([]);
     setMarkers([]);
     setRouteWaypoints([]);
     setRouteGeometry([]);
+    setRouteMetrics(null);
     setPerfil6mAlertas({});
     setBusca('');
+    setFiltroSelecao('');
+    setMostrarSomenteSelecionadas(false);
     setSelectedBairro(null);
   };
 
@@ -1005,12 +1355,12 @@ const RoteirizacaoPage = () => {
             variant="contained"
             color="secondary"
             size="small"
-            startIcon={<RouteIcon fontSize="small" />}
+            startIcon={gerandoPdf ? <CircularProgress size={16} color="inherit" /> : <RouteIcon fontSize="small" />}
             onClick={handleImprimir}
-            disabled={markers.length <= 1}
+            disabled={markers.length <= 1 || !routeMetrics || gerandoPdf}
             sx={{ borderRadius: '9px', px: 1.25, fontSize: '0.75rem' }}
           >
-            PDF
+            {gerandoPdf ? 'Gerando...' : 'PDF'}
           </Button>
         </Box>
       </Box>
@@ -1057,6 +1407,17 @@ const RoteirizacaoPage = () => {
                 </Button>
               </Box>
 
+              <Box display="flex" gap={1} mb={1.5} flexWrap="wrap">
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="Filtrar seleção"
+                  placeholder="Nota, cliente, bairro, cidade ou pedido"
+                  value={filtroSelecao}
+                  onChange={(e) => setFiltroSelecao(e.target.value)}
+                />
+              </Box>
+
               <Divider sx={{ mb: 1.5 }} />
 
               <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
@@ -1087,6 +1448,15 @@ const RoteirizacaoPage = () => {
                     variant={mostrarApenasFalhas ? 'filled' : 'outlined'}
                     sx={{ fontSize: '10px' }}
                   />
+                  <Chip
+                    size="small"
+                    label="Só selecionadas"
+                    color="primary"
+                    clickable
+                    onClick={() => setMostrarSomenteSelecionadas(!mostrarSomenteSelecionadas)}
+                    variant={mostrarSomenteSelecionadas ? 'filled' : 'outlined'}
+                    sx={{ fontSize: '10px' }}
+                  />
 
                 </Box>
               </Box>
@@ -1110,6 +1480,26 @@ const RoteirizacaoPage = () => {
                   variant="outlined"
                   label={`Peso: ${formatPeso(resumoSelecionadas.pesoTotal)}`}
                 />
+                <Chip
+                  size="small"
+                  variant="outlined"
+                  label={`Visíveis: ${notasFiltradas.length}`}
+                />
+              </Box>
+
+              <Box display="flex" gap={1} flexWrap="wrap" mb={2}>
+                <Button size="small" variant="outlined" onClick={handleSelecionarFiltradas}>
+                  Selecionar filtradas
+                </Button>
+                <Button size="small" variant="outlined" color="warning" onClick={handleLimparFiltradas}>
+                  Limpar filtradas
+                </Button>
+                <Button size="small" variant="outlined" onClick={handleSelecionarTodas} disabled={notas.length === 0}>
+                  Selecionar tudo
+                </Button>
+                <Button size="small" variant="outlined" color="error" onClick={handleLimparSelecao} disabled={selecionadas.length === 0}>
+                  Limpar seleção
+                </Button>
               </Box>
 
               <Box
@@ -1272,7 +1662,27 @@ const RoteirizacaoPage = () => {
                         });
                       }}
                     >
-                      <span>{bairro} ({notasDoBairro.length})</span>
+                      <Box display="flex" alignItems="center" gap={1}>
+                        <Checkbox
+                          size="small"
+                          checked={notasDoBairro.every((nota) => selecionadasSet.has(nota.numero))}
+                          indeterminate={
+                            notasDoBairro.some((nota) => selecionadasSet.has(nota.numero)) &&
+                            !notasDoBairro.every((nota) => selecionadasSet.has(nota.numero))
+                          }
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={(e) => handleSelecionarNotas(
+                            notasDoBairro.map((nota) => nota.numero),
+                            e.target.checked
+                          )}
+                        />
+                        <span>
+                          {bairro} ({notasDoBairro.length})
+                          {notasDoBairro.some((nota) => selecionadasSet.has(nota.numero))
+                            ? ` • ${notasDoBairro.filter((nota) => selecionadasSet.has(nota.numero)).length} sel.`
+                            : ''}
+                        </span>
+                      </Box>
                       {expandedBairros.has(bairro) ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
                     </ListSubheader>
                     {expandedBairros.has(bairro) && notasDoBairro.map((nota) => {
@@ -1481,6 +1891,25 @@ const RoteirizacaoPage = () => {
                       size="small"
                       sx={{ bgcolor: 'rgba(59,130,246,0.25)', color: 'white', fontWeight: 'bold' }}
                     />
+                    {routeMetrics && (
+                      <>
+                        <Chip
+                          label={`Ida ${formatDistance(routeMetrics.distanciaIda)}`}
+                          size="small"
+                          sx={{ bgcolor: 'rgba(14,116,144,0.35)', color: 'white', fontWeight: 'bold' }}
+                        />
+                        <Chip
+                          label={`Volta ${formatDistance(routeMetrics.distanciaVolta)}`}
+                          size="small"
+                          sx={{ bgcolor: 'rgba(234,88,12,0.35)', color: 'white', fontWeight: 'bold' }}
+                        />
+                        <Chip
+                          label={`Total ${formatDistance(routeMetrics.distanciaTotal)}`}
+                          size="small"
+                          sx={{ bgcolor: 'rgba(15,23,42,0.35)', color: 'white', fontWeight: 'bold' }}
+                        />
+                      </>
+                    )}
                   </>
                 )}
               </Box>
@@ -1498,6 +1927,27 @@ const RoteirizacaoPage = () => {
                 onMarkerClick={handleMapMarkerClick}
               />
             </Box>
+
+            {routeMetrics && (
+              <Box
+                sx={{
+                  px: 2,
+                  py: 1.5,
+                  borderTop: '1px solid',
+                  borderColor: 'divider',
+                  display: 'flex',
+                  gap: 1,
+                  flexWrap: 'wrap',
+                  alignItems: 'center',
+                  bgcolor: 'grey.50'
+                }}
+              >
+                <Chip label={`Ida: ${formatDistance(routeMetrics.distanciaIda)}`} color="info" variant="outlined" />
+                <Chip label={`Volta: ${formatDistance(routeMetrics.distanciaVolta)}`} color="warning" variant="outlined" />
+                <Chip label={`Total: ${formatDistance(routeMetrics.distanciaTotal)}`} color="success" variant="filled" />
+                <Chip label={`Tempo total: ${formatDuration(routeMetrics.duracaoTotal)}`} variant="outlined" />
+              </Box>
+            )}
 
           </Card>
         </Grid>

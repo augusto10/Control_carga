@@ -583,7 +583,7 @@ async function fetchNotasFiscaisFallback(
   username: string,
   password: string,
   dataReferencia: string
-): Promise<Array<Record<string, unknown>>> {
+): Promise<Map<number, Record<string, unknown>>> {
   const pendingIds = pedidos
     .filter((pedido) => {
       const numeroNota = pickString(pedido.NUMERO_NOTA, pedido.NUMERO_NOTA_FISCAL);
@@ -594,9 +594,11 @@ async function fetchNotasFiscaisFallback(
     .filter((id) => id > 0);
 
   if (pendingIds.length === 0) {
-    return [];
+    return new Map<number, Record<string, unknown>>();
   }
 
+  const pendingSet = new Set(pendingIds);
+  const notaMap = new Map<number, Record<string, unknown>>();
   const dataInicio = addDays(dataReferencia, -45);
   const dataFim = addDays(dataReferencia, 2);
 
@@ -609,80 +611,21 @@ async function fetchNotasFiscaisFallback(
     password
   );
 
-  return notas as Array<Record<string, unknown>>;
-}
-
-function buildNotaFiscalMap(
-  notas: Array<Record<string, unknown>>,
-  pedidos: Array<Record<string, unknown>>
-): Map<number, Record<string, unknown>> {
-  const pendingIds = new Set(
-    pedidos
-      .filter((pedido) => {
-        const numeroNota = pickString(pedido.NUMERO_NOTA, pedido.NUMERO_NOTA_FISCAL);
-        const chave = onlyDigits(pickString(pedido.IDENTIFICACAO_NFE, pedido.CHAVE_NFE));
-        return !numeroNota || chave.length !== 44;
-      })
-      .map(extractPedidoId)
-      .filter((id) => id > 0)
-  );
-
-  const notaMap = new Map<number, Record<string, unknown>>();
-
   for (const nota of notas) {
+    const notaRecord = nota as unknown as Record<string, unknown>;
     const pedidoId =
       pickNumber(
-        nota.ORCAMENTO_BASE_ID,
-        nota.ORCAMENTO_ID,
-        nota.PEDIDO_ID
+        notaRecord.ORCAMENTO_BASE_ID,
+        notaRecord.ORCAMENTO_ID,
+        notaRecord.PEDIDO_ID
       ) || 0;
 
-    if (pedidoId > 0 && pendingIds.has(pedidoId) && !notaMap.has(pedidoId)) {
-      notaMap.set(pedidoId, nota);
+    if (pedidoId > 0 && pendingSet.has(pedidoId) && !notaMap.has(pedidoId)) {
+      notaMap.set(pedidoId, notaRecord);
     }
   }
 
   return notaMap;
-}
-
-function buildPedidoIdFromNotasExternas(
-  notas: Array<Record<string, unknown>>
-): {
-  pedidoIdPorNumeroNota: Map<string, number>;
-  pedidoIdPorCodigo: Map<string, number>;
-} {
-  const pedidoIdPorNumeroNota = new Map<string, number>();
-  const pedidoIdPorCodigo = new Map<string, number>();
-
-  for (const nota of notas) {
-    const pedidoId =
-      pickNumber(
-        nota.ORCAMENTO_BASE_ID,
-        nota.ORCAMENTO_ID,
-        nota.PEDIDO_ID
-      ) || 0;
-
-    if (!pedidoId) continue;
-
-    const numeroNota = normalizeNumeroNota(extractNumeroNotaFromExternalNota(nota));
-    if (numeroNota && !pedidoIdPorNumeroNota.has(numeroNota)) {
-      pedidoIdPorNumeroNota.set(numeroNota, pedidoId);
-    }
-
-    const codigo = onlyDigits(
-      pickString(
-        nota.IDENTIFICACAO_NFE,
-        nota.CHAVE_NFE,
-        nota.codigo,
-        nota.CODIGO
-      )
-    );
-    if (codigo.length === 44 && !pedidoIdPorCodigo.has(codigo)) {
-      pedidoIdPorCodigo.set(codigo, pedidoId);
-    }
-  }
-
-  return { pedidoIdPorNumeroNota, pedidoIdPorCodigo };
 }
 
 async function fetchApuracoesPorPedidoFallback(
@@ -732,8 +675,7 @@ async function fetchApuracoesPorPedidoFallback(
 }
 
 async function fetchLocalNotasPorPedidoSelecionado(
-  dataReferencia: string,
-  notasExternas: Array<Record<string, unknown>>
+  dataReferencia: string
 ): Promise<
   Map<
     number,
@@ -748,7 +690,6 @@ async function fetchLocalNotasPorPedidoSelecionado(
 > {
   const start = new Date(`${dataReferencia}T00:00:00-03:00`);
   const end = new Date(`${addDays(dataReferencia, 7)}T23:59:59-03:00`);
-  const { pedidoIdPorNumeroNota, pedidoIdPorCodigo } = buildPedidoIdFromNotasExternas(notasExternas);
 
   const notasLocais = await prisma.notaFiscal.findMany({
     where: {
@@ -771,35 +712,52 @@ async function fetchLocalNotasPorPedidoSelecionado(
     },
   });
 
-  const map = new Map<
-    number,
-    {
-      numeroNota: string;
-      codigo: string;
-      controleId: string | null;
-      controleDataCriacao: Date | null;
-      controleTransportadora: string | null;
+  const notasComCodigo = notasLocais.filter((nota) => onlyDigits(nota.codigo).length === 44);
+  const externalEntries = await mapWithConcurrency(notasComCodigo, 8, async (nota) => {
+    try {
+      const external = await consultarNotaFiscal(onlyDigits(nota.codigo));
+      const pedidoId =
+        pickNumber(
+          external.ORCAMENTO_BASE_ID,
+          external.ORCAMENTO_ID,
+          external.PEDIDO_ID
+        ) || 0;
+
+      if (!pedidoId) return null;
+
+      return [
+        pedidoId,
+        {
+          numeroNota: nota.numeroNota,
+          codigo: nota.codigo,
+          controleId: nota.controleId,
+          controleDataCriacao: nota.controle?.dataCriacao || null,
+          controleTransportadora: nota.controle?.transportadora
+            ? String(nota.controle.transportadora)
+            : null,
+        },
+      ] as const;
+    } catch {
+      return null;
     }
-  >();
+  });
 
-  for (const nota of notasLocais) {
-    const pedidoId =
-      pedidoIdPorCodigo.get(onlyDigits(nota.codigo)) ||
-      pedidoIdPorNumeroNota.get(normalizeNumeroNota(nota.numeroNota)) ||
-      0;
-
-    if (!pedidoId || map.has(pedidoId)) continue;
-
-    map.set(pedidoId, {
-      numeroNota: nota.numeroNota,
-      codigo: nota.codigo,
-      controleId: nota.controleId,
-      controleDataCriacao: nota.controle?.dataCriacao || null,
-      controleTransportadora: nota.controle?.transportadora || null,
-    });
-  }
-
-  return map;
+  return new Map(
+    externalEntries.filter(
+      (
+        entry
+      ): entry is readonly [
+        number,
+        {
+          numeroNota: string;
+          codigo: string;
+          controleId: string | null;
+          controleDataCriacao: Date | null;
+          controleTransportadora: string | null;
+        },
+      ] => Boolean(entry)
+    )
+  );
 }
 
 export default async function handler(
@@ -828,22 +786,18 @@ export default async function handler(
     const pedidosComApuracao = pedidosBase.map((pedido) =>
       enrichPedidoWithApuracao(pedido, apuracaoMap.get(extractPedidoId(pedido)))
     );
-    const notasExternas = await fetchNotasFiscaisFallback(
+    const notaFiscalMap = await fetchNotasFiscaisFallback(
       pedidosComApuracao,
       username,
       password,
       dataReferencia
     );
-    const notaFiscalMap = buildNotaFiscalMap(notasExternas, pedidosComApuracao);
 
     const pedidosComNotas = pedidosComApuracao.map((pedido) =>
       enrichPedidoWithNotaFiscal(pedido, notaFiscalMap.get(extractPedidoId(pedido)))
     );
     const apuracaoPorPedidoMap = await fetchApuracoesPorPedidoFallback(pedidosComNotas, req);
-    const localNotasPorPedidoMap = await fetchLocalNotasPorPedidoSelecionado(
-      dataReferencia,
-      notasExternas
-    );
+    const localNotasPorPedidoMap = await fetchLocalNotasPorPedidoSelecionado(dataReferencia);
 
     const pedidosEnriquecidos = pedidosComNotas.map((pedido) =>
       enrichPedidoWithNotaFiscal(pedido, apuracaoPorPedidoMap.get(extractPedidoId(pedido)))
