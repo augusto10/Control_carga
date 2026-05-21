@@ -34,7 +34,8 @@ const transportadoraNomes: Record<string, string> = {
   'DETAFRA_TRANSPORTES': 'Detafra Transportes',
   'RETIRA_VENDEDOR': 'Retira Vendedor',
   'RETIRA_CLIENTE': 'Retira Cliente',
-  'VLOG': 'VLOG Transportes'
+  'VLOG': 'VLOG Transportes',
+  'ZANUELO_TRANSPORTE_LOGISTICA': 'Zanuelo Transporte e Logistica'
 };
 
 interface Motorista {

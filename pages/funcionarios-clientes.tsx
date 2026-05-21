@@ -69,7 +69,8 @@ const transportadoras = [
   { id: 'ACCERT', nome: 'ACCERT' },
   { id: 'TERCEIRIZADA', nome: 'Terceirizada' },
   { id: 'DETAFRA_TRANSPORTES', nome: 'Detafra Transportes' },
-  { id: 'RETIRA_VENDEDOR', nome: 'Retira Vendedor' }
+  { id: 'RETIRA_VENDEDOR', nome: 'Retira Vendedor' },
+  { id: 'ZANUELO_TRANSPORTE_LOGISTICA', nome: 'Zanuelo Transporte e Logistica' }
 ];
 
 const tiposFuncionario = [

@@ -151,7 +151,7 @@ const CriarControleContent: React.FC = () => {
     return encontrada;
   };
 
-  type TransportadoraEnum = 'ACERT' | 'ACCERT' | 'EXPRESSO_GOIAS' | 'TERCEIRIZADA' | 'DETAFRA_TRANSPORTES' | 'RETIRA_VENDEDOR' | 'RETIRA_CLIENTE' | 'VLOG';
+  type TransportadoraEnum = 'ACERT' | 'ACCERT' | 'EXPRESSO_GOIAS' | 'TERCEIRIZADA' | 'DETAFRA_TRANSPORTES' | 'RETIRA_VENDEDOR' | 'RETIRA_CLIENTE' | 'VLOG' | 'ZANUELO_TRANSPORTE_LOGISTICA';
   
   interface FormData {
     motorista: string;
@@ -299,7 +299,7 @@ const CriarControleContent: React.FC = () => {
         motorista: (formData.motorista || 'PENDENTE').trim(),
         cpfMotorista: formData.cpfMotorista ? formData.cpfMotorista.replace(/[^\d]/g, '') : 'PENDENTE',
         responsavel: (formData.responsavel || 'PENDENTE').trim(),
-        transportadora: (['ACERT', 'ACCERT', 'EXPRESSO_GOIAS', 'TERCEIRIZADA', 'DETAFRA_TRANSPORTES', 'RETIRA_VENDEDOR', 'RETIRA_CLIENTE', 'VLOG'].includes(formData.transportadora)) 
+        transportadora: (['ACERT', 'ACCERT', 'EXPRESSO_GOIAS', 'TERCEIRIZADA', 'DETAFRA_TRANSPORTES', 'RETIRA_VENDEDOR', 'RETIRA_CLIENTE', 'VLOG', 'ZANUELO_TRANSPORTE_LOGISTICA'].includes(formData.transportadora))
           ? formData.transportadora 
           : 'ACCERT',
         qtdPallets: Number(formData.qtdPalletsLevados) || 0, // Fallback to levados for total pallets
@@ -522,7 +522,8 @@ const CriarControleContent: React.FC = () => {
                             'DETAFRA_TRANSPORTES': 'Detafra Transportes',
                             'RETIRA_VENDEDOR': 'Retira Vendedor',
                             'RETIRA_CLIENTE': 'Retira Cliente',
-                            'VLOG': 'VLOG Transportes'
+                            'VLOG': 'VLOG Transportes',
+                            'ZANUELO_TRANSPORTE_LOGISTICA': 'Zanuelo Transporte e Logistica'
                           };
                           
                           const transportadoraNome = transportadoraMap[option.transportadoraId] || option.transportadoraId;

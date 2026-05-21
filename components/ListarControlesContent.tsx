@@ -128,7 +128,8 @@ const ListarControlesContent: React.FC = () => {
     { id: 'DETAFRA_TRANSPORTES', nome: 'DETAFRA_TRANSPORTES', descricao: 'Detafra Transportes' },
     { id: 'RETIRA_VENDEDOR', nome: 'RETIRA_VENDEDOR', descricao: 'Retira Vendedor' },
     { id: 'RETIRA_CLIENTE', nome: 'RETIRA_CLIENTE', descricao: 'Retira Cliente' },
-    { id: 'VLOG', nome: 'VLOG', descricao: 'VLOG Transportes' }
+    { id: 'VLOG', nome: 'VLOG', descricao: 'VLOG Transportes' },
+    { id: 'ZANUELO_TRANSPORTE_LOGISTICA', nome: 'ZANUELO_TRANSPORTE_LOGISTICA', descricao: 'Zanuelo Transporte e Logistica' }
   ];
 
   // Função para obter o objeto da transportadora pelo ID
@@ -1419,7 +1420,7 @@ const ListarControlesContent: React.FC = () => {
       if (editData.responsavel !== undefined) dadosAtualizacao.responsavel = editData.responsavel as string;
       if (editData.cpfMotorista !== undefined) dadosAtualizacao.cpfMotorista = editData.cpfMotorista as string;
       if (editData.transportadora !== undefined) {
-        const transportadoraValida = (['ACCERT', 'EXPRESSO_GOIAS', 'TERCEIRIZADA', 'DETAFRA_TRANSPORTES', 'RETIRA_VENDEDOR', 'RETIRA_CLIENTE'].includes(editData.transportadora)) ? editData.transportadora : 'ACCERT';
+        const transportadoraValida = (['ACCERT', 'EXPRESSO_GOIAS', 'TERCEIRIZADA', 'DETAFRA_TRANSPORTES', 'RETIRA_VENDEDOR', 'RETIRA_CLIENTE', 'VLOG', 'ZANUELO_TRANSPORTE_LOGISTICA'].includes(editData.transportadora)) ? editData.transportadora : 'ACCERT';
         dadosAtualizacao.transportadora = transportadoraValida;
       }
       if (editData.qtdPallets !== undefined) dadosAtualizacao.qtdPallets = Number(editData.qtdPallets) || 0;

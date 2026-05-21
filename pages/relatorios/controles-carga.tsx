@@ -159,7 +159,8 @@ const RelatorioControlesCargaPage: React.FC = () => {
     { id: 'DETAFRA_TRANSPORTES', nome: 'Detafra Transportes' },
     { id: 'RETIRA_VENDEDOR', nome: 'Retira Vendedor' },
     { id: 'RETIRA_CLIENTE', nome: 'Retira Cliente' },
-    { id: 'VLOG', nome: 'VLOG Transportes' }
+    { id: 'VLOG', nome: 'VLOG Transportes' },
+    { id: 'ZANUELO_TRANSPORTE_LOGISTICA', nome: 'Zanuelo Transporte e Logistica' }
   ];
 
   const statusOptions = [
