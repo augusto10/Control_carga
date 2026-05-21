@@ -73,7 +73,7 @@ type PersistedKanbanCacheRow = {
 const kanbanResponseCache = new Map<string, KanbanCacheEntry>();
 
 function getKanbanCacheKey(dataReferencia: string): string {
-  return `kanban:v2:${dataReferencia}`;
+  return `kanban:v3:${dataReferencia}`;
 }
 
 function getPersistedKanbanCacheConfigKey(cacheKey: string): string {
@@ -287,6 +287,47 @@ function isPedidoRecebidoNoCaixa(pedido: Record<string, unknown>): boolean {
 
 function isPedidoFechadoERecebidoNoCaixa(pedido: Record<string, unknown>): boolean {
   return isPedidoFechado(pedido) && isPedidoRecebidoNoCaixa(pedido);
+}
+
+function getPedidoEmpresaId(pedido: Record<string, unknown>): number | null {
+  return pickNumber(pedido.EMPRESA_ID, pedido.EMPRESAID, pedido.ID_EMPRESA, pedido.EMPRESA);
+}
+
+function getPedidoDataReferenciaDia(pedido: Record<string, unknown>): string | null {
+  const raw = pickString(
+    pedido.DATA_HORA_RECEBIMENTO,
+    pedido.data_hora_recebimento,
+    pedido.DATA_RECEBIMENTO,
+    pedido.data_recebimento,
+    pedido.RECEBIMENTO,
+    pedido.recebimento
+  );
+
+  if (!raw) return null;
+  if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.slice(0, 10);
+  if (/^\d{1,2}\/\d{1,2}\/\d{4}/.test(raw)) {
+    const [datePart] = raw.split(' ');
+    const [day, month, year] = datePart.split('/');
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  }
+  if (/^\d{1,2}-\d{1,2}-\d{4}/.test(raw)) {
+    const [datePart] = raw.split(' ');
+    const [day, month, year] = datePart.split('-');
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  }
+
+  const parsed = new Date(raw);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString().slice(0, 10);
+}
+
+function isPedidoDoKanbanNaData(pedido: Record<string, unknown>, dataReferencia: string): boolean {
+  const tipoEntrega = String(pedido.TIPO_ENTREGA || pedido.tipo_entrega || '').toUpperCase();
+  return (
+    getPedidoEmpresaId(pedido) === 1 &&
+    tipoEntrega === 'EPG' &&
+    isPedidoFechadoERecebidoNoCaixa(pedido) &&
+    getPedidoDataReferenciaDia(pedido) === dataReferencia
+  );
 }
 
 function getStatusLabel(status: KanbanStatus): string {
@@ -652,7 +693,6 @@ async function mapWithConcurrency<T, R>(
 }
 
 async function fetchPedidosDoDia(
-  req: NextApiRequest,
   dataReferencia: string,
   username: string,
   password: string
@@ -699,45 +739,46 @@ async function fetchPedidosDoDia(
     return pedidosConsolidados;
   }
 
-  const baseUrl = getBaseUrl(req);
   const pedidos: Array<Record<string, unknown>> = [];
   const seen = new Set<number>();
   const limit = 100;
-  const dataInicio = dataReferencia;
+  const maxRecords = 30000;
+  let emptyPagesAfterMatches = 0;
 
-  for (let offset = 0; offset < 5000; offset += limit) {
-    const url = new URL('/api/pedidos/externos', baseUrl);
-    url.searchParams.set('limit', String(limit));
-    url.searchParams.set('offset', String(offset));
-    url.searchParams.set('data_inicio', dataInicio);
-    url.searchParams.set('data_fim', dataReferencia);
-    url.searchParams.set('tipo_data', 'recebimento');
-    url.searchParams.set('tipo_entrega', 'EPG');
-    url.searchParams.set('status', 'FECHADO');
+  for (let offset = 0; offset < maxRecords; offset += limit) {
+    const resultado = await apiExternaService.listarPedidos(
+      {
+        limit,
+        offset,
+        data_inicio: dataReferencia,
+        data_fim: dataReferencia,
+        tipo_data: 'recebimento',
+        tipo_entrega: 'EPG',
+        status: 'FECHADO',
+      },
+      username,
+      password
+    );
 
-    const response = await fetch(url.toString(), {
-      headers: buildInternalRequestHeaders(req),
-      cache: 'no-store',
-    });
+    const page = Array.isArray(resultado?.data) ? resultado.data : [];
+    if (page.length === 0) break;
 
-    if (!response.ok) {
-      throw new Error(`Falha ao carregar pedidos externos (${response.status})`);
-    }
-
-    const payload = (await response.json()) as PedidosExternosResponse;
-    const page = Array.isArray(payload.data) ? payload.data : [];
-
+    let matchesInPage = 0;
     for (const item of page) {
+      if (!isPedidoDoKanbanNaData(item, dataReferencia)) continue;
       const pedidoId = extractPedidoId(item);
       if (!pedidoId || seen.has(pedidoId)) continue;
       seen.add(pedidoId);
       pedidos.push(item);
+      matchesInPage += 1;
     }
 
     // A API intermediÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ria filtra localmente e pode devolver uma pÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡gina vazia
     // mesmo quando ainda existem pedidos em offsets seguintes.
-    if (page.length > 0 && page.length < limit) break;
-    if (typeof payload.total === 'number' && payload.total > 0 && offset + page.length >= payload.total) {
+    emptyPagesAfterMatches = matchesInPage > 0 ? 0 : emptyPagesAfterMatches + 1;
+    if (pedidos.length > 0 && emptyPagesAfterMatches >= 3) break;
+    if (page.length < limit) break;
+    if (typeof resultado?.total === 'number' && resultado.total > 0 && offset + page.length >= resultado.total) {
       break;
     }
   }
@@ -1043,7 +1084,7 @@ export default async function handler(
       return res.status(500).json({ error: 'Credenciais da API externa nao configuradas' });
     }
 
-    const pedidosBase = (await fetchPedidosDoDia(req, dataReferencia, username, password)).filter((pedido) => {
+    const pedidosBase = (await fetchPedidosDoDia(dataReferencia, username, password)).filter((pedido) => {
       if (pedido._KANBAN_CONSULTA_CONSOLIDADA === true) return true;
       return isPedidoFechadoERecebidoNoCaixa(pedido);
     });
