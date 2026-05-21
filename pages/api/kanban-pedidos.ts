@@ -115,6 +115,50 @@ function normalizeFreeText(value: string | null | undefined): string {
     .toLowerCase()
     .trim();
 }
+function hasMeaningfulExternalValue(value: unknown): boolean {
+  const text = pickString(value);
+  if (!text) return false;
+
+  const normalized = normalizeFreeText(text);
+  return !['null', 'undefined', 'none', 'nan'].includes(normalized);
+}
+
+function isPedidoFechado(pedido: Record<string, unknown>): boolean {
+  const fechado = pickString(
+    pedido.PEDIDO_FECHADO,
+    pedido.pedido_fechado,
+    pedido.FECHADO,
+    pedido.fechado
+  );
+
+  return String(fechado || '').trim().toUpperCase() === 'S';
+}
+
+function isPedidoRecebidoNoCaixa(pedido: Record<string, unknown>): boolean {
+  return [
+    pedido.DATA_HORA_RECEBIMENTO,
+    pedido.data_hora_recebimento,
+    pedido.DATA_RECEBIMENTO,
+    pedido.data_recebimento,
+    pedido.RECEBIMENTO,
+    pedido.recebimento,
+    pedido.DATA_HORA_RECEBIDO,
+    pedido.data_hora_recebido,
+    pedido.DATA_RECEBIDO,
+    pedido.data_recebido,
+    pedido.DATA_RECEB,
+    pedido.data_receb,
+    pedido.HORA_RECEBIMENTO,
+    pedido.hora_recebimento,
+    pedido.HORA_RECEB,
+    pedido.hora_receb,
+  ].some(hasMeaningfulExternalValue);
+}
+
+function isPedidoFechadoERecebidoNoCaixa(pedido: Record<string, unknown>): boolean {
+  return isPedidoFechado(pedido) && isPedidoRecebidoNoCaixa(pedido);
+}
+
 
 function getStatusLabel(status: KanbanStatus): string {
   switch (status) {
@@ -487,6 +531,7 @@ async function fetchPedidosDoDia(
     url.searchParams.set('data_fim', dataReferencia);
     url.searchParams.set('tipo_data', 'recebimento');
     url.searchParams.set('tipo_entrega', 'EPG');
+    url.searchParams.set('status', 'FECHADO');
 
     const response = await fetch(url.toString(), {
       headers: buildInternalRequestHeaders(req),
@@ -781,7 +826,9 @@ export default async function handler(
       return res.status(500).json({ error: 'Credenciais da API externa nÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â£o configuradas' });
     }
 
-    const pedidosBase = await fetchPedidosDoDia(req, dataReferencia);
+    const pedidosBase = (await fetchPedidosDoDia(req, dataReferencia)).filter(
+      isPedidoFechadoERecebidoNoCaixa
+    );
     const apuracaoMap = await fetchApuracoesFallback(pedidosBase, username, password, dataReferencia);
     const pedidosComApuracao = pedidosBase.map((pedido) =>
       enrichPedidoWithApuracao(pedido, apuracaoMap.get(extractPedidoId(pedido)))
