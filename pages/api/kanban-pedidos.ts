@@ -2,6 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 import { apiExternaService, type ApuracaoExterna } from '@/services/api-externa';
 import { consultarNotaFiscal, trackingDanfe } from '@/services/sswClient';
+import { createHash } from 'crypto';
 
 const KANBAN_STATUSES = [
   'EM_PREPARACAO',
@@ -56,6 +57,134 @@ type TrackingInfo = {
   status: string | null;
   message: string | null;
 };
+
+type KanbanCacheEntry = {
+  payload: KanbanResponse;
+  expiresAt: number;
+  staleAt: number;
+};
+
+type PersistedKanbanCacheRow = {
+  payload: KanbanResponse;
+  expiresAt: Date;
+  staleAt: Date;
+};
+
+const kanbanResponseCache = new Map<string, KanbanCacheEntry>();
+
+function getKanbanCacheKey(dataReferencia: string): string {
+  return `kanban:v2:${dataReferencia}`;
+}
+
+function getPersistedKanbanCacheConfigKey(cacheKey: string): string {
+  const hash = createHash('sha1').update(cacheKey).digest('hex');
+  return `kanban_query_cache:${hash}`;
+}
+
+function getKanbanCacheTtlMs(dataReferencia: string): { freshMs: number; staleMs: number } {
+  const hoje = getDateInSaoPaulo();
+
+  if (dataReferencia < hoje) {
+    return {
+      freshMs: 30 * 60 * 1000,
+      staleMs: 12 * 60 * 60 * 1000,
+    };
+  }
+
+  return {
+    freshMs: 60 * 1000,
+    staleMs: 10 * 60 * 1000,
+  };
+}
+
+function getPersistedKanbanCacheTtlMs(dataReferencia: string): { freshMs: number; staleMs: number } {
+  const hoje = getDateInSaoPaulo();
+
+  if (dataReferencia < hoje) {
+    return {
+      freshMs: 6 * 60 * 60 * 1000,
+      staleMs: 3 * 24 * 60 * 60 * 1000,
+    };
+  }
+
+  return {
+    freshMs: 5 * 60 * 1000,
+    staleMs: 60 * 60 * 1000,
+  };
+}
+
+function setKanbanCache(dataReferencia: string, payload: KanbanResponse): KanbanResponse {
+  const now = Date.now();
+  const ttl = getKanbanCacheTtlMs(dataReferencia);
+
+  kanbanResponseCache.set(getKanbanCacheKey(dataReferencia), {
+    payload,
+    expiresAt: now + ttl.freshMs,
+    staleAt: now + ttl.staleMs,
+  });
+
+  return payload;
+}
+
+async function readPersistedKanbanCache(cacheKey: string): Promise<PersistedKanbanCacheRow | null> {
+  try {
+    const cache = await prisma.configuracaoSistema.findUnique({
+      where: { chave: getPersistedKanbanCacheConfigKey(cacheKey) },
+    });
+
+    if (!cache?.valor) return null;
+
+    const parsed = JSON.parse(cache.valor) as {
+      cacheKey?: string;
+      payload?: KanbanResponse;
+      expiresAt?: string;
+      staleAt?: string;
+    };
+
+    if (parsed.cacheKey !== cacheKey || !parsed.payload || !parsed.expiresAt || !parsed.staleAt) {
+      return null;
+    }
+
+    return {
+      payload: parsed.payload,
+      expiresAt: new Date(parsed.expiresAt),
+      staleAt: new Date(parsed.staleAt),
+    };
+  } catch (error) {
+    console.error('[Kanban Cache] Falha ao ler cache persistente:', error);
+    return null;
+  }
+}
+
+async function writePersistedKanbanCache(
+  cacheKey: string,
+  payload: KanbanResponse,
+  dataReferencia: string
+): Promise<void> {
+  try {
+    const ttl = getPersistedKanbanCacheTtlMs(dataReferencia);
+    const valor = JSON.stringify({
+      cacheKey,
+      payload,
+      expiresAt: new Date(Date.now() + ttl.freshMs).toISOString(),
+      staleAt: new Date(Date.now() + ttl.staleMs).toISOString(),
+    });
+
+    await prisma.configuracaoSistema.upsert({
+      where: { chave: getPersistedKanbanCacheConfigKey(cacheKey) },
+      create: {
+        chave: getPersistedKanbanCacheConfigKey(cacheKey),
+        valor,
+        descricao: 'Cache persistente de consultas do kanban de pedidos',
+        tipo: 'json',
+        editavel: false,
+      },
+      update: { valor },
+    });
+  } catch (error) {
+    console.error('[Kanban Cache] Falha ao gravar cache persistente:', error);
+  }
+}
 
 function getDateInSaoPaulo(date = new Date()): string {
   return new Intl.DateTimeFormat('en-CA', {
@@ -115,6 +244,7 @@ function normalizeFreeText(value: string | null | undefined): string {
     .toLowerCase()
     .trim();
 }
+
 function hasMeaningfulExternalValue(value: unknown): boolean {
   const text = pickString(value);
   if (!text) return false;
@@ -158,7 +288,6 @@ function isPedidoRecebidoNoCaixa(pedido: Record<string, unknown>): boolean {
 function isPedidoFechadoERecebidoNoCaixa(pedido: Record<string, unknown>): boolean {
   return isPedidoFechado(pedido) && isPedidoRecebidoNoCaixa(pedido);
 }
-
 
 function getStatusLabel(status: KanbanStatus): string {
   switch (status) {
@@ -210,7 +339,16 @@ function buildInternalRequestHeaders(req: NextApiRequest): HeadersInit {
 
 function extractPedidoId(pedido: Record<string, unknown>): number {
   return (
-    pickNumber(pedido.ORCAMENTO_ID, pedido.PEDIDO_ID, pedido.ID) ||
+    pickNumber(
+      pedido.ORCAMENTO_ID,
+      pedido.ORCAMENTO_BASE_ID,
+      pedido.PEDIDO_ID,
+      pedido.ID,
+      pedido.orcamento_id,
+      pedido.orcamento_base_id,
+      pedido.pedido_id,
+      pedido.id
+    ) ||
     0
   );
 }
@@ -515,8 +653,52 @@ async function mapWithConcurrency<T, R>(
 
 async function fetchPedidosDoDia(
   req: NextApiRequest,
-  dataReferencia: string
+  dataReferencia: string,
+  username: string,
+  password: string
 ): Promise<Array<Record<string, unknown>>> {
+  const pedidosConsolidados: Array<Record<string, unknown>> = [];
+  const seenConsolidados = new Set<number>();
+  const consultaLimit = 100;
+
+  for (let offset = 0; offset < 5000; offset += consultaLimit) {
+    const resultado = await apiExternaService.listarConsultaNotasFiscais(
+      {
+        limit: consultaLimit,
+        offset,
+        data_inicio: dataReferencia,
+        data_fim: dataReferencia,
+        tipo_data: 'recebimento',
+        tipo_entrega: 'EPG',
+        status: 'FECHADO',
+      },
+      username,
+      password
+    );
+
+    if (!resultado) break;
+
+    const page = Array.isArray(resultado.data) ? resultado.data : [];
+    for (const item of page) {
+      const pedidoId = extractPedidoId(item);
+      if (!pedidoId || seenConsolidados.has(pedidoId)) continue;
+      seenConsolidados.add(pedidoId);
+      pedidosConsolidados.push({
+        ...item,
+        _KANBAN_CONSULTA_CONSOLIDADA: true,
+      });
+    }
+
+    if (page.length < consultaLimit) return pedidosConsolidados;
+    if (typeof resultado.total === 'number' && resultado.total > 0 && offset + page.length >= resultado.total) {
+      return pedidosConsolidados;
+    }
+  }
+
+  if (pedidosConsolidados.length > 0) {
+    return pedidosConsolidados;
+  }
+
   const baseUrl = getBaseUrl(req);
   const pedidos: Array<Record<string, unknown>> = [];
   const seen = new Set<number>();
@@ -810,25 +992,61 @@ export default async function handler(
   res: NextApiResponse<KanbanResponse | { error: string }>
 ) {
   if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'MÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©todo nÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â£o permitido' });
+    return res.status(405).json({ error: 'Metodo nao permitido' });
   }
+
+  res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=600');
 
   try {
     const dataReferencia =
       typeof req.query.data === 'string' && req.query.data.trim()
         ? req.query.data.trim()
         : getDateInSaoPaulo();
+    const forceRefresh = req.query.refresh === '1';
+    const cacheKey = getKanbanCacheKey(dataReferencia);
+    const cached = kanbanResponseCache.get(cacheKey);
+    const now = Date.now();
+
+    if (!forceRefresh && cached && now < cached.expiresAt) {
+      res.setHeader('X-Kanban-Cache', 'fresh');
+      return res.status(200).json(cached.payload);
+    }
+
+    if (!forceRefresh && cached && now < cached.staleAt) {
+      res.setHeader('X-Kanban-Cache', 'stale');
+      return res.status(200).json(cached.payload);
+    }
+
+    if (!forceRefresh) {
+      const persistedCache = await readPersistedKanbanCache(cacheKey);
+      if (persistedCache) {
+        const persistedPayload = setKanbanCache(dataReferencia, persistedCache.payload);
+        const persistedExpiresAt = persistedCache.expiresAt.getTime();
+        const persistedStaleAt = persistedCache.staleAt.getTime();
+
+        if (now < persistedExpiresAt) {
+          res.setHeader('X-Kanban-Cache', 'persisted-fresh');
+          return res.status(200).json(persistedPayload);
+        }
+
+        if (now < persistedStaleAt) {
+          res.setHeader('X-Kanban-Cache', 'persisted-stale');
+          return res.status(200).json(persistedPayload);
+        }
+      }
+    }
 
     const username = process.env.API_EXTERNA_USERNAME;
     const password = process.env.API_EXTERNA_PASSWORD;
 
     if (!username || !password) {
-      return res.status(500).json({ error: 'Credenciais da API externa nÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â£o configuradas' });
+      return res.status(500).json({ error: 'Credenciais da API externa nao configuradas' });
     }
 
-    const pedidosBase = (await fetchPedidosDoDia(req, dataReferencia)).filter(
-      isPedidoFechadoERecebidoNoCaixa
-    );
+    const pedidosBase = (await fetchPedidosDoDia(req, dataReferencia, username, password)).filter((pedido) => {
+      if (pedido._KANBAN_CONSULTA_CONSOLIDADA === true) return true;
+      return isPedidoFechadoERecebidoNoCaixa(pedido);
+    });
     const apuracaoMap = await fetchApuracoesFallback(pedidosBase, username, password, dataReferencia);
     const pedidosComApuracao = pedidosBase.map((pedido) =>
       enrichPedidoWithApuracao(pedido, apuracaoMap.get(extractPedidoId(pedido)))
@@ -1074,10 +1292,16 @@ export default async function handler(
           pickNumber(
             pedido.VALOR_TOTAL,
             pedido.VALOR_PEDIDO,
+            pedido.VALOR_TOTAL_NOTA,
             pedido.VALOR_PRODUTOS,
             pedido.VALOR_DUPLICATA
           ) || 0,
-        dataHoraCadastro: pickString(pedido.DATA_HORA_CADASTRO, pedido.DATA_HORA_RECEBIMENTO),
+        dataHoraCadastro: pickString(
+          pedido.DATA_HORA_CADASTRO,
+          pedido.DATA_HORA_RECEBIMENTO,
+          pedido.DATA_CADASTRO,
+          pedido.DATA_EMISSAO
+        ),
         dataEntrega: pickString(pedido.DATA_ENTREGA, pedido.DATA_HORA_ENTREGA),
         tipoEntrega: pickString(pedido.TIPO_ENTREGA),
         numeroNota,
@@ -1115,13 +1339,18 @@ export default async function handler(
       PEDIDO_ENTREGUE: columns.PEDIDO_ENTREGUE.length,
     };
 
-    return res.status(200).json({
+    const payload: KanbanResponse = {
       dataReferencia,
       dataInicio: dataReferencia,
       generatedAt: new Date().toISOString(),
       totals,
       columns,
-    });
+    };
+
+    setKanbanCache(dataReferencia, payload);
+    await writePersistedKanbanCache(cacheKey, payload, dataReferencia);
+    res.setHeader('X-Kanban-Cache', forceRefresh ? 'refresh' : 'miss');
+    return res.status(200).json(payload);
   } catch (error) {
     console.error('[API Kanban Pedidos] Erro:', error);
     return res.status(500).json({

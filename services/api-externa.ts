@@ -81,6 +81,13 @@ interface ApuracaoExterna {
   [key: string]: any;
 }
 
+interface ConsultaNotasFiscaisResponse {
+  data: Record<string, any>[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
 class APIExternaService {
   private apiInstance: AxiosInstance;
   private token: string | null = null;
@@ -507,6 +514,110 @@ class APIExternaService {
     } catch (error: any) {
       console.error(
         '[API Externa] Erro ao listar pedidos:',
+        error.response?.data || error.message
+      );
+      return null;
+    }
+  }
+
+  async listarConsultaNotasFiscais(
+    filtros: {
+      data_inicio?: string;
+      data_fim?: string;
+      limit?: number;
+      offset?: number;
+      tipo_data?: string;
+      tipo_entrega?: string;
+      status?: string;
+      search?: string;
+      pedido?: string;
+      numero_pedido?: string;
+      cnpj?: string;
+    },
+    username: string,
+    password: string
+  ): Promise<ConsultaNotasFiscaisResponse | null> {
+    try {
+      const authenticated = await this.ensureAuthenticated(username, password);
+      if (!authenticated) {
+        console.error('[API Externa] Falha na autenticaÃ§Ã£o');
+        return null;
+      }
+
+      const params = new URLSearchParams();
+      if (filtros.data_inicio) {
+        params.append('data_inicio', filtros.data_inicio);
+        params.append('dataInicio', filtros.data_inicio);
+      }
+      if (filtros.data_fim) {
+        params.append('data_fim', filtros.data_fim);
+        params.append('dataFim', filtros.data_fim);
+      }
+      if (filtros.limit) params.append('limit', filtros.limit.toString());
+      if (filtros.offset) params.append('offset', filtros.offset.toString());
+      if (filtros.tipo_data) {
+        params.append('tipo_data', filtros.tipo_data);
+        params.append('tipoData', filtros.tipo_data);
+      }
+      if (filtros.tipo_entrega) {
+        params.append('tipo_entrega', filtros.tipo_entrega);
+        params.append('tipoEntrega', filtros.tipo_entrega);
+      }
+      if (filtros.status) params.append('status', filtros.status);
+      if (filtros.search) params.append('search', filtros.search);
+      if (filtros.pedido) params.append('pedido', filtros.pedido);
+      if (filtros.numero_pedido) {
+        params.append('numero_pedido', filtros.numero_pedido);
+        params.append('numeroPedido', filtros.numero_pedido);
+      }
+      if (filtros.cnpj) params.append('cnpj', filtros.cnpj);
+
+      const url = `/api/v1/consultas/notas-fiscais${params.toString() ? `?${params.toString()}` : ''}`;
+      console.log('[API Externa] Buscando consulta consolidada de notas fiscais:', url);
+
+      const response = await this.apiInstance.get<ConsultaNotasFiscaisResponse | Record<string, any>[]>(
+        url,
+        { validateStatus: (status) => status < 500 }
+      );
+
+      if (response.status === 404) {
+        console.warn('[API Externa] Endpoint consolidado de notas fiscais ainda nao encontrado.');
+        return null;
+      }
+
+      if (response.status >= 400) {
+        console.warn(
+          '[API Externa] Falha na consulta consolidada de notas fiscais:',
+          response.status,
+          response.statusText
+        );
+        return null;
+      }
+
+      const data = Array.isArray(response.data)
+        ? response.data
+        : Array.isArray(response.data?.data)
+          ? response.data.data
+          : [];
+
+      return {
+        data,
+        total:
+          !Array.isArray(response.data) && typeof response.data?.total === 'number'
+            ? response.data.total
+            : data.length,
+        limit:
+          !Array.isArray(response.data) && typeof response.data?.limit === 'number'
+            ? response.data.limit
+            : filtros.limit || data.length,
+        offset:
+          !Array.isArray(response.data) && typeof response.data?.offset === 'number'
+            ? response.data.offset
+            : filtros.offset || 0,
+      };
+    } catch (error: any) {
+      console.error(
+        '[API Externa] Erro na consulta consolidada de notas fiscais:',
         error.response?.data || error.message
       );
       return null;

@@ -336,7 +336,7 @@ export default function PedidosKanbanPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchKanban = useCallback(async (dateRef: string, silent = false) => {
+  const fetchKanban = useCallback(async (dateRef: string, silent = false, forceRefresh = false) => {
     try {
       if (silent) {
         setIsRefreshing(true);
@@ -345,7 +345,12 @@ export default function PedidosKanbanPage() {
       }
 
       setError(null);
-      const response = await fetch(`/api/kanban-pedidos?data=${encodeURIComponent(dateRef)}`, {
+      const params = new URLSearchParams({ data: dateRef });
+      if (forceRefresh) {
+        params.set('refresh', '1');
+      }
+
+      const response = await fetch(`/api/kanban-pedidos?${params.toString()}`, {
         headers: { accept: 'application/json' },
         cache: 'no-store',
       });
@@ -404,7 +409,7 @@ export default function PedidosKanbanPage() {
           />
           <Button
             variant="contained"
-            onClick={() => fetchKanban(selectedDate, true)}
+            onClick={() => fetchKanban(selectedDate, true, true)}
             disabled={isRefreshing || isLoading}
             startIcon={isRefreshing ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
           >

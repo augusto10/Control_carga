@@ -107,10 +107,12 @@ function extractPedidoId(pedido: Record<string, unknown>): number {
   return (
     pickNumber(
       pedido.ORCAMENTO_ID,
+      pedido.ORCAMENTO_BASE_ID,
       pedido.PEDIDO_ID,
       pedido.ID,
       pedido.ORCAMENTO,
       pedido.orcamento_id,
+      pedido.orcamento_base_id,
       pedido.pedido_id,
       pedido.id,
       pedido.numero_pedido,
@@ -476,11 +478,74 @@ async function mapWithConcurrency<T, R>(
   return results;
 }
 
+async function fetchConsultaNotasFiscais(
+  filtros: {
+    data_inicio?: string;
+    data_fim?: string;
+    search?: string;
+    pedido?: string;
+    numero_pedido?: string;
+    cnpj?: string;
+    tipo_data?: string;
+    tipo_entrega?: string;
+    status?: string;
+  },
+  username: string,
+  password: string
+): Promise<Array<Record<string, unknown>> | null> {
+  const limit = 100;
+  const resultados: Array<Record<string, unknown>> = [];
+  const seen = new Set<number>();
+
+  for (let offset = 0; offset < 1000; offset += limit) {
+    const resultado = await apiExternaService.listarConsultaNotasFiscais(
+      {
+        ...filtros,
+        limit,
+        offset,
+      },
+      username,
+      password
+    );
+
+    if (!resultado) return null;
+
+    const page = Array.isArray(resultado.data) ? resultado.data : [];
+    for (const item of page) {
+      const pedidoId = extractPedidoId(item);
+      const dedupeKey = pedidoId || resultados.length + 1;
+      if (seen.has(dedupeKey)) continue;
+      seen.add(dedupeKey);
+      resultados.push(item);
+    }
+
+    if (page.length < limit) break;
+    if (typeof resultado.total === 'number' && resultado.total > 0 && offset + page.length >= resultado.total) break;
+  }
+
+  return resultados;
+}
+
 async function fetchPedidosPorPedido(
   numeroPedido: string,
   username: string,
   password: string
 ): Promise<Array<Record<string, unknown>>> {
+  const pedidosConsolidados = await fetchConsultaNotasFiscais(
+    {
+      search: numeroPedido,
+      pedido: numeroPedido,
+      numero_pedido: numeroPedido,
+    },
+    username,
+    password
+  );
+
+  if (pedidosConsolidados) {
+    const encontrados = pedidosConsolidados.filter((pedido) => matchesPedidoQuery(pedido, numeroPedido));
+    if (encontrados.length > 0) return encontrados;
+  }
+
   const candidatos = new Map<number, Record<string, unknown>>();
 
   const pedidosDiretos = await apiExternaService.buscarPedidoPorNumero(numeroPedido, username, password);
@@ -543,10 +608,28 @@ async function fetchPedidosPorCnpj(
   username: string,
   password: string
 ): Promise<Array<Record<string, unknown>>> {
-  const pedidos: Array<Record<string, unknown>> = [];
-  const seen = new Set<number>();
   const dateTo = getDateInSaoPaulo();
   const dateFrom = addDays(dateTo, -60);
+  const pedidosConsolidados = await fetchConsultaNotasFiscais(
+    {
+      data_inicio: dateFrom,
+      data_fim: dateTo,
+      tipo_data: 'recebimento',
+      tipo_entrega: 'EPG',
+      search: cnpj,
+      cnpj,
+    },
+    username,
+    password
+  );
+
+  if (pedidosConsolidados) {
+    const encontrados = pedidosConsolidados.filter((pedido) => extractPedidoCnpj(pedido) === cnpj);
+    if (encontrados.length > 0) return encontrados;
+  }
+
+  const pedidos: Array<Record<string, unknown>> = [];
+  const seen = new Set<number>();
   const limit = 100;
 
   for (let offset = 0; offset < 1000; offset += limit) {
@@ -1094,10 +1177,16 @@ export default async function handler(
           pickNumber(
             pedido.VALOR_TOTAL,
             pedido.VALOR_PEDIDO,
+            pedido.VALOR_TOTAL_NOTA,
             pedido.VALOR_PRODUTOS,
             pedido.VALOR_DUPLICATA
           ) || 0,
-        dataHoraCadastro: pickString(pedido.DATA_HORA_CADASTRO, pedido.DATA_HORA_RECEBIMENTO),
+        dataHoraCadastro: pickString(
+          pedido.DATA_HORA_CADASTRO,
+          pedido.DATA_HORA_RECEBIMENTO,
+          pedido.DATA_CADASTRO,
+          pedido.DATA_EMISSAO
+        ),
         numeroNota,
         identificacaoNfe,
         controleId: controleIdResolvido,
