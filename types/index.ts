@@ -12,7 +12,7 @@ export type CriarControleDTO = {
   motorista: string;
   responsavel: string;
   cpfMotorista?: string; // Tornando o CPF opcional
-  transportadora: 'ACERT' | 'EXPRESSO_GOIAS' | 'TERCEIRIZADA';
+  transportadora: 'ACERT' | 'ACCERT' | 'EXPRESSO_GOIAS' | 'TERCEIRIZADA' | 'DETAFRA_TRANSPORTES' | 'RETIRA_VENDEDOR' | 'RETIRA_CLIENTE' | 'VLOG' | 'ZANUELO_TRANSPORTE_LOGISTICA';
   qtdPallets: number;
   observacao?: string;
   notasIds?: string[];

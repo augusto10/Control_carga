@@ -209,6 +209,7 @@ enum Transportadora {
   RETIRA_VENDEDOR
   RETIRA_CLIENTE
   VLOG
+  ZANUELO_TRANSPORTE_LOGISTICA
 }
 
 enum AcaoPontuacao {
