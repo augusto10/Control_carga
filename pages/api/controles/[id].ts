@@ -40,7 +40,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         qtdPalletsDevolvidos,
         qtdPalletsLevados,
         freteInformado,
-        valorFrete
+        valorFrete,
+        imagens
       } = req.body;
 
       // Validate transportadora if provided
@@ -64,6 +65,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           qtdPalletsLevados: qtdPalletsLevados !== undefined ? Number(qtdPalletsLevados) : undefined,
           freteInformado: freteInformado !== undefined ? Boolean(freteInformado) : undefined,
           valorFrete: valorFrete !== undefined && valorFrete !== null && valorFrete !== '' ? Number(valorFrete) : undefined,
+          imagens: Array.isArray(imagens) ? imagens.filter((imagem: unknown) => typeof imagem === 'string') : undefined,
         },
         include: { notas: true }
       });

@@ -25,6 +25,7 @@ export interface ControleCarga {
   cpfMotorista: string;
   freteInformado?: boolean;
   valorFrete?: number | null;
+  imagens?: string[];
   notas: NotaFiscal[];
   assinaturaMotorista?: string | null;
   assinaturaResponsavel?: string | null;

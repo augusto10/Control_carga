@@ -310,7 +310,7 @@ const ListarControlesContent: React.FC = () => {
       const novasImagens = [...imagensAtuais, capturedImage];
 
       // Atualizar controle no banco usando a API específica
-      await api.put(`/api/controles/${currentControleId}/imagens`, {
+      await api.put(`/api/controles/${currentControleId}`, {
         imagens: novasImagens
       });
 
@@ -384,7 +384,7 @@ const ListarControlesContent: React.FC = () => {
       const novasImagens = imagensAtuais.filter((_, index) => index !== indexImagem);
 
       // Atualizar controle no banco
-      await api.put(`/api/controles/${controleId}/imagens`, {
+      await api.put(`/api/controles/${controleId}`, {
         imagens: novasImagens
       });
 

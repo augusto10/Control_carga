@@ -41,6 +41,7 @@ export type ControleCarga = {
   notas: NotaFiscal[];
   freteInformado?: boolean;
   valorFrete?: number | null;
+  imagens?: string[];
   assinaturaMotorista?: string | null;
   assinaturaResponsavel?: string | null;
   dataAssinaturaMotorista?: Date | null;

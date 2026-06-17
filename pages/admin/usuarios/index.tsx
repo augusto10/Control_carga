@@ -482,8 +482,8 @@ export default function GerenciarUsuariosPage() {
               </div>
             )}
 
-            <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-200 transition-all hover:bg-slate-100/50">
-              <div className="relative inline-flex items-center cursor-pointer">
+            <label htmlFor="user-active" className="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-200 transition-all hover:bg-slate-100/50 cursor-pointer">
+              <div className="relative inline-flex items-center">
                 <input 
                   type="checkbox"
                   id="user-active"
@@ -493,11 +493,11 @@ export default function GerenciarUsuariosPage() {
                 />
                 <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
               </div>
-              <label htmlFor="user-active" className="flex flex-col cursor-pointer">
+              <div className="flex flex-col">
                 <span className="text-sm font-bold text-slate-700">Usuário Ativo</span>
                 <span className="text-[10px] text-slate-500 uppercase tracking-wider font-medium">Define se o usuário pode acessar o sistema</span>
-              </label>
-            </div>
+              </div>
+            </label>
           </div>
 
           <div className="flex justify-end gap-3 pt-6 border-t border-slate-100">
