@@ -39,6 +39,8 @@ export type ControleCarga = {
   observacao: string | null;
   finalizado: boolean;
   notas: NotaFiscal[];
+  freteInformado?: boolean;
+  valorFrete?: number | null;
   assinaturaMotorista?: string | null;
   assinaturaResponsavel?: string | null;
   dataAssinaturaMotorista?: Date | null;

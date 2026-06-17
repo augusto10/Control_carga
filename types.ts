@@ -7,6 +7,8 @@ export interface CriarControleDTO {
   responsavel: string;
   observacao: string | null;
   qtdPallets: number;
+  freteInformado?: boolean;
+  valorFrete?: number | null;
   notasIds: string[];
 }
 
@@ -21,6 +23,8 @@ export interface ControleCarga {
   observacao: string | null;
   finalizado: boolean;
   cpfMotorista: string;
+  freteInformado?: boolean;
+  valorFrete?: number | null;
   notas: NotaFiscal[];
   assinaturaMotorista?: string | null;
   assinaturaResponsavel?: string | null;

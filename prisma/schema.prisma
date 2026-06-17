@@ -26,6 +26,13 @@ model ControleCarga {
   placaVeiculo              String?
   qtdPalletsDevolvidos      Int            @default(0)
   qtdPalletsLevados         Int            @default(0)
+  freteInformado            Boolean        @default(false)
+  valorFrete                Float?
+  fretePago                 Boolean        @default(false)
+  fretePagoEm               DateTime?
+  fretePagamentoId          String?
+  fretePagamento            FretePagamento? @relation("ControlePagamentoFrete", fields: [fretePagamentoId], references: [id], onDelete: SetNull)
+  fretePagamentoItens       FretePagamentoControle? @relation("ControleFreteItens")
   imagens                   String[]       // Array de imagens em base64
   notas                     NotaFiscal[]
   pedidos                   Pedido[]
@@ -76,6 +83,7 @@ model Usuario {
   pedidosConferidos    PedidoConferido[]       @relation("Conferencia")
   pedidosSeparados     PedidoConferido[]       @relation("Separacao")
   pedidosValidados     PedidoConferido[]       @relation("Validacao")
+  fretePagamentos      FretePagamento[]
   pontuacao            PontuacaoUsuario?
   auditoriasAcesso     AuditoriaAcesso[]
   solicitacoesMaterial SolicitacaoMaterial[]   @relation("SolicitacoesMaterial")
@@ -198,6 +206,35 @@ model PalletAjuste {
   @@index([dataRecebimento])
   @@index([transportadora])
   @@index([usuarioId])
+}
+
+model FretePagamento {
+  id               String                   @id @default(uuid())
+  dataCriacao      DateTime                 @default(now())
+  dataPagamento    DateTime                 @default(now())
+  valorTotal       Float
+  comprovante      String?
+  observacao       String?
+  criadoPor        String
+  criadoPorUser    Usuario                  @relation(fields: [criadoPor], references: [id])
+  controlesPagos   ControleCarga[]          @relation("ControlePagamentoFrete")
+  controles        FretePagamentoControle[] @relation("PagamentoFreteItens")
+
+  @@index([dataCriacao])
+  @@index([dataPagamento])
+  @@index([criadoPor])
+}
+
+model FretePagamentoControle {
+  id                String          @id @default(uuid())
+  fretePagamentoId  String
+  controleId        String          @unique
+  valorFrete        Float
+  fretePagamento    FretePagamento  @relation("PagamentoFreteItens", fields: [fretePagamentoId], references: [id], onDelete: Cascade)
+  controle          ControleCarga   @relation("ControleFreteItens", fields: [controleId], references: [id], onDelete: Restrict)
+
+  @@index([fretePagamentoId])
+  @@index([controleId])
 }
 
 enum Transportadora {

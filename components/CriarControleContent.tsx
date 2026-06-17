@@ -30,7 +30,13 @@ import {
   InputAdornment,
   Avatar,
   LinearProgress,
-  alpha
+  alpha,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
+  Alert
 } from '@mui/material';
 import type { SelectChangeEvent } from '@mui/material';
 import { useRouter } from 'next/router';
@@ -55,6 +61,7 @@ import {
   CheckCircle as CheckIcon,
   Info as InfoIcon
 } from '@mui/icons-material';
+import { NumericFormat } from 'react-number-format';
 
 const MotionBox = motion.create(Box);
 const MotionGrid = motion.create(Grid);
@@ -102,6 +109,16 @@ function validarCPF(cpf: string): boolean {
   const digito2 = resto >= 10 ? 0 : resto;
   
   return parseInt(cpf.charAt(9)) === digito1 && parseInt(cpf.charAt(10)) === digito2;
+}
+
+function parseCurrencyBR(value: string): number {
+  const cleaned = value
+    .replace(/[^\d,.-]/g, '')
+    .replace(/\./g, '')
+    .replace(',', '.');
+
+  const parsed = Number(cleaned);
+  return Number.isFinite(parsed) ? parsed : NaN;
 }
 
 const CriarControleContent: React.FC = () => {
@@ -176,6 +193,9 @@ const CriarControleContent: React.FC = () => {
     qtdPalletsDevolvidos: 0,
     placaVeiculo: '',
   });
+  const [freteDialogOpen, setFreteDialogOpen] = useState(false);
+  const [freteInformado, setFreteInformado] = useState(false);
+  const [valorFrete, setValorFrete] = useState('');
   
   useEffect(() => {
     if (user?.nome) {
@@ -233,6 +253,20 @@ const CriarControleContent: React.FC = () => {
         ...prev,
         [name]: numValue
       }));
+    } else if (name === 'transportadora') {
+      const transportadoraSelecionada = value as TransportadoraEnum;
+      setFormData(prev => ({
+        ...prev,
+        transportadora: transportadoraSelecionada
+      }));
+
+      if (transportadoraSelecionada === 'TERCEIRIZADA') {
+        setFreteDialogOpen(true);
+      } else {
+        setFreteDialogOpen(false);
+        setFreteInformado(false);
+        setValorFrete('');
+      }
     } else {
       setFormData(prev => ({
         ...prev,
@@ -280,6 +314,13 @@ const CriarControleContent: React.FC = () => {
       if (!formData.placaVeiculo?.trim()) {
         newErrors.placaVeiculo = 'Placa do veículo é obrigatória';
       }
+
+      if (formData.transportadora === 'TERCEIRIZADA' && freteInformado) {
+        const valorNumericoFrete = parseCurrencyBR(valorFrete);
+        if (!valorFrete || Number.isNaN(valorNumericoFrete) || valorNumericoFrete <= 0) {
+          newErrors.valorFrete = 'Informe um valor de frete válido';
+        }
+      }
       
       // Se houver erros de validação, exibe e interrompe o processo
       if (Object.keys(newErrors).length > 0) {
@@ -307,6 +348,10 @@ const CriarControleContent: React.FC = () => {
         qtdPalletsDevolvidos: Number(formData.qtdPalletsDevolvidos) || 0,
         placaVeiculo: (formData.placaVeiculo || '').trim(),
         observacao: formData.observacao?.trim() || undefined,
+        freteInformado: formData.transportadora === 'TERCEIRIZADA' ? freteInformado : false,
+        valorFrete: formData.transportadora === 'TERCEIRIZADA' && freteInformado
+          ? parseCurrencyBR(valorFrete)
+          : null,
         finalizado: false,
         notasIds: Array.isArray(selectedNotas) ? selectedNotas : []
       };
@@ -363,6 +408,15 @@ const CriarControleContent: React.FC = () => {
     } finally {
       // Desativa o estado de carregamento independentemente do resultado
       setIsLoading(prev => ({ ...prev, submit: false }));
+    }
+  };
+
+  const responderFrete = (informarFrete: boolean) => {
+    setFreteInformado(informarFrete);
+    setFreteDialogOpen(false);
+
+    if (!informarFrete) {
+      setValorFrete('');
     }
   };
 
@@ -491,13 +545,22 @@ const CriarControleContent: React.FC = () => {
                               telefoneMotorista: ''
                             }));
                           } else if (newValue) {
+                            const transportadoraSelecionada = newValue.transportadoraId as TransportadoraEnum;
                             setFormData(prev => ({
                               ...prev,
                               motorista: newValue.nome,
                               cpfMotorista: newValue.cpf,
                               telefoneMotorista: newValue.telefone || '',
-                              transportadora: newValue.transportadoraId as Transportadora
+                              transportadora: transportadoraSelecionada
                             }));
+
+                            if (transportadoraSelecionada === 'TERCEIRIZADA') {
+                              setFreteDialogOpen(true);
+                            } else {
+                              setFreteDialogOpen(false);
+                              setFreteInformado(false);
+                              setValorFrete('');
+                            }
                           } else {
                             setFormData(prev => ({
                               ...prev,
@@ -660,6 +723,60 @@ const CriarControleContent: React.FC = () => {
                       {errors.transportadora && <FormHelperText>{errors.transportadora}</FormHelperText>}
                     </FormControl>
                   </Grid>
+
+                  {formData.transportadora === 'TERCEIRIZADA' && (
+                    <Grid item xs={12}>
+                      <Alert
+                        severity={freteInformado ? 'success' : 'info'}
+                        action={
+                          <Button color="inherit" size="small" onClick={() => setFreteDialogOpen(true)}>
+                            {freteInformado ? 'Alterar frete' : 'Informar frete'}
+                          </Button>
+                        }
+                      >
+                        {freteInformado
+                          ? 'Frete informado e será salvo junto com este controle.'
+                          : 'Este controle está marcado como terceirizado. Você pode informar o valor do frete agora.'}
+                      </Alert>
+                    </Grid>
+                  )}
+
+                  {formData.transportadora === 'TERCEIRIZADA' && freteInformado && (
+                    <Grid item xs={12} md={4}>
+                      <NumericFormat
+                        value={valorFrete}
+                        onValueChange={(values) => {
+                          setValorFrete(values.formattedValue);
+                          if (errors.valorFrete) {
+                            setErrors(prev => ({ ...prev, valorFrete: '' }));
+                          }
+                        }}
+                        customInput={TextField}
+                        fullWidth
+                        label="Valor do Frete"
+                        name="valorFrete"
+                        allowNegative={false}
+                        thousandSeparator="."
+                        decimalSeparator=","
+                        decimalScale={2}
+                        fixedDecimalScale
+                        prefix=""
+                        required
+                        error={!!errors.valorFrete}
+                        helperText={errors.valorFrete || 'Ex.: R$ 150,00'}
+                        sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
+                        InputProps={{
+                          startAdornment: (
+                            <InputAdornment position="start">
+                              <Box component="span" sx={{ fontWeight: 700, color: 'primary.main', minWidth: 26 }}>
+                                R$
+                              </Box>
+                            </InputAdornment>
+                          ),
+                        }}
+                      />
+                    </Grid>
+                  )}
 
                   {/* Seção: Dados do Veículo e Carga */}
                   <Grid item xs={12} sx={{ mt: 2 }}>
@@ -912,6 +1029,26 @@ const CriarControleContent: React.FC = () => {
           </MotionCard>
         </MotionBox>
       </AnimatePresence>
+
+      <Dialog open={freteDialogOpen} onClose={() => setFreteDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Informar frete</DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ mb: 2 }}>
+            A transportadora foi marcada como terceirizada. Deseja informar o valor do frete agora?
+          </DialogContentText>
+          <DialogContentText variant="body2" color="text.secondary">
+            Se você escolher não informar agora, o controle será salvo sem valor de frete.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 3 }}>
+          <Button onClick={() => responderFrete(false)} variant="outlined">
+            Salvar sem frete
+          </Button>
+          <Button onClick={() => responderFrete(true)} variant="contained">
+            Informar frete
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 };

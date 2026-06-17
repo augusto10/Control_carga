@@ -610,25 +610,45 @@ const ListarControlesContent: React.FC = () => {
           nota?.emitente?.cnpj
         );
       };
+      const toNumber = (x: any) => {
+        if (x === null || x === undefined) return undefined;
+        let s = String(x).trim().replace(/R\$\s*/g, '');
+        if (s === '') return undefined;
+        const hasComma = s.includes(',');
+        if (hasComma) {
+          s = s.replace(/\./g, '').replace(',', '.');
+        }
+        const n = Number(s);
+        return isNaN(n) ? undefined : n;
+      };
+      const notaExternaCache = new Map<string, any>();
+      const buscarNotaExternaCache = async (params: Record<string, string>) => {
+        const cacheKey = Object.entries(params)
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([chave, valor]) => `${chave}:${valor}`)
+          .join('|');
+
+        if (notaExternaCache.has(cacheKey)) {
+          return notaExternaCache.get(cacheKey);
+        }
+
+        const promise = api
+          .get('/api/buscar-nota-externa', { params })
+          .then((resp) => resp.data || {})
+          .catch(() => ({}));
+
+        notaExternaCache.set(cacheKey, promise);
+        const data = await promise;
+        notaExternaCache.set(cacheKey, data);
+        return data;
+      };
       const notasParaPdf = await Promise.all(
         (controleCompleto.notas || []).map(async (nota) => {
           const base = { ...nota };
           try {
             const chave = extrairChaveNFe(base.codigo || '');
             if (chave) {
-              const resp = await api.get('/api/buscar-nota-externa', { params: { chave } });
-              const d = resp.data || {};
-              const toNumber = (x: any) => {
-                if (x === null || x === undefined) return undefined;
-                let s = String(x).trim().replace(/R\$\s*/g, '');
-                if (s === '') return undefined;
-                const hasComma = s.includes(',');
-                if (hasComma) {
-                  s = s.replace(/\./g, '').replace(',', '.');
-                }
-                const n = Number(s);
-                return isNaN(n) ? undefined : n;
-              };
+              const d = await buscarNotaExternaCache({ chave });
               const valorFromD = toNumber(d.valorPedido ?? d.valor ?? d.VALOR_TOTAL_NOTA ?? d.VALOR_TOTAL ?? (d as any).TOTAL ?? (d as any).total);
               const pesoFromD = toNumber(
                 (d as any).TOTAL_PESO ?? (d as any).PESO_TOTAL ?? (d as any).PESO_NOTA ??
@@ -657,19 +677,7 @@ const ListarControlesContent: React.FC = () => {
               };
             }
             if (base.numeroNota) {
-              const resp = await api.get('/api/buscar-nota-externa', { params: { numero: base.numeroNota, serie: '1' } });
-              const d = resp.data || {};
-              const toNumber = (x: any) => {
-                if (x === null || x === undefined) return undefined;
-                let s = String(x).trim().replace(/R\$\s*/g, '');
-                if (s === '') return undefined;
-                const hasComma = s.includes(',');
-                if (hasComma) {
-                  s = s.replace(/\./g, '').replace(',', '.');
-                }
-                const n = Number(s);
-                return isNaN(n) ? undefined : n;
-              };
+              const d = await buscarNotaExternaCache({ numero: String(base.numeroNota), serie: '1' });
               const valorFromD = toNumber(d.valorPedido ?? d.valor ?? d.VALOR_TOTAL_NOTA ?? d.VALOR_TOTAL ?? (d as any).TOTAL ?? (d as any).total);
               const pesoFromD = toNumber(
                 (d as any).TOTAL_PESO ?? (d as any).PESO_TOTAL ?? (d as any).PESO_NOTA ??
@@ -1037,6 +1045,15 @@ const ListarControlesContent: React.FC = () => {
       yPos -= lineHeight;
       page.drawText(`Total de Valor: ${totalValorFmt}`, { x: 50, y: yPos, size: fontSize - 1, font });
       page.drawText(`Total de Peso: ${totalPesoFmt} kg`, { x: 250, y: yPos, size: fontSize - 1, font });
+      const valorFreteControle = Number((controle as any).valorFrete ?? (controleCompleto as any).valorFrete ?? 0);
+      const freteInformadoControle = Boolean((controle as any).freteInformado ?? (controleCompleto as any).freteInformado);
+      if (freteInformadoControle) {
+        yPos -= lineHeight;
+        page.drawText(
+          `Frete Terceirizado: ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valorFreteControle)}`,
+          { x: 50, y: yPos, size: fontSize - 1, font }
+        );
+      }
 
       // Seção de Assinaturas
       // Garante espaço suficiente; se não houver, cria nova página para as assinaturas

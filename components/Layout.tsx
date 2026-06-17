@@ -479,6 +479,11 @@ const menuItems = [
         text: 'Relatório de Controles',
         icon: <ReportsIcon sx={{ fontSize: 20 }} />,
         path: '/relatorios/controles-carga'
+      },
+      {
+        text: 'Fretes',
+        icon: <ReceiptModernIcon sx={{ fontSize: 20 }} />,
+        path: '/relatorios/fretes'
       }
     ]
   },

@@ -58,6 +58,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     let totalPalletsLevados = 0;
     let totalPalletsDevolvidos = 0;
     let totalNotas = 0;
+    let totalFretes = 0;
+    let totalFretesPagos = 0;
+    let totalFretesPendentes = 0;
 
     const controlesDetalhados = controles.map((controle) => {
       const notasCount = controle.notas?.length || 0;
@@ -66,10 +69,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const diferencaPallets = palletsDevolvidos - palletsLevados;
       const statusValue = controle.finalizado ? 'FINALIZADO' : 'PENDENTE';
       const assinados = Boolean(controle.assinaturaMotorista) && Boolean(controle.assinaturaResponsavel);
+      const freteInformado = Boolean((controle as any).freteInformado);
+      const valorFrete = freteInformado ? Number((controle as any).valorFrete || 0) : 0;
+      const fretePago = Boolean((controle as any).fretePago);
+      const fretePagoEm = (controle as any).fretePagoEm || null;
+      const fretePagamentoId = (controle as any).fretePagamentoId || null;
 
       totalPalletsLevados += palletsLevados;
       totalPalletsDevolvidos += palletsDevolvidos;
       totalNotas += notasCount;
+      totalFretes += valorFrete;
+      if (fretePago) {
+        totalFretesPagos += valorFrete;
+      } else if (freteInformado) {
+        totalFretesPendentes += valorFrete;
+      }
       statusContadores[statusValue] += 1;
 
       const dataLabel = controle.dataCriacao.toISOString().slice(0, 10);
@@ -83,7 +97,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         totalPalletsDevolvidos: 0,
         diferencaPallets: 0,
         totalNotas: 0,
-        controlesAssinados: 0
+        controlesAssinados: 0,
+        totalFretes: 0
       };
 
       resumoAtual.totalControles += 1;
@@ -92,6 +107,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       resumoAtual.diferencaPallets += diferencaPallets;
       resumoAtual.totalNotas += notasCount;
       resumoAtual.controlesAssinados += assinados ? 1 : 0;
+      resumoAtual.totalFretes += valorFrete;
       resumoTransportadorasMap.set(resumoKey, resumoAtual);
 
       const motoristaKey = `${controle.motorista}||${controle.transportadora}`;
@@ -103,7 +119,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         totalPalletsDevolvidos: 0,
         diferencaPallets: 0,
         totalNotas: 0,
-        controlesAssinados: 0
+        controlesAssinados: 0,
+        totalFretes: 0
       };
       resumoMotoristaAtual.totalControles += 1;
       resumoMotoristaAtual.totalPalletsLevados += palletsLevados;
@@ -111,6 +128,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       resumoMotoristaAtual.diferencaPallets += diferencaPallets;
       resumoMotoristaAtual.totalNotas += notasCount;
       resumoMotoristaAtual.controlesAssinados += assinados ? 1 : 0;
+      resumoMotoristaAtual.totalFretes += valorFrete;
       resumoMotoristasMap.set(motoristaKey, resumoMotoristaAtual);
 
       return {
@@ -122,6 +140,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         diferencaPallets,
         totalNotas: notasCount,
         dataCriacao: controle.dataCriacao.toISOString(),
+        freteInformado,
+        valorFrete,
+        fretePago,
+        fretePagoEm: fretePagoEm ? new Date(fretePagoEm).toISOString() : null,
+        fretePagamentoId,
         status: statusValue,
         assinaturaMotorista: Boolean(controle.assinaturaMotorista),
         assinaturaResponsavel: Boolean(controle.assinaturaResponsavel)
@@ -166,7 +189,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         controlesPendentes: statusContadores.PENDENTE,
         totalPalletsLevados,
         totalPalletsDevolvidos,
-        totalNotas
+        totalNotas,
+        totalFretes,
+        totalFretesPagos,
+        totalFretesPendentes
       }
     });
   } catch (error) {

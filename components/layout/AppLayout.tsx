@@ -130,6 +130,7 @@ export function AppLayout({
       children: [
         { name: 'Relatório de Pallets', href: '/relatorios/pallets' },
         { name: 'Relatório de Controles', href: '/relatorios/controles-carga' },
+        { name: 'Fretes', href: '/relatorios/fretes' },
       ]
     },
     { name: 'Configurações', icon: Settings, href: '/admin/configuracoes', adminOnly: true },

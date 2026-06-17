@@ -38,7 +38,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         cpfMotorista,
         placaVeiculo,
         qtdPalletsDevolvidos,
-        qtdPalletsLevados
+        qtdPalletsLevados,
+        freteInformado,
+        valorFrete
       } = req.body;
 
       // Validate transportadora if provided
@@ -60,6 +62,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           placaVeiculo,
           qtdPalletsDevolvidos: qtdPalletsDevolvidos !== undefined ? Number(qtdPalletsDevolvidos) : undefined,
           qtdPalletsLevados: qtdPalletsLevados !== undefined ? Number(qtdPalletsLevados) : undefined,
+          freteInformado: freteInformado !== undefined ? Boolean(freteInformado) : undefined,
+          valorFrete: valorFrete !== undefined && valorFrete !== null && valorFrete !== '' ? Number(valorFrete) : undefined,
         },
         include: { notas: true }
       });

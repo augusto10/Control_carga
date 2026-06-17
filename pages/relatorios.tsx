@@ -24,7 +24,8 @@ import {
   History as HistoryIcon,
   GetApp as DownloadIcon,
   TrendingUp as TrendingUpIcon,
-  ArrowForward as ArrowForwardIcon
+  ArrowForward as ArrowForwardIcon,
+  ReceiptLong as ReceiptLongIcon
 } from '@mui/icons-material';
 import { motion } from 'framer-motion';
 import { AppLayout } from '@/components/layout/AppLayout';
@@ -102,7 +103,7 @@ export default function Relatorios() {
         ]}
       >
         <Grid container spacing={3}>
-          <Grid item xs={12} md={4}>
+          <Grid item xs={12} md={3}>
             <RelatorioCard 
               title="Pallets por Motorista" 
               description="Totais de pallets levados, devolvidos e diferença, agrupados por motorista e período."
@@ -112,7 +113,7 @@ export default function Relatorios() {
               delay={0.1}
             />
           </Grid>
-          <Grid item xs={12} md={4}>
+          <Grid item xs={12} md={3}>
             <RelatorioCard 
               title="Controles de Carga" 
               description="Resumo completo de todos os controles de carga realizados no período selecionado."
@@ -122,14 +123,24 @@ export default function Relatorios() {
               delay={0.2}
             />
           </Grid>
-          <Grid item xs={12} md={4}>
+          <Grid item xs={12} md={3}>
+            <RelatorioCard 
+              title="Fretes" 
+              description="Carteira de fretes, histórico de lotes pagos, comprovantes e filtros por motorista."
+              icon={<ReceiptLongIcon />}
+              href="/relatorios/fretes"
+              color="warning"
+              delay={0.3}
+            />
+          </Grid>
+          <Grid item xs={12} md={3}>
             <RelatorioCard 
               title="Conferências de Pedidos" 
               description="Detalhamento das conferências e auditorias realizadas pelos usuários."
               icon={<BarChartIcon />}
               href="/relatorios/conferencias"
               color="success"
-              delay={0.3}
+              delay={0.4}
             />
           </Grid>
           

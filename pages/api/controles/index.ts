@@ -74,6 +74,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         placaVeiculo,
         qtdPalletsLevados,
         qtdPalletsDevolvidos,
+        freteInformado,
+        valorFrete,
         notasIds
       } = req.body;
 
@@ -96,6 +98,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           placaVeiculo,
           qtdPalletsLevados: Number(qtdPalletsLevados) || 0,
           qtdPalletsDevolvidos: Number(qtdPalletsDevolvidos) || 0,
+          freteInformado: Boolean(freteInformado),
+          valorFrete: valorFrete !== undefined && valorFrete !== null && valorFrete !== '' ? Number(valorFrete) : null,
           notas: notasIds && Array.isArray(notasIds) && notasIds.length > 0 ? {
             connect: notasIds.map((id: string) => ({ id }))
           } : undefined
