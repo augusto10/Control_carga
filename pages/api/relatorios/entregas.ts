@@ -1,12 +1,51 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 import { apiExternaService } from '@/services/api-externa';
+import { createHash } from 'crypto';
 
-const CACHE_TTL_MS = 5 * 60_000;
+const CACHE_TTL_MS = 30 * 60_000;
 const cache = new Map<string, { expiresAt: number; payload: any }>();
+const inFlight = new Map<string, Promise<any>>();
 const LOGISTICA_CACHE_TTL_MS = 30 * 60_000;
 const logisticaCache = new Map<number, { expiresAt: number; payload: any }>();
-const CACHE_VERSION = 'v2';
+const CACHE_VERSION = 'v4';
+const PERSISTED_CACHE_STALE_MS = 24 * 60 * 60_000;
+
+const persistedCacheKey = (cacheKey: string) =>
+  `relatorio_entregas_cache:${createHash('sha1').update(cacheKey).digest('hex')}`;
+
+const readPersistedCache = async (cacheKey: string) => {
+  try {
+    const row = await prisma.configuracaoSistema.findUnique({ where: { chave: persistedCacheKey(cacheKey) } });
+    if (!row?.valor) return null;
+    const parsed = JSON.parse(row.valor);
+    if (parsed?.cacheKey !== cacheKey || !parsed?.payload) return null;
+    return parsed as { payload: any; expiresAt: string; staleAt: string };
+  } catch (error: any) {
+    console.error('[Relatorio Entregas] Falha ao ler cache persistente:', error?.message || error);
+    return null;
+  }
+};
+
+const writePersistedCache = async (cacheKey: string, payload: any) => {
+  try {
+    const valor = JSON.stringify({
+      cacheKey, payload,
+      expiresAt: new Date(Date.now() + CACHE_TTL_MS).toISOString(),
+      staleAt: new Date(Date.now() + PERSISTED_CACHE_STALE_MS).toISOString(),
+    });
+    await prisma.configuracaoSistema.upsert({
+      where: { chave: persistedCacheKey(cacheKey) },
+      create: {
+        chave: persistedCacheKey(cacheKey), valor,
+        descricao: 'Cache persistente do relatorio de entregas', tipo: 'json', editavel: false,
+      },
+      update: { valor },
+    });
+  } catch (error: any) {
+    console.error('[Relatorio Entregas] Falha ao gravar cache persistente:', error?.message || error);
+  }
+};
 
 const first = (value: string | string[] | undefined) => Array.isArray(value) ? value[0] : value;
 const digits = (value: unknown) => String(value ?? '').replace(/\D/g, '');
@@ -83,13 +122,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const cacheKey = `${CACHE_VERSION}:${dataInicio}:${dataFim}`;
   const cached = cache.get(cacheKey);
-  if (cached && cached.expiresAt > Date.now()) return res.status(200).json({ ...cached.payload, cache: true });
+  if (cached && cached.expiresAt > Date.now()) {
+    res.setHeader('Cache-Control', 'private, max-age=60, stale-while-revalidate=300');
+    return res.status(200).json({ ...cached.payload, cache: true });
+  }
+  const persisted = await readPersistedCache(cacheKey);
+  if (persisted && new Date(persisted.expiresAt).getTime() > Date.now()) {
+    cache.set(cacheKey, { expiresAt: new Date(persisted.expiresAt).getTime(), payload: persisted.payload });
+    res.setHeader('Cache-Control', 'private, max-age=60, stale-while-revalidate=300');
+    return res.status(200).json({ ...persisted.payload, cache: true, persistedCache: true });
+  }
+  const requestInFlight = inFlight.get(cacheKey);
+  if (requestInFlight) {
+    const payload = await requestInFlight;
+    return res.status(200).json({ ...payload, cache: true, sharedRequest: true });
+  }
 
   const username = process.env.API_EXTERNA_USERNAME;
   const password = process.env.API_EXTERNA_PASSWORD;
   if (!username || !password) return res.status(500).json({ message: 'API externa nao configurada' });
 
-  try {
+  const generation = (async () => {
+   try {
     const pageSize = 100;
     const periodoDias = diffDaysInclusive(dataInicio, dataFim);
     const limiteBuscaFiltrada =
@@ -153,7 +207,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       throw new Error('Falha ao consultar pedidos na API externa');
     }
 
-    const pedidos = await mapLimit(recebidos, 16, async (base: any) => {
+    const inicioUtc = new Date(`${dataInicio}T00:00:00-03:00`);
+    const fimUtc = new Date(`${dataFim}T23:59:59.999-03:00`);
+
+    // A consulta de logística é independente da consulta dos controles locais.
+    // Mantemos concorrência limitada para reduzir o tempo total sem saturar a API externa.
+    const controlesDbPromise = prisma.controleCarga.findMany({
+      where: { finalizado: true, dataCriacao: { gte: inicioUtc, lte: fimUtc } },
+      include: { notas: true },
+      orderBy: { dataCriacao: 'asc' },
+    });
+
+    const recebidosEntrega = recebidos.filter((pedido: any) =>
+      ['ENT', 'EPG'].includes(String(pedido.TIPO_ENTREGA ?? pedido.tipo_entrega ?? '').trim().toUpperCase())
+    );
+
+    const pedidosBase = await mapLimit(recebidosEntrega, 24, async (base: any) => {
       const pedidoId = getPedidoId(base);
       const logistica: any = Number.isFinite(pedidoId)
         ? await getPedidoLogisticaCached(pedidoId, username, password)
@@ -179,13 +248,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       };
     });
 
-    const inicioUtc = new Date(`${dataInicio}T00:00:00-03:00`);
-    const fimUtc = new Date(`${dataFim}T23:59:59.999-03:00`);
-    const controlesDb = await prisma.controleCarga.findMany({
-      where: { finalizado: true, dataCriacao: { gte: inicioUtc, lte: fimUtc } },
-      include: { notas: true },
-      orderBy: { dataCriacao: 'asc' },
-    });
+    // A indicação "Carregado" significa que alguma NF do pedido já foi
+    // vinculada a um controle, mesmo que ele ainda esteja aberto ou tenha sido
+    // criado fora do período selecionado no relatório.
+    const numerosNotasPedidos = Array.from(new Set(
+      pedidosBase.flatMap((pedido) => pedido.numeroNotas.flatMap((nota: unknown) => {
+        const original = String(nota ?? '').trim();
+        return original ? [original, normalizeNota(original)] : [];
+      }))
+    ));
+    const notasEmControles = numerosNotasPedidos.length > 0
+      ? await prisma.notaFiscal.findMany({
+          where: { controleId: { not: null }, numeroNota: { in: numerosNotasPedidos } },
+          select: { numeroNota: true },
+        })
+      : [];
+    const numerosCarregados = new Set(notasEmControles.map((nota) => normalizeNota(nota.numeroNota)));
+    const pedidos = pedidosBase.map((pedido) => ({
+      ...pedido,
+      carregado: pedido.numeroNotas.some((nota: unknown) => numerosCarregados.has(normalizeNota(nota))),
+    }));
+
+    const controlesDb = await controlesDbPromise;
 
     const notasProcuradas = new Set(controlesDb.flatMap((controle) => controle.notas.map((nota) => normalizeNota(nota.numeroNota))));
     const completas = new Map<string, any>();
@@ -252,9 +336,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       controles,
     };
     cache.set(cacheKey, { expiresAt: Date.now() + CACHE_TTL_MS, payload });
-    return res.status(200).json(payload);
+    await writePersistedCache(cacheKey, payload);
+    return payload;
   } catch (error: any) {
     console.error('[Relatorio Entregas] Erro:', error);
+    throw new Error(error?.message || 'Erro ao gerar relatorio de entregas');
+  }
+  })();
+  inFlight.set(cacheKey, generation);
+  try {
+    const payload = await generation;
+    res.setHeader('Cache-Control', 'private, max-age=60, stale-while-revalidate=300');
+    return res.status(200).json(payload);
+  } catch (error: any) {
+    if (persisted && new Date(persisted.staleAt).getTime() > Date.now()) {
+      return res.status(200).json({ ...persisted.payload, cache: true, staleCache: true });
+    }
     return res.status(500).json({ message: 'Erro ao gerar relatorio de entregas', details: error?.message });
+  } finally {
+    inFlight.delete(cacheKey);
   }
 }

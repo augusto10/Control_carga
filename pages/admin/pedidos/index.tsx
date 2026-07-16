@@ -797,10 +797,10 @@ export default function CicloPedidoPage() {
     return Boolean(endereco.cidade || endereco.uf);
   }), [pedidos]);
   const tableColumnCount = 13 + (showCnpjColumn ? 1 : 0);
-  const isEntregaPedido = (pedido: Pedido) => ['EPG', 'ENT', 'RLR'].includes(String(pedido.TIPO_ENTREGA || '').toUpperCase());
+  const isEntregaPedido = (pedido: Pedido) => ['EPG', 'ENT'].includes(String(pedido.TIPO_ENTREGA || '').toUpperCase());
   const pedidosEntrega = useMemo(() => pedidos.filter(isEntregaPedido), [pedidos]);
   const pedidosNoAto = useMemo(() => pedidos.filter((pedido) =>
-    ['ATO', 'NDF'].includes(String(pedido.TIPO_ENTREGA || '').toUpperCase())
+    ['ATO', 'NDF', 'RLR'].includes(String(pedido.TIPO_ENTREGA || '').toUpperCase())
   ), [pedidos]);
   const alertaPerfil6mSelecionado = pedidoSelecionado ? perfil6mAlertas[pedidoSelecionado.ORCAMENTO_ID] : null;
 
@@ -1160,7 +1160,7 @@ export default function CicloPedidoPage() {
       if (filtroEntrega === 'entrega') {
         params.set('tipo_entrega', 'EPG');
       } else if (filtroEntrega === 'nao_entrega') {
-        params.set('tipo_entrega', 'NDF,ATO');
+        params.set('tipo_entrega', 'NDF,ATO,RLR');
       }
 
       if (searchTerm.trim()) {
@@ -1441,7 +1441,7 @@ export default function CicloPedidoPage() {
             statsHojeUrl.searchParams.set('classificacao_logistica', 'entrega');
             statsHojeUrl.searchParams.set('somente_recebidos', '1');
           } else if (filtroEntrega === 'nao_entrega') {
-            statsHojeUrl.searchParams.set('tipo_entrega', 'NDF,ATO');
+            statsHojeUrl.searchParams.set('tipo_entrega', 'NDF,ATO,RLR');
           }
 
           const respHoje = await fetch(statsHojeUrl.toString(), { headers: { accept: 'application/json' }, cache: 'no-store' });
@@ -1469,7 +1469,7 @@ export default function CicloPedidoPage() {
           statsUrl.searchParams.set('classificacao_logistica', 'entrega');
           statsUrl.searchParams.set('somente_recebidos', '1');
         } else if (filtroEntrega === 'nao_entrega') {
-          statsUrl.searchParams.set('tipo_entrega', 'NDF,ATO');
+          statsUrl.searchParams.set('tipo_entrega', 'NDF,ATO,RLR');
         }
 
         const respMes = await fetch(statsUrl.toString(), { headers: { accept: 'application/json' }, cache: 'no-store' });
@@ -1715,7 +1715,7 @@ export default function CicloPedidoPage() {
 
       <div className="space-y-6">
         {/* Resumo em Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-4">
           <StatCard
             title="Pedidos"
             value={totalPedidos}
@@ -1746,15 +1746,6 @@ export default function CicloPedidoPage() {
             size="sm"
           />
 
-          <StatCard
-            title="Valor Total"
-            value={new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valorPedidosFiltrados)}
-            icon={TrendingUp}
-            color="cyan"
-            trend="Soma do período"
-            loading={loading}
-            size="sm"
-          />
         </div>
 
         {/* Filtro de período */}
@@ -2000,7 +1991,7 @@ export default function CicloPedidoPage() {
 
         {renderTabelaPedidos(
           pedidosNoAto,
-          'Pedidos retira no ato',
+          'Retira',
           'Nenhum pedido de retirada no ato encontrado para o período selecionado.'
         )}
 

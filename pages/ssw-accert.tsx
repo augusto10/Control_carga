@@ -399,7 +399,7 @@ export default function SswPainelPage() {
     const response = await fetch(url, { method: 'GET' });
     const json = await response.json().catch(() => null);
     if (!response.ok) {
-      const message = json?.error || 'Falha na consulta';
+      const message = json?.error || 'Falha na consulta. Consulte novamente.';
       throw new Error(message);
     }
     return json as T;

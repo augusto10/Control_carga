@@ -1,6 +1,6 @@
 import { ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Alert, Box, Button, Card, CardContent, Chip, CircularProgress, Grid,
+  Alert, Box, Button, Card, CardContent, Chip, CircularProgress,
   Paper, Stack, Table, TableBody, TableCell, TableContainer, TableHead,
   TableRow, TextField, Typography,
 } from '@mui/material';
@@ -13,7 +13,7 @@ type Grupo = { total: number; geradas: number; naoGeradas: number; valor: number
 type Pedido = {
   pedidoId: number; cliente: string; vendedor: string; tipoEntrega?: string;
   dataHoraRecebimento: string; dentroCorte: boolean; entregaGerada: boolean;
-  entregue: boolean; entregaIds: Array<number | string>; numeroNotas: string[]; valor: number;
+  entregue: boolean; entregaIds: Array<number | string>; numeroNotas: string[]; valor: number; carregado?: boolean;
 };
 type Controle = {
   id: string; numeroManifesto?: string; dataCriacao: string; motorista: string;
@@ -45,13 +45,13 @@ const tipoEntregaLabel = (value?: string | null) => {
   return tipo;
 };
 
-function Metric({ title, value, subtitle, color = '#2563eb' }: { title: string; value: string | number; subtitle: string; color?: string }) {
+function Metric({ title, value, subtitle, color = '#2563eb' }: { title: string; value: string | number; subtitle?: string; color?: string }) {
   return (
-    <Card sx={{ height: '100%', borderRadius: 3, borderTop: `4px solid ${color}` }}>
-      <CardContent>
-        <Typography variant="body2" color="text.secondary">{title}</Typography>
-        <Typography variant="h4" fontWeight={800} sx={{ my: 0.5 }}>{value}</Typography>
-        <Typography variant="caption" color="text.secondary">{subtitle}</Typography>
+    <Card sx={{ width: '100%', height: 128, borderRadius: 3, borderTop: `4px solid ${color}` }}>
+      <CardContent sx={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', py: 0.5, px: 0.8, '&:last-child': { pb: 0.5 } }}>
+        <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1, fontSize: '0.66rem', mb: 0.25 }}>{title}</Typography>
+        <Typography variant="h6" fontWeight={800} sx={{ my: 0, lineHeight: 0.9, fontSize: '1rem' }}>{value}</Typography>
+        {subtitle ? <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1, fontSize: '0.62rem', mt: 0.25 }}>{subtitle}</Typography> : null}
       </CardContent>
     </Card>
   );
@@ -172,6 +172,40 @@ export default function RelatorioEntregasPage() {
     return Array.from(map.entries());
   }, [dados]);
 
+  const pedidosEntrega = useMemo(() => (
+    dados?.pedidos.filter((pedido) => ['EPG', 'ENT'].includes(String(pedido.tipoEntrega || '').toUpperCase())) || []
+  ), [dados]);
+
+  const normalizarNumero = (valor: string) => valor.replace(/\D/g, '').replace(/^0+/, '') || '0';
+
+  const notasCarregadas = useMemo(() => new Set(
+    (dados?.controles || []).flatMap((controle) => controle.notas.map((nota) => normalizarNumero(String(nota.numeroNota || ''))))
+  ), [dados]);
+
+  const pedidoCarregado = (pedido: Pedido) => pedido.carregado === true || pedido.numeroNotas.some((nota) =>
+    notasCarregadas.has(normalizarNumero(String(nota || '')))
+  );
+
+  const resumoEntrega = useMemo(() => ({
+    total: pedidosEntrega.length,
+    geradas: pedidosEntrega.filter((pedido) => pedido.entregaGerada).length,
+    naoGeradas: pedidosEntrega.filter((pedido) => !pedido.entregaGerada).length,
+    carregados: pedidosEntrega.filter((pedido) => pedidoCarregado(pedido)).length,
+    notasCarregadas: pedidosEntrega.reduce((sum, pedido) => sum + pedido.numeroNotas.length, 0),
+  }), [pedidosEntrega, notasCarregadas]);
+
+  const resumoCorteEntrega = useMemo(() => {
+    const resumir = (dentroCorte: boolean) => {
+      const itens = pedidosEntrega.filter((pedido) => pedido.dentroCorte === dentroCorte);
+      return {
+        total: itens.length,
+        geradas: itens.filter((pedido) => pedido.entregaGerada).length,
+        naoGeradas: itens.filter((pedido) => !pedido.entregaGerada).length,
+      };
+    };
+    return { dentro: resumir(true), fora: resumir(false) };
+  }, [pedidosEntrega]);
+
   return (
     <ProtectedRoute>
       <AppLayout title="Relatório de Entregas" subtitle="Pedidos recebidos, entregas geradas e caminhões carregados" breadcrumbs={[{ label: 'Relatórios', href: '/relatorios' }, { label: 'Entregas' }]}>
@@ -190,17 +224,14 @@ export default function RelatorioEntregasPage() {
           {loading && !dados && <Box textAlign="center" py={8}><CircularProgress /></Box>}
 
           {dados && <>
-            <Grid container spacing={2}>
-              <Grid item xs={12} sm={6} md={3}><Metric title="Pedidos recebidos" value={dados.totais.total} subtitle={money(dados.totais.valor)} /></Grid>
-              <Grid item xs={12} sm={6} md={3}><Metric title="Entregas geradas" value={dados.totais.geradas} subtitle="Com ENTREGA_ID" color="#16a34a" /></Grid>
-              <Grid item xs={12} sm={6} md={3}><Metric title="Não geradas" value={dados.totais.naoGeradas} subtitle="Sem ENTREGA_ID" color="#dc2626" /></Grid>
-              <Grid item xs={12} sm={6} md={3}><Metric title="Caminhões carregados" value={dados.totais.caminhoesCarregados} subtitle={`${dados.totais.notasCarregadas} notas`} color="#7c3aed" /></Grid>
-            </Grid>
-
-            <Grid container spacing={2}>
-              <Grid item xs={12} md={6}><Metric title="Dentro do horário de corte" value={dados.corte.dentro.total} subtitle={`${dados.corte.dentro.geradas} geradas • ${dados.corte.dentro.naoGeradas} não geradas`} color="#0284c7" /></Grid>
-              <Grid item xs={12} md={6}><Metric title="Fora do horário de corte" value={dados.corte.fora.total} subtitle={`${dados.corte.fora.geradas} geradas • ${dados.corte.fora.naoGeradas} não geradas`} color="#ea580c" /></Grid>
-            </Grid>
+            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(128px, 1fr))', gap: 0.5, width: '100%', overflowX: 'auto', pb: 0.25 }}>
+              <Metric title="Pedidos entrega" value={resumoEntrega.total} subtitle={money(pedidosEntrega.reduce((sum, pedido) => sum + pedido.valor, 0))} />
+              <Metric title="Entregas geradas" value={resumoEntrega.geradas} color="#16a34a" />
+              <Metric title="Não geradas" value={resumoEntrega.naoGeradas} color="#dc2626" />
+              <Metric title="Carregados" value={resumoEntrega.carregados} subtitle={`${resumoEntrega.notasCarregadas} notas`} color="#7c3aed" />
+              <Metric title="Dentro do horário de corte" value={resumoCorteEntrega.dentro.total} subtitle={`${resumoCorteEntrega.dentro.geradas} geradas • ${resumoCorteEntrega.dentro.naoGeradas} não geradas`} color="#0284c7" />
+              <Metric title="Fora do horário de corte" value={resumoCorteEntrega.fora.total} subtitle={`${resumoCorteEntrega.fora.geradas} geradas • ${resumoCorteEntrega.fora.naoGeradas} não geradas`} color="#ea580c" />
+            </Box>
 
             <Paper sx={{ p: 2.5, borderRadius: 3 }}>
               <Stack direction="row" spacing={1} alignItems="center" mb={2}><Assessment color="primary" /><Typography variant="h6" fontWeight={700}>Pedidos recebidos</Typography></Stack>
@@ -209,7 +240,7 @@ export default function RelatorioEntregasPage() {
                 sx={{
                   maxHeight: 560,
                   overflowY: 'auto',
-                  overflowX: 'hidden',
+                  overflowX: 'auto',
                   '&::-webkit-scrollbar': {
                     width: 10,
                     height: 10,
@@ -224,14 +255,15 @@ export default function RelatorioEntregasPage() {
                   },
                 }}
               >
-                <Table stickyHeader size="small" sx={{ minWidth: 1100 }}>
-                  <TableHead><TableRow><TableCell>Pedido</TableCell><TableCell>Recebimento</TableCell><TableCell>Corte</TableCell><TableCell>Cliente</TableCell><TableCell>Tipo</TableCell><TableCell>Entrega</TableCell><TableCell>NF</TableCell><TableCell align="right">Valor</TableCell></TableRow></TableHead>
-                  <TableBody>{dados.pedidos.map((pedido) => <TableRow key={pedido.pedidoId} hover>
+                <Table stickyHeader size="small" sx={{ minWidth: 900, '& th, & td': { px: 0.75, py: 0.5, whiteSpace: 'nowrap' } }}>
+                  <TableHead><TableRow><TableCell>Pedido</TableCell><TableCell>Recebimento</TableCell><TableCell>Corte</TableCell><TableCell>Cliente</TableCell><TableCell>Tipo</TableCell><TableCell>Entrega</TableCell><TableCell>Carregado</TableCell><TableCell>NF</TableCell><TableCell align="right">Valor</TableCell></TableRow></TableHead>
+                  <TableBody>{pedidosEntrega.map((pedido) => <TableRow key={pedido.pedidoId} hover>
                     <TableCell><b>{pedido.pedidoId}</b></TableCell>
                     <TableCell>{pedido.dataHoraRecebimento ? format(new Date(pedido.dataHoraRecebimento), 'dd/MM/yyyy HH:mm:ss') : '-'}</TableCell>
                     <TableCell><Chip size="small" icon={<QueryBuilder />} color={pedido.dentroCorte ? 'info' : 'warning'} label={pedido.dentroCorte ? 'Dentro' : 'Fora'} /></TableCell>
                     <TableCell>{pedido.cliente}</TableCell><TableCell>{tipoEntregaLabel(pedido.tipoEntrega)}</TableCell>
                     <TableCell><Chip size="small" color={pedido.entregaGerada ? 'success' : 'error'} label={pedido.entregaGerada ? `Gerada${pedido.entregaIds.length ? ` #${pedido.entregaIds.join(', ')}` : ''}` : 'Não gerada'} /></TableCell>
+                    <TableCell>{pedidoCarregado(pedido) ? <Chip size="small" color="success" label="✓" /> : '-'}</TableCell>
                     <TableCell>{pedido.numeroNotas.join(', ') || '-'}</TableCell><TableCell align="right">{money(pedido.valor)}</TableCell>
                   </TableRow>)}</TableBody>
                 </Table>
