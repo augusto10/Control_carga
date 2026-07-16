@@ -1022,14 +1022,15 @@ export default async function handler(
           // filtrar apenas os 100 pedidos mais recentes, percorremos uma janela
           // paginada e aplicamos a data de recebimento localmente. O limite cobre
           // inclusive pedidos antigos recebidos no dia (ex.: pedido reaberto).
-          const rawItems = await getMonthBase();
-
-          resultadoRapido = {
-            data: rawItems,
-            total: rawItems.length,
+          // Períodos curtos são o caso principal da tela. Consultar diretamente
+          // evita carregar toda a base mensal e estourar o limite da Vercel.
+          resultadoRapido = await listarPedidosExternos({
+            ...filtrosApi,
             limit: safeLimit,
-            offset: safeOffset
-          };
+            offset: safeOffset,
+            data_inicio: inicio || undefined,
+            data_fim: fim || undefined
+          });
         } else if (shouldSliceDates) {
           const collected: any[] = [];
           let skipped = 0;
