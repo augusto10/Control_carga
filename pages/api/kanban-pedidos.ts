@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 import { apiExternaService, type ApuracaoExterna } from '@/services/api-externa';
-import { consultarNotaFiscal, trackingDanfe } from '@/services/sswClient';
+import { trackingDanfe } from '@/services/sswClient';
 import { createHash } from 'crypto';
 
 const KANBAN_STATUSES = [
@@ -73,7 +73,7 @@ type PersistedKanbanCacheRow = {
 const kanbanResponseCache = new Map<string, KanbanCacheEntry>();
 
 function getKanbanCacheKey(dataReferencia: string): string {
-  return `kanban:v3:${dataReferencia}`;
+  return `kanban:v8:notas-completas:${dataReferencia}`;
 }
 
 function getPersistedKanbanCacheConfigKey(cacheKey: string): string {
@@ -300,7 +300,13 @@ function getPedidoDataReferenciaDia(pedido: Record<string, unknown>): string | n
     pedido.DATA_RECEBIMENTO,
     pedido.data_recebimento,
     pedido.RECEBIMENTO,
-    pedido.recebimento
+    pedido.recebimento,
+    pedido.PEDIDO_DATA_FECHAMENTO,
+    pedido.pedido_data_fechamento,
+    pedido.PEDIDO_DATA_CADASTRO,
+    pedido.pedido_data_cadastro,
+    pedido.DATA_EMISSAO,
+    pedido.data_emissao
   );
 
   if (!raw) return null;
@@ -322,10 +328,21 @@ function getPedidoDataReferenciaDia(pedido: Record<string, unknown>): string | n
 
 function isPedidoDoKanbanNaData(pedido: Record<string, unknown>, dataReferencia: string): boolean {
   const tipoEntrega = String(pedido.TIPO_ENTREGA || pedido.tipo_entrega || '').toUpperCase();
+  const recebidoValor = String(pedido.RECEBIDO ?? pedido.recebido ?? '').trim().toUpperCase();
+  const recebido = ['S', 'SIM', 'TRUE', '1'].includes(recebidoValor);
+  const dataRecebimento = pickString(
+    pedido.DATA_HORA_RECEBIMENTO,
+    pedido.data_hora_recebimento,
+    pedido.DATA_RECEBIMENTO,
+    pedido.data_recebimento
+  );
+
   return (
     getPedidoEmpresaId(pedido) === 1 &&
-    tipoEntrega === 'EPG' &&
-    isPedidoFechadoERecebidoNoCaixa(pedido) &&
+    ['EPG', 'ENT'].includes(tipoEntrega) &&
+    recebido &&
+    Boolean(dataRecebimento) &&
+    Boolean(extractPedidoId(pedido)) &&
     getPedidoDataReferenciaDia(pedido) === dataReferencia
   );
 }
@@ -356,26 +373,6 @@ function buildPedidoKanban(
     statusLabel: getStatusLabel(status),
     observacaoStatus,
   };
-}
-
-function getBaseUrl(req: NextApiRequest): string {
-  const protoHeader = req.headers['x-forwarded-proto'];
-  const proto = Array.isArray(protoHeader) ? protoHeader[0] : protoHeader || 'http';
-  const hostHeader = req.headers['x-forwarded-host'] || req.headers.host || 'localhost:3000';
-  const host = Array.isArray(hostHeader) ? hostHeader[0] : hostHeader;
-  return `${proto}://${host}`;
-}
-
-function buildInternalRequestHeaders(req: NextApiRequest): HeadersInit {
-  const headers: Record<string, string> = {
-    accept: 'application/json',
-  };
-
-  if (typeof req.headers.cookie === 'string' && req.headers.cookie.trim()) {
-    headers.cookie = req.headers.cookie;
-  }
-
-  return headers;
 }
 
 function extractPedidoId(pedido: Record<string, unknown>): number {
@@ -419,14 +416,118 @@ function enrichPedidoWithApuracao(
 
 function extractNumeroNotaFromExternalNota(nota: Record<string, unknown> | null): string | null {
   if (!nota) return null;
+  const notaFiscal =
+    (nota.nota_fiscal as Record<string, unknown> | undefined) ||
+    (nota.notaFiscal as Record<string, unknown> | undefined) ||
+    nota;
+
   return pickString(
-    nota.NUMERO_NOTA,
-    nota.numero,
-    nota.NUMERO,
-    nota.numeroNota,
-    nota.NOTA_FISCAL_NUMERO,
-    nota.NF_NUMERO
+    notaFiscal.NUMERO_NOTA,
+    notaFiscal.NUMERO_NOTA_FISCAL,
+    notaFiscal.numero,
+    notaFiscal.NUMERO,
+    notaFiscal.numeroNota,
+    notaFiscal.NOTA_FISCAL_NUMERO,
+    notaFiscal.NF_NUMERO
   );
+}
+
+function extractNotaFiscalId(value: Record<string, unknown> | null | undefined): number | null {
+  if (!value) return null;
+
+  const notaFiscal =
+    (value.nota_fiscal as Record<string, unknown> | undefined) ||
+    (value.notaFiscal as Record<string, unknown> | undefined) ||
+    value;
+
+  return (
+    pickNumber(
+      value.NOTA_FISCAL_ID,
+      value.nota_fiscal_id,
+      value.ID_NOTA_FISCAL,
+      value.id_nota_fiscal,
+      notaFiscal.NOTA_FISCAL_ID,
+      notaFiscal.ID_NOTA_FISCAL,
+      notaFiscal.ID,
+      notaFiscal.id
+    ) || null
+  );
+}
+
+function extractPedidoIdFromNotaCompleta(nota: Record<string, unknown>): number {
+  const pedido =
+    (nota.pedido as Record<string, unknown> | undefined) ||
+    (nota.pedido_venda as Record<string, unknown> | undefined) ||
+    (nota.pedidoVenda as Record<string, unknown> | undefined);
+  return extractPedidoId(pedido || nota);
+}
+
+function getNotaCompletaDoPedido(
+  notasMap: Map<number, Record<string, unknown>>,
+  pedido: Record<string, unknown>
+): Record<string, unknown> | null {
+  const notaId = extractNotaFiscalId(pedido);
+  const pedidoId = extractPedidoId(pedido);
+  return (
+    (notaId ? notasMap.get(notaId) : undefined) ||
+    (pedidoId ? notasMap.get(-pedidoId) : undefined) ||
+    null
+  );
+}
+
+function enrichPedidoWithNotaFiscalCompleta(
+  pedido: Record<string, unknown>,
+  nota?: Record<string, unknown> | null
+): Record<string, unknown> {
+  if (!nota) return pedido;
+
+  const notaFiscal =
+    (nota.nota_fiscal as Record<string, unknown> | undefined) ||
+    (nota.notaFiscal as Record<string, unknown> | undefined) ||
+    nota;
+  const pedidoDaNota =
+    (nota.pedido as Record<string, unknown> | undefined) ||
+    (nota.pedido_venda as Record<string, unknown> | undefined) ||
+    null;
+
+  return {
+    ...pedido,
+    ...(pedidoDaNota || {}),
+    NOTA_FISCAL_ID: extractNotaFiscalId(nota) ?? extractNotaFiscalId(pedido),
+    NUMERO_NOTA:
+      pickString(
+        pedido.NUMERO_NOTA,
+        pedido.NUMERO_NOTA_FISCAL,
+        notaFiscal.NUMERO_NOTA,
+        notaFiscal.NUMERO_NOTA_FISCAL,
+        notaFiscal.numero,
+        notaFiscal.NUMERO
+      ) || null,
+    IDENTIFICACAO_NFE:
+      pickString(
+        pedido.IDENTIFICACAO_NFE,
+        pedido.CHAVE_NFE,
+        notaFiscal.IDENTIFICACAO_NFE,
+        notaFiscal.CHAVE_NFE,
+        notaFiscal.CHAVE,
+        notaFiscal.chave
+      ) || null,
+    DATA_EMISSAO:
+      pickString(
+        pedido.DATA_EMISSAO,
+        notaFiscal.DATA_EMISSAO,
+        notaFiscal.data_emissao,
+        notaFiscal.DATA_HORA_EMISSAO
+      ) || null,
+    VALOR_TOTAL_NOTA:
+      pickNumber(
+        pedido.VALOR_TOTAL_NOTA,
+        notaFiscal.VALOR_TOTAL_NOTA,
+        notaFiscal.VALOR_TOTAL,
+        notaFiscal.valor_total,
+        notaFiscal.valor
+      ) ?? null,
+  };
 }
 
 function enrichPedidoWithNotaFiscal(
@@ -442,34 +543,6 @@ function enrichPedidoWithNotaFiscal(
         pedido.NUMERO_NOTA,
         pedido.NUMERO_NOTA_FISCAL,
         nota.NUMERO_NOTA,
-        nota.numero,
-        nota.NUMERO
-      ) || null,
-    IDENTIFICACAO_NFE:
-      pickString(
-        pedido.IDENTIFICACAO_NFE,
-        pedido.CHAVE_NFE,
-        nota.IDENTIFICACAO_NFE,
-        nota.CHAVE_NFE,
-        nota.chave
-      ) || null,
-  };
-}
-
-function enrichPedidoWithExternalNota(
-  pedido: Record<string, unknown>,
-  nota?: Record<string, unknown> | null
-): Record<string, unknown> {
-  if (!nota) return pedido;
-
-  return {
-    ...pedido,
-    NUMERO_NOTA:
-      pickString(
-        pedido.NUMERO_NOTA,
-        pedido.NUMERO_NOTA_FISCAL,
-        nota.NUMERO_NOTA,
-        nota.NUMERO_NOTA_FISCAL,
         nota.numero,
         nota.NUMERO
       ) || null,
@@ -697,90 +770,36 @@ async function fetchPedidosDoDia(
   username: string,
   password: string
 ): Promise<Array<Record<string, unknown>>> {
-  const pedidosConsolidados: Array<Record<string, unknown>> = [];
-  const seenConsolidados = new Set<number>();
-  const consultaLimit = 100;
-
-  for (let offset = 0; offset < 5000; offset += consultaLimit) {
-    const resultado = await apiExternaService.listarConsultaNotasFiscais(
+  const pedidos: Array<Record<string, unknown>> = [];
+  const seen = new Set<number>();
+  const limit = 100;
+  for (let offset = 0; offset < 1500; offset += limit) {
+    const resultado = await apiExternaService.listarPedidos(
       {
-        limit: consultaLimit,
+        limit,
         offset,
-        data_inicio: dataReferencia,
-        data_fim: dataReferencia,
-        tipo_data: 'recebimento',
-        tipo_entrega: 'EPG',
-        status: 'FECHADO',
       },
       username,
       password
     );
 
     if (!resultado) break;
-
     const page = Array.isArray(resultado.data) ? resultado.data : [];
-    for (const item of page) {
-      const pedidoId = extractPedidoId(item);
-      if (!pedidoId || seenConsolidados.has(pedidoId)) continue;
-      seenConsolidados.add(pedidoId);
-      pedidosConsolidados.push({
-        ...item,
-        _KANBAN_CONSULTA_CONSOLIDADA: true,
-      });
-    }
-
-    if (page.length < consultaLimit) return pedidosConsolidados;
-    if (typeof resultado.total === 'number' && resultado.total > 0 && offset + page.length >= resultado.total) {
-      return pedidosConsolidados;
-    }
-  }
-
-  if (pedidosConsolidados.length > 0) {
-    return pedidosConsolidados;
-  }
-
-  const pedidos: Array<Record<string, unknown>> = [];
-  const seen = new Set<number>();
-  const limit = 100;
-  const maxRecords = 30000;
-  let emptyPagesAfterMatches = 0;
-
-  for (let offset = 0; offset < maxRecords; offset += limit) {
-    const resultado = await apiExternaService.listarPedidos(
-      {
-        limit,
-        offset,
-        data_inicio: dataReferencia,
-        data_fim: dataReferencia,
-        tipo_data: 'recebimento',
-        tipo_entrega: 'EPG',
-        status: 'FECHADO',
-      },
-      username,
-      password
-    );
-
-    const page = Array.isArray(resultado?.data) ? resultado.data : [];
     if (page.length === 0) break;
 
-    let matchesInPage = 0;
     for (const item of page) {
       if (!isPedidoDoKanbanNaData(item, dataReferencia)) continue;
       const pedidoId = extractPedidoId(item);
       if (!pedidoId || seen.has(pedidoId)) continue;
       seen.add(pedidoId);
-      pedidos.push(item);
-      matchesInPage += 1;
+      pedidos.push({ ...item, _KANBAN_CONSULTA_CONSOLIDADA: true });
     }
 
     // A API intermediÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ria filtra localmente e pode devolver uma pÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡gina vazia
     // mesmo quando ainda existem pedidos em offsets seguintes.
-    emptyPagesAfterMatches = matchesInPage > 0 ? 0 : emptyPagesAfterMatches + 1;
-    if (pedidos.length > 0 && emptyPagesAfterMatches >= 3) break;
+    // A API pode retornar registros fora de ordem; continue a paginação até
+    // o fim para não perder pedidos de datas anteriores.
     if (page.length < limit) break;
-    if (typeof resultado?.total === 'number' && resultado.total > 0 && offset + page.length >= resultado.total) {
-      break;
-    }
   }
 
   return pedidos;
@@ -792,58 +811,7 @@ async function fetchApuracoesFallback(
   password: string,
   dataReferencia: string
 ): Promise<Map<number, ApuracaoExterna>> {
-  const missingIds = pedidos
-    .filter((pedido) => {
-      const numeroNota = pickString(pedido.NUMERO_NOTA, pedido.NUMERO_NOTA_FISCAL);
-      const chave = pickString(pedido.IDENTIFICACAO_NFE, pedido.CHAVE_NFE);
-      return !numeroNota || onlyDigits(chave).length !== 44;
-    })
-    .map(extractPedidoId)
-    .filter((id) => id > 0);
-
-  if (missingIds.length === 0) {
-    return new Map<number, ApuracaoExterna>();
-  }
-
-  const missingSet = new Set(missingIds);
-  const apuracaoMap = new Map<number, ApuracaoExterna>();
-  const dataInicio = addDays(dataReferencia, -45);
-  const dataFim = addDays(dataReferencia, 2);
-  const batchLimit = 200;
-
-  for (let offset = 0; offset < 5000; offset += batchLimit) {
-    const resultado = await apiExternaService.listarApuracoes(
-      {
-        data_inicio: dataInicio,
-        data_fim: dataFim,
-        limit: batchLimit,
-        offset,
-      },
-      username,
-      password
-    );
-
-    const itens = resultado?.data || [];
-    if (itens.length === 0) break;
-
-    for (const apuracao of itens) {
-      const id =
-        pickNumber(
-          apuracao.ORCAMENTO_BASE_ID,
-          (apuracao as Record<string, unknown>).ORCAMENTO_ID,
-          (apuracao as Record<string, unknown>).ORCAMENTO
-        ) || 0;
-
-      if (id > 0 && missingSet.has(id) && !apuracaoMap.has(id)) {
-        apuracaoMap.set(id, apuracao);
-      }
-    }
-
-    if (itens.length < batchLimit) break;
-    if (apuracaoMap.size >= missingSet.size) break;
-  }
-
-  return apuracaoMap;
+  return new Map<number, ApuracaoExterna>();
 }
 
 async function fetchNotasFiscaisFallback(
@@ -852,94 +820,48 @@ async function fetchNotasFiscaisFallback(
   password: string,
   dataReferencia: string
 ): Promise<Map<number, Record<string, unknown>>> {
-  const pendingIds = pedidos
-    .filter((pedido) => {
-      const numeroNota = pickString(pedido.NUMERO_NOTA, pedido.NUMERO_NOTA_FISCAL);
-      const chave = onlyDigits(pickString(pedido.IDENTIFICACAO_NFE, pedido.CHAVE_NFE));
-      return !numeroNota || chave.length !== 44;
-    })
-    .map(extractPedidoId)
-    .filter((id) => id > 0);
-
-  if (pendingIds.length === 0) {
-    return new Map<number, Record<string, unknown>>();
-  }
-
-  const pendingSet = new Set(pendingIds);
-  const notaMap = new Map<number, Record<string, unknown>>();
-  const dataInicio = addDays(dataReferencia, -45);
-  const dataFim = addDays(dataReferencia, 2);
-
-  const notas = await apiExternaService.listarNotasFiscais(
-    {
-      dataInicio,
-      dataFim,
-    },
-    username,
-    password
-  );
-
-  for (const nota of notas) {
-    const notaRecord = nota as unknown as Record<string, unknown>;
-    const pedidoId =
-      pickNumber(
-        notaRecord.ORCAMENTO_BASE_ID,
-        notaRecord.ORCAMENTO_ID,
-        notaRecord.PEDIDO_ID
-      ) || 0;
-
-    if (pedidoId > 0 && pendingSet.has(pedidoId) && !notaMap.has(pedidoId)) {
-      notaMap.set(pedidoId, notaRecord);
-    }
-  }
-
-  return notaMap;
+  return new Map<number, Record<string, unknown>>();
 }
 
-async function fetchApuracoesPorPedidoFallback(
+async function fetchNotasFiscaisCompletas(
   pedidos: Array<Record<string, unknown>>,
-  req: NextApiRequest
+  username: string,
+  password: string
 ): Promise<Map<number, Record<string, unknown>>> {
-  const pendingIds = pedidos
-    .filter((pedido) => {
-      const numeroNota = pickString(pedido.NUMERO_NOTA, pedido.NUMERO_NOTA_FISCAL);
-      const chave = onlyDigits(pickString(pedido.IDENTIFICACAO_NFE, pedido.CHAVE_NFE));
-      return !numeroNota || chave.length !== 44;
-    })
-    .map(extractPedidoId)
-    .filter((id) => id > 0);
+  const notaIds = new Set(
+    pedidos.map(extractNotaFiscalId).filter((id): id is number => Boolean(id))
+  );
+  const pedidoIds = new Set(
+    pedidos.map(extractPedidoId).filter((id) => id > 0)
+  );
+  if (notaIds.size === 0 && pedidoIds.size === 0) return new Map();
 
-  if (pendingIds.length === 0) {
-    return new Map<number, Record<string, unknown>>();
+  const notasMap = new Map<number, Record<string, unknown>>();
+  const limit = 500;
+
+  for (let offset = 0; offset < 5000; offset += limit) {
+    const resultado = await apiExternaService.listarNotasFiscaisCompletas(
+      { limit, offset },
+      username,
+      password
+    );
+    const completas = Array.isArray(resultado?.data) ? resultado.data : [];
+    if (completas.length === 0) break;
+
+    for (const nota of completas) {
+      const notaId = extractNotaFiscalId(nota);
+      const pedidoId = extractPedidoIdFromNotaCompleta(nota);
+      if (notaId && notaIds.has(notaId)) notasMap.set(notaId, nota);
+      if (pedidoId && pedidoIds.has(pedidoId)) notasMap.set(-pedidoId, nota);
+    }
+
+    const encontrados = pedidos.filter((pedido) => Boolean(getNotaCompletaDoPedido(notasMap, pedido))).length;
+    if (encontrados >= pedidos.length) break;
+    if (completas.length < limit) break;
+    if (typeof resultado?.total === 'number' && resultado.total > 0 && offset + completas.length >= resultado.total) break;
   }
 
-  const baseUrl = getBaseUrl(req);
-  const entries = await mapWithConcurrency(
-    Array.from(new Set(pendingIds)),
-    8,
-    async (pedidoId) => {
-      try {
-        const url = new URL(`/api/pedidos/apuracao/${pedidoId}`, baseUrl);
-        const response = await fetch(url.toString(), {
-          headers: buildInternalRequestHeaders(req),
-          cache: 'no-store',
-        });
-
-        if (!response.ok) {
-          return [pedidoId, null] as const;
-        }
-
-        const payload = (await response.json()) as Record<string, unknown>;
-        return [pedidoId, payload] as const;
-      } catch {
-        return [pedidoId, null] as const;
-      }
-    }
-  );
-
-  return new Map<number, Record<string, unknown>>(
-    entries.filter((entry): entry is readonly [number, Record<string, unknown>] => Boolean(entry[1]))
-  );
+  return notasMap;
 }
 
 async function fetchLocalNotasPorPedidoSelecionado(
@@ -956,76 +878,7 @@ async function fetchLocalNotasPorPedidoSelecionado(
     }
   >
 > {
-  const start = new Date(`${dataReferencia}T00:00:00-03:00`);
-  const end = new Date(`${addDays(dataReferencia, 7)}T23:59:59-03:00`);
-
-  const notasLocais = await prisma.notaFiscal.findMany({
-    where: {
-      dataCriacao: {
-        gte: start,
-        lte: end,
-      },
-      controleId: {
-        not: null,
-      },
-    },
-    include: {
-      controle: {
-        select: {
-          id: true,
-          dataCriacao: true,
-          transportadora: true,
-        },
-      },
-    },
-  });
-
-  const notasComCodigo = notasLocais.filter((nota) => onlyDigits(nota.codigo).length === 44);
-  const externalEntries = await mapWithConcurrency(notasComCodigo, 8, async (nota) => {
-    try {
-      const external = await consultarNotaFiscal(onlyDigits(nota.codigo));
-      const pedidoId =
-        pickNumber(
-          external.ORCAMENTO_BASE_ID,
-          external.ORCAMENTO_ID,
-          external.PEDIDO_ID
-        ) || 0;
-
-      if (!pedidoId) return null;
-
-      return [
-        pedidoId,
-        {
-          numeroNota: nota.numeroNota,
-          codigo: nota.codigo,
-          controleId: nota.controleId,
-          controleDataCriacao: nota.controle?.dataCriacao || null,
-          controleTransportadora: nota.controle?.transportadora
-            ? String(nota.controle.transportadora)
-            : null,
-        },
-      ] as const;
-    } catch {
-      return null;
-    }
-  });
-
-  return new Map(
-    externalEntries.filter(
-      (
-        entry
-      ): entry is readonly [
-        number,
-        {
-          numeroNota: string;
-          codigo: string;
-          controleId: string | null;
-          controleDataCriacao: Date | null;
-          controleTransportadora: string | null;
-        },
-      ] => Boolean(entry)
-    )
-  );
+  return new Map();
 }
 
 export default async function handler(
@@ -1084,65 +937,28 @@ export default async function handler(
       return res.status(500).json({ error: 'Credenciais da API externa nao configuradas' });
     }
 
+    // Fluxo exclusivo do Kanban: /api/v1/pedidos seleciona os pedidos de
+    // entrega; /api/v1/notas-fiscais/completas apenas complementa NF e NF-e.
     const pedidosBase = (await fetchPedidosDoDia(dataReferencia, username, password)).filter((pedido) => {
       if (pedido._KANBAN_CONSULTA_CONSOLIDADA === true) return true;
       return isPedidoFechadoERecebidoNoCaixa(pedido);
     });
-    const apuracaoMap = await fetchApuracoesFallback(pedidosBase, username, password, dataReferencia);
-    const pedidosComApuracao = pedidosBase.map((pedido) =>
-      enrichPedidoWithApuracao(pedido, apuracaoMap.get(extractPedidoId(pedido)))
-    );
-    const notaFiscalMap = await fetchNotasFiscaisFallback(
-      pedidosComApuracao,
+    const notasFiscaisCompletasMap = await fetchNotasFiscaisCompletas(
+      pedidosBase,
       username,
-      password,
-      dataReferencia
+      password
     );
-
-    const pedidosComNotas = pedidosComApuracao.map((pedido) =>
-      enrichPedidoWithNotaFiscal(pedido, notaFiscalMap.get(extractPedidoId(pedido)))
-    );
-    const apuracaoPorPedidoMap = await fetchApuracoesPorPedidoFallback(pedidosComNotas, req);
     const localNotasPorPedidoMap = await fetchLocalNotasPorPedidoSelecionado(dataReferencia);
 
-    const pedidosEnriquecidos = pedidosComNotas.map((pedido) =>
-      enrichPedidoWithNotaFiscal(pedido, apuracaoPorPedidoMap.get(extractPedidoId(pedido)))
-    );
-
-    const keysSemNumeroNota = Array.from(
-      new Set(
-        pedidosEnriquecidos
-          .filter((pedido) => {
-            const chave = onlyDigits(pickString(pedido.IDENTIFICACAO_NFE, pedido.CHAVE_NFE));
-            const numeroNota = pickString(pedido.NUMERO_NOTA, pedido.NUMERO_NOTA_FISCAL);
-            return chave.length === 44 && !numeroNota;
-          })
-          .map((pedido) => onlyDigits(pickString(pedido.IDENTIFICACAO_NFE, pedido.CHAVE_NFE)))
-          .filter((chave) => chave.length === 44)
-      )
-    );
-
-    const notaExternaEntries = await mapWithConcurrency(keysSemNumeroNota, 8, async (chave) => {
-      try {
-        const nota = await consultarNotaFiscal(chave);
-        return [chave, nota] as const;
-      } catch {
-        return [chave, null] as const;
-      }
-    });
-    const notaExternaMap = new Map<string, Record<string, unknown> | null>(notaExternaEntries);
-    const pedidosComNotasExternas = pedidosEnriquecidos.map((pedido) =>
-      enrichPedidoWithExternalNota(
+    const pedidosComNotasLocaisPorPedido = pedidosBase.map((pedido) =>
+      enrichPedidoWithNotaFiscalCompleta(
         pedido,
-        notaExternaMap.get(onlyDigits(pickString(pedido.IDENTIFICACAO_NFE, pedido.CHAVE_NFE))) || null
+        getNotaCompletaDoPedido(notasFiscaisCompletasMap, pedido)
       )
-    );
-    const pedidosComNotasLocaisPorPedido = pedidosComNotasExternas.map((pedido) =>
-      enrichPedidoWithLocalNotaPorPedido(
-        pedido,
-        localNotasPorPedidoMap.get(extractPedidoId(pedido)) || null
-      )
-    );
+    ).map((pedido) => enrichPedidoWithLocalNotaPorPedido(
+      pedido,
+      localNotasPorPedidoMap.get(extractPedidoId(pedido)) || null
+    ));
 
     const numeroNotaCandidates = new Set<string>();
     const codigoCandidates = new Set<string>();
@@ -1153,7 +969,7 @@ export default async function handler(
           pedido.NUMERO_NOTA,
           pedido.NUMERO_NOTA_FISCAL,
           extractNumeroNotaFromExternalNota(
-            notaExternaMap.get(onlyDigits(pickString(pedido.IDENTIFICACAO_NFE, pedido.CHAVE_NFE))) || null
+            getNotaCompletaDoPedido(notasFiscaisCompletasMap, pedido)
           )
         ) || null;
 
@@ -1213,7 +1029,7 @@ export default async function handler(
                 pedido.NUMERO_NOTA,
                 pedido.NUMERO_NOTA_FISCAL,
                 extractNumeroNotaFromExternalNota(
-                  notaExternaMap.get(onlyDigits(pickString(pedido.IDENTIFICACAO_NFE, pedido.CHAVE_NFE))) || null
+                  getNotaCompletaDoPedido(notasFiscaisCompletasMap, pedido)
                 )
               ) || null;
             const chave = onlyDigits(pickString(pedido.IDENTIFICACAO_NFE, pedido.CHAVE_NFE));
@@ -1280,7 +1096,7 @@ export default async function handler(
           pedido.NUMERO_NOTA,
           pedido.NUMERO_NOTA_FISCAL,
           extractNumeroNotaFromExternalNota(
-            notaExternaMap.get(onlyDigits(pickString(pedido.IDENTIFICACAO_NFE, pedido.CHAVE_NFE))) || null
+            getNotaCompletaDoPedido(notasFiscaisCompletasMap, pedido)
           )
         ) || null;
 
@@ -1341,6 +1157,8 @@ export default async function handler(
           pedido.DATA_HORA_CADASTRO,
           pedido.DATA_HORA_RECEBIMENTO,
           pedido.DATA_CADASTRO,
+          pedido.PEDIDO_DATA_FECHAMENTO,
+          pedido.PEDIDO_DATA_CADASTRO,
           pedido.DATA_EMISSAO
         ),
         dataEntrega: pickString(pedido.DATA_ENTREGA, pedido.DATA_HORA_ENTREGA),

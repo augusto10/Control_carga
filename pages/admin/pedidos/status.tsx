@@ -175,7 +175,7 @@ function StatusPedidosContent() {
       setLoading(true);
       setError(null);
       
-      const pedidosUrl = '/api/pedidos/externos?limit=100&offset=0';
+      const pedidosUrl = '/api/pedidos/status?limit=100&offset=0';
       const response = await fetch(pedidosUrl, {
         headers: {
           accept: 'application/json'

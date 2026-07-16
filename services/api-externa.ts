@@ -30,6 +30,7 @@ interface NotaFiscalExterna {
   volumes?: number;
   peso?: number;
   observacoes?: string;
+  [key: string]: any;
 }
 
 interface ClienteExterna {
@@ -69,6 +70,16 @@ interface PedidoItemExterno {
   CODIGO_BARRAS?: string | null;
   CODIGO_ORIGINAL?: string | null;
   QUANTIDADE?: number;
+  [key: string]: any;
+}
+
+interface PedidoLogisticaExterna {
+  pedido?: Record<string, any> | null;
+  separacoes?: Record<string, any>[];
+  itens_separacoes?: Record<string, any>[];
+  entregas?: Record<string, any>[];
+  itens_entregas?: Record<string, any>[];
+  notas_fiscais?: Record<string, any>[];
   [key: string]: any;
 }
 
@@ -466,6 +477,89 @@ class APIExternaService {
     }
   }
 
+  async buscarNotaFiscalCompleta(
+    notaFiscalId: number | string,
+    username: string,
+    password: string
+  ): Promise<Record<string, any> | null> {
+    try {
+      const authenticated = await this.ensureAuthenticated(username, password);
+      if (!authenticated) {
+        console.error('[API Externa] Falha na autenticacao');
+        return null;
+      }
+
+      const url = `/api/v1/notas-fiscais/${notaFiscalId}/completa`;
+      console.log('[API Externa] Buscando nota fiscal completa:', url);
+
+      const response = await this.apiInstance.get<Record<string, any>>(url, {
+        validateStatus: (status) => status < 500,
+      });
+
+      if (response.status >= 400) {
+        console.warn(
+          `[API Externa] Falha ao buscar nota fiscal completa ${notaFiscalId}:`,
+          response.status,
+          response.statusText
+        );
+        return null;
+      }
+
+      return response.data || null;
+    } catch (error: any) {
+      console.error(
+        '[API Externa] Erro ao buscar nota fiscal completa:',
+        error.response?.data || error.message
+      );
+      return null;
+    }
+  }
+
+  async listarNotasFiscaisCompletas(
+    filtros: { limit?: number; offset?: number },
+    username: string,
+    password: string
+  ): Promise<ConsultaNotasFiscaisResponse | null> {
+    try {
+      const authenticated = await this.ensureAuthenticated(username, password);
+      if (!authenticated) {
+        console.error('[API Externa] Falha na autenticacao');
+        return null;
+      }
+
+      const params = new URLSearchParams();
+      params.append('limit', String(Math.min(Math.max(filtros.limit || 500, 1), 500)));
+      params.append('offset', String(Math.max(filtros.offset || 0, 0)));
+
+      const response = await this.apiInstance.get<ConsultaNotasFiscaisResponse>(
+        `/api/v1/notas-fiscais/completas?${params.toString()}`,
+        { validateStatus: (status) => status < 500 }
+      );
+
+      if (response.status >= 400) {
+        console.warn(
+          '[API Externa] Falha ao listar notas fiscais completas:',
+          response.status,
+          response.statusText
+        );
+        return null;
+      }
+
+      return {
+        data: Array.isArray(response.data?.data) ? response.data.data : [],
+        total: typeof response.data?.total === 'number' ? response.data.total : 0,
+        limit: typeof response.data?.limit === 'number' ? response.data.limit : filtros.limit || 500,
+        offset: typeof response.data?.offset === 'number' ? response.data.offset : filtros.offset || 0,
+      };
+    } catch (error: any) {
+      console.error(
+        '[API Externa] Erro ao listar notas fiscais completas:',
+        error.response?.data || error.message
+      );
+      return null;
+    }
+  }
+
   async listarPedidos(
     filtros: {
       data_inicio?: string;
@@ -681,6 +775,44 @@ class APIExternaService {
     }
   }
 
+  async buscarPedidoLogistica(
+    pedidoId: number | string,
+    username: string,
+    password: string
+  ): Promise<PedidoLogisticaExterna | null> {
+    try {
+      const authenticated = await this.ensureAuthenticated(username, password);
+      if (!authenticated) {
+        console.error('[API Externa] Falha na autenticação');
+        return null;
+      }
+
+      const url = `/api/v1/pedidos/${pedidoId}/logistica`;
+      console.log('[API Externa] Buscando logística do pedido:', url);
+
+      const response = await this.apiInstance.get<PedidoLogisticaExterna>(url, {
+        validateStatus: (status) => status < 500
+      });
+
+      if (response.status >= 400) {
+        console.warn(
+          `[API Externa] Falha ao buscar logística do pedido ${pedidoId}:`,
+          response.status,
+          response.statusText
+        );
+        return null;
+      }
+
+      return response.data || null;
+    } catch (error: any) {
+      console.error(
+        '[API Externa] Erro ao buscar logística do pedido:',
+        error.response?.data || error.message
+      );
+      return null;
+    }
+  }
+
   async listarApuracoes(
     filtros: {
       data_inicio?: string;
@@ -729,4 +861,11 @@ class APIExternaService {
 }
 
 export const apiExternaService = new APIExternaService();
-export type { NotaFiscalExterna, ClienteExterna, PedidoExterno, PedidoItemExterno, ApuracaoExterna };
+export type {
+  NotaFiscalExterna,
+  ClienteExterna,
+  PedidoExterno,
+  PedidoItemExterno,
+  PedidoLogisticaExterna,
+  ApuracaoExterna
+};

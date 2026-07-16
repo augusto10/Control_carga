@@ -52,15 +52,20 @@ export function AppLayout({
 }: AppLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
+  const [sidebarHoverExpanded, setSidebarHoverExpanded] = useState(false);
   const [openSubmenus, setOpenSubmenus] = useState<Record<string, boolean>>({});
   const router = useRouter();
   const { user, logout } = useAuth();
   const SIDEBAR_COLLAPSED_KEY = 'app_layout_sidebar_collapsed';
   const SIDEBAR_AUTO_CLOSE_MS = 30000;
+  const hiddenMenuNames = new Set([
+    'Painel Gerencial',
+    'Checklist Recebimento',
+    'Controle de Materiais'
+  ]);
 
   const menuItems = [
     { name: 'Início', icon: LayoutDashboard, href: '/', exact: true },
-    { name: 'Painel Gerencial', icon: LayoutDashboard, href: '/painel-gerencial', adminOnly: true },
     { 
       name: 'Pedidos', 
       icon: ShoppingCart, 
@@ -128,6 +133,7 @@ export function AppLayout({
       name: 'Relatórios e Análises', 
       icon: LayoutDashboard,
       children: [
+        { name: 'Relatório de Entregas', href: '/relatorios/entregas' },
         { name: 'Relatório de Pallets', href: '/relatorios/pallets' },
         { name: 'Relatório de Controles', href: '/relatorios/controles-carga' },
         { name: 'Fretes', href: '/relatorios/fretes' },
@@ -140,6 +146,24 @@ export function AppLayout({
   const isActive = (path: string, exact?: boolean) => {
     return exact ? router.pathname === path : router.pathname.startsWith(path);
   };
+
+  useEffect(() => {
+    if (!user || typeof window === 'undefined') return;
+
+    const monthKey = new Date().toISOString().slice(0, 7);
+    const warmKey = `pedidos_month_cache_warm:${monthKey}`;
+    if (window.sessionStorage.getItem(warmKey)) return;
+
+    window.sessionStorage.setItem(warmKey, '1');
+    void fetch('/api/pedidos/externos?preload_month=1', {
+      credentials: 'include',
+      headers: { accept: 'application/json' }
+    }).then((response) => {
+      if (!response.ok) throw new Error('Falha ao aquecer cache de pedidos');
+    }).catch(() => {
+      window.sessionStorage.removeItem(warmKey);
+    });
+  }, [user]);
 
   const toggleSubmenu = (key: string) => {
     setOpenSubmenus((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -178,10 +202,13 @@ export function AppLayout({
 
   const handleToggleSidebarCollapsed = () => {
     setSidebarCollapsed((prev) => !prev);
+    setSidebarHoverExpanded(false);
     if (sidebarOpen) {
       setSidebarOpen(false);
     }
   };
+
+  const sidebarExpanded = !sidebarCollapsed || sidebarHoverExpanded;
 
   return (
     <div className="min-h-screen bg-app-bg flex text-textMain">
@@ -194,15 +221,26 @@ export function AppLayout({
       )}
 
       {/* Sidebar */}
-      <aside className={cn(
+      <aside
+        onMouseEnter={() => {
+          if (typeof window !== 'undefined' && window.innerWidth >= 768 && sidebarCollapsed) {
+            setSidebarHoverExpanded(true);
+          }
+        }}
+        onMouseLeave={() => {
+          if (typeof window !== 'undefined' && window.innerWidth >= 768) {
+            setSidebarHoverExpanded(false);
+          }
+        }}
+        className={cn(
         "fixed inset-y-0 left-0 bg-white border-r border-slate-200 z-50 transition-all duration-300 md:translate-x-0 md:static md:block",
-        sidebarCollapsed ? "w-64 md:w-20" : "w-64 md:w-64",
+        sidebarExpanded ? "w-64 md:w-64" : "w-64 md:w-20",
         sidebarOpen ? "translate-x-0" : "-translate-x-full"
       )}>
         <div className="flex flex-col h-full">
           {/* Logo */}
           <div className="h-16 flex items-center px-6">
-            {!sidebarCollapsed && (
+            {sidebarExpanded && (
               <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
                 Navegação
               </span>
@@ -213,6 +251,7 @@ export function AppLayout({
           <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
             {menuItems
               .filter((item: any) => {
+                if (hiddenMenuNames.has(item.name)) return false;
                 if (item.adminOnly && user?.tipo !== 'ADMIN' && user?.tipo !== 'GERENTE') return false;
                 return true;
               })
@@ -228,21 +267,21 @@ export function AppLayout({
                         href={item.href}
                         className={cn(
                           "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group",
-                          sidebarCollapsed && "md:justify-center md:px-2",
+                          !sidebarExpanded && "md:justify-center md:px-2",
                           activeTop ? "bg-primary text-white" : "text-textMuted hover:bg-slate-50 hover:text-textMain"
                         )}
-                        title={sidebarCollapsed ? item.name : undefined}
+                        title={!sidebarExpanded ? item.name : undefined}
                       >
                         <ItemIcon className={cn("w-5 h-5", activeTop ? "text-white" : "text-textMuted group-hover:text-primary")} />
-                        <span className={cn("truncate", sidebarCollapsed && "md:hidden")}>{item.name}</span>
-                        {activeTop && !sidebarCollapsed && <ChevronRight className="w-4 h-4 ml-auto" />}
+                        <span className={cn("truncate", !sidebarExpanded && "md:hidden")}>{item.name}</span>
+                        {activeTop && sidebarExpanded && <ChevronRight className="w-4 h-4 ml-auto" />}
                       </Link>
                     ) : (
                       <button
                         type="button"
                         onClick={() => {
-                          if (sidebarCollapsed) {
-                            setSidebarCollapsed(false);
+                          if (!sidebarExpanded) {
+                            setSidebarHoverExpanded(true);
                             setOpenSubmenus((prev) => ({ ...prev, [item.name]: true }));
                             return;
                           }
@@ -250,19 +289,19 @@ export function AppLayout({
                         }}
                         className={cn(
                           "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200",
-                          sidebarCollapsed && "md:justify-center md:px-2",
+                          !sidebarExpanded && "md:justify-center md:px-2",
                           activeTop ? "bg-primary text-white" : "text-textMuted hover:bg-slate-50 hover:text-textMain"
                         )}
-                        title={sidebarCollapsed ? item.name : undefined}
+                        title={!sidebarExpanded ? item.name : undefined}
                       >
                         <ItemIcon className={cn("w-5 h-5", activeTop ? "text-white" : "text-textMuted group-hover:text-primary")} />
-                        <span className={cn("truncate", sidebarCollapsed && "md:hidden")}>{item.name}</span>
-                        {!sidebarCollapsed && (
+                        <span className={cn("truncate", !sidebarExpanded && "md:hidden")}>{item.name}</span>
+                        {sidebarExpanded && (
                           <ChevronDown className={cn("w-4 h-4 ml-auto transition-transform", open ? "rotate-180" : "")} />
                         )}
                       </button>
                     )}
-                    {hasChildren && open && !sidebarCollapsed && (
+                    {hasChildren && open && sidebarExpanded && (
                       <div className="pl-8 space-y-1">
                         {item.children
                           .filter((c: any) => {
@@ -297,7 +336,7 @@ export function AppLayout({
           <div className="p-4 border-t border-slate-100">
             <div className={cn(
               "p-2 rounded-xl bg-slate-50 border border-slate-100",
-              sidebarCollapsed ? "flex justify-center" : "flex items-center gap-3"
+              !sidebarExpanded ? "flex justify-center" : "flex items-center gap-3"
             )}>
               <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center overflow-hidden border-2 border-white">
                 {user?.avatar_url ? (
@@ -306,7 +345,7 @@ export function AppLayout({
                   <User className="w-6 h-6 text-slate-400" />
                 )}
               </div>
-              {!sidebarCollapsed && (
+              {sidebarExpanded && (
                 <>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold truncate">{user?.nome || 'Usuário'}</p>
@@ -340,9 +379,9 @@ export function AppLayout({
             <button
               className="hidden md:inline-flex p-2 rounded-lg hover:bg-slate-100 transition-colors"
               onClick={handleToggleSidebarCollapsed}
-              title={sidebarCollapsed ? 'Expandir menu' : 'Recolher menu'}
+              title={sidebarExpanded ? 'Recolher menu' : 'Expandir menu'}
             >
-              {sidebarCollapsed ? (
+              {!sidebarExpanded ? (
                 <ChevronRight className="w-5 h-5 text-textMuted" />
               ) : (
                 <ChevronLeft className="w-5 h-5 text-textMuted" />

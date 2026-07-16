@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Box,
@@ -335,6 +335,34 @@ export default function PedidosKanbanPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const topScrollRef = useRef<HTMLDivElement | null>(null);
+  const kanbanScrollRef = useRef<HTMLDivElement | null>(null);
+  const [kanbanScrollWidth, setKanbanScrollWidth] = useState(0);
+
+  useEffect(() => {
+    const container = kanbanScrollRef.current;
+    if (!container || isLoading) return;
+
+    const updateWidth = () => setKanbanScrollWidth(container.scrollWidth);
+    updateWidth();
+
+    const observer = new ResizeObserver(updateWidth);
+    observer.observe(container);
+    window.addEventListener('resize', updateWidth);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', updateWidth);
+    };
+  }, [data, isLoading]);
+
+  const syncScroll = (source: 'top' | 'kanban') => {
+    const from = source === 'top' ? topScrollRef.current : kanbanScrollRef.current;
+    const to = source === 'top' ? kanbanScrollRef.current : topScrollRef.current;
+    if (from && to && to.scrollLeft !== from.scrollLeft) {
+      to.scrollLeft = from.scrollLeft;
+    }
+  };
 
   const fetchKanban = useCallback(async (dateRef: string, silent = false, forceRefresh = false) => {
     try {
@@ -471,15 +499,30 @@ export default function PedidosKanbanPage() {
             <CircularProgress />
           </Box>
         ) : (
-          <Box sx={{ display: 'flex', gap: 2.5, overflowX: 'auto', pb: 2 }}>
-            {STATUS_ORDER.map((status) => (
-              <StatusColumn
-                key={status}
-                status={status}
-                pedidos={data?.columns[status] || []}
-              />
-            ))}
-          </Box>
+          <Stack spacing={0.75}>
+            <Box
+              ref={topScrollRef}
+              onScroll={() => syncScroll('top')}
+              sx={{ overflowX: 'auto', overflowY: 'hidden', height: 17 }}
+              aria-label="Rolagem horizontal superior do Kanban"
+            >
+              <Box sx={{ width: kanbanScrollWidth, height: 1 }} />
+            </Box>
+
+            <Box
+              ref={kanbanScrollRef}
+              onScroll={() => syncScroll('kanban')}
+              sx={{ display: 'flex', gap: 2.5, overflowX: 'auto', pb: 2 }}
+            >
+              {STATUS_ORDER.map((status) => (
+                <StatusColumn
+                  key={status}
+                  status={status}
+                  pedidos={data?.columns[status] || []}
+                />
+              ))}
+            </Box>
+          </Stack>
         )}
       </Stack>
     </AppLayout>

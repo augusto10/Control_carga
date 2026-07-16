@@ -51,7 +51,7 @@ import { useSnackbar } from 'notistack';
 import api from '../services/api';
 import { CEPService } from '../services/cep';
 import { useAuth } from '../contexts/AuthContext';
-import { FRETE_DF_FONTE_REFERENCIA, estimarFreteDfPorRegiao } from '@/lib/freteDf';
+import { estimarFreteDfPorRegiao } from '@/lib/freteDf';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
@@ -551,9 +551,14 @@ const ListarControlesContent: React.FC = () => {
     // Importar dependências necessárias
     const { PDFDocument, rgb, StandardFonts } = await import('pdf-lib');
     try {
+      const controlePdf = await api
+        .get(`/api/controles/${controle.id}/pdf-dados`)
+        .then((response) => response.data as ControleComNotas)
+        .catch(() => controle);
+
       // Garante que as propriedades opcionais estejam definidas
       const controleCompleto: ControleComNotas = {
-        ...controle,
+        ...controlePdf,
         numeroManifesto: 'numeroManifesto' in controle ? controle.numeroManifesto : null,
         motorista: controle.motorista || '',
         responsavel: controle.responsavel || '',
@@ -570,7 +575,7 @@ const ListarControlesContent: React.FC = () => {
         assinaturaResponsavel: 'assinaturaResponsavel' in controle ? controle.assinaturaResponsavel || null : null,
         dataAssinaturaMotorista: 'dataAssinaturaMotorista' in controle ? controle.dataAssinaturaMotorista || null : null,
         dataAssinaturaResponsavel: 'dataAssinaturaResponsavel' in controle ? controle.dataAssinaturaResponsavel || null : null,
-        notas: 'notas' in controle ? (controle.notas || []) : []
+        notas: 'notas' in controlePdf ? (controlePdf.notas || []) : []
       };
       const extrairChaveNFe = (codigo: string): string | null => {
         if (!codigo) return null;
@@ -646,6 +651,7 @@ const ListarControlesContent: React.FC = () => {
         (controleCompleto.notas || []).map(async (nota) => {
           const base = { ...nota };
           try {
+            if ((base as any)._pdfEnriquecida) return base;
             const chave = extrairChaveNFe(base.codigo || '');
             if (chave) {
               const d = await buscarNotaExternaCache({ chave });
@@ -2793,12 +2799,7 @@ const ListarControlesContent: React.FC = () => {
               }}>
                 Notas Fiscais ({detalhesModal.controle.notas?.length || 0})
               </Typography>
-
-              <Alert severity="info" sx={{ mb: 2 }}>
-                Frete de referência por região do DF exibido apenas neste modal. Fonte temporária: <a href={FRETE_DF_FONTE_REFERENCIA.url} target="_blank" rel="noreferrer">{FRETE_DF_FONTE_REFERENCIA.nome}</a>. Regiões sem tabela exata usam estimativa operacional provisória.
-              </Alert>
-
-              <Grid container spacing={2} sx={{ mb: 2 }}>
+<Grid container spacing={2} sx={{ mb: 2 }}>
                 <Grid item xs={12} md={4}>
                   <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
                     <Typography variant="subtitle2" color="text.secondary">Frete estimado total</Typography>

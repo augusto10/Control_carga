@@ -65,6 +65,9 @@ type DeliveryItem = {
   sswStatus: string | null;
   sswMensagem: string | null;
   observacaoStatus: string | null;
+  dataHoraEntrega: string | null;
+  recebedor: string | null;
+  fotoEntregaUrl: string | null;
 };
 
 type DeliverySearchResponse = {
@@ -285,12 +288,12 @@ function DeliveryResultCard({ item }: { item: DeliveryItem }) {
 
       <DeliveryProgress status={item.status} />
 
-      <Grid container spacing={2} sx={{ mt: 0.5 }}>
+        <Grid container spacing={2} sx={{ mt: 0.5 }}>
         <Grid item xs={12} md={6}>
           <Typography variant="body2"><strong>Cliente:</strong> {item.clienteNome}</Typography>
           <Typography variant="body2"><strong>CNPJ/CPF:</strong> {item.cnpjCpf || '-'}</Typography>
           <Typography variant="body2"><strong>Representante:</strong> {item.vendedorNome}</Typography>
-          <Typography variant="body2"><strong>Data do pedido:</strong> {formatDateTime(item.dataHoraCadastro)}</Typography>
+          <Typography variant="body2"><strong>Data do recebimento:</strong> {formatDateTime(item.dataHoraCadastro)}</Typography>
         </Grid>
         <Grid item xs={12} md={6}>
           <Typography variant="body2"><strong>Numero da NF:</strong> {item.numeroNota || '-'}</Typography>
@@ -298,7 +301,18 @@ function DeliveryResultCard({ item }: { item: DeliveryItem }) {
           <Typography variant="body2"><strong>Transportadora:</strong> {item.controleTransportadora || '-'}</Typography>
           <Typography variant="body2"><strong>Data do controle:</strong> {formatDateTime(item.controleDataCriacao)}</Typography>
         </Grid>
-      </Grid>
+        </Grid>
+
+      {item.status === 'PEDIDO_ENTREGUE' && (
+        <Grid container spacing={2} sx={{ mt: 0.5 }}>
+          <Grid item xs={12} md={6}>
+            <Typography variant="body2"><strong>Data da entrega:</strong> {formatDateTime(item.dataHoraEntrega)}</Typography>
+          </Grid>
+          <Grid item xs={12} md={6}>
+            <Typography variant="body2"><strong>Recebedor:</strong> {item.recebedor || '-'}</Typography>
+          </Grid>
+        </Grid>
+      )}
 
       {(item.sswMensagem || item.observacaoStatus) && (
         <Box
@@ -325,6 +339,19 @@ function DeliveryResultCard({ item }: { item: DeliveryItem }) {
               <strong>Fluxo:</strong> {item.observacaoStatus}
             </Typography>
           )}
+        </Box>
+      )}
+
+      {item.fotoEntregaUrl && (
+        <Box sx={{ mt: 2 }}>
+          <Button
+            variant="outlined"
+            href={item.fotoEntregaUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Ver foto da entrega
+          </Button>
         </Box>
       )}
     </Paper>

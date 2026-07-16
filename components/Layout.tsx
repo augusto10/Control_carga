@@ -471,6 +471,11 @@ const menuItems = [
     icon: <ChartIcon sx={{ fontSize: 22 }} />,
     subItems: [
       {
+        text: 'Relatório de Entregas',
+        icon: <ShippingIcon sx={{ fontSize: 20 }} />,
+        path: '/relatorios/entregas'
+      },
+      {
         text: 'Relatório de Pallets',
         icon: <AnalyticsIcon sx={{ fontSize: 20 }} />,
         path: '/relatorios/pallets'

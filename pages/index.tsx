@@ -6,7 +6,6 @@ import { Card } from '@/components/ui/Card';
 import { StatCard } from '@/components/ui/StatCard';
 import { cn } from '@/utils/cn';
 import { motion } from 'framer-motion';
-import { format } from 'date-fns';
 import { 
   FilePlus, 
   ClipboardList, 
@@ -25,6 +24,8 @@ function Home() {
     notasHoje: 0,
     controlesHoje: 0,
     pedidosHoje: 0,
+    pedidosEntregaHoje: 0,
+    pedidosRetiraAtoHoje: 0,
     loading: true
   });
 
@@ -41,34 +42,12 @@ function Home() {
       const res = await fetch('/api/dashboard/resumo-hoje', { credentials: 'include' });
       const data = res.ok ? await res.json() : {};
 
-      let pedidosHoje = data.pedidosHoje || 0;
-      try {
-        const hojeStr = format(new Date(), 'yyyy-MM-dd');
-        const statsUrl = new URL('/api/pedidos/externos', window.location.origin);
-        statsUrl.searchParams.set('stats', '1');
-        statsUrl.searchParams.set('tipo_data', 'recebimento');
-        statsUrl.searchParams.set('data_inicio', hojeStr);
-        statsUrl.searchParams.set('data_fim', hojeStr);
-
-        const resp = await fetch(statsUrl.toString(), {
-          credentials: 'include',
-          headers: { accept: 'application/json' },
-          cache: 'no-store'
-        });
-        if (resp.ok) {
-          const json = await resp.json();
-          if (typeof json.total === 'number') {
-            pedidosHoje = json.total;
-          }
-        }
-      } catch (error) {
-        console.error('Erro ao carregar pedidos externos:', error);
-      }
-
       setStats({
         notasHoje: data.notasHoje || 0,
         controlesHoje: data.controlesHoje || 0,
-        pedidosHoje,
+        pedidosHoje: data.pedidosHoje || 0,
+        pedidosEntregaHoje: data.pedidosEntregaHoje || 0,
+        pedidosRetiraAtoHoje: data.pedidosRetiraAtoHoje || 0,
         loading: false
       });
     } catch (error) {
@@ -168,7 +147,7 @@ function Home() {
         {/* KPI Stats */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           <StatCard 
-            title="Notas de Hoje" 
+            title="Notas atribuídas a controles hoje" 
             value={stats.notasHoje} 
             icon={FilePlus}
             color="orange"
@@ -177,7 +156,7 @@ function Home() {
             delay={0.1}
           />
           <StatCard 
-            title="Controles de Hoje" 
+            title="Controles carregados no caminhão hoje" 
             value={stats.controlesHoje} 
             icon={ClipboardList}
             color="cyan"
@@ -190,7 +169,7 @@ function Home() {
             value={stats.pedidosHoje} 
             icon={ShoppingCart}
             color="blue"
-            trend="Registrados hoje"
+            trend={`Entrega: ${stats.pedidosEntregaHoje} | Retira no ato: ${stats.pedidosRetiraAtoHoje}`}
             loading={stats.loading}
             delay={0.3}
           />

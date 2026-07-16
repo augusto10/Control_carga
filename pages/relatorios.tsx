@@ -104,7 +104,17 @@ export default function Relatorios() {
       >
         <Grid container spacing={3}>
           <Grid item xs={12} md={3}>
-            <RelatorioCard 
+            <RelatorioCard
+              title="Entregas e Corte"
+              description="Pedidos recebidos, entregas geradas, horário de corte e caminhões carregados."
+              icon={<TruckIcon />}
+              href="/relatorios/entregas"
+              color="primary"
+              delay={0.05}
+            />
+          </Grid>
+          <Grid item xs={12} md={3}>
+            <RelatorioCard
               title="Pallets por Motorista" 
               description="Totais de pallets levados, devolvidos e diferença, agrupados por motorista e período."
               icon={<TruckIcon />}

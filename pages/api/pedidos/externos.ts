@@ -10,6 +10,11 @@ const FAST_QUERY_STALE_TTL_MS = 15 * 60_000;
 const fastQueryCache = new Map<string, { expiresAt: number; staleAt: number; payload: any }>();
 const PERSISTED_QUERY_CACHE_TTL_MS = 5 * 60_000;
 const PERSISTED_QUERY_CACHE_STALE_MS = 60 * 60_000;
+const MONTH_BASE_CACHE_TTL_MS = 10 * 60_000;
+const MONTH_BASE_CACHE_STALE_MS = 24 * 60 * 60_000;
+const MONTH_BASE_CACHE_KEY = 'pedidos_month_base:v2';
+let monthBaseCache: { expiresAt: number; staleAt: number; data: any[] } | null = null;
+let monthBaseRefreshPromise: Promise<any[]> | null = null;
 
 type PersistedQueryCacheRow = {
   payload: any;
@@ -104,12 +109,18 @@ export default async function handler(
       tipo_data,
       cidade,
       bairro,
-      ordenacao_valor
+      ordenacao_valor,
+      classificacao_logistica,
+      somente_recebidos,
+      preload_month
     } = req.query;
 
     const tipoData = typeof tipo_data === 'string' 
       ? tipo_data.toLowerCase() 
       : 'recebimento';
+    const classificacaoLogistica =
+      typeof classificacao_logistica === 'string' ? classificacao_logistica.toLowerCase() : '';
+    const somenteRecebidos = somente_recebidos === '1';
 
     const username = process.env.API_EXTERNA_USERNAME;
     const password = process.env.API_EXTERNA_PASSWORD;
@@ -127,6 +138,99 @@ export default async function handler(
         warning: 'Credenciais da API externa não configuradas no .env',
         details: 'API_EXTERNA_USERNAME e API_EXTERNA_PASSWORD são necessários.'
       });
+    }
+
+    const listarPedidosExternos = async (filtros: { limit?: number; offset?: number; [key: string]: any }) => {
+      // O endpoint externo de pedidos retorna vazio quando recebe o periodo em
+      // alguns ambientes. Carregamos a pagina e aplicamos a data localmente.
+      const { data_inicio: _dataInicio, data_fim: _dataFim, tipo_data: _tipoData, ...filtrosConsulta } = filtros;
+      return apiExternaService.listarPedidos(
+        filtrosConsulta,
+        username,
+        password
+      );
+    };
+
+    const listarApuracoesExternas = (filtros: { limit?: number; offset?: number; [key: string]: any }) =>
+      apiExternaService.listarApuracoes(
+        filtros,
+        username,
+        password
+      );
+
+    const refreshMonthBase = async () => {
+      if (monthBaseRefreshPromise) return monthBaseRefreshPromise;
+
+      monthBaseRefreshPromise = (async () => {
+        const data: any[] = [];
+        const batchLimit = 100;
+        const maxRecords = 1500;
+
+        for (let currentOffset = 0; currentOffset < maxRecords; currentOffset += batchLimit) {
+          const batch = await listarPedidosExternos({ limit: batchLimit, offset: currentOffset });
+          if (!batch || !Array.isArray(batch.data) || batch.data.length === 0) break;
+          data.push(...batch.data);
+          if (batch.data.length < batchLimit) break;
+        }
+
+        if (data.length === 0) {
+          throw new Error('API externa retornou base mensal vazia');
+        }
+
+        const now = Date.now();
+        monthBaseCache = {
+          data,
+          expiresAt: now + MONTH_BASE_CACHE_TTL_MS,
+          staleAt: now + MONTH_BASE_CACHE_STALE_MS
+        };
+        void writePersistedQueryCache(
+          MONTH_BASE_CACHE_KEY,
+          { data },
+          MONTH_BASE_CACHE_TTL_MS,
+          MONTH_BASE_CACHE_STALE_MS
+        );
+        return data;
+      })().finally(() => {
+        monthBaseRefreshPromise = null;
+      });
+
+      return monthBaseRefreshPromise;
+    };
+
+    const getMonthBase = async () => {
+      const now = Date.now();
+      if (monthBaseCache && monthBaseCache.expiresAt > now) return monthBaseCache.data;
+
+      const persisted = await readPersistedQueryCache(MONTH_BASE_CACHE_KEY);
+      const persistedData = Array.isArray(persisted?.payload?.data) ? persisted.payload.data : null;
+      if (persistedData && persistedData.length > 0 && persisted) {
+        monthBaseCache = {
+          data: persistedData,
+          expiresAt: persisted.expiresAt.getTime(),
+          staleAt: persisted.staleAt.getTime()
+        };
+        if (persisted.expiresAt.getTime() > now) return persistedData;
+        if (persisted.staleAt.getTime() > now) {
+          void refreshMonthBase().catch((error: any) =>
+            console.error('[Pedidos Cache] Falha ao atualizar base mensal:', error?.message || error)
+          );
+          return persistedData;
+        }
+      }
+
+      if (monthBaseCache && monthBaseCache.staleAt > now) {
+        void refreshMonthBase().catch((error: any) =>
+          console.error('[Pedidos Cache] Falha ao atualizar base mensal:', error?.message || error)
+        );
+        return monthBaseCache.data;
+      }
+
+      return refreshMonthBase();
+    };
+
+    if (preload_month === '1') {
+      const base = await getMonthBase();
+      return res.status(200).json({ warmed: true, records: base.length });
     }
 
     console.log('[API Pedidos Externos] Parâmetros recebidos:', {
@@ -234,7 +338,14 @@ export default async function handler(
       }
       // ISO com T
       if (s.includes('T')) {
-        const d = new Date(s);
+        // A API retorna timestamps em UTC/ISO. Para o filtro da tela, a data
+        // deve respeitar o dia exibido pelo ERP, sem recuar para o dia anterior
+        // por causa do fuso horario local.
+        const [datePart, timePart = '00:00:00'] = s.split('T');
+        const [year, month, day] = datePart.split('-').map((n) => Number(n));
+        const [hh = 0, mm = 0, ssRaw = 0] = timePart.replace(/Z$/, '').split(':').map((n) => Number(n));
+        const ss = Number.isFinite(ssRaw) ? Math.floor(ssRaw) : 0;
+        const d = new Date(year, month - 1, day, hh || 0, mm || 0, ss);
         return isNaN(d.getTime()) ? null : d;
       }
       // DD/MM/YYYY [HH:MM[:SS]]
@@ -293,14 +404,11 @@ export default async function handler(
           parseDate(p.data_hora_recebimento) ||
           parseDate(p.DATA_RECEBIMENTO) ||
           parseDate(p.data_recebimento) ||
+          parseDate(p.PEDIDO_DATA_FECHAMENTO) ||
+          parseDate(p.PEDIDO_DATA_CADASTRO) ||
           parseDate(p.DATA_HORA_CADASTRO) ||
-          parseDate(p.data_hora_cadastro) ||
           parseDate(p.DATA_CADASTRO) ||
-          parseDate(p.data_cadastro) ||
-          parseDate(p.DATA_FECHAMENTO) ||
-          parseDate(p.data_fechamento) ||
-          parseDate(p.DATA_ENTREGA) ||
-          parseDate(p.data_entrega)
+          parseDate(p.DATA_EMISSAO)
         );
       } catch (error) {
         console.error('[API Pedidos Externos] Erro ao parsear data:', error, p);
@@ -595,6 +703,141 @@ export default async function handler(
       return 0;
     };
 
+    const parseDateSafe = (value: unknown) => {
+      if (!value) return null;
+      const raw = String(value).trim();
+      if (!raw) return null;
+      const parsed = new Date(raw);
+      return Number.isNaN(parsed.getTime()) ? null : parsed;
+    };
+
+    const isPedidoEntregaLogistica = async (pedido: any) => {
+      const tipoEntregaPedido = String(pedido?.TIPO_ENTREGA ?? pedido?.tipo_entrega ?? '').toUpperCase();
+      if (tipoEntregaPedido === 'ATO' || tipoEntregaPedido === 'NDF') return false;
+
+      const pedidoId =
+        parseNumber(pedido?.ORCAMENTO_ID) ??
+        parseNumber(pedido?.ORCAMENTO_BASE_ID) ??
+        parseNumber(pedido?.PEDIDO_ID) ??
+        parseNumber(pedido?.ID) ??
+        parseNumber(pedido?.orcamento_id) ??
+        parseNumber(pedido?.orcamento_base_id) ??
+        parseNumber(pedido?.pedido_id) ??
+        parseNumber(pedido?.id);
+
+      if (pedidoId === null) {
+        return ['EPG', 'ENT'].includes(tipoEntregaPedido);
+      }
+
+      const logistica = await apiExternaService.buscarPedidoLogistica(pedidoId, username, password);
+      const pedidoLogistica = logistica?.pedido || {};
+      const tipoEntregaLogistica = String(
+        pedidoLogistica.TIPO_ENTREGA ?? pedidoLogistica.tipo_entrega ?? tipoEntregaPedido
+      ).toUpperCase();
+
+      if (tipoEntregaLogistica === 'ATO' || tipoEntregaLogistica === 'NDF') return false;
+
+      const entregas = Array.isArray(logistica?.entregas) ? logistica.entregas : [];
+      const entregaNoAto = entregas.some((entrega: any) =>
+        String(entrega?.ENTREGA_NO_ATO ?? entrega?.entrega_no_ato ?? '').toUpperCase() === 'S'
+      );
+
+      return !entregaNoAto;
+    };
+
+    const isPedidoEntregaDireta = (pedido: any) => {
+      const tipoEntregaPedido = String(pedido?.TIPO_ENTREGA ?? pedido?.tipo_entrega ?? '').toUpperCase();
+      return ['EPG', 'ENT'].includes(tipoEntregaPedido);
+    };
+
+    const isPedidoRecebidoLogistica = async (pedido: any) => {
+      const recebidoBruto = String(pedido?.RECEBIDO ?? pedido?.recebido ?? '').toUpperCase() === 'S';
+      const dataHoraRecebimentoBruta =
+        parseDateSafe(pedido?.DATA_HORA_RECEBIMENTO) ??
+        parseDateSafe(pedido?.data_hora_recebimento) ??
+        parseDateSafe(pedido?.DATA_RECEBIMENTO) ??
+        parseDateSafe(pedido?.data_recebimento);
+
+      const pedidoId =
+        parseNumber(pedido?.ORCAMENTO_ID) ??
+        parseNumber(pedido?.ORCAMENTO_BASE_ID) ??
+        parseNumber(pedido?.PEDIDO_ID) ??
+        parseNumber(pedido?.ID) ??
+        parseNumber(pedido?.orcamento_id) ??
+        parseNumber(pedido?.orcamento_base_id) ??
+        parseNumber(pedido?.pedido_id) ??
+        parseNumber(pedido?.id);
+
+      if (pedidoId === null) {
+        return recebidoBruto && Boolean(dataHoraRecebimentoBruta);
+      }
+
+      const logistica = await apiExternaService.buscarPedidoLogistica(pedidoId, username, password);
+      const pedidoLogistica = logistica?.pedido || {};
+      const recebidoLogistica = String(
+        pedidoLogistica.RECEBIDO ?? pedidoLogistica.recebido ?? pedido?.RECEBIDO ?? pedido?.recebido ?? ''
+      ).toUpperCase() === 'S';
+      const dataHoraRecebimentoLogistica =
+        parseDateSafe(pedidoLogistica.DATA_HORA_RECEBIMENTO) ??
+        parseDateSafe(pedidoLogistica.data_hora_recebimento) ??
+        parseDateSafe(pedidoLogistica.DATA_RECEBIMENTO) ??
+        parseDateSafe(pedidoLogistica.data_recebimento) ??
+        dataHoraRecebimentoBruta;
+
+      return recebidoLogistica && Boolean(dataHoraRecebimentoLogistica);
+    };
+
+    const isPedidoRecebidoDireto = (pedido: any) => {
+      const recebidoValor = String(pedido?.RECEBIDO ?? pedido?.recebido ?? '').trim().toUpperCase();
+      const recebidoBruto = recebidoValor === 'S' || recebidoValor === 'SIM' || recebidoValor === 'TRUE' || recebidoValor === '1';
+      const dataRecebimento =
+        parseDateSafe(pedido?.DATA_HORA_RECEBIMENTO) ??
+        parseDateSafe(pedido?.data_hora_recebimento) ??
+        parseDateSafe(pedido?.DATA_RECEBIMENTO) ??
+        parseDateSafe(pedido?.data_recebimento);
+
+      // A flag RECEBIDO e a informação oficial para este filtro. Alguns
+      // pedidos recebidos não trazem a data no retorno resumido de /pedidos;
+      // quando a flag não vem, a data de recebimento é a segunda evidência.
+      return recebidoBruto && Boolean(dataRecebimento);
+    };
+
+    const aplicarClassificacaoLogistica = async (items: any[]) => {
+      if (classificacaoLogistica !== 'entrega' || items.length === 0) {
+        return items;
+      }
+
+      // A listagem consolidada ja traz a classificacao usada pela tela.
+      // Nao fazer uma chamada de logistica para cada linha da listagem.
+      return items.filter(isPedidoEntregaDireta);
+
+      const classificados = await Promise.all(
+        items.map(async (pedido) => ({
+          pedido,
+          manter: await isPedidoEntregaLogistica(pedido)
+        }))
+      );
+
+      return classificados.filter((item) => item.manter).map((item) => item.pedido);
+    };
+
+    const aplicarFiltroRecebidos = async (items: any[]) => {
+      if (!somenteRecebidos || items.length === 0) {
+        return items;
+      }
+
+      return items.filter(isPedidoRecebidoDireto);
+
+      const classificados = await Promise.all(
+        items.map(async (pedido) => ({
+          pedido,
+          manter: await isPedidoRecebidoLogistica(pedido)
+        }))
+      );
+
+      return classificados.filter((item) => item.manter).map((item) => item.pedido);
+    };
+
     const applyFilters = (items: any[]) => {
       const results = (items || []).map(normalizePedido).filter((p: any) => {
         if (getEmpresaId(p) !== EMPRESA_ID_ALVO) return false;
@@ -663,7 +906,7 @@ export default async function handler(
     };
 
     const queryCacheKey = JSON.stringify({
-      v: 3,
+      v: 23,
       data_inicio,
       data_fim,
       tipo_entrega,
@@ -673,6 +916,8 @@ export default async function handler(
       cidade: cidadeFiltro,
       bairro: bairroFiltro,
       ordenacaoValor,
+      classificacaoLogistica,
+      somenteRecebidos,
       stats,
       limit: safeLimit,
       offset: safeOffset
@@ -682,7 +927,14 @@ export default async function handler(
       && !bairroFiltro
       && !ordenacaoValor
       && !searchFiltro;
-    const precisaVarreduraCompleta = stats === '1' || Boolean(cidadeFiltro || bairroFiltro || ordenacaoValor);
+    // Os filtros logísticos são aplicados após consultar cada pedido. Portanto,
+    // não podemos calcular o total usando apenas uma página da API externa.
+    const precisaVarreduraCompleta = stats === '1' || Boolean(
+      cidadeFiltro ||
+      bairroFiltro ||
+      ordenacaoValor ||
+      classificacaoLogistica
+    );
     const fastCacheKey = queryCacheKey;
     if (!precisaVarreduraCompleta || isSimpleStatsRequest) {
       const cachedFast = fastQueryCache.get(fastCacheKey);
@@ -734,43 +986,12 @@ export default async function handler(
 
     if (isSimpleStatsRequest) {
       try {
-        const batchLimit = 100;
-        const maxStatsRecords = 1000;
-        let currentOffset = 0;
-        let totalStats = 0;
-        let totalValorStats = 0;
-
-        while (currentOffset < maxStatsRecords) {
-          const resultadoStats = await apiExternaService.listarPedidos(
-            {
-              ...filtrosApi,
-              limit: batchLimit,
-              offset: currentOffset
-            },
-            username,
-            password
-          );
-
-          if (!resultadoStats || !Array.isArray((resultadoStats as any).data)) {
-            throw new Error('API externa nao respondeu pedidos para estatistica diaria');
-          }
-
-          const dataBatch = resultadoStats.data || [];
-          const filtradosStats = applyFilters(dataBatch);
-          totalStats += filtradosStats.length;
-          totalValorStats += filtradosStats.reduce((sum: number, p: any) => sum + getValorPedido(p), 0);
-
-          const hasOlderRecord = Boolean(inicio) && dataBatch.some((item: any) => {
-            const ref = getRef(item);
-            return ref ? ref < inicio! : false;
-          });
-
-          if (dataBatch.length < batchLimit || hasOlderRecord) {
-            break;
-          }
-
-          currentOffset += dataBatch.length;
-        }
+        const dataBase = await getMonthBase();
+        const filtradosStats = await aplicarFiltroRecebidos(
+          await aplicarClassificacaoLogistica(applyFilters(dataBase))
+        );
+        const totalStats = filtradosStats.length;
+        const totalValorStats = filtradosStats.reduce((sum: number, p: any) => sum + getValorPedido(p), 0);
 
         const statsPayload = {
           total: totalStats,
@@ -796,7 +1017,20 @@ export default async function handler(
       let resultadoRapido: { data: any[]; total: number; limit: number; offset: number } | null = null;
 
       try {
-        if (shouldSliceDates) {
+        if (inicio || fim) {
+          // /api/v1/pedidos atualmente ignora data_inicio/data_fim. Para não
+          // filtrar apenas os 100 pedidos mais recentes, percorremos uma janela
+          // paginada e aplicamos a data de recebimento localmente. O limite cobre
+          // inclusive pedidos antigos recebidos no dia (ex.: pedido reaberto).
+          const rawItems = await getMonthBase();
+
+          resultadoRapido = {
+            data: rawItems,
+            total: rawItems.length,
+            limit: safeLimit,
+            offset: safeOffset
+          };
+        } else if (shouldSliceDates) {
           const collected: any[] = [];
           let skipped = 0;
           let cursor = dateOnly(inicio);
@@ -808,23 +1042,23 @@ export default async function handler(
             const chunkEnd = dateOnly(addDays(cursor, 2));
             const chunkEndSafe = chunkEnd > endDate ? endDate : chunkEnd;
             const chunkEndDay = formatDate(chunkEndSafe);
-            const dayResult = await apiExternaService.listarPedidos(
+            const dayResult = await listarPedidosExternos(
               {
                 ...filtrosApi,
                 data_inicio: day,
                 data_fim: chunkEndDay,
                 limit: 100,
                 offset: 0
-              },
-              username,
-              password
+              }
             );
 
             if (!dayResult || !Array.isArray((dayResult as any).data)) {
               throw new Error('API externa nao respondeu pedidos no periodo solicitado');
             }
 
-            const dayItems = applyFilters(dayResult?.data || []);
+            const dayItems = await aplicarFiltroRecebidos(
+              await aplicarClassificacaoLogistica(applyFilters(dayResult?.data || []))
+            );
 
             for (const item of dayItems) {
               if (skipped < safeOffset) {
@@ -850,14 +1084,12 @@ export default async function handler(
             offset: safeOffset
           };
         } else {
-          resultadoRapido = await apiExternaService.listarPedidos(
+          resultadoRapido = await listarPedidosExternos(
             {
               ...filtrosApi,
               limit: safeLimit,
               offset: safeOffset
-            },
-            username,
-            password
+            }
           );
         }
       } catch (apiError: any) {
@@ -869,7 +1101,11 @@ export default async function handler(
         return res.status(200).json(getFastFallbackPayload());
       }
 
-      const dataRapida = applyFilters(resultadoRapido.data || []).sort((a, b) => {
+      const dataRapida = (
+        await aplicarFiltroRecebidos(
+          await aplicarClassificacaoLogistica(applyFilters(resultadoRapido.data || []))
+        )
+      ).sort((a, b) => {
         const refA = getRef(a);
         const refB = getRef(b);
         if (!refA && !refB) return 0;
@@ -917,21 +1153,23 @@ export default async function handler(
 
     const listarTodosPedidosPeriodo = async () => {
       const allData: any[] = [];
-      const batchLimit = 100;
-      const maxRecords = 20000;
+      const batchLimit = 500;
+      // Para a listagem diária, os pedidos recentes ficam nos primeiros lotes.
+      // Limitar a varredura evita que a tela fique aguardando a API externa por
+      // dezenas de segundos quando ela não informa a data em algum registro.
+      const periodoCurto = inicio && fim && diffDays(inicio, fim) <= 2;
+      const maxRecords = periodoCurto ? 1500 : 20000;
       let currentOffset = 0;
       let totalExterno: number | null = null;
       let guard = 0;
 
       while (currentOffset < maxRecords) {
-        const resultado = await apiExternaService.listarPedidos(
+        const resultado = await listarPedidosExternos(
           {
             ...filtrosApi,
             limit: batchLimit,
             offset: currentOffset
-          },
-          username,
-          password
+          }
         );
 
         if (!resultado || typeof resultado !== 'object' || !Array.isArray((resultado as any).data)) {
@@ -990,15 +1228,13 @@ export default async function handler(
         let guard = 0;
 
         while (currentOffset < maxRecords) {
-          const apBatch = await apiExternaService.listarApuracoes(
+          const apBatch = await listarApuracoesExternas(
             {
               data_inicio: inicioAp,
               data_fim: fimAp,
               limit: batchLimit,
               offset: currentOffset
-            },
-            username,
-            password
+            }
           );
           const dataBatch = apBatch?.data || [];
           if (dataBatch.length === 0) break;
@@ -1031,10 +1267,12 @@ export default async function handler(
       status,
       search,
       tipoData,
-      cidade: cidadeFiltro,
-      bairro: bairroFiltro,
-      ordenacaoValor
-    });
+        cidade: cidadeFiltro,
+        bairro: bairroFiltro,
+        ordenacaoValor,
+        classificacaoLogistica,
+        somenteRecebidos
+      });
     const cached = fullScanCache.get(cacheKey);
     let filtradosCorrigidos: any[] = [];
     let totalValorCorrigido = 0;
@@ -1065,7 +1303,11 @@ export default async function handler(
         baseDataCorrigida = await enriquecerPedidosComApuracoes(baseDataCorrigida);
       }
 
-      filtradosCorrigidos = sortPedidosFiltrados(applyFilters(baseDataCorrigida));
+      filtradosCorrigidos = sortPedidosFiltrados(
+        await aplicarFiltroRecebidos(
+          await aplicarClassificacaoLogistica(applyFilters(baseDataCorrigida))
+        )
+      );
       totalValorCorrigido = filtradosCorrigidos.reduce((sum: number, p: any) => sum + getValorPedido(p), 0);
       fullScanCache.set(cacheKey, {
         expiresAt: Date.now() + FULL_SCAN_CACHE_TTL_MS,
@@ -1108,7 +1350,7 @@ export default async function handler(
 
     if (stats === '1') {
       // Se estamos pedindo stats, queremos o total filtrado para o período
-      const resultado = await apiExternaService.listarPedidos(
+      const resultado = await listarPedidosExternos(
         filtrosApi,
         username,
         password
@@ -1140,7 +1382,7 @@ export default async function handler(
     console.log('[API Pedidos Externos] Chamando listarPedidos com filtros:', filtrosApi);
     let resultado;
     try {
-      resultado = await apiExternaService.listarPedidos(
+      resultado = await listarPedidosExternos(
         filtrosApi,
         username,
         password
@@ -1240,7 +1482,7 @@ export default async function handler(
         let currentOffset = 0;
         let guard = 0;
         while (currentOffset < maxRecords) {
-          const apBatch = await apiExternaService.listarApuracoes(
+          const apBatch = await listarApuracoesExternas(
             {
               data_inicio: inicioAp,
               data_fim: fimAp,

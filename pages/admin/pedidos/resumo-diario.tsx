@@ -179,7 +179,7 @@ function ResumoDiarioContent() {
       setLoading(true);
       setError(null);
 
-      const url = `/api/pedidos/externos?limit=10000&offset=0&data_inicio=${dataReferencia}&data_fim=${dataReferencia}`;
+      const url = `/api/pedidos/resumo-diario?data=${dataReferencia}`;
       const response = await fetch(url, {
         headers: { accept: 'application/json' }
       });

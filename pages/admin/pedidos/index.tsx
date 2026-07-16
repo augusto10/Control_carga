@@ -1,6 +1,7 @@
 import { NextPage } from 'next';
 import Head from 'next/head';
 import { useState, useEffect, useMemo, useRef } from 'react';
+import type { ReactNode } from 'react';
 import { 
   Search, 
   Filter, 
@@ -149,6 +150,87 @@ interface Perfil6mPedidosResponse {
   };
 }
 
+function ScrollAreaComBarraSuperior({
+  children,
+  className = '',
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  const topScrollRef = useRef<HTMLDivElement | null>(null);
+  const bottomScrollRef = useRef<HTMLDivElement | null>(null);
+  const topSpacerRef = useRef<HTMLDivElement | null>(null);
+  const syncingRef = useRef(false);
+
+  useEffect(() => {
+    const top = topScrollRef.current;
+    const bottom = bottomScrollRef.current;
+    const spacer = topSpacerRef.current;
+    if (!top || !bottom || !spacer) return;
+
+    const syncWidths = () => {
+      const larguraConteudo = bottom.scrollWidth;
+      const larguraVisivel = bottom.clientWidth;
+      spacer.style.width = `${larguraConteudo}px`;
+      top.style.display = larguraConteudo > larguraVisivel ? 'block' : 'none';
+    };
+
+    const syncFromTop = () => {
+      if (syncingRef.current) return;
+      syncingRef.current = true;
+      bottom.scrollLeft = top.scrollLeft;
+      syncingRef.current = false;
+    };
+
+    const syncFromBottom = () => {
+      if (syncingRef.current) return;
+      syncingRef.current = true;
+      top.scrollLeft = bottom.scrollLeft;
+      syncingRef.current = false;
+    };
+
+    syncWidths();
+    top.scrollLeft = bottom.scrollLeft;
+
+    top.addEventListener('scroll', syncFromTop, { passive: true });
+    bottom.addEventListener('scroll', syncFromBottom, { passive: true });
+
+    const observer = typeof ResizeObserver !== 'undefined'
+      ? new ResizeObserver(() => syncWidths())
+      : null;
+
+    observer?.observe(bottom);
+    if (bottom.firstElementChild instanceof HTMLElement) {
+      observer?.observe(bottom.firstElementChild);
+    }
+
+    window.addEventListener('resize', syncWidths);
+
+    return () => {
+      top.removeEventListener('scroll', syncFromTop);
+      bottom.removeEventListener('scroll', syncFromBottom);
+      observer?.disconnect();
+      window.removeEventListener('resize', syncWidths);
+    };
+  }, []);
+
+  return (
+    <div className={className}>
+      <div
+        ref={topScrollRef}
+        className="overflow-x-auto overflow-y-hidden border-b border-slate-100"
+        aria-hidden="true"
+      >
+        <div ref={topSpacerRef} className="h-4" />
+      </div>
+
+      <div ref={bottomScrollRef} className="overflow-x-auto">
+        {children}
+      </div>
+    </div>
+  );
+}
+
 const parseValorNumero = (v: any) => {
   if (typeof v === 'number') return v;
   if (typeof v === 'string') {
@@ -225,6 +307,7 @@ const getEnderecoResumo = (p: Pedido) => {
     pAny.COMPLEMENTO_ENTREGA
   );
   const bairro = pickString(
+    pAny.BAIRRO_ENTREGA_NOME,
     p.NOME_BAIRRO_NOTA,
     pAny.NOME_BAIRRO_NOTA,
     pAny.BAIRRO,
@@ -235,6 +318,7 @@ const getEnderecoResumo = (p: Pedido) => {
     cliente?.bairro
   );
   const cidade = pickString(
+    pAny.CIDADE_ENTREGA_NOME,
     p.NOME_CIDADE,
     pAny.CIDADE,
     pAny.cidade,
@@ -244,6 +328,8 @@ const getEnderecoResumo = (p: Pedido) => {
     cliente?.cidade
   );
   const uf = pickString(
+    pAny.UF_ENTREGA,
+    pAny.ESTADO_ENTREGA,
     p.ESTADO_DESTINO,
     pAny.UF,
     pAny.uf,
@@ -499,12 +585,14 @@ export default function CicloPedidoPage() {
   const pedidosRequestId = useRef(0);
   
   // Filtros
-  const [filtroPeriodo, setFiltroPeriodo] = useState('hoje');
-  const [filtroEntrega, setFiltroEntrega] = useState('entrega_fechados');
+  const [filtroPeriodo, setFiltroPeriodo] = useState('personalizado');
+  const [filtroEntrega, setFiltroEntrega] = useState('todos');
   const [filtroCidade, setFiltroCidade] = useState('');
   const [filtroBairro, setFiltroBairro] = useState('');
   const [ordenacaoValor, setOrdenacaoValor] = useState('');
-  const [tipoData, setTipoData] = useState<'recebimento' | 'entrega'>('recebimento');
+  // O periodo desta pagina considera exclusivamente a data e hora em que a
+  // venda foi recebida no caixa, independentemente do fechamento ou entrega.
+  const tipoData: 'recebimento' = 'recebimento';
   const [dataInicio, setDataInicio] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [dataFim, setDataFim] = useState(format(new Date(), 'yyyy-MM-dd'));
   const anoAtual = new Date().getFullYear();
@@ -512,42 +600,32 @@ export default function CicloPedidoPage() {
   const anosDisponiveis = useMemo(() => {
     return Array.from({ length: 6 }, (_, i) => anoAtual - i);
   }, [anoAtual]);
-  
-  // Resumo
-  // Resumo
-  const [stats, setStats] = useState({
-    hoje: 0,
-    mes: 0,
-    valorHoje: 0,
-    valorMes: 0,
-    notasHoje: 0,
-    controlesHoje: 0,
-    totalNotas: 0,
-    totalControles: 0,
-    loading: false
-  });
 
+  // Estado legado mantido apenas até a remoção completa do bloco antigo de
+  // resumo. A tela de Pedidos não consulta mais a rota do Dashboard.
+  const [, setStats] = useState({
+    hoje: 0, mes: 0, valorHoje: 0, valorMes: 0,
+    notasHoje: 0, controlesHoje: 0, totalNotas: 0, totalControles: 0,
+    loading: false,
+  });
+  
   // Paginação
-  const [paginaAtual, setPaginaAtual] = useState(1);
+  const [filtroAplicado, setFiltroAplicado] = useState(0);
   const [totalPedidos, setTotalPedidos] = useState(0);
   const [valorPedidosFiltrados, setValorPedidosFiltrados] = useState(0);
-  const pedidosPorPagina = 50;
   const totalPedidosCard = Math.max(0, Number(totalPedidos) || 0);
-  const totalPaginas = Math.ceil(totalPedidosCard / pedidosPorPagina) || 1;
-  const primeiroResultado = totalPedidosCard === 0 ? 0 : (paginaAtual - 1) * pedidosPorPagina + 1;
-  const ultimoResultado = totalPedidosCard === 0 ? 0 : Math.min(paginaAtual * pedidosPorPagina, totalPedidosCard);
-
-  const pedidosExibidos = useMemo(() => {
-    if (paginaAtual !== 1) return pedidos;
-    if (totalPedidosCard > 0 && pedidos.length > totalPedidosCard) {
-      return pedidos.slice(0, totalPedidosCard);
-    }
-    return pedidos;
-  }, [pedidos, paginaAtual, totalPedidosCard]);
+  const paginaAtual = 1;
+  const pedidosPorPagina = Math.max(pedidos.length, 1);
+  const totalPaginas = 1;
+  const primeiroResultado = totalPedidosCard === 0 ? 0 : 1;
+  const ultimoResultado = totalPedidosCard;
+  const pedidosExibidos = pedidos;
+  const setPaginaAtual = (_value: any) => {};
 
   const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({ show: false, message: '', type: 'success' });
   const [pedidoSelecionado, setPedidoSelecionado] = useState<Pedido | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [loadingPedidoDetalhes, setLoadingPedidoDetalhes] = useState(false);
   const [abrirDetalhesNoPerfil6m, setAbrirDetalhesNoPerfil6m] = useState(false);
   const [enriquecendoCep, setEnriquecendoCep] = useState(false);
   const [perfil6mAlertas, setPerfil6mAlertas] = useState<Record<number, Perfil6mPedidoAlerta>>({});
@@ -718,7 +796,12 @@ export default function CicloPedidoPage() {
     const endereco = getEnderecoCampos(p);
     return Boolean(endereco.cidade || endereco.uf);
   }), [pedidos]);
-  const tableColumnCount = 11 + (showCnpjColumn ? 1 : 0) + (showBairroColumn ? 1 : 0) + (showCidadeColumn ? 1 : 0);
+  const tableColumnCount = 13 + (showCnpjColumn ? 1 : 0);
+  const isEntregaPedido = (pedido: Pedido) => ['EPG', 'ENT', 'RLR'].includes(String(pedido.TIPO_ENTREGA || '').toUpperCase());
+  const pedidosEntrega = useMemo(() => pedidos.filter(isEntregaPedido), [pedidos]);
+  const pedidosNoAto = useMemo(() => pedidos.filter((pedido) =>
+    ['ATO', 'NDF'].includes(String(pedido.TIPO_ENTREGA || '').toUpperCase())
+  ), [pedidos]);
   const alertaPerfil6mSelecionado = pedidoSelecionado ? perfil6mAlertas[pedidoSelecionado.ORCAMENTO_ID] : null;
 
   const abrirDetalhesPerfil6m = (pedido: Pedido) => {
@@ -737,6 +820,44 @@ export default function CicloPedidoPage() {
 
     return () => window.clearTimeout(timeoutId);
   }, [isDetailModalOpen, abrirDetalhesNoPerfil6m, pedidoSelecionado?.ORCAMENTO_ID]);
+
+  useEffect(() => {
+    if (!isDetailModalOpen || !pedidoSelecionado?.ORCAMENTO_ID) return;
+
+    let ativo = true;
+
+    void (async () => {
+      try {
+        setLoadingPedidoDetalhes(true);
+        const response = await fetch(`/api/pedidos/${pedidoSelecionado.ORCAMENTO_ID}/logistica`, {
+          headers: { accept: 'application/json' },
+          cache: 'no-store',
+        });
+
+        if (!response.ok) return;
+        const data = await response.json();
+        const pedidoAtualizado = data?.pedido;
+
+        if (ativo && pedidoAtualizado) {
+          setPedidoSelecionado((anterior) =>
+            anterior?.ORCAMENTO_ID === pedidoAtualizado.ORCAMENTO_ID
+              ? { ...anterior, ...pedidoAtualizado }
+              : anterior
+          );
+        }
+      } catch (error) {
+        console.error('[Pedidos] Erro ao carregar logística do pedido:', error);
+      } finally {
+        if (ativo) {
+          setLoadingPedidoDetalhes(false);
+        }
+      }
+    })();
+
+    return () => {
+      ativo = false;
+    };
+  }, [isDetailModalOpen, pedidoSelecionado?.ORCAMENTO_ID]);
 
   const renderPerfil6mAlertButton = (pedido: Pedido, alerta?: Perfil6mPedidoAlerta) => {
     const quantidade = formatQuantidade(alerta?.totalQuantidade || 0);
@@ -796,29 +917,23 @@ export default function CicloPedidoPage() {
     return { label: 'Tudo', inicio: '', fim: '' };
   };
 
-  const appendPedidosFiltros = (params: URLSearchParams, periodo = getPeriodoConfig()) => {
+  const getPeriodoSelecionado = () => ({
+    label: 'Período selecionado',
+    inicio: dataInicio || format(new Date(), 'yyyy-MM-dd'),
+    fim: dataFim || format(new Date(), 'yyyy-MM-dd'),
+  });
+
+  const appendPedidosFiltros = (params: URLSearchParams, periodo = getPeriodoSelecionado()) => {
     params.set('tipo_data', tipoData);
     if (periodo.inicio) params.set('data_inicio', periodo.inicio);
     if (periodo.fim) params.set('data_fim', periodo.fim);
+    params.set('somente_recebidos', '1');
 
-    if (filtroEntrega === 'entrega') {
-      params.set('tipo_entrega', 'EPG,ENT');
-    } else if (filtroEntrega === 'entrega_fechados') {
-      params.set('tipo_entrega', 'EPG,ENT');
-      params.set('status', 'FECHADO');
-    } else if (filtroEntrega === 'nao_entrega') {
-      params.set('tipo_entrega', 'NDF,ATO');
-    }
-
-    if (searchTerm.trim()) params.set('search', searchTerm.trim());
-    if (filtroCidade.trim()) params.set('cidade', filtroCidade.trim());
-    if (filtroBairro.trim()) params.set('bairro', filtroBairro.trim());
-    if (ordenacaoValor) params.set('ordenacao_valor', ordenacaoValor);
   };
 
   const fetchAllFilteredPedidos = async () => {
     try {
-      const periodo = getPeriodoConfig();
+      const periodo = getPeriodoSelecionado();
       let allData: Pedido[] = [];
       let offset = 0;
       const limit = 100;
@@ -928,6 +1043,29 @@ export default function CicloPedidoPage() {
     }
   };
 
+  const fetchPedidosPeriodoRapido = async () => {
+    const periodo = getPeriodoSelecionado();
+    const params = new URLSearchParams({
+      limit: '100',
+      offset: '0',
+    });
+    appendPedidosFiltros(params, periodo);
+
+    // Uma unica consulta evita duas autenticacoes simultaneas e nao depende
+    // de a API externa interpretar listas separadas por virgula.
+    const response = await fetch(`/api/pedidos/externos?${params.toString()}`, {
+      headers: { accept: 'application/json' },
+      cache: 'no-store',
+    });
+
+    if (!response.ok) {
+      throw new Error('Erro ao carregar pedidos');
+    }
+
+    const data: PedidosResponse = await response.json();
+    return data.data || [];
+  };
+
   const exportToExcel = async () => {
     try {
       showToast('Preparando Excel...', 'success');
@@ -1012,7 +1150,7 @@ export default function CicloPedidoPage() {
   const exportarRelatorioAvancado = async () => {
     try {
       showToast('Gerando relatório completo...', 'success');
-      const periodo = getPeriodoConfig();
+      const periodo = getPeriodoSelecionado();
       const params = new URLSearchParams();
       
       if (periodo.inicio) params.set('data_inicio', periodo.inicio);
@@ -1021,9 +1159,6 @@ export default function CicloPedidoPage() {
 
       if (filtroEntrega === 'entrega') {
         params.set('tipo_entrega', 'EPG');
-      } else if (filtroEntrega === 'entrega_fechados') {
-        params.set('tipo_entrega', 'EPG');
-        params.set('status', 'FECHADO');
       } else if (filtroEntrega === 'nao_entrega') {
         params.set('tipo_entrega', 'NDF,ATO');
       }
@@ -1043,36 +1178,26 @@ export default function CicloPedidoPage() {
     const reqId = ++pedidosRequestId.current;
     try {
       setLoading(true);
-      if (filtroPeriodo === 'personalizado' && dataInicio && dataFim && dataInicio > dataFim) {
+      if (dataInicio && dataFim && dataInicio > dataFim) {
         showToast('Período personalizado inválido: a data inicial não pode ser maior que a final.', 'error');
         setPedidos([]);
         setTotalPedidos(0);
         return;
       }
 
-      const periodo = getPeriodoConfig();
-      const offset = (paginaAtual - 1) * pedidosPorPagina;
-      const params = new URLSearchParams({
-        limit: String(pedidosPorPagina),
-        offset: String(offset),
-      });
-      appendPedidosFiltros(params, periodo);
-      const url = `/api/pedidos/externos?${params.toString()}`;
-
-      console.log('[Pedidos] Carregando URL:', url);
-
-      const response = await fetch(url, { headers: { accept: 'application/json' }, cache: 'no-store' });
-      if (!response.ok) {
-        console.error('[Pedidos] Erro na resposta:', response.status, response.statusText);
-        throw new Error('Erro ao carregar pedidos');
-      }
-      
-      const data: PedidosResponse = await response.json();
+      const periodo = getPeriodoSelecionado();
+      const data: PedidosResponse = {
+        total: 0,
+        limit: 0,
+        offset: 0,
+        totalValor: 0,
+        data: await fetchPedidosPeriodoRapido(),
+      };
       if (reqId !== pedidosRequestId.current) return;
       console.log('[Pedidos] Resposta API:', { 
         total: data.total, 
         count: data.data?.length,
-        periodo: getPeriodoConfig()
+        periodo: getPeriodoSelecionado()
       });
       
       const base = ordenacaoValor
@@ -1097,43 +1222,71 @@ export default function CicloPedidoPage() {
         });
       }
 
-      const valorTotal = typeof data.totalValor === 'number'
-        ? data.totalValor
-        : (base || []).reduce((sum, p) => sum + parseValorNumero(p.VALOR_PEDIDO), 0);
+      const valorTotal = (base || []).reduce(
+        (sum, pedido) => sum + parseValorNumero(pedido.VALOR_PEDIDO),
+        0
+      );
       setPedidos(base);
-      setTotalPedidos(typeof data.total === 'number' ? data.total : base.length || 0);
+      setTotalPedidos(base.length || 0);
       setValorPedidosFiltrados(valorTotal);
+
+      // A listagem resumida da API externa não inclui bairro/cidade/UF.
+      // Completa esses campos pela logística em pequenos lotes e atualiza a
+      // tabela progressivamente, sem bloquear a exibição inicial dos pedidos.
+      const pedidosSemLocalizacao = base.filter((pedido) => {
+        const endereco = getEnderecoCampos(pedido);
+        return !endereco.bairro || !endereco.cidade || !endereco.uf;
+      });
+
+      if (pedidosSemLocalizacao.length > 0) {
+        void (async () => {
+          const tamanhoLote = 8;
+          for (let inicioLote = 0; inicioLote < pedidosSemLocalizacao.length; inicioLote += tamanhoLote) {
+            if (reqId !== pedidosRequestId.current) return;
+            const lote = pedidosSemLocalizacao.slice(inicioLote, inicioLote + tamanhoLote);
+            const respostas = await Promise.allSettled(
+              lote.map(async (pedido) => {
+                const response = await fetch(`/api/pedidos/${pedido.ORCAMENTO_ID}/logistica`, {
+                  headers: { accept: 'application/json' },
+                });
+                if (!response.ok) return null;
+                const json = await response.json();
+                return json?.pedido ? { id: pedido.ORCAMENTO_ID, detalhes: json.pedido as Partial<Pedido> } : null;
+              })
+            );
+
+            if (reqId !== pedidosRequestId.current) return;
+            const detalhesPorId = new Map<number, Partial<Pedido>>();
+            respostas.forEach((resposta) => {
+              if (resposta.status === 'fulfilled' && resposta.value) {
+                detalhesPorId.set(resposta.value.id, resposta.value.detalhes);
+              }
+            });
+
+            if (detalhesPorId.size > 0) {
+              setPedidos((atuais) => atuais.map((pedido) => {
+                const detalhes = detalhesPorId.get(pedido.ORCAMENTO_ID);
+                return detalhes ? { ...pedido, ...detalhes } as Pedido : pedido;
+              }));
+            }
+          }
+        })();
+      }
       const alertaReqId = ++perfil6mRequestId.current;
       void carregarAlertasPerfil6m(
-        base.map((pedido) => pedido.ORCAMENTO_ID),
+        base.slice(0, 60).map((pedido) => pedido.ORCAMENTO_ID),
         reqId,
         alertaReqId
       );
       // Mantém paginação estável na primeira página enquanto o total filtrado é calculado.
-      setStats(prev => ({
-        ...prev,
-        hoje: typeof data.total === 'number' ? data.total : base.length || 0,
-        valorHoje: valorTotal,
-      }));
-
-      // Enriquecer via CEP em background
-      void (async () => {
-        try {
-          const comCep = await enriquecerViaCEP(base);
-          if (reqId === pedidosRequestId.current) {
-            setPedidos([...comCep]);
-          }
-        } catch (err) {
-          console.error('[CEP Enrich] Erro:', err);
-        }
-      })();
+      // Otimizacao: a listagem responde primeiro com os dados principais.
 
       const needsEnrich = base.some(p => {
         const cep = (p as any).CEP || p.CEP_ENTREGA || p.CEP_CONS_FINAL;
         return !getNumeroNota(p) || !getCnpjPedido(p) || !p.NOME_BAIRRO_NOTA || !p.NOME_CIDADE || !p.ESTADO_DESTINO || !cep;
       });
 
-      if (base.length > 0 && needsEnrich) {
+      if (false && base.length > 0 && needsEnrich) {
         void (async () => {
           try {
             const apuracoesUrl = new URL('/api/apuracoes', window.location.origin);
@@ -1231,7 +1384,7 @@ export default function CicloPedidoPage() {
       carregarPedidos();
     }, 250);
     return () => clearTimeout(handle);
-  }, [paginaAtual, filtroPeriodo, filtroEntrega, filtroCidade, filtroBairro, ordenacaoValor, tipoData, dataInicio, dataFim, anoSelecionado]);
+  }, [filtroAplicado]);
 
   useEffect(() => {
     if (paginaAtual > totalPaginas) {
@@ -1285,9 +1438,8 @@ export default function CicloPedidoPage() {
           statsHojeUrl.searchParams.set('data_fim', hojeStr);
           if (filtroEntrega === 'entrega') {
             statsHojeUrl.searchParams.set('tipo_entrega', 'EPG,ENT');
-          } else if (filtroEntrega === 'entrega_fechados') {
-            statsHojeUrl.searchParams.set('tipo_entrega', 'EPG,ENT');
-            statsHojeUrl.searchParams.set('status', 'FECHADO');
+            statsHojeUrl.searchParams.set('classificacao_logistica', 'entrega');
+            statsHojeUrl.searchParams.set('somente_recebidos', '1');
           } else if (filtroEntrega === 'nao_entrega') {
             statsHojeUrl.searchParams.set('tipo_entrega', 'NDF,ATO');
           }
@@ -1314,9 +1466,8 @@ export default function CicloPedidoPage() {
         statsUrl.searchParams.set('data_fim', ultimoDiaMes);
         if (filtroEntrega === 'entrega') {
           statsUrl.searchParams.set('tipo_entrega', 'EPG,ENT');
-        } else if (filtroEntrega === 'entrega_fechados') {
-          statsUrl.searchParams.set('tipo_entrega', 'EPG,ENT');
-          statsUrl.searchParams.set('status', 'FECHADO');
+          statsUrl.searchParams.set('classificacao_logistica', 'entrega');
+          statsUrl.searchParams.set('somente_recebidos', '1');
         } else if (filtroEntrega === 'nao_entrega') {
           statsUrl.searchParams.set('tipo_entrega', 'NDF,ATO');
         }
@@ -1335,64 +1486,342 @@ export default function CicloPedidoPage() {
         setStats(s => ({ ...s, mes: 0, valorMes: 0, loading: false }));
       }
     };
-    carregarResumos();
+    // Não executar: os cards desta tela são calculados pela própria listagem.
+    void carregarResumos;
   }, [tipoData, filtroEntrega]);
+
+  const renderTabelaPedidos = (lista: Pedido[], titulo: string, descricaoVazia: string) => (
+    <Card noPadding className="relative min-h-[220px]">
+      <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+        <div>
+          <h3 className="text-base font-semibold text-textMain">{titulo}</h3>
+          <p className="text-sm text-textMuted">{lista.length} pedido(s)</p>
+        </div>
+      </div>
+
+      <ScrollAreaComBarraSuperior>
+        <table className="w-full text-sm text-left">
+          <thead>
+            <tr className="bg-slate-50 border-b border-slate-200">
+              <th className="px-3 py-4 font-semibold text-textMain text-center w-14">Nº</th>
+              <th className="px-6 py-4 font-semibold text-textMain">Pedido / Nota</th>
+              <th className="px-6 py-4 font-semibold text-textMain">Cliente</th>
+              <th className="px-4 py-4 font-semibold text-textMain whitespace-nowrap">Recebimento</th>
+              {showCnpjColumn && (
+                <th className="px-6 py-4 font-semibold text-textMain hidden xl:table-cell">CNPJ</th>
+              )}
+              <th className="px-6 py-4 font-semibold text-textMain hidden xl:table-cell">Endereço</th>
+              <th className="px-4 py-4 font-semibold text-textMain">Bairro</th>
+              <th className="px-4 py-4 font-semibold text-textMain">Cidade</th>
+              <th className="px-4 py-4 font-semibold text-textMain">Estado</th>
+              <th className="px-6 py-4 font-semibold text-textMain hidden xl:table-cell">CEP</th>
+              <th className="px-6 py-4 font-semibold text-textMain">Valor</th>
+              <th className="px-6 py-4 font-semibold text-textMain hidden sm:table-cell">Status</th>
+              <th className="px-6 py-4 font-semibold text-textMain hidden md:table-cell">Perfil 6m</th>
+              <th className="px-6 py-4 font-semibold text-textMain text-right">Detalhes</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {loading ? (
+              Array.from({ length: 5 }).map((_, i) => (
+                <tr key={`${titulo}-loading-${i}`} className="animate-pulse">
+                  <td colSpan={tableColumnCount} className="px-6 py-4">
+                    <div className="h-10 bg-slate-100 rounded w-full"></div>
+                  </td>
+                </tr>
+              ))
+            ) : lista.length === 0 ? (
+              <tr>
+                <td colSpan={tableColumnCount} className="px-6 py-12 text-center">
+                  <div className="flex flex-col items-center gap-2 text-textMuted">
+                    <ShoppingCart className="w-10 h-10 opacity-20" />
+                    <p>{descricaoVazia}</p>
+                  </div>
+                </td>
+              </tr>
+            ) : (
+              lista.map((p, index) => {
+                const enderecoCampos = getEnderecoCampos(p);
+                const logradouroCompleto = [enderecoCampos.logradouro, enderecoCampos.numero, enderecoCampos.complemento]
+                  .filter(Boolean)
+                  .join(', ');
+                const cidadeUf = [enderecoCampos.cidade, enderecoCampos.uf].filter(Boolean).join('/');
+                const numeroNota = getIdentificacaoNfeReduzida(p.IDENTIFICACAO_NFE) || getNumeroNota(p);
+                const numeroLinha = index + 1;
+                const alertaPerfil6m = perfil6mAlertas[p.ORCAMENTO_ID];
+                const temPerfil6m = Boolean(alertaPerfil6m?.hasPerfil6m);
+                const dataHoraRecebimento = getDataRecebimento(p);
+
+                return (
+                  <tr key={`${titulo}-${p.ORCAMENTO_ID}`} className="hover:bg-slate-50/50 transition-colors group">
+                    <td className="px-3 py-4 text-center">
+                      <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-slate-100 text-[11px] font-bold text-slate-700 px-1.5">
+                        {numeroLinha}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex flex-col">
+                        <span className="font-bold text-textMain">{p.ORCAMENTO_ID}</span>
+                        {numeroNota && (
+                          <span className="text-[10px] text-textMuted font-medium uppercase tracking-wider">
+                            NF: {numeroNota}
+                          </span>
+                        )}
+                        {alertaPerfil6m?.loading ? (
+                          <span className="text-[10px] text-slate-400 mt-1">Validando perfil 6m...</span>
+                        ) : temPerfil6m ? (
+                          <div className="mt-1">
+                            {renderPerfil6mAlertButton(p, alertaPerfil6m)}
+                          </div>
+                        ) : null}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="hidden sm:flex w-8 h-8 rounded-full bg-slate-100 items-center justify-center text-slate-400">
+                          <User className="w-4 h-4" />
+                        </div>
+                        <div className="flex flex-col max-w-[200px]">
+                          <span className="font-medium text-textMain truncate" title={p.CLIENTE_NOME}>
+                            {p.CLIENTE_NOME}
+                          </span>
+                          <span className="text-[10px] text-textMuted truncate">
+                            {p.VENDEDOR_NOME}
+                          </span>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap">
+                      <div className="flex flex-col">
+                        <span className="text-textMain font-medium">
+                          {dataHoraRecebimento ? format(dataHoraRecebimento, 'dd/MM/yyyy') : '---'}
+                        </span>
+                        <span className="text-xs font-semibold text-blue-700 flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          {dataHoraRecebimento ? format(dataHoraRecebimento, 'HH:mm:ss') : 'Horário não informado'}
+                        </span>
+                      </div>
+                    </td>
+                    {showCnpjColumn && (
+                      <td className="px-6 py-4 hidden xl:table-cell">
+                        <span className="text-textMain">
+                          {getCnpjPedido(p) || '---'}
+                        </span>
+                      </td>
+                    )}
+                    <td className="px-6 py-4 hidden xl:table-cell">
+                      <span className="text-textMain text-xs leading-tight">
+                        {logradouroCompleto || '---'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-4">
+                        <div className="flex items-center gap-1">
+                          <span className="text-textMain">
+                            {enderecoCampos.bairro || '---'}
+                          </span>
+                          {(p as any)._cepEnriquecido && (
+                            <span className="text-[8px] bg-sky-100 text-sky-600 px-1 py-0.5 rounded font-bold">CEP</span>
+                          )}
+                        </div>
+                    </td>
+                    <td className="px-4 py-4">
+                        <div className="flex items-center gap-1">
+                          <span className="text-textMain">
+                            {enderecoCampos.cidade || '---'}
+                          </span>
+                          {(p as any)._cepEnriquecido && (
+                            <span className="text-[8px] bg-sky-100 text-sky-600 px-1 py-0.5 rounded font-bold">CEP</span>
+                          )}
+                        </div>
+                    </td>
+                    <td className="px-4 py-4">
+                      <span className="text-textMain font-medium uppercase">
+                        {enderecoCampos.uf || '---'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 hidden xl:table-cell">
+                      <span className="text-textMain text-xs leading-tight whitespace-nowrap">
+                        {enderecoCampos.cep || '---'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex flex-col">
+                        <span className="font-bold text-textMain">
+                          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(parseValorNumero(p.VALOR_PEDIDO))}
+                        </span>
+                        <div className="sm:hidden mt-1">
+                          {p.CANCELADO === 'S' ? (
+                            <Badge variant="danger">Cancelado</Badge>
+                          ) : p.PEDIDO_FECHADO === 'S' ? (
+                            <Badge variant="success">Fechado</Badge>
+                          ) : (
+                            <Badge variant="warning">Aberto</Badge>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 hidden sm:table-cell">
+                      {p.CANCELADO === 'S' ? (
+                        <Badge variant="danger">Cancelado</Badge>
+                      ) : p.PEDIDO_FECHADO === 'S' ? (
+                        <Badge variant="success">Fechado</Badge>
+                      ) : (
+                        <Badge variant="warning">Aberto</Badge>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 hidden md:table-cell">
+                      {alertaPerfil6m?.loading ? (
+                        <Badge variant="neutral">Validando...</Badge>
+                      ) : temPerfil6m ? (
+                        <div className="flex justify-start">
+                          {renderPerfil6mAlertButton(p, alertaPerfil6m)}
+                        </div>
+                      ) : (
+                        renderSemPerfil6m()
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setPedidoSelecionado(p);
+                          setAbrirDetalhesNoPerfil6m(false);
+                          setIsDetailModalOpen(true);
+                        }}
+                      >
+                        Detalhes
+                      </Button>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </ScrollAreaComBarraSuperior>
+    </Card>
+  );
 
   return (
     <AppLayout 
-      title="Pedidos Entregas" 
+      title="Pedidos" 
       subtitle="Entregas fechadas do dia e resumo do mês"
       fluid
     >
       <Head>
-        <title>Pedidos Entregas | ControlCarga</title>
+        <title>Pedidos | ControlCarga</title>
       </Head>
 
       <div className="space-y-6">
         {/* Resumo em Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4 gap-4">
           <StatCard
-            title="Pedidos Filtrados"
+            title="Pedidos"
             value={totalPedidos}
             icon={ShoppingCart}
             color="blue"
-            trend="Total do filtro atual"
-            loading={stats.loading}
+            trend="Recebidos no período"
+            loading={loading}
             size="sm"
           />
 
           <StatCard
-            title="Valor Filtrado"
+            title="Entregas"
+            value={pedidosEntrega.length}
+            icon={Truck}
+            color="green"
+            trend="Pedidos com entrega"
+            loading={loading}
+            size="sm"
+          />
+
+          <StatCard
+            title="Retira no ato"
+            value={pedidosNoAto.length}
+            icon={Receipt}
+            color="orange"
+            trend="Pedidos retirados"
+            loading={loading}
+            size="sm"
+          />
+
+          <StatCard
+            title="Valor Total"
             value={new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valorPedidosFiltrados)}
             icon={TrendingUp}
-            color="green"
-            trend="Soma do filtro atual"
-            loading={stats.loading}
-            size="sm"
-          />
-
-          <StatCard
-            title="Notas de Hoje"
-            value={stats.notasHoje}
-            icon={FileText}
-            color="orange"
-            trend="Hoje"
-            loading={stats.loading}
-            size="sm"
-          />
-
-          <StatCard
-            title="Controles de Hoje"
-            value={stats.controlesHoje}
-            icon={Truck}
             color="cyan"
-            trend="Hoje"
-            loading={stats.loading}
+            trend="Soma do período"
+            loading={loading}
             size="sm"
           />
         </div>
 
-        {/* Filtros e Busca */}
+        {/* Filtro de período */}
+        <Card className="overflow-visible">
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="space-y-1.5">
+              <Label>Período</Label>
+              <Select
+                value={filtroPeriodo}
+                onChange={(e) => {
+                  setFiltroPeriodo(e.target.value);
+                  setPaginaAtual(1);
+                }}
+              >
+                <option value="hoje">Hoje</option>
+                <option value="ontem">Ontem</option>
+                <option value="semana">Última semana</option>
+                <option value="mes">Último mês</option>
+                <option value="ano">Este ano</option>
+                <option value="personalizado">Personalizado</option>
+                <option value="tudo">Todos os períodos</option>
+              </Select>
+            </div>
+
+            {filtroPeriodo === 'personalizado' && (
+              <>
+                <div className="space-y-1.5">
+                  <Label>Data início</Label>
+                  <Input
+                    type="date"
+                    value={dataInicio}
+                    onChange={(e) => {
+                      setDataInicio(e.target.value);
+                      setPaginaAtual(1);
+                    }}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Data fim</Label>
+                  <Input
+                    type="date"
+                    value={dataFim}
+                    onChange={(e) => {
+                      setDataFim(e.target.value);
+                      setPaginaAtual(1);
+                    }}
+                  />
+                </div>
+              </>
+            )}
+
+            <Button
+              type="button"
+              variant="primary"
+              iconLeft={<Filter className="w-4 h-4" />}
+              onClick={() => {
+                setPaginaAtual(1);
+                setFiltroAplicado((valor) => valor + 1);
+              }}
+            >
+              Filtrar
+            </Button>
+          </div>
+        </Card></div>
+
+        {/* Demais filtros temporariamente desativados. */}
+        {false && (
         <Card className="overflow-visible">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             <form onSubmit={handleSearch} className="flex-1 flex gap-2">
@@ -1412,13 +1841,9 @@ export default function CicloPedidoPage() {
                 <Select 
                   className="pl-10"
                   value={tipoData}
-                  onChange={(e) => {
-                    setTipoData(e.target.value as 'recebimento' | 'entrega');
-                    setPaginaAtual(1);
-                  }}
+                  disabled
                 >
                   <option value="recebimento">Data de Recebimento</option>
-                  <option value="entrega">Data de Entrega</option>
                 </Select>
               </div>
 
@@ -1448,7 +1873,6 @@ export default function CicloPedidoPage() {
                   value={filtroEntrega}
                   onChange={(e) => { setFiltroEntrega(e.target.value); setPaginaAtual(1); }}
                 >
-                  <option value="entrega_fechados">Entrega e Fechados</option>
                   <option value="entrega">Somente Entrega</option>
                   <option value="nao_entrega">Não Entrega</option>
                   <option value="todos">Todos os Pedidos</option>
@@ -1566,8 +1990,21 @@ export default function CicloPedidoPage() {
             </div>
           )}
         </Card>
+        )}
 
-        {/* Tabela de Pedidos */}
+        {renderTabelaPedidos(
+          pedidosEntrega,
+          'Pedidos de entrega',
+          'Nenhum pedido de entrega encontrado para o período selecionado.'
+        )}
+
+        {renderTabelaPedidos(
+          pedidosNoAto,
+          'Pedidos retira no ato',
+          'Nenhum pedido de retirada no ato encontrado para o período selecionado.'
+        )}
+
+        <div className="hidden">
         <Card noPadding className="relative min-h-[400px]">
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-left">
@@ -1802,7 +2239,7 @@ export default function CicloPedidoPage() {
                 variant="secondary" 
                 size="sm" 
                 iconLeft={<ChevronLeft className="w-4 h-4" />}
-                onClick={() => setPaginaAtual(p => Math.max(1, p - 1))}
+                onClick={() => setPaginaAtual((p: number) => Math.max(1, p - 1))}
                 disabled={paginaAtual === 1 || loading}
               >
                 Anterior
@@ -1816,7 +2253,7 @@ export default function CicloPedidoPage() {
                 variant="secondary" 
                 size="sm" 
                 iconRight={<ChevronRight className="w-4 h-4" />}
-                onClick={() => setPaginaAtual(p => Math.min(totalPaginas, p + 1))}
+                onClick={() => setPaginaAtual((p: number) => Math.min(totalPaginas, p + 1))}
                 disabled={paginaAtual === totalPaginas || loading}
               >
                 Próxima
@@ -1868,6 +2305,9 @@ export default function CicloPedidoPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-4">
                 <h4 className="text-sm font-bold text-textMain uppercase tracking-wider border-b border-slate-100 pb-2">Informações Gerais</h4>
+                {loadingPedidoDetalhes && (
+                  <p className="text-xs text-textMuted">Atualizando dados completos da logística...</p>
+                )}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <p className="text-[10px] text-textMuted uppercase font-bold">Cliente</p>

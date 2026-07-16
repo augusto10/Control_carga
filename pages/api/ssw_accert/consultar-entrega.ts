@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
-import { apiExternaService, type ApuracaoExterna } from '@/services/api-externa';
-import { consultarNotaFiscal, trackingDanfe } from '@/services/sswClient';
+import { apiExternaService } from '@/services/api-externa';
+import { trackingDanfe } from '@/services/sswClient';
 
 const DELIVERY_STATUSES = [
   'EM_PREPARACAO',
@@ -17,6 +17,9 @@ type DeliveryTrackingInfo = {
   delivered: boolean;
   status: string | null;
   message: string | null;
+  deliveredAt: string | null;
+  receiverName: string | null;
+  photoUrl: string | null;
 };
 
 type DeliveryItem = {
@@ -38,19 +41,10 @@ type DeliveryItem = {
   sswStatus: string | null;
   sswMensagem: string | null;
   observacaoStatus: string | null;
+  dataHoraEntrega: string | null;
+  recebedor: string | null;
+  fotoEntregaUrl: string | null;
 };
-
-function addDays(dateRef: string, days: number): string {
-  const date = new Date(`${dateRef}T12:00:00`);
-  date.setDate(date.getDate() + days);
-  return date.toISOString().slice(0, 10);
-}
-
-function getDateInSaoPaulo(date = new Date()): string {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/Sao_Paulo',
-  }).format(date);
-}
 
 function pickString(...values: Array<unknown>): string | null {
   for (const value of values) {
@@ -97,12 +91,6 @@ function normalizeFreeText(value: string | null | undefined): string {
     .trim();
 }
 
-function parseDate(value: unknown): Date | null {
-  if (!value) return null;
-  const parsed = new Date(String(value));
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
-}
-
 function extractPedidoId(pedido: Record<string, unknown>): number {
   return (
     pickNumber(
@@ -140,6 +128,28 @@ function extractPedidoCnpj(pedido: Record<string, unknown>): string | null {
   return digits || raw;
 }
 
+function extractVendedorLabel(pedido: Record<string, unknown>): string {
+  const nome = pickString(
+    pedido.VENDEDOR_NOME,
+    pedido.NOME_VENDEDOR,
+    pedido.NOME_REPRESENTANTE,
+    pedido.REPRESENTANTE,
+    pedido.VENDEDOR,
+    pedido.NOME
+  );
+
+  if (nome) return nome;
+
+  const codigo = pickString(
+    pedido.VENDEDOR_ID,
+    pedido.COD_VENDEDOR,
+    pedido.CODIGO_VENDEDOR,
+    pedido.REPRESENTANTE_ID
+  );
+
+  return codigo ? `Vendedor ${codigo}` : 'Sem representante';
+}
+
 function matchesPedidoQuery(
   pedido: Record<string, unknown>,
   numeroPedido: string
@@ -152,6 +162,8 @@ function matchesPedidoQuery(
     pickString(pedido.numero_pedido),
     pickString(pedido.ORCAMENTO_ID),
     pickString(pedido.orcamento_id),
+    pickString(pedido.ORCAMENTO_BASE_ID),
+    pickString(pedido.orcamento_base_id),
     pickString(pedido.ORCAMENTO),
     pickString(pedido.PEDIDO_ID),
     pickString(pedido.pedido_id),
@@ -182,120 +194,96 @@ function getStatusLabel(status: DeliveryStatus): string {
 
 function extractNumeroNotaFromExternalNota(nota: Record<string, unknown> | null): string | null {
   if (!nota) return null;
+  const notaFiscal =
+    (nota.nota_fiscal as Record<string, unknown> | undefined) ||
+    (nota.notaFiscal as Record<string, unknown> | undefined) ||
+    nota;
+
   return pickString(
-    nota.NUMERO_NOTA,
-    nota.numero,
-    nota.NUMERO,
-    nota.numeroNota,
-    nota.NOTA_FISCAL_NUMERO,
-    nota.NF_NUMERO
+    notaFiscal.NUMERO_NOTA,
+    notaFiscal.NUMERO_NOTA_FISCAL,
+    notaFiscal.numero,
+    notaFiscal.NUMERO,
+    notaFiscal.numeroNota,
+    notaFiscal.NOTA_FISCAL_NUMERO,
+    notaFiscal.NF_NUMERO
   );
 }
 
-function enrichPedidoWithApuracao(
-  pedido: Record<string, unknown>,
-  apuracao?: ApuracaoExterna
-): Record<string, unknown> {
-  if (!apuracao) return pedido;
+function extractNotaFiscalId(value: Record<string, unknown> | null | undefined): number | null {
+  if (!value) return null;
 
-  return {
-    ...pedido,
-    NUMERO_NOTA:
-      pickString(
-        pedido.NUMERO_NOTA,
-        apuracao.NUMERO_NOTA,
-        (apuracao as Record<string, unknown>).NUMERO_NOTA_FISCAL
-      ) || null,
-    IDENTIFICACAO_NFE:
-      pickString(
-        pedido.IDENTIFICACAO_NFE,
-        apuracao.IDENTIFICACAO_NFE,
-        (apuracao as Record<string, unknown>).CHAVE_NFE
-      ) || null,
-  };
+  const notaFiscal =
+    (value.nota_fiscal as Record<string, unknown> | undefined) ||
+    (value.notaFiscal as Record<string, unknown> | undefined) ||
+    value;
+
+  return (
+    pickNumber(
+      value.NOTA_FISCAL_ID,
+      value.nota_fiscal_id,
+      value.ID_NOTA_FISCAL,
+      value.id_nota_fiscal,
+      notaFiscal.NOTA_FISCAL_ID,
+      notaFiscal.ID_NOTA_FISCAL,
+      notaFiscal.ID,
+      notaFiscal.id
+    ) || null
+  );
 }
 
-function enrichPedidoWithNotaFiscal(
+function enrichPedidoWithNotaFiscalCompleta(
   pedido: Record<string, unknown>,
   nota?: Record<string, unknown> | null
 ): Record<string, unknown> {
   if (!nota) return pedido;
 
+  const notaFiscal =
+    (nota.nota_fiscal as Record<string, unknown> | undefined) ||
+    (nota.notaFiscal as Record<string, unknown> | undefined) ||
+    nota;
+  const pedidoDaNota =
+    (nota.pedido as Record<string, unknown> | undefined) ||
+    (nota.pedido_venda as Record<string, unknown> | undefined) ||
+    null;
+
   return {
     ...pedido,
+    ...(pedidoDaNota || {}),
+    NOTA_FISCAL_ID: extractNotaFiscalId(nota) ?? extractNotaFiscalId(pedido),
     NUMERO_NOTA:
       pickString(
         pedido.NUMERO_NOTA,
         pedido.NUMERO_NOTA_FISCAL,
-        nota.NUMERO_NOTA,
-        nota.numero,
-        nota.NUMERO
+        notaFiscal.NUMERO_NOTA,
+        notaFiscal.NUMERO_NOTA_FISCAL,
+        notaFiscal.numero,
+        notaFiscal.NUMERO
       ) || null,
     IDENTIFICACAO_NFE:
       pickString(
         pedido.IDENTIFICACAO_NFE,
         pedido.CHAVE_NFE,
-        nota.IDENTIFICACAO_NFE,
-        nota.CHAVE_NFE,
-        nota.chave
+        notaFiscal.IDENTIFICACAO_NFE,
+        notaFiscal.CHAVE_NFE,
+        notaFiscal.CHAVE,
+        notaFiscal.chave
       ) || null,
-  };
-}
-
-function enrichPedidoWithExternalNota(
-  pedido: Record<string, unknown>,
-  nota?: Record<string, unknown> | null
-): Record<string, unknown> {
-  if (!nota) return pedido;
-
-  return {
-    ...pedido,
-    NUMERO_NOTA:
+    DATA_EMISSAO:
       pickString(
-        pedido.NUMERO_NOTA,
-        pedido.NUMERO_NOTA_FISCAL,
-        nota.NUMERO_NOTA,
-        nota.NUMERO_NOTA_FISCAL,
-        nota.numero,
-        nota.NUMERO
+        pedido.DATA_EMISSAO,
+        notaFiscal.DATA_EMISSAO,
+        notaFiscal.data_emissao,
+        notaFiscal.DATA_HORA_EMISSAO
       ) || null,
-    IDENTIFICACAO_NFE:
-      pickString(
-        pedido.IDENTIFICACAO_NFE,
-        pedido.CHAVE_NFE,
-        nota.IDENTIFICACAO_NFE,
-        nota.CHAVE_NFE,
-        nota.chave
-      ) || null,
-  };
-}
-
-function enrichPedidoWithLocalNotaPorPedido(
-  pedido: Record<string, unknown>,
-  notaLocalPorPedido?: {
-    numeroNota: string;
-    codigo: string;
-    controleId: string | null;
-    controleDataCriacao: Date | null;
-    controleTransportadora: string | null;
-  } | null
-): Record<string, unknown> {
-  if (!notaLocalPorPedido) return pedido;
-
-  return {
-    ...pedido,
-    NUMERO_NOTA:
-      pickString(
-        pedido.NUMERO_NOTA,
-        pedido.NUMERO_NOTA_FISCAL,
-        notaLocalPorPedido.numeroNota
-      ) || null,
-    IDENTIFICACAO_NFE:
-      pickString(
-        pedido.IDENTIFICACAO_NFE,
-        pedido.CHAVE_NFE,
-        notaLocalPorPedido.codigo
-      ) || null,
+    VALOR_TOTAL_NOTA:
+      pickNumber(
+        pedido.VALOR_TOTAL_NOTA,
+        notaFiscal.VALOR_TOTAL_NOTA,
+        notaFiscal.VALOR_TOTAL,
+        notaFiscal.valor_total,
+        notaFiscal.valor
+      ) ?? null,
   };
 }
 
@@ -339,6 +327,46 @@ function parseTrackingEventDateMs(event: Record<string, unknown>): number {
 
   const parsed = new Date(raw);
   return Number.isNaN(parsed.getTime()) ? -1 : parsed.getTime();
+}
+
+function extractTrackingEventPhotoUrl(event: Record<string, unknown> | null | undefined): string | null {
+  if (!event) return null;
+  return (
+    pickString(
+      event.foto,
+      event.FOTO,
+      event.imagem,
+      event.IMAGEM,
+      event.comprovante,
+      event.COMPROVANTE,
+      event.url_foto,
+      event.URL_FOTO,
+      event.link_foto,
+      event.LINK_FOTO,
+      event.url_imagem,
+      event.URL_IMAGEM,
+      event.pod,
+      event.POD
+    ) || null
+  );
+}
+
+function extractTrackingEventReceiver(event: Record<string, unknown> | null | undefined): string | null {
+  if (!event) return null;
+  return (
+    pickString(
+      event.recebedor,
+      event.RECEBEDOR,
+      event.nome_recebedor,
+      event.NOME_RECEBEDOR,
+      event.recebido_por,
+      event.RECEBIDO_POR,
+      event.destinatario,
+      event.DESTINATARIO,
+      event.nome_destinatario,
+      event.NOME_DESTINATARIO
+    ) || null
+  );
 }
 
 function isTrackingEventLike(value: unknown): value is Record<string, unknown> {
@@ -439,6 +467,28 @@ function parseTrackingInfo(data: Record<string, unknown>): DeliveryTrackingInfo 
     normalized.includes('recebido pelo destinatario') ||
     normalized.includes('baixado');
 
+  const deliveredEvent = delivered
+    ? [...events]
+        .reverse()
+        .find((event) =>
+          normalizeFreeText(
+            `${pickString(event.ocorrencia, event.OCORRENCIA, event.descricao, event.DESCRICAO) || ''}`
+          ).match(/entregue|entrega realizada|mercadoria entregue|recebido pelo destinatario|baixado/)
+        ) || latestEvent
+    : null;
+
+  const deliveredAt =
+    pickString(
+      deliveredEvent?.data_hora_efetiva,
+      deliveredEvent?.DATA_HORA_EFETIVA,
+      deliveredEvent?.data_hora,
+      deliveredEvent?.DATA_HORA,
+      deliveredEvent?.data_entrega,
+      deliveredEvent?.DATA_ENTREGA
+    ) || null;
+  const receiverName = extractTrackingEventReceiver(deliveredEvent);
+  const photoUrl = extractTrackingEventPhotoUrl(deliveredEvent);
+
   const notFound =
     normalized.includes('nenhum documento localizado') ||
     normalized.includes('nenhum documento') ||
@@ -451,6 +501,9 @@ function parseTrackingInfo(data: Record<string, unknown>): DeliveryTrackingInfo 
     delivered,
     status,
     message,
+    deliveredAt,
+    receiverName,
+    photoUrl,
   };
 }
 
@@ -478,32 +531,19 @@ async function mapWithConcurrency<T, R>(
   return results;
 }
 
-async function fetchConsultaNotasFiscais(
-  filtros: {
-    data_inicio?: string;
-    data_fim?: string;
-    search?: string;
-    pedido?: string;
-    numero_pedido?: string;
-    cnpj?: string;
-    tipo_data?: string;
-    tipo_entrega?: string;
-    status?: string;
-  },
+async function fetchNotasFiscaisCompletasPorFiltro(
+  matches: (item: Record<string, unknown>) => boolean,
   username: string,
-  password: string
+  password: string,
+  stopOnFirstMatch: boolean
 ): Promise<Array<Record<string, unknown>> | null> {
-  const limit = 100;
+  const limit = 500;
   const resultados: Array<Record<string, unknown>> = [];
-  const seen = new Set<number>();
+  const seen = new Set<number | string>();
 
-  for (let offset = 0; offset < 1000; offset += limit) {
-    const resultado = await apiExternaService.listarConsultaNotasFiscais(
-      {
-        ...filtros,
-        limit,
-        offset,
-      },
+  for (let offset = 0; offset < 2500; offset += limit) {
+    const resultado = await apiExternaService.listarNotasFiscaisCompletas(
+      { limit, offset },
       username,
       password
     );
@@ -511,14 +551,15 @@ async function fetchConsultaNotasFiscais(
     if (!resultado) return null;
 
     const page = Array.isArray(resultado.data) ? resultado.data : [];
-    for (const item of page) {
-      const pedidoId = extractPedidoId(item);
-      const dedupeKey = pedidoId || resultados.length + 1;
+    const encontrados = page.filter(matches);
+    for (const item of encontrados) {
+      const dedupeKey = extractNotaFiscalId(item) || `${extractPedidoId(item)}-${resultados.length}`;
       if (seen.has(dedupeKey)) continue;
       seen.add(dedupeKey);
       resultados.push(item);
     }
 
+    if (stopOnFirstMatch && resultados.length > 0) break;
     if (page.length < limit) break;
     if (typeof resultado.total === 'number' && resultado.total > 0 && offset + page.length >= resultado.total) break;
   }
@@ -531,76 +572,15 @@ async function fetchPedidosPorPedido(
   username: string,
   password: string
 ): Promise<Array<Record<string, unknown>>> {
-  const pedidosConsolidados = await fetchConsultaNotasFiscais(
-    {
-      search: numeroPedido,
-      pedido: numeroPedido,
-      numero_pedido: numeroPedido,
-    },
+  const pedidosConsolidados = await fetchNotasFiscaisCompletasPorFiltro(
+    (item) => matchesPedidoQuery(item, numeroPedido),
     username,
-    password
+    password,
+    true
   );
 
-  if (pedidosConsolidados) {
-    const encontrados = pedidosConsolidados.filter((pedido) => matchesPedidoQuery(pedido, numeroPedido));
-    if (encontrados.length > 0) return encontrados;
-  }
-
-  const candidatos = new Map<number, Record<string, unknown>>();
-
-  const pedidosDiretos = await apiExternaService.buscarPedidoPorNumero(numeroPedido, username, password);
-  if (Array.isArray(pedidosDiretos)) {
-    for (const pedido of pedidosDiretos as Array<Record<string, unknown>>) {
-      const pedidoId = extractPedidoId(pedido);
-      candidatos.set(pedidoId || candidatos.size + 1, pedido);
-    }
-  }
-
-  const limit = 100;
-  const dateFrom = addDays(getDateInSaoPaulo(), -480);
-  const dateTo = addDays(getDateInSaoPaulo(), 300);
-  let totalDisponivel = Number.POSITIVE_INFINITY;
-
-  for (let offset = 0; offset < totalDisponivel; offset += limit) {
-    const resultadoBusca = await apiExternaService.listarPedidos(
-      {
-        data_inicio: dateFrom,
-        data_fim: dateTo,
-        search: numeroPedido,
-        limit,
-        offset,
-      },
-      username,
-      password
-    );
-
-    const page = Array.isArray(resultadoBusca?.data)
-      ? (resultadoBusca.data as Array<Record<string, unknown>>)
-      : [];
-    totalDisponivel =
-      typeof resultadoBusca?.total === 'number' && resultadoBusca.total > 0
-        ? resultadoBusca.total
-        : offset + page.length;
-
-    for (const pedido of page) {
-      const pedidoId = extractPedidoId(pedido);
-      candidatos.set(pedidoId || candidatos.size + 1, pedido);
-    }
-
-    if (page.some((pedido) => matchesPedidoQuery(pedido, numeroPedido))) {
-      break;
-    }
-
-    if (page.length < limit) {
-      break;
-    }
-
-    if (offset >= 1000 && candidatos.size === 0) {
-      break;
-    }
-  }
-
-  return Array.from(candidatos.values()).filter((pedido) => matchesPedidoQuery(pedido, numeroPedido));
+  if (pedidosConsolidados?.length) return pedidosConsolidados;
+  return [];
 }
 
 async function fetchPedidosPorCnpj(
@@ -608,286 +588,30 @@ async function fetchPedidosPorCnpj(
   username: string,
   password: string
 ): Promise<Array<Record<string, unknown>>> {
-  const dateTo = getDateInSaoPaulo();
-  const dateFrom = addDays(dateTo, -60);
-  const pedidosConsolidados = await fetchConsultaNotasFiscais(
-    {
-      data_inicio: dateFrom,
-      data_fim: dateTo,
-      tipo_data: 'recebimento',
-      tipo_entrega: 'EPG',
-      search: cnpj,
-      cnpj,
-    },
+  const pedidosConsolidados = await fetchNotasFiscaisCompletasPorFiltro(
+    (item) => extractPedidoCnpj(item) === cnpj,
     username,
-    password
+    password,
+    false
   );
 
-  if (pedidosConsolidados) {
-    const encontrados = pedidosConsolidados.filter((pedido) => extractPedidoCnpj(pedido) === cnpj);
-    if (encontrados.length > 0) return encontrados;
-  }
-
-  const pedidos: Array<Record<string, unknown>> = [];
-  const seen = new Set<number>();
-  const limit = 100;
-
-  for (let offset = 0; offset < 1000; offset += limit) {
-    const resultado = await apiExternaService.listarPedidos(
-      {
-        data_inicio: dateFrom,
-        data_fim: dateTo,
-        tipo_data: 'recebimento',
-        tipo_entrega: 'EPG',
-        search: cnpj,
-        limit,
-        offset,
-      },
-      username,
-      password
-    );
-
-    const page = Array.isArray(resultado?.data)
-      ? resultado.data.filter((pedido) => extractPedidoCnpj(pedido as Record<string, unknown>) === cnpj)
-      : [];
-
-    for (const item of page) {
-      const pedidoId = extractPedidoId(item as Record<string, unknown>);
-      if (!pedidoId || seen.has(pedidoId)) continue;
-      seen.add(pedidoId);
-      pedidos.push(item as Record<string, unknown>);
-    }
-
-    if (!resultado?.data?.length || (resultado.data?.length ?? 0) < limit) break;
-  }
-
-  return pedidos;
+  if (pedidosConsolidados?.length) return pedidosConsolidados;
+  return [];
 }
 
-function getSearchWindow(pedidos: Array<Record<string, unknown>>): { dataInicio: string; dataFim: string } {
-  const dates = pedidos
-    .map((pedido) =>
-      parseDate(
-        pickString(
-          pedido.DATA_HORA_RECEBIMENTO,
-          pedido.DATA_RECEBIMENTO,
-          pedido.DATA_HORA_CADASTRO,
-          pedido.DATA_CADASTRO
-        )
-      )
-    )
-    .filter((value): value is Date => Boolean(value));
-
-  if (dates.length === 0) {
-    const dataFim = getDateInSaoPaulo();
-    return {
-      dataInicio: addDays(dataFim, -60),
-      dataFim,
-    };
-  }
-
-  const minDate = new Date(Math.min(...dates.map((date) => date.getTime())));
-  const maxDate = new Date(Math.max(...dates.map((date) => date.getTime())));
-
-  return {
-    dataInicio: addDays(minDate.toISOString().slice(0, 10), -7),
-    dataFim: addDays(maxDate.toISOString().slice(0, 10), 10),
-  };
-}
-
-async function fetchApuracoesFallback(
+async function fetchNotasFiscaisCompletas(
   pedidos: Array<Record<string, unknown>>,
-  username: string,
-  password: string,
-  dataInicio: string,
-  dataFim: string
-): Promise<Map<number, ApuracaoExterna>> {
-  const missingIds = pedidos
-    .filter((pedido) => {
-      const numeroNota = pickString(pedido.NUMERO_NOTA, pedido.NUMERO_NOTA_FISCAL);
-      const chave = pickString(pedido.IDENTIFICACAO_NFE, pedido.CHAVE_NFE);
-      return !numeroNota || onlyDigits(chave).length !== 44;
-    })
-    .map(extractPedidoId)
-    .filter((id) => id > 0);
-
-  if (missingIds.length === 0) return new Map<number, ApuracaoExterna>();
-
-  const missingSet = new Set(missingIds);
-  const apuracaoMap = new Map<number, ApuracaoExterna>();
-  const batchLimit = 200;
-
-  for (let offset = 0; offset < 5000; offset += batchLimit) {
-    const resultado = await apiExternaService.listarApuracoes(
-      { data_inicio: dataInicio, data_fim: dataFim, limit: batchLimit, offset },
-      username,
-      password
-    );
-
-    const itens = resultado?.data || [];
-    if (itens.length === 0) break;
-
-    for (const apuracao of itens) {
-      const id =
-        pickNumber(
-          apuracao.ORCAMENTO_BASE_ID,
-          (apuracao as Record<string, unknown>).ORCAMENTO_ID,
-          (apuracao as Record<string, unknown>).ORCAMENTO
-        ) || 0;
-
-      if (id > 0 && missingSet.has(id) && !apuracaoMap.has(id)) {
-        apuracaoMap.set(id, apuracao);
-      }
-    }
-
-    if (itens.length < batchLimit || apuracaoMap.size >= missingSet.size) break;
-  }
-
-  return apuracaoMap;
-}
-
-async function fetchNotasFiscaisFallback(
-  pedidos: Array<Record<string, unknown>>,
-  username: string,
-  password: string,
-  dataInicio: string,
-  dataFim: string
+  _username: string,
+  _password: string
 ): Promise<Map<number, Record<string, unknown>>> {
-  const pendingIds = pedidos
-    .filter((pedido) => {
-      const numeroNota = pickString(pedido.NUMERO_NOTA, pedido.NUMERO_NOTA_FISCAL);
-      const chave = onlyDigits(pickString(pedido.IDENTIFICACAO_NFE, pedido.CHAVE_NFE));
-      return !numeroNota || chave.length !== 44;
-    })
-    .map(extractPedidoId)
-    .filter((id) => id > 0);
+  const notasJaCompletas = new Map<number, Record<string, unknown>>();
 
-  if (pendingIds.length === 0) return new Map<number, Record<string, unknown>>();
-
-  const pendingSet = new Set(pendingIds);
-  const notaMap = new Map<number, Record<string, unknown>>();
-
-  const notas = await apiExternaService.listarNotasFiscais(
-    { dataInicio, dataFim },
-    username,
-    password
-  );
-
-  for (const nota of notas) {
-    const notaRecord = nota as unknown as Record<string, unknown>;
-    const pedidoId =
-      pickNumber(
-        notaRecord.ORCAMENTO_BASE_ID,
-        notaRecord.ORCAMENTO_ID,
-        notaRecord.PEDIDO_ID
-      ) || 0;
-
-    if (pedidoId > 0 && pendingSet.has(pedidoId) && !notaMap.has(pedidoId)) {
-      notaMap.set(pedidoId, notaRecord);
-    }
+  for (const pedido of pedidos) {
+    const notaFiscalId = extractNotaFiscalId(pedido);
+    if (notaFiscalId) notasJaCompletas.set(notaFiscalId, pedido);
   }
 
-  return notaMap;
-}
-
-async function fetchLocalNotasPorPedidoIds(
-  dataInicio: string,
-  dataFim: string,
-  pedidoIds: number[]
-): Promise<
-  Map<
-    number,
-    {
-      numeroNota: string;
-      codigo: string;
-      controleId: string | null;
-      controleDataCriacao: Date | null;
-      controleTransportadora: string | null;
-    }
-  >
-> {
-  const targetIds = Array.from(new Set(pedidoIds.filter((id) => id > 0)));
-  if (targetIds.length === 0) {
-    return new Map();
-  }
-
-  const notasLocais = await prisma.notaFiscal.findMany({
-    where: {
-      dataCriacao: {
-        gte: new Date(`${dataInicio}T00:00:00-03:00`),
-        lte: new Date(`${dataFim}T23:59:59-03:00`),
-      },
-      controleId: {
-        not: null,
-      },
-    },
-    orderBy: {
-      dataCriacao: 'desc',
-    },
-    include: {
-      controle: {
-        select: {
-          id: true,
-          dataCriacao: true,
-          transportadora: true,
-        },
-      },
-    },
-  });
-
-  const notasComCodigo = notasLocais.filter((nota) => onlyDigits(nota.codigo).length === 44);
-  const targetSet = new Set(targetIds);
-  const foundIds = new Set<number>();
-  const externalEntries = await mapWithConcurrency(notasComCodigo, 12, async (nota) => {
-    if (foundIds.size >= targetSet.size) {
-      return null;
-    }
-
-    try {
-      const external = await consultarNotaFiscal(onlyDigits(nota.codigo));
-      const pedidoId =
-        pickNumber(
-          external.ORCAMENTO_BASE_ID,
-          external.ORCAMENTO_ID,
-          external.PEDIDO_ID
-        ) || 0;
-
-      if (!pedidoId || !targetSet.has(pedidoId) || foundIds.has(pedidoId)) return null;
-      foundIds.add(pedidoId);
-
-      return [
-        pedidoId,
-        {
-          numeroNota: nota.numeroNota,
-          codigo: nota.codigo,
-          controleId: nota.controleId,
-          controleDataCriacao: nota.controle?.dataCriacao || null,
-          controleTransportadora: nota.controle?.transportadora
-            ? String(nota.controle.transportadora)
-            : null,
-        },
-      ] as const;
-    } catch {
-      return null;
-    }
-  });
-
-  return new Map(
-    externalEntries.filter(
-      (
-        entry
-      ): entry is readonly [
-        number,
-        {
-          numeroNota: string;
-          codigo: string;
-          controleId: string | null;
-          controleDataCriacao: Date | null;
-          controleTransportadora: string | null;
-        },
-      ] => Boolean(entry)
-    )
-  );
+  return notasJaCompletas;
 }
 
 export default async function handler(
@@ -921,50 +645,17 @@ export default async function handler(
       return res.status(200).json({ data: [] });
     }
 
-    const { dataInicio, dataFim } = getSearchWindow(pedidosBase);
-    const apuracaoMap = await fetchApuracoesFallback(pedidosBase, username, password, dataInicio, dataFim);
-    const pedidosComApuracao = pedidosBase.map((pedido) =>
-      enrichPedidoWithApuracao(pedido, apuracaoMap.get(extractPedidoId(pedido)))
-    );
-
-    const notaFiscalMap = await fetchNotasFiscaisFallback(
-      pedidosComApuracao,
+    const pedidosComNotas = pedidosBase;
+    const notasFiscaisCompletasMap = await fetchNotasFiscaisCompletas(
+      pedidosComNotas,
       username,
-      password,
-      dataInicio,
-      dataFim
+      password
     );
-    const pedidosComNotas = pedidosComApuracao.map((pedido) =>
-      enrichPedidoWithNotaFiscal(pedido, notaFiscalMap.get(extractPedidoId(pedido)))
-    );
-
-    const keysSemNumeroNota = Array.from(
-      new Set(
-        pedidosComNotas
-          .filter((pedido) => {
-            const chave = onlyDigits(pickString(pedido.IDENTIFICACAO_NFE, pedido.CHAVE_NFE));
-            const numeroNota = pickString(pedido.NUMERO_NOTA, pedido.NUMERO_NOTA_FISCAL);
-            return chave.length === 44 && !numeroNota;
-          })
-          .map((pedido) => onlyDigits(pickString(pedido.IDENTIFICACAO_NFE, pedido.CHAVE_NFE)))
-          .filter((chave) => chave.length === 44)
-      )
-    );
-
-    const notaExternaEntries = await mapWithConcurrency(keysSemNumeroNota, 8, async (chave) => {
-      try {
-        const nota = await consultarNotaFiscal(chave);
-        return [chave, nota as Record<string, unknown>] as const;
-      } catch {
-        return [chave, null] as const;
-      }
-    });
-    const notaExternaMap = new Map<string, Record<string, unknown> | null>(notaExternaEntries);
 
     const pedidosResolvidos = pedidosComNotas.map((pedido) =>
-      enrichPedidoWithExternalNota(
+      enrichPedidoWithNotaFiscalCompleta(
         pedido,
-        notaExternaMap.get(onlyDigits(pickString(pedido.IDENTIFICACAO_NFE, pedido.CHAVE_NFE))) || null
+        notasFiscaisCompletasMap.get(extractNotaFiscalId(pedido) || 0)
       )
     );
 
@@ -977,7 +668,7 @@ export default async function handler(
           pedido.NUMERO_NOTA,
           pedido.NUMERO_NOTA_FISCAL,
           extractNumeroNotaFromExternalNota(
-            notaExternaMap.get(onlyDigits(pickString(pedido.IDENTIFICACAO_NFE, pedido.CHAVE_NFE))) || null
+            notasFiscaisCompletasMap.get(extractNotaFiscalId(pedido) || 0) || null
           )
         ) || null;
 
@@ -1026,35 +717,7 @@ export default async function handler(
         process.env.SSW_ACCERT_PASSWORD
     );
 
-    const pedidosPendentesPorPedido = pedidosResolvidos.filter((pedido) => {
-      const numeroNota =
-        pickString(
-          pedido.NUMERO_NOTA,
-          pedido.NUMERO_NOTA_FISCAL,
-          extractNumeroNotaFromExternalNota(
-            notaExternaMap.get(onlyDigits(pickString(pedido.IDENTIFICACAO_NFE, pedido.CHAVE_NFE))) || null
-          )
-        ) || null;
-      const chave = onlyDigits(pickString(pedido.IDENTIFICACAO_NFE, pedido.CHAVE_NFE));
-      const notaLocal =
-        (numeroNota ? notaPorNumero.get(normalizeNumeroNota(numeroNota)) : undefined) ||
-        notaPorCodigo.get(chave);
-
-      return !notaLocal?.controleId;
-    });
-
-    const localNotasPorPedidoMap = await fetchLocalNotasPorPedidoIds(
-      dataInicio,
-      dataFim,
-      pedidosPendentesPorPedido.map(extractPedidoId)
-    );
-
-    const pedidosComNotasLocaisPorPedido = pedidosResolvidos.map((pedido) =>
-      enrichPedidoWithLocalNotaPorPedido(
-        pedido,
-        localNotasPorPedidoMap.get(extractPedidoId(pedido)) || null
-      )
-    );
+    const pedidosComNotasLocaisPorPedido = pedidosResolvidos;
 
     const chavesComControle = Array.from(
       new Set(
@@ -1065,16 +728,14 @@ export default async function handler(
                 pedido.NUMERO_NOTA,
                 pedido.NUMERO_NOTA_FISCAL,
                 extractNumeroNotaFromExternalNota(
-                  notaExternaMap.get(onlyDigits(pickString(pedido.IDENTIFICACAO_NFE, pedido.CHAVE_NFE))) || null
+                  notasFiscaisCompletasMap.get(extractNotaFiscalId(pedido) || 0) || null
                 )
               ) || null;
             const chave = onlyDigits(pickString(pedido.IDENTIFICACAO_NFE, pedido.CHAVE_NFE));
             const notaLocal =
               (numeroNota ? notaPorNumero.get(normalizeNumeroNota(numeroNota)) : undefined) ||
               notaPorCodigo.get(chave);
-            const pedidoId = extractPedidoId(pedido);
-            const notaLocalPorPedido = localNotasPorPedidoMap.get(pedidoId);
-            const controleIdResolvido = notaLocal?.controleId || notaLocalPorPedido?.controleId || null;
+            const controleIdResolvido = notaLocal?.controleId || null;
 
             if (!controleIdResolvido || chave.length !== 44 || !sswEnabled) {
               return null;
@@ -1092,13 +753,16 @@ export default async function handler(
         if (tracking.erro) {
           return [
             chave,
-            {
-              found: false,
-              delivered: false,
-              status: null,
-              message: pickString(tracking.mensagem, (tracking as Record<string, unknown>).MENSAGEM),
-            } satisfies DeliveryTrackingInfo,
-          ] as const;
+          {
+            found: false,
+            delivered: false,
+            status: null,
+            message: pickString(tracking.mensagem, (tracking as Record<string, unknown>).MENSAGEM),
+            deliveredAt: null,
+            receiverName: null,
+            photoUrl: null,
+          } satisfies DeliveryTrackingInfo,
+        ] as const;
         }
 
         return [chave, parseTrackingInfo(tracking)] as const;
@@ -1110,6 +774,9 @@ export default async function handler(
             delivered: false,
             status: null,
             message: error instanceof Error ? error.message : 'Erro ao consultar SSW',
+            deliveredAt: null,
+            receiverName: null,
+            photoUrl: null,
           } satisfies DeliveryTrackingInfo,
         ] as const;
       }
@@ -1123,7 +790,7 @@ export default async function handler(
           pedido.NUMERO_NOTA,
           pedido.NUMERO_NOTA_FISCAL,
           extractNumeroNotaFromExternalNota(
-            notaExternaMap.get(onlyDigits(pickString(pedido.IDENTIFICACAO_NFE, pedido.CHAVE_NFE))) || null
+            notasFiscaisCompletasMap.get(extractNotaFiscalId(pedido) || 0) || null
           )
         ) || null;
 
@@ -1135,12 +802,9 @@ export default async function handler(
       const notaLocal =
         (numeroNota ? notaPorNumero.get(normalizeNumeroNota(numeroNota)) : undefined) ||
         (identificacaoNfe ? notaPorCodigo.get(identificacaoNfe) : undefined);
-      const notaLocalPorPedido = localNotasPorPedidoMap.get(pedidoId);
-      const controleIdResolvido = notaLocal?.controleId || notaLocalPorPedido?.controleId || null;
-      const controleDataCriacaoResolvida =
-        notaLocal?.controle?.dataCriacao || notaLocalPorPedido?.controleDataCriacao || null;
-      const controleTransportadoraResolvida =
-        notaLocal?.controle?.transportadora || notaLocalPorPedido?.controleTransportadora || null;
+      const controleIdResolvido = notaLocal?.controleId || null;
+      const controleDataCriacaoResolvida = notaLocal?.controle?.dataCriacao || null;
+      const controleTransportadoraResolvida = notaLocal?.controle?.transportadora || null;
 
       const tracking = identificacaoNfe ? trackingMap.get(identificacaoNfe) : undefined;
 
@@ -1171,8 +835,7 @@ export default async function handler(
           pickString(pedido.CLIENTE_NOME, pedido.NOME_RAZAO_SOCIAL, pedido.NOME_FANTASIA, pedido.NOME) ||
           'Cliente nao identificado',
         cnpjCpf: extractPedidoCnpj(pedido),
-        vendedorNome:
-          pickString(pedido.VENDEDOR_NOME, pedido.NOME_REPRESENTANTE, pedido.NOME) || 'Sem representante',
+        vendedorNome: extractVendedorLabel(pedido),
         valor:
           pickNumber(
             pedido.VALOR_TOTAL,
@@ -1182,10 +845,13 @@ export default async function handler(
             pedido.VALOR_DUPLICATA
           ) || 0,
         dataHoraCadastro: pickString(
-          pedido.DATA_HORA_CADASTRO,
           pedido.DATA_HORA_RECEBIMENTO,
+          pedido.DATA_RECEBIMENTO,
+          pedido.PEDIDO_DATA_FECHAMENTO,
+          pedido.DATA_HORA_CADASTRO,
+          pedido.PEDIDO_DATA_CADASTRO,
           pedido.DATA_CADASTRO,
-          pedido.DATA_EMISSAO
+          pedido.DATA_HORA_EMISSAO
         ),
         numeroNota,
         identificacaoNfe,
@@ -1197,6 +863,9 @@ export default async function handler(
         sswStatus: tracking?.status || null,
         sswMensagem: tracking?.message || null,
         observacaoStatus,
+        dataHoraEntrega: tracking?.deliveredAt || null,
+        recebedor: tracking?.receiverName || null,
+        fotoEntregaUrl: tracking?.photoUrl || null,
       } satisfies DeliveryItem;
     });
 
