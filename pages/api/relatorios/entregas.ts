@@ -8,7 +8,7 @@ const cache = new Map<string, { expiresAt: number; payload: any }>();
 const inFlight = new Map<string, Promise<any>>();
 const LOGISTICA_CACHE_TTL_MS = 30 * 60_000;
 const logisticaCache = new Map<number, { expiresAt: number; payload: any }>();
-const CACHE_VERSION = 'v4';
+const CACHE_VERSION = 'v7';
 const PERSISTED_CACHE_STALE_MS = 24 * 60 * 60_000;
 
 const persistedCacheKey = (cacheKey: string) =>
@@ -98,15 +98,11 @@ const getPedidoId = (pedido: any) => Number(
   pedido?.id
 );
 
-const getPedidoLogisticaCached = async (
-  pedidoId: number,
-  username: string,
-  password: string
-) => {
+const getPedidoLogisticaCached = async (pedidoId: number, username: string, password: string) => {
   const cached = logisticaCache.get(pedidoId);
   if (cached && cached.expiresAt > Date.now()) return cached.payload;
-  const payload = await apiExternaService.buscarPedidoLogistica(pedidoId, username, password);
-  logisticaCache.set(pedidoId, { expiresAt: Date.now() + LOGISTICA_CACHE_TTL_MS, payload });
+  const payload = await apiExternaService.buscarPedidoLogistica(pedidoId, username, password, 8_000);
+  if (payload) logisticaCache.set(pedidoId, { expiresAt: Date.now() + LOGISTICA_CACHE_TTL_MS, payload });
   return payload;
 };
 
@@ -151,17 +147,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       periodoDias <= 3 ? 300 :
       periodoDias <= 7 ? 500 :
       700;
-    const limiteBuscaFallback =
-      periodoDias <= 1 ? 200 :
-      periodoDias <= 3 ? 400 :
-      periodoDias <= 7 ? 700 :
-      1000;
-
     const carregarPedidos = async (usarFiltroRecebimento: boolean, limiteBusca: number) => {
-      const acumulado: any[] = [];
-      let houveRespostaValida = false;
-      for (let offset = 0; offset < limiteBusca; offset += pageSize) {
-        const page = await apiExternaService.listarPedidos(
+      const carregarPagina = (offset: number) => apiExternaService.listarPedidos(
           usarFiltroRecebimento
             ? {
                 data_inicio: dataInicio,
@@ -174,17 +161,66 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           username,
           password
         );
-        if (!page) {
-          if (!houveRespostaValida) return null;
-          break;
-        }
-        houveRespostaValida = true;
+
+      const acumulado: any[] = [];
+      for (let offset = 0; offset < limiteBusca; offset += pageSize) {
+        const page = await carregarPagina(offset);
+        if (!page) return acumulado.length > 0 ? acumulado : null;
         const items = Array.isArray(page?.data) ? page.data : [];
         if (items.length === 0) break;
         acumulado.push(...items);
         if (items.length < pageSize || (page?.total && offset + items.length >= page.total)) break;
       }
       return acumulado;
+    };
+
+    const carregarPedidosPorLocalizacao = async () => {
+      const carregarPagina = (offset: number) => apiExternaService.listarPedidos(
+        { limit: pageSize, offset }, username, password
+      );
+      const primeira = await carregarPagina(0);
+      if (!primeira) return null;
+
+      const total = Math.max(Number(primeira.total) || pageSize, pageSize);
+      const alvo = new Date(`${dataInicio}T12:00:00`).getTime() +
+        (new Date(`${dataFim}T12:00:00`).getTime() - new Date(`${dataInicio}T12:00:00`).getTime()) / 2;
+      let menorOffset = 0;
+      let maiorOffset = Math.floor((total - 1) / pageSize) * pageSize;
+      let melhorOffset = 0;
+      let melhorDistancia = Number.POSITIVE_INFINITY;
+
+      // A API ignora o filtro de data, mas a listagem é aproximadamente
+      // decrescente. A busca binária localiza qualquer período sem varrer toda a base.
+      for (let tentativa = 0; tentativa < 12 && menorOffset <= maiorOffset; tentativa++) {
+        const meio = Math.floor(((menorOffset + maiorOffset) / 2) / pageSize) * pageSize;
+        const page = meio === 0 ? primeira : await carregarPagina(meio);
+        const datas = (Array.isArray(page?.data) ? page.data : [])
+          .map((pedido: any) => parseDate(pedido.DATA_HORA_RECEBIMENTO ?? pedido.data_hora_recebimento)?.getTime())
+          .filter((value): value is number => typeof value === 'number' && Number.isFinite(value))
+          .sort((a, b) => a - b);
+        if (datas.length === 0) {
+          menorOffset = meio + pageSize;
+          continue;
+        }
+        const mediana = datas[Math.floor(datas.length / 2)];
+        const distancia = Math.abs(mediana - alvo);
+        if (distancia < melhorDistancia) {
+          melhorDistancia = distancia;
+          melhorOffset = meio;
+        }
+        if (mediana > alvo) menorOffset = meio + pageSize;
+        else maiorOffset = meio - pageSize;
+      }
+
+      const margemPaginas = Math.max(4, Math.ceil(periodoDias * 0.8) + 3);
+      const inicio = Math.max(0, melhorOffset - margemPaginas * pageSize);
+      const fim = Math.min(total, melhorOffset + (margemPaginas + 1) * pageSize);
+      const offsets = Array.from(
+        { length: Math.ceil((fim - inicio) / pageSize) },
+        (_, index) => inicio + index * pageSize
+      );
+      const pages = await mapLimit(offsets, 8, (offset) => offset === 0 ? Promise.resolve(primeira) : carregarPagina(offset));
+      return pages.flatMap((page) => Array.isArray(page?.data) ? page.data : []);
     };
 
     const filtrarRecebidos = (pedidosBrutos: any[]) => pedidosBrutos.filter((pedido: any) => {
@@ -195,11 +231,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     let pedidosBrutos = await carregarPedidos(true, limiteBuscaFiltrada);
     let recebidos = Array.isArray(pedidosBrutos) ? filtrarRecebidos(pedidosBrutos) : [];
+    const filtroPeriodoIgnorado = Array.isArray(pedidosBrutos) && pedidosBrutos.some((pedido: any) => {
+      const data = parseDate(pedido.DATA_HORA_RECEBIMENTO ?? pedido.data_hora_recebimento);
+      return data && (dateKey(data) < dataInicio || dateKey(data) > dataFim);
+    });
 
-    if (recebidos.length === 0) {
+    if (recebidos.length === 0 || filtroPeriodoIgnorado) {
       // Fallback para ambientes em que a API ignora o filtro por tipo_data/periodo
       // ou retorna uma janela inicial que ainda nao contem os pedidos recebidos.
-      pedidosBrutos = await carregarPedidos(false, limiteBuscaFallback);
+      pedidosBrutos = await carregarPedidosPorLocalizacao();
       recebidos = Array.isArray(pedidosBrutos) ? filtrarRecebidos(pedidosBrutos) : [];
     }
 
@@ -222,7 +262,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       ['ENT', 'EPG'].includes(String(pedido.TIPO_ENTREGA ?? pedido.tipo_entrega ?? '').trim().toUpperCase())
     );
 
-    const pedidosBase = await mapLimit(recebidosEntrega, 24, async (base: any) => {
+    const pedidosBase = await mapLimit(recebidosEntrega, 12, async (base: any) => {
       const pedidoId = getPedidoId(base);
       const logistica: any = Number.isFinite(pedidoId)
         ? await getPedidoLogisticaCached(pedidoId, username, password)

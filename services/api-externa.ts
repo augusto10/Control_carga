@@ -778,7 +778,8 @@ class APIExternaService {
   async buscarPedidoLogistica(
     pedidoId: number | string,
     username: string,
-    password: string
+    password: string,
+    timeoutMs = API_EXTERNA_TIMEOUT_MS
   ): Promise<PedidoLogisticaExterna | null> {
     try {
       const authenticated = await this.ensureAuthenticated(username, password);
@@ -791,7 +792,8 @@ class APIExternaService {
       console.log('[API Externa] Buscando logística do pedido:', url);
 
       const response = await this.apiInstance.get<PedidoLogisticaExterna>(url, {
-        validateStatus: (status) => status < 500
+        validateStatus: (status) => status < 500,
+        timeout: timeoutMs,
       });
 
       if (response.status >= 400) {

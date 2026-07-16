@@ -150,8 +150,16 @@ export default function RelatorioEntregasPage() {
     try {
       const params = new URLSearchParams({ dataInicio, dataFim });
       const response = await fetch(`/api/relatorios/entregas?${params}`, { credentials: 'include' });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.message || 'Não foi possível gerar o relatório');
+      const contentType = response.headers.get('content-type') || '';
+      const raw = await response.text();
+      let payload: any = null;
+      if (contentType.includes('application/json')) {
+        try { payload = JSON.parse(raw); } catch { /* resposta inválida do proxy */ }
+      }
+      if (!response.ok) {
+        throw new Error(payload?.details || payload?.message || raw.slice(0, 180) || `Erro HTTP ${response.status}`);
+      }
+      if (!payload || typeof payload !== 'object') throw new Error('O servidor retornou uma resposta inválida');
       setDados(payload);
     } catch (error: any) {
       setErro(error?.message || 'Erro ao gerar relatório');
