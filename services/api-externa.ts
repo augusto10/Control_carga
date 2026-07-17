@@ -518,7 +518,8 @@ class APIExternaService {
   async listarNotasFiscaisCompletas(
     filtros: { limit?: number; offset?: number },
     username: string,
-    password: string
+    password: string,
+    timeoutMs = API_EXTERNA_TIMEOUT_MS
   ): Promise<ConsultaNotasFiscaisResponse | null> {
     try {
       const authenticated = await this.ensureAuthenticated(username, password);
@@ -533,7 +534,7 @@ class APIExternaService {
 
       const response = await this.apiInstance.get<ConsultaNotasFiscaisResponse>(
         `/api/v1/notas-fiscais/completas?${params.toString()}`,
-        { validateStatus: (status) => status < 500 }
+        { validateStatus: (status) => status < 500, timeout: timeoutMs }
       );
 
       if (response.status >= 400) {

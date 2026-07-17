@@ -316,7 +316,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (notasProcuradas.size > 0) {
       const limit = 500;
       for (let offset = 0; offset < 5000; offset += limit) {
-        const page = await apiExternaService.listarNotasFiscaisCompletas({ limit, offset }, username, password);
+        // Esta consulta é complementar. Não deixe uma API externa lenta consumir
+        // todo o tempo disponível da função e derrubar o relatório inteiro.
+        const page = await apiExternaService.listarNotasFiscaisCompletas({ limit, offset }, username, password, 6_000);
         const items = Array.isArray(page?.data) ? page.data : [];
         if (items.length === 0) break;
         for (const item of items as any[]) {
