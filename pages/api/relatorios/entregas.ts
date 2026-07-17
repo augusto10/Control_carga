@@ -8,7 +8,7 @@ const cache = new Map<string, { expiresAt: number; payload: any }>();
 const inFlight = new Map<string, Promise<any>>();
 const LOGISTICA_CACHE_TTL_MS = 30 * 60_000;
 const logisticaCache = new Map<number, { expiresAt: number; payload: any }>();
-const CACHE_VERSION = 'v8';
+const CACHE_VERSION = 'v9';
 const PERSISTED_CACHE_STALE_MS = 24 * 60 * 60_000;
 
 const persistedCacheKey = (cacheKey: string) =>
@@ -101,7 +101,7 @@ const getPedidoId = (pedido: any) => Number(
 const getPedidoLogisticaCached = async (pedidoId: number, username: string, password: string) => {
   const cached = logisticaCache.get(pedidoId);
   if (cached && cached.expiresAt > Date.now()) return cached.payload;
-  const payload = await apiExternaService.buscarPedidoLogistica(pedidoId, username, password, 8_000);
+  const payload = await apiExternaService.buscarPedidoLogistica(pedidoId, username, password, 6_000);
   if (payload) logisticaCache.set(pedidoId, { expiresAt: Date.now() + LOGISTICA_CACHE_TTL_MS, payload });
   return payload;
 };
@@ -159,7 +159,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               }
             : { limit: pageSize, offset },
           username,
-          password
+          password,
+          6_000
         );
 
       const acumulado: any[] = [];
@@ -176,7 +177,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const carregarPedidosPorLocalizacao = async () => {
       const carregarPagina = (offset: number) => apiExternaService.listarPedidos(
-        { limit: pageSize, offset }, username, password
+        { limit: pageSize, offset }, username, password, 6_000
       );
       const primeira = await carregarPagina(0);
       if (!primeira) return null;
@@ -191,25 +192,51 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       // A API ignora o filtro de data, mas a listagem é aproximadamente
       // decrescente. A busca binária localiza qualquer período sem varrer toda a base.
-      for (let tentativa = 0; tentativa < 12 && menorOffset <= maiorOffset; tentativa++) {
-        const meio = Math.floor(((menorOffset + maiorOffset) / 2) / pageSize) * pageSize;
-        const page = meio === 0 ? primeira : await carregarPagina(meio);
+      const registrarPagina = (offset: number, page: Awaited<ReturnType<typeof carregarPagina>>) => {
         const datas = (Array.isArray(page?.data) ? page.data : [])
           .map((pedido: any) => parseDate(pedido.DATA_HORA_RECEBIMENTO ?? pedido.data_hora_recebimento)?.getTime())
           .filter((value): value is number => typeof value === 'number' && Number.isFinite(value))
           .sort((a, b) => a - b);
-        if (datas.length === 0) {
-          menorOffset = meio + pageSize;
-          continue;
-        }
+        if (datas.length === 0) return null;
         const mediana = datas[Math.floor(datas.length / 2)];
         const distancia = Math.abs(mediana - alvo);
         if (distancia < melhorDistancia) {
           melhorDistancia = distancia;
-          melhorOffset = meio;
+          melhorOffset = offset;
         }
-        if (mediana > alvo) menorOffset = meio + pageSize;
-        else maiorOffset = meio - pageSize;
+        return mediana;
+      };
+
+      registrarPagina(0, primeira);
+
+      for (let tentativa = 0; tentativa < 5 && menorOffset < maiorOffset; tentativa++) {
+        const paginaInicial = Math.floor(menorOffset / pageSize);
+        const paginaFinal = Math.floor(maiorOffset / pageSize);
+        if (paginaFinal - paginaInicial <= 2) break;
+
+        const amplitude = paginaFinal - paginaInicial;
+        const offsets = [1, 2, 3].map((parte) =>
+          (paginaInicial + Math.floor((amplitude * parte) / 4)) * pageSize
+        );
+        const paginas = await mapLimit(offsets, 3, async (offset) => ({
+          offset,
+          page: offset === 0 ? primeira : await carregarPagina(offset),
+        }));
+        const pontos = paginas
+          .map(({ offset, page }) => ({ offset, data: registrarPagina(offset, page) }))
+          .filter((ponto): ponto is { offset: number; data: number } => ponto.data !== null)
+          .sort((a, b) => a.offset - b.offset);
+
+        if (pontos.length === 0) break;
+        const primeiroMaisAntigo = pontos.findIndex((ponto) => ponto.data <= alvo);
+        if (primeiroMaisAntigo === -1) {
+          menorOffset = pontos[pontos.length - 1].offset + pageSize;
+        } else if (primeiroMaisAntigo === 0) {
+          maiorOffset = pontos[0].offset;
+        } else {
+          menorOffset = pontos[primeiroMaisAntigo - 1].offset;
+          maiorOffset = pontos[primeiroMaisAntigo].offset;
+        }
       }
 
       const margemPaginas = Math.max(4, Math.ceil(periodoDias * 0.8) + 3);
@@ -219,7 +246,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         { length: Math.ceil((fim - inicio) / pageSize) },
         (_, index) => inicio + index * pageSize
       );
-      const pages = await mapLimit(offsets, 8, (offset) => offset === 0 ? Promise.resolve(primeira) : carregarPagina(offset));
+      const pages = await mapLimit(offsets, 4, (offset) => offset === 0 ? Promise.resolve(primeira) : carregarPagina(offset));
       return pages.flatMap((page) => Array.isArray(page?.data) ? page.data : []);
     };
 

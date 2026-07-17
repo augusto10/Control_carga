@@ -573,7 +573,8 @@ class APIExternaService {
       search?: string;
     },
     username: string,
-    password: string
+    password: string,
+    timeoutMs = API_EXTERNA_TIMEOUT_MS
   ): Promise<{ data: PedidoExterno[]; total: number; limit: number; offset: number } | null> {
     try {
       const authenticated = await this.ensureAuthenticated(username, password);
@@ -601,7 +602,8 @@ class APIExternaService {
         limit: number;
         offset: number;
       }>(url, {
-        validateStatus: (status) => status < 500
+        validateStatus: (status) => status < 500,
+        timeout: timeoutMs,
       });
 
       console.log('[API Externa] Pedidos encontrados:', response.data.data?.length || 0);
