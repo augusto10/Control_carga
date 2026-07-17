@@ -8,7 +8,7 @@ const cache = new Map<string, { expiresAt: number; payload: any }>();
 const inFlight = new Map<string, Promise<any>>();
 const LOGISTICA_CACHE_TTL_MS = 30 * 60_000;
 const logisticaCache = new Map<number, { expiresAt: number; payload: any }>();
-const CACHE_VERSION = 'v7';
+const CACHE_VERSION = 'v8';
 const PERSISTED_CACHE_STALE_MS = 24 * 60 * 60_000;
 
 const persistedCacheKey = (cacheKey: string) =>
@@ -231,14 +231,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     let pedidosBrutos = await carregarPedidos(true, limiteBuscaFiltrada);
     let recebidos = Array.isArray(pedidosBrutos) ? filtrarRecebidos(pedidosBrutos) : [];
-    const filtroPeriodoIgnorado = Array.isArray(pedidosBrutos) && pedidosBrutos.some((pedido: any) => {
-      const data = parseDate(pedido.DATA_HORA_RECEBIMENTO ?? pedido.data_hora_recebimento);
-      return data && (dateKey(data) < dataInicio || dateKey(data) > dataFim);
-    });
-
-    if (recebidos.length === 0 || filtroPeriodoIgnorado) {
-      // Fallback para ambientes em que a API ignora o filtro por tipo_data/periodo
-      // ou retorna uma janela inicial que ainda nao contem os pedidos recebidos.
+    if (recebidos.length === 0) {
+      // Fallback somente quando a janela inicial não contém o período pedido.
+      // A API externa pode misturar registros de dias vizinhos mesmo quando
+      // recebe filtros de data; isso não invalida os registros corretos já retornados.
       pedidosBrutos = await carregarPedidosPorLocalizacao();
       recebidos = Array.isArray(pedidosBrutos) ? filtrarRecebidos(pedidosBrutos) : [];
     }
