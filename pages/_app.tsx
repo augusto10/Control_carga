@@ -2,9 +2,7 @@ import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import '../styles/globals.css';
 import 'leaflet/dist/leaflet.css';
-import Alert from '@mui/material/Alert';
 import { alpha } from '@mui/material/styles';
-import { useTheme } from '@mui/material/styles';
 import { styled } from '@mui/material/styles';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { professionalTheme } from '../styles/theme';
@@ -56,7 +54,6 @@ const StyledMaterialDesignContent = styled(MaterialDesignContent)(({ theme }) =>
     },
   },
 }));
-import VisualPageLayout from '../components/VisualPageLayout';
 import { AuthProvider } from '../contexts/AuthContext';
 import { ConfiguracaoProvider } from '../contexts/ConfiguracaoContext';
 import ProtectedRoute from '../components/ProtectedRoute';

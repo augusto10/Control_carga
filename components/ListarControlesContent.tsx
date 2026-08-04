@@ -1454,14 +1454,32 @@ const ListarControlesContent: React.FC = () => {
         dadosAtualizacao.numeroManifesto = editData.numeroManifesto || undefined;
       }
       
-      await atualizarControle(editing.id, dadosAtualizacao as any);
+      const controleAtualizado = await atualizarControle(editing.id, dadosAtualizacao as any);
+      if (!controleAtualizado) {
+        throw new Error('Controle não retornado após atualização');
+      }
+
+      const controleConvertido = converterControles([controleAtualizado as any])[0];
+      setControles(prevControles =>
+        prevControles.map(controle =>
+          controle.id === editing.id ? controleConvertido : controle
+        )
+      );
+
+      if (detalhesModal.aberto && detalhesModal.controle?.id === editing.id) {
+        setDetalhesModal({
+          aberto: true,
+          controle: controleConvertido
+        });
+      }
+
       enqueueSnackbar('Controle atualizado com sucesso', { variant: 'success' });
       handleCloseEdit();
     } catch (error) {
       console.error('Erro ao atualizar controle:', error);
       enqueueSnackbar('Erro ao atualizar controle', { variant: 'error' });
     }
-  }, [editing, editData, atualizarControle, enqueueSnackbar, handleCloseEdit]);
+  }, [editing, editData, atualizarControle, enqueueSnackbar, handleCloseEdit, converterControles, detalhesModal]);
 
   const handleAbrirAssinatura = useCallback((controle: ControleComNotas, tipo: 'motorista' | 'responsavel') => {
     console.log('[Modal Assinatura] Abrindo modal para controle:', controle.id, 'tipo:', tipo);

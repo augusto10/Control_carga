@@ -1,0 +1,436 @@
+import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Alert,
+  alpha,
+  Box,
+  Button,
+  Card,
+  CardContent,
+  CircularProgress,
+  Divider,
+  Grid,
+  Stack,
+  TextField,
+  Typography,
+} from '@mui/material';
+import {
+  CleaningServices as CleaningServicesIcon,
+  Download as DownloadIcon,
+  Label as LabelIcon,
+  LocalPrintshop as LocalPrintshopIcon,
+  Search as SearchIcon,
+} from '@mui/icons-material';
+import { useSnackbar } from 'notistack';
+import ProtectedRoute from '@/components/ProtectedRoute';
+import { AppLayout } from '@/components/layout/AppLayout';
+import { LabelPreview } from '@/components/labels/LabelPreview';
+import { PrinterSelector } from '@/components/labels/PrinterSelector';
+import api from '@/lib/api';
+import { analyzeBarcode } from '@/lib/barcode-validation';
+import { generateZplLabels } from '@/lib/zpl-generator';
+import { printLabelsInBrowser } from '@/services/browser-label-print';
+import {
+  configureQzSecurity,
+  detectQzStatus,
+  isZplCompatiblePrinter,
+  listLocalPrinters,
+  printRawZpl,
+  QZ_DOWNLOAD_URL,
+  savePreferredPrinter,
+} from '@/services/qz-print';
+import { ProdutoEtiqueta, QzStatus } from '@/types/labels';
+import { USER_TYPES } from '@/types/auth-types';
+
+const INITIAL_QZ_STATUS: QzStatus = {
+  code: 'checking',
+  message: 'Verificando conexao com o QZ Tray...',
+};
+
+export default function CriarEtiquetasPage() {
+  const { enqueueSnackbar } = useSnackbar();
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const [codigoAdm, setCodigoAdm] = useState('');
+  const [produto, setProduto] = useState<ProdutoEtiqueta | null>(null);
+  const [quantidade, setQuantidade] = useState(3);
+  const [loading, setLoading] = useState(false);
+  const [previewRequested, setPreviewRequested] = useState(false);
+  const [qzConnected, setQzConnected] = useState(false);
+  const [checkingQz, setCheckingQz] = useState(false);
+  const [printers, setPrinters] = useState<string[]>([]);
+  const [printer, setPrinter] = useState('');
+  const [printing, setPrinting] = useState(false);
+  const [qzStatus, setQzStatus] = useState<QzStatus>(INITIAL_QZ_STATUS);
+
+  const barcodeInfo = useMemo(() => analyzeBarcode(produto?.codigoBarras), [produto]);
+  const printerIsCompatible = useMemo(() => (printer ? isZplCompatiblePrinter(printer) : false), [printer]);
+  const canPrint = Boolean(produto && barcodeInfo.isValid && quantidade > 0 && printer && qzConnected);
+
+  useEffect(() => {
+    configureQzSecurity();
+    void refreshPrinters(false);
+    inputRef.current?.focus();
+  }, []);
+
+  async function refreshPrinters(showToasts: boolean) {
+    setCheckingQz(true);
+    setQzStatus(INITIAL_QZ_STATUS);
+
+    try {
+      const status = await detectQzStatus();
+      setQzStatus(status);
+
+      if (status.code !== 'connected') {
+        setQzConnected(false);
+        setPrinters([]);
+        setPrinter('');
+
+        if (showToasts) {
+          enqueueSnackbar(status.message, {
+            variant: status.code === 'authorization_required' ? 'info' : 'warning',
+          });
+        }
+        return;
+      }
+
+      const result = await listLocalPrinters();
+      setPrinters(result.printers);
+      setPrinter((current) => current || result.suggestedPrinter);
+      setQzConnected(true);
+      setQzStatus({
+        code: result.printers.length > 0 ? 'connected' : 'no_printers',
+        message: result.printers.length > 0
+          ? 'QZ Tray conectado e impressoras locais carregadas.'
+          : 'QZ Tray conectado, mas nenhuma impressora local foi encontrada.',
+      });
+
+      if (showToasts) {
+        if (result.printers.length > 0) {
+          enqueueSnackbar('QZ Tray conectado e impressoras atualizadas.', { variant: 'success' });
+        } else {
+          enqueueSnackbar('Nenhuma impressora local foi encontrada.', { variant: 'warning' });
+        }
+      }
+    } catch (error: any) {
+      setQzConnected(false);
+      setPrinters([]);
+      setPrinter('');
+      setQzStatus({
+        code: 'error',
+        message: error?.message || 'Nao foi possivel validar a conexao com o QZ Tray.',
+      });
+
+      if (showToasts) {
+        enqueueSnackbar(error?.message || 'Nao foi possivel validar a conexao com o QZ Tray.', {
+          variant: 'error',
+        });
+      }
+    } finally {
+      setCheckingQz(false);
+    }
+  }
+
+  function handleInstallQzTray() {
+    window.open(QZ_DOWNLOAD_URL, '_blank', 'noopener,noreferrer');
+    enqueueSnackbar(
+      'Abrimos o download oficial do QZ Tray. Instale, abra o aplicativo e depois clique em testar novamente.',
+      { variant: 'info' }
+    );
+  }
+
+  async function handleSearch() {
+    if (!codigoAdm.trim()) {
+      enqueueSnackbar('Informe o codigo ADM para pesquisar.', { variant: 'warning' });
+      inputRef.current?.focus();
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await api.get<ProdutoEtiqueta>(`/api/etiquetas/produto/${encodeURIComponent(codigoAdm.trim())}`);
+      setProduto(response.data);
+      setPreviewRequested(true);
+
+      if (!response.data.codigoBarras) {
+        enqueueSnackbar('Este produto nao possui codigo de barras cadastrado.', { variant: 'warning' });
+      } else {
+        enqueueSnackbar('Produto encontrado com sucesso.', { variant: 'success' });
+      }
+    } catch (error: any) {
+      setProduto(null);
+      enqueueSnackbar(error.response?.data?.message || 'Produto nao encontrado para o codigo ADM informado.', {
+        variant: 'error',
+      });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function handleClear() {
+    setCodigoAdm('');
+    setProduto(null);
+    setQuantidade(3);
+    setPreviewRequested(false);
+    inputRef.current?.focus();
+  }
+
+  async function registerHistory(result: 'SUCESSO' | 'ERRO', message?: string) {
+    if (!produto) return;
+
+    await api.post('/api/etiquetas/print-history', {
+      produtoId: produto.produtoId,
+      codigoAdm: produto.codigoAdm,
+      nomeProduto: produto.nome,
+      marcaProduto: produto.marca,
+      codigoBarras: produto.codigoBarras,
+      quantidade,
+      impressora: printer || 'NAO INFORMADA',
+      resultado: result,
+      mensagemErro: message || null,
+    }).catch(() => undefined);
+  }
+
+  async function handlePrint() {
+    if (!produto) return;
+
+    try {
+      setPrinting(true);
+      if (printerIsCompatible) {
+        const zpl = generateZplLabels(produto, quantidade);
+        await printRawZpl(printer, zpl);
+      } else {
+        printLabelsInBrowser(produto, quantidade, printer);
+      }
+
+      savePreferredPrinter(printer);
+      await registerHistory('SUCESSO');
+      enqueueSnackbar(
+        printerIsCompatible
+          ? 'Etiquetas enviadas para impressao na Zebra.'
+          : 'Previa de impressao aberta. Confira a etiqueta e clique em imprimir na janela.',
+        { variant: 'success' }
+      );
+      inputRef.current?.focus();
+    } catch (error: any) {
+      await registerHistory('ERRO', error?.message || 'Erro de impressao');
+      enqueueSnackbar('Nao foi possivel imprimir as etiquetas.', { variant: 'error' });
+    } finally {
+      setPrinting(false);
+    }
+  }
+
+  return (
+    <ProtectedRoute
+      allowedRoles={[
+        USER_TYPES.ADMIN,
+        USER_TYPES.GERENTE,
+        USER_TYPES.USUARIO,
+        USER_TYPES.SEPARADOR,
+        USER_TYPES.CONFERENTE,
+        USER_TYPES.AUDITOR,
+      ]}
+    >
+      <AppLayout
+        title="Criar Etiquetas"
+        subtitle="Pesquise um produto pelo codigo ADM e imprima etiquetas com codigo de barras."
+        breadcrumbs={[
+          { label: 'Inicio', href: '/' },
+          { label: 'Criar Etiquetas' },
+        ]}
+        actions={(
+          <Button
+            variant="outlined"
+            startIcon={checkingQz ? <CircularProgress size={18} color="inherit" /> : <LocalPrintshopIcon />}
+            onClick={() => void refreshPrinters(true)}
+            sx={{ borderRadius: 3, textTransform: 'none', fontWeight: 700 }}
+          >
+            Atualizar impressoras
+          </Button>
+        )}
+      >
+        <Stack spacing={3}>
+          <Card sx={{ borderRadius: 4, background: alpha('#ffffff', 0.78), backdropFilter: 'blur(12px)' }}>
+            <CardContent>
+              <Grid container spacing={2} alignItems="stretch">
+                <Grid item xs={12} md={5}>
+                  <TextField
+                    fullWidth
+                    label="Codigo ADM"
+                    value={codigoAdm}
+                    onChange={(event) => setCodigoAdm(event.target.value)}
+                    inputRef={inputRef}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        void handleSearch();
+                      }
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={2}>
+                  <TextField
+                    fullWidth
+                    label="Quantidade"
+                    type="number"
+                    value={quantidade}
+                    onChange={(event) => setQuantidade(Math.max(1, Number(event.target.value) || 1))}
+                    inputProps={{ min: 1 }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={5}>
+                  <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} height="100%">
+                    <Button
+                      fullWidth
+                      variant="contained"
+                      startIcon={loading ? <CircularProgress size={18} color="inherit" /> : <SearchIcon />}
+                      onClick={() => void handleSearch()}
+                      disabled={loading}
+                      sx={{ borderRadius: 3, textTransform: 'none', fontWeight: 800 }}
+                    >
+                      Pesquisar
+                    </Button>
+                    <Button
+                      fullWidth
+                      variant="outlined"
+                      startIcon={<CleaningServicesIcon />}
+                      onClick={handleClear}
+                      sx={{ borderRadius: 3, textTransform: 'none', fontWeight: 700 }}
+                    >
+                      Limpar
+                    </Button>
+                    <Button
+                      fullWidth
+                      variant="outlined"
+                      startIcon={<LabelIcon />}
+                      onClick={() => setPreviewRequested(true)}
+                      disabled={!produto}
+                      sx={{ borderRadius: 3, textTransform: 'none', fontWeight: 700 }}
+                    >
+                      Visualizar etiqueta
+                    </Button>
+                  </Stack>
+                </Grid>
+              </Grid>
+            </CardContent>
+          </Card>
+
+          {produto && (
+            <Grid container spacing={3}>
+              <Grid item xs={12} lg={5}>
+                <Card sx={{ borderRadius: 4, height: '100%', background: alpha('#ffffff', 0.78), backdropFilter: 'blur(12px)' }}>
+                  <CardContent>
+                    <Stack spacing={2.5}>
+                      <Box>
+                        <Typography variant="h6" fontWeight={900}>Produto encontrado</Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          Confira os dados retornados pela integracao antes de imprimir.
+                        </Typography>
+                      </Box>
+
+                      <Stack spacing={1.5}>
+                        <Typography><strong>Produto:</strong> {produto.nome}</Typography>
+                        <Typography><strong>Marca:</strong> {produto.marca || 'Sem marca'}</Typography>
+                        <Typography><strong>Codigo ADM:</strong> {produto.codigoAdm}</Typography>
+                        <Typography><strong>Codigo de barras:</strong> {produto.codigoBarras || 'Nao informado'}</Typography>
+                        <Typography><strong>Tipo identificado:</strong> {barcodeInfo.type}</Typography>
+                        <Typography><strong>Situacao da consulta:</strong> Produto encontrado</Typography>
+                      </Stack>
+
+                      <Divider />
+
+                      {!barcodeInfo.isValid && (
+                        <Alert severity="warning">
+                          {barcodeInfo.reason || 'Codigo de barras invalido.'}
+                        </Alert>
+                      )}
+
+                      {printer && !printerIsCompatible && (
+                        <Alert severity="info">
+                          Esta impressora vai abrir uma previa visual no navegador. Para Zebra/ZDesigner, a impressao continua direta pelo QZ Tray.
+                        </Alert>
+                      )}
+
+                      <PrinterSelector
+                        printers={printers}
+                        printer={printer}
+                        onChange={setPrinter}
+                        status={qzStatus}
+                        onInstall={handleInstallQzTray}
+                        onRetry={() => void refreshPrinters(true)}
+                      />
+
+                      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+                        <Button
+                          variant="contained"
+                          startIcon={printing ? <CircularProgress size={18} color="inherit" /> : <LocalPrintshopIcon />}
+                          disabled={!canPrint || printing}
+                          onClick={() => void handlePrint()}
+                          sx={{ borderRadius: 3, textTransform: 'none', fontWeight: 800 }}
+                        >
+                          {printerIsCompatible ? 'Imprimir na Zebra' : 'Imprimir em outra impressora'}
+                        </Button>
+                        <Button
+                          variant="outlined"
+                          startIcon={checkingQz ? <CircularProgress size={18} color="inherit" /> : <DownloadIcon />}
+                          onClick={() => {
+                            if (qzStatus.code === 'not_installed') {
+                              handleInstallQzTray();
+                            } else {
+                              void refreshPrinters(true);
+                            }
+                          }}
+                          sx={{ borderRadius: 3, textTransform: 'none', fontWeight: 700 }}
+                        >
+                          {qzStatus.code === 'not_installed' ? 'Baixar QZ Tray' : 'Testar conexao QZ'}
+                        </Button>
+                      </Stack>
+                    </Stack>
+                  </CardContent>
+                </Card>
+              </Grid>
+
+              <Grid item xs={12} lg={7}>
+                <Card sx={{ borderRadius: 4, background: alpha('#ffffff', 0.78), backdropFilter: 'blur(12px)' }}>
+                  <CardContent>
+                    {previewRequested ? (
+                      <LabelPreview produto={produto} quantidade={quantidade} />
+                    ) : (
+                      <Typography color="text.secondary">
+                        Clique em visualizar etiqueta para gerar a previa.
+                      </Typography>
+                    )}
+                  </CardContent>
+                </Card>
+              </Grid>
+            </Grid>
+          )}
+
+          {qzStatus.code === 'not_installed' && (
+            <Alert
+              severity="warning"
+              action={(
+                <Button color="inherit" size="small" onClick={handleInstallQzTray}>
+                  Baixar agora
+                </Button>
+              )}
+            >
+              QZ Tray nao encontrado. O sistema abriu o fluxo assistido: baixar, instalar, abrir o aplicativo e testar novamente.
+            </Alert>
+          )}
+
+          {qzStatus.code === 'authorization_required' && (
+            <Alert severity="info">
+              QZ Tray instalado. Falta autorizar este site no aplicativo para liberar a busca da impressora e a impressao.
+            </Alert>
+          )}
+
+          {!qzConnected && qzStatus.code === 'error' && (
+            <Alert severity="warning">
+              {qzStatus.message}
+            </Alert>
+          )}
+        </Stack>
+      </AppLayout>
+    </ProtectedRoute>
+  );
+}
+
+(CriarEtiquetasPage as any).usesAppLayout = true;

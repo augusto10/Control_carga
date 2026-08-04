@@ -20,7 +20,8 @@ import {
   ClipboardList,
   AlertTriangle,
   History,
-  Map
+  Map,
+  Tags
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { clsx, type ClassValue } from 'clsx';
@@ -89,6 +90,14 @@ export function AppLayout({
       children: [
         { name: 'Criar Controle', href: '/criar-controle' },
         { name: 'Listar Controles', href: '/controles' },
+        { name: 'Baixar Entregas', href: '/baixar-entregas' },
+      ]
+    },
+    {
+      name: 'Criar Etiquetas',
+      icon: Tags,
+      children: [
+        { name: 'Criar Etiquetas', href: '/criar-etiquetas' },
       ]
     },
     {
@@ -98,7 +107,6 @@ export function AppLayout({
         { name: 'Roteirização', href: '/roteirizacao' },
       ]
     },
-
     { 
       name: 'Checklist Recebimento', 
       icon: History,

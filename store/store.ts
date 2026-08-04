@@ -439,47 +439,62 @@ export const useStore = create<StoreState>((set) => ({
   atualizarControle: async (controleId, dados): Promise<ControleCarga | null> => {
     console.log('Iniciando atualizarControle...');
     try {
-      console.log('Enviando requisição para /api/controles/atualizar com dados:', {
-        controleId,
+      const isCriacao = !controleId;
+      const url = isCriacao ? '/api/controles' : `/api/controles/${controleId}`;
+      const method = isCriacao ? 'POST' : 'PUT';
+      const payload = {
         ...dados,
         qtdPallets: Number(dados.qtdPallets) || 0
+      };
+
+      console.log(`Enviando requisi????o ${method} para ${url} com dados:`, {
+        controleId,
+        ...payload
       });
-      
-      const response = await fetch('/api/controles/atualizar', {
-        method: 'POST',
+
+      const response = await fetch(url, {
+        method,
         headers: { 
           'Content-Type': 'application/json',
           'Cache-Control': 'no-cache, no-store, must-revalidate',
           'Pragma': 'no-cache',
           'Expires': '0'
         },
-        body: JSON.stringify({ 
-          controleId, 
-          ...dados,
-          // Garante que qtdPallets seja um número
-          qtdPallets: Number(dados.qtdPallets) || 0
-        }),
+        credentials: 'include',
+        body: JSON.stringify(payload),
       });
 
       console.log('Resposta recebida, status:', response.status);
-      
+
       if (!response.ok) {
         console.error('Erro na resposta da API:', response.status, response.statusText);
         const errorData = await response.json().catch(() => ({}));
         console.error('Detalhes do erro:', errorData);
-        throw new Error(errorData.error || 'Erro ao atualizar controle');
+        throw new Error(errorData.error || errorData.message || 'Erro ao atualizar controle');
       }
-      
-      // Atualiza a lista de controles após a atualização
-      console.log('Atualizando lista de controles...');
+
       const result = await response.json();
-      await useStore.getState().fetchControles();
+
+      set((state) => {
+        if (isCriacao) {
+          return {
+            controles: [result, ...state.controles]
+          };
+        }
+
+        return {
+          controles: state.controles.map((controle) =>
+            controle.id === controleId ? result : controle
+          )
+        };
+      });
+
       console.log('Controle atualizado com sucesso:', result);
       return result as ControleCarga;
-      
+
     } catch (error) {
       console.error('Erro ao atualizar controle:', error);
-      return null;
+      throw error;
     }
   },
 

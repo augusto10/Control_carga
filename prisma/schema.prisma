@@ -90,6 +90,7 @@ model Usuario {
   aprovacoesMateria    SolicitacaoMaterial[]   @relation("AprovacoesMateria")
   historicosEstoque    HistoricoEstoque[]
   etiquetasLotes       EtiquetaLote[]         // Etiquetas de transporte criadas
+  historicoImpressaoEtiquetas LabelPrintHistory[]
   checklistsRecebimento ChecklistRecebimento[] // Checklists de recebimento criados
   roteirizacoes       Roteirizacao[]         // Roteirizações criadas
 }
@@ -392,6 +393,28 @@ model EtiquetaVolume {
   @@index([loteId])
   @@index([codigoVolume])
   @@index([impressoEm])
+}
+
+model LabelPrintHistory {
+  id             String   @id @default(uuid())
+  dataCriacao    DateTime @default(now())
+  usuarioId      String
+  usuario        Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
+  produtoId      String
+  codigoAdm      String
+  nomeProduto    String
+  marcaProduto   String?
+  codigoBarras   String
+  quantidade     Int
+  impressora     String
+  resultado      String
+  mensagemErro   String?
+
+  @@index([usuarioId])
+  @@index([produtoId])
+  @@index([codigoAdm])
+  @@index([dataCriacao])
+  @@map("label_print_history")
 }
 
 enum TipoMovimentacao {
