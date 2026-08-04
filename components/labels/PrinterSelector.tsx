@@ -36,11 +36,11 @@ export function PrinterSelector({
           action={(
             <Stack direction="row" spacing={1}>
               {status.code === 'not_installed' && (
-                <Button color="inherit" size="small" onClick={onInstall}>
+                <Button color="inherit" size="small" onClick={onInstall} sx={{ borderRadius: 1, fontWeight: 500, minHeight: 28, py: 0.25 }}>
                   Baixar
                 </Button>
               )}
-              <Button color="inherit" size="small" onClick={onRetry}>
+              <Button color="inherit" size="small" onClick={onRetry} sx={{ borderRadius: 1, fontWeight: 500, minHeight: 28, py: 0.25 }}>
                 Testar
               </Button>
             </Stack>
@@ -54,7 +54,7 @@ export function PrinterSelector({
         <Alert
           severity="warning"
           action={(
-            <Button color="inherit" size="small" onClick={onRetry}>
+            <Button color="inherit" size="small" onClick={onRetry} sx={{ borderRadius: 1, fontWeight: 500, minHeight: 28, py: 0.25 }}>
               Atualizar
             </Button>
           )}

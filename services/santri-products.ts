@@ -66,6 +66,54 @@ function readBarcodeCandidates(record: Record<string, unknown>): string[] {
   return candidates.sort((a, b) => b.score - a.score).map((item) => item.value);
 }
 
+function readClosedBoxData(raw: Record<string, unknown>, source: Record<string, unknown>) {
+  const directBarcode = readString(source, [
+    'CODIGO_BARRAS_CAIXA_FECHADA',
+    'codigo_barras_caixa_fechada',
+    'codigoBarrasCaixaFechada',
+  ]);
+  const directQuantity = readString(source, [
+    'QUANTIDADE_CAIXA_FECHADA',
+    'quantidade_caixa_fechada',
+    'quantidadeCaixaFechada',
+  ]);
+  const auxiliaryCollections = [
+    raw.codigos_auxiliares,
+    raw.codigosAuxiliares,
+    source.codigos_auxiliares,
+    source.codigosAuxiliares,
+  ];
+
+  for (const collection of auxiliaryCollections) {
+    if (!Array.isArray(collection)) continue;
+
+    for (const entry of collection) {
+      if (!entry || typeof entry !== 'object') continue;
+      const item = entry as Record<string, unknown>;
+      const barcode = readString(item, [
+        'CODIGO_BARRAS',
+        'codigo_barras',
+        'codigoBarras',
+        'CODIGO_BARRAS_CAIXA_FECHADA',
+      ]);
+      const quantity = readString(item, [
+        'QUANTIDADE_CAIXA_FECHADA',
+        'quantidade_caixa_fechada',
+        'quantidadeCaixaFechada',
+      ]);
+
+      if (barcode && quantity && Number(quantity) > 0) {
+        return { barcode, quantity: Number(quantity) };
+      }
+    }
+  }
+
+  return {
+    barcode: directBarcode,
+    quantity: directQuantity && Number(directQuantity) > 0 ? Number(directQuantity) : null,
+  };
+}
+
 async function getSantriToken(): Promise<string> {
   const now = Date.now();
   if (cachedSantriToken && now < cachedSantriTokenExpiresAtMs) {
@@ -132,6 +180,7 @@ export function mapSantriProductToEtiqueta(payload: unknown, produtoId: string):
   const barcodeCandidates = readBarcodeCandidates(source);
   const codigoBarras = barcodeCandidates.find((value) => analyzeBarcode(value).isValid) || barcodeCandidates[0] || null;
   const analysis = analyzeBarcode(codigoBarras);
+  const closedBox = readClosedBoxData(raw, source);
 
   return {
     produtoId: readString(source, ['id', 'produto_id', 'produtoId', 'PRODUTO_ID']) || produtoId,
@@ -140,6 +189,8 @@ export function mapSantriProductToEtiqueta(payload: unknown, produtoId: string):
     marca,
     codigoBarras,
     barcodeType: analysis.type,
+    codigoBarrasCaixaFechada: closedBox.barcode,
+    quantidadeCaixaFechada: closedBox.quantity,
   };
 }
 

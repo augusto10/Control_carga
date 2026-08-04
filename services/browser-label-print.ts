@@ -1,6 +1,6 @@
 import JsBarcode from 'jsbarcode';
 import { analyzeBarcode } from '@/lib/barcode-validation';
-import { ProdutoEtiqueta } from '@/types/labels';
+import { LabelType, ProdutoEtiqueta } from '@/types/labels';
 
 function escapeHtml(value: string) {
   return value
@@ -30,10 +30,17 @@ function buildBarcodeSvg(value: string, format: 'EAN13' | 'EAN8' | 'CODE128') {
   return svg.outerHTML;
 }
 
-export function printLabelsInBrowser(produto: ProdutoEtiqueta, quantidade: number, printerName: string) {
+export function printLabelsInBrowser(
+  produto: ProdutoEtiqueta,
+  quantidade: number,
+  printerName: string,
+  labelType: LabelType = 'UNITARIA',
+) {
   if (typeof window === 'undefined') return;
 
-  const barcode = analyzeBarcode(produto.codigoBarras);
+  const isClosedBox = labelType === 'CAIXA_FECHADA';
+  const selectedBarcode = isClosedBox ? produto.codigoBarrasCaixaFechada : produto.codigoBarras;
+  const barcode = analyzeBarcode(selectedBarcode);
   if (!barcode.isValid || barcode.type === 'UNSUPPORTED') {
     throw new Error(barcode.reason || 'Codigo de barras invalido.');
   }
@@ -52,6 +59,7 @@ export function printLabelsInBrowser(produto: ProdutoEtiqueta, quantidade: numbe
     <article class="label">
       <div class="title">${escapeHtml(produto.nome)}</div>
       <div class="brand">${escapeHtml(produto.marca || 'Sem marca')}</div>
+      ${isClosedBox ? `<div class="box-info">CAIXA FECHADA - ${produto.quantidadeCaixaFechada || '-'} UN</div>` : ''}
       <div class="barcode">${barcodeSvg}</div>
       <div class="adm">ADM ${escapeHtml(produto.codigoAdm)}</div>
     </article>
@@ -139,7 +147,7 @@ export function printLabelsInBrowser(produto: ProdutoEtiqueta, quantidade: numbe
 
           .sheet {
             display: grid;
-            grid-template-columns: repeat(3, 66mm);
+            grid-template-columns: ${isClosedBox ? 'repeat(2, 100mm)' : 'repeat(3, 66mm)'};
             gap: 4mm;
             justify-content: center;
             padding: 10mm;
@@ -149,8 +157,8 @@ export function printLabelsInBrowser(produto: ProdutoEtiqueta, quantidade: numbe
           }
 
           .label {
-            width: 66mm;
-            min-height: 44mm;
+            width: ${isClosedBox ? '100mm' : '66mm'};
+            height: ${isClosedBox ? '60mm' : '44mm'};
             border: 1px solid #94a3b8;
             padding: 3mm;
             display: flex;
@@ -168,7 +176,8 @@ export function printLabelsInBrowser(produto: ProdutoEtiqueta, quantidade: numbe
           }
 
           .brand,
-          .adm {
+          .adm,
+          .box-info {
             font-size: 10px;
             text-align: center;
           }
@@ -176,6 +185,12 @@ export function printLabelsInBrowser(produto: ProdutoEtiqueta, quantidade: numbe
           .brand {
             color: #4b5563;
             margin-top: 2mm;
+          }
+
+          .box-info {
+            margin-top: 2mm;
+            font-size: ${isClosedBox ? '14px' : '10px'};
+            font-weight: 800;
           }
 
           .barcode {

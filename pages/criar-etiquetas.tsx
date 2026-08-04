@@ -9,6 +9,7 @@ import {
   CircularProgress,
   Divider,
   Grid,
+  MenuItem,
   Stack,
   TextField,
   Typography,
@@ -38,12 +39,26 @@ import {
   QZ_DOWNLOAD_URL,
   savePreferredPrinter,
 } from '@/services/qz-print';
-import { ProdutoEtiqueta, QzStatus } from '@/types/labels';
+import { LabelType, ProdutoEtiqueta, QzStatus } from '@/types/labels';
 import { USER_TYPES } from '@/types/auth-types';
 
 const INITIAL_QZ_STATUS: QzStatus = {
   code: 'checking',
   message: 'Verificando conexao com o QZ Tray...',
+};
+
+const COMPACT_BUTTON_SX = {
+  borderRadius: 1.25,
+  textTransform: 'none',
+  fontWeight: 600,
+  fontSize: '0.78rem',
+  minHeight: 32,
+  py: 0.5,
+  px: 1.25,
+  boxShadow: 'none',
+  '&:hover': { boxShadow: 'none' },
+  '& .MuiButton-startIcon': { mr: 0.6 },
+  '& .MuiSvgIcon-root': { fontSize: 17 },
 };
 
 export default function CriarEtiquetasPage() {
@@ -52,6 +67,7 @@ export default function CriarEtiquetasPage() {
   const [codigoAdm, setCodigoAdm] = useState('');
   const [produto, setProduto] = useState<ProdutoEtiqueta | null>(null);
   const [quantidade, setQuantidade] = useState(3);
+  const [labelType, setLabelType] = useState<LabelType>('UNITARIA');
   const [loading, setLoading] = useState(false);
   const [previewRequested, setPreviewRequested] = useState(false);
   const [qzConnected, setQzConnected] = useState(false);
@@ -61,7 +77,10 @@ export default function CriarEtiquetasPage() {
   const [printing, setPrinting] = useState(false);
   const [qzStatus, setQzStatus] = useState<QzStatus>(INITIAL_QZ_STATUS);
 
-  const barcodeInfo = useMemo(() => analyzeBarcode(produto?.codigoBarras), [produto]);
+  const selectedBarcode = labelType === 'CAIXA_FECHADA'
+    ? produto?.codigoBarrasCaixaFechada
+    : produto?.codigoBarras;
+  const barcodeInfo = useMemo(() => analyzeBarcode(selectedBarcode), [selectedBarcode]);
   const printerIsCompatible = useMemo(() => (printer ? isZplCompatiblePrinter(printer) : false), [printer]);
   const canPrint = Boolean(produto && barcodeInfo.isValid && quantidade > 0 && printer && qzConnected);
 
@@ -148,6 +167,7 @@ export default function CriarEtiquetasPage() {
       setLoading(true);
       const response = await api.get<ProdutoEtiqueta>(`/api/etiquetas/produto/${encodeURIComponent(codigoAdm.trim())}`);
       setProduto(response.data);
+      setLabelType('UNITARIA');
       setPreviewRequested(true);
 
       if (!response.data.codigoBarras) {
@@ -169,6 +189,7 @@ export default function CriarEtiquetasPage() {
     setCodigoAdm('');
     setProduto(null);
     setQuantidade(3);
+    setLabelType('UNITARIA');
     setPreviewRequested(false);
     inputRef.current?.focus();
   }
@@ -181,7 +202,7 @@ export default function CriarEtiquetasPage() {
       codigoAdm: produto.codigoAdm,
       nomeProduto: produto.nome,
       marcaProduto: produto.marca,
-      codigoBarras: produto.codigoBarras,
+      codigoBarras: selectedBarcode || '',
       quantidade,
       impressora: printer || 'NAO INFORMADA',
       resultado: result,
@@ -195,10 +216,10 @@ export default function CriarEtiquetasPage() {
     try {
       setPrinting(true);
       if (printerIsCompatible) {
-        const zpl = generateZplLabels(produto, quantidade);
+        const zpl = generateZplLabels(produto, quantidade, labelType);
         await printRawZpl(printer, zpl);
       } else {
-        printLabelsInBrowser(produto, quantidade, printer);
+        printLabelsInBrowser(produto, quantidade, printer, labelType);
       }
 
       savePreferredPrinter(printer);
@@ -238,10 +259,11 @@ export default function CriarEtiquetasPage() {
         ]}
         actions={(
           <Button
+            size="small"
             variant="outlined"
             startIcon={checkingQz ? <CircularProgress size={18} color="inherit" /> : <LocalPrintshopIcon />}
             onClick={() => void refreshPrinters(true)}
-            sx={{ borderRadius: 3, textTransform: 'none', fontWeight: 700 }}
+            sx={COMPACT_BUTTON_SX}
           >
             Atualizar impressoras
           </Button>
@@ -251,7 +273,7 @@ export default function CriarEtiquetasPage() {
           <Card sx={{ borderRadius: 4, background: alpha('#ffffff', 0.78), backdropFilter: 'blur(12px)' }}>
             <CardContent>
               <Grid container spacing={2} alignItems="stretch">
-                <Grid item xs={12} md={5}>
+                <Grid item xs={12} md={4}>
                   <TextField
                     fullWidth
                     label="Codigo ADM"
@@ -275,34 +297,54 @@ export default function CriarEtiquetasPage() {
                     inputProps={{ min: 1 }}
                   />
                 </Grid>
-                <Grid item xs={12} md={5}>
-                  <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} height="100%">
+                <Grid item xs={12} md={2}>
+                  <TextField
+                    select
+                    fullWidth
+                    label="Tipo da etiqueta"
+                    value={labelType}
+                    onChange={(event) => setLabelType(event.target.value as LabelType)}
+                  >
+                    <MenuItem value="UNITARIA">Produto (3 por linha)</MenuItem>
+                    <MenuItem value="CAIXA_FECHADA">Caixa fechada 100 x 60 mm</MenuItem>
+                  </TextField>
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <Stack
+                    direction="row"
+                    spacing={1}
+                    useFlexGap
+                    flexWrap="wrap"
+                    alignItems="center"
+                    justifyContent={{ xs: 'flex-start', md: 'flex-end' }}
+                    height="100%"
+                  >
                     <Button
-                      fullWidth
+                      size="small"
                       variant="contained"
                       startIcon={loading ? <CircularProgress size={18} color="inherit" /> : <SearchIcon />}
                       onClick={() => void handleSearch()}
                       disabled={loading}
-                      sx={{ borderRadius: 3, textTransform: 'none', fontWeight: 800 }}
+                      sx={COMPACT_BUTTON_SX}
                     >
                       Pesquisar
                     </Button>
                     <Button
-                      fullWidth
+                      size="small"
                       variant="outlined"
                       startIcon={<CleaningServicesIcon />}
                       onClick={handleClear}
-                      sx={{ borderRadius: 3, textTransform: 'none', fontWeight: 700 }}
+                      sx={COMPACT_BUTTON_SX}
                     >
                       Limpar
                     </Button>
                     <Button
-                      fullWidth
+                      size="small"
                       variant="outlined"
                       startIcon={<LabelIcon />}
                       onClick={() => setPreviewRequested(true)}
                       disabled={!produto}
-                      sx={{ borderRadius: 3, textTransform: 'none', fontWeight: 700 }}
+                      sx={COMPACT_BUTTON_SX}
                     >
                       Visualizar etiqueta
                     </Button>
@@ -330,6 +372,8 @@ export default function CriarEtiquetasPage() {
                         <Typography><strong>Marca:</strong> {produto.marca || 'Sem marca'}</Typography>
                         <Typography><strong>Codigo ADM:</strong> {produto.codigoAdm}</Typography>
                         <Typography><strong>Codigo de barras:</strong> {produto.codigoBarras || 'Nao informado'}</Typography>
+                        <Typography><strong>Codigo da caixa fechada:</strong> {produto.codigoBarrasCaixaFechada || 'Nao informado'}</Typography>
+                        <Typography><strong>Unidades por caixa:</strong> {produto.quantidadeCaixaFechada || 'Nao informado'}</Typography>
                         <Typography><strong>Tipo identificado:</strong> {barcodeInfo.type}</Typography>
                         <Typography><strong>Situacao da consulta:</strong> Produto encontrado</Typography>
                       </Stack>
@@ -338,7 +382,9 @@ export default function CriarEtiquetasPage() {
 
                       {!barcodeInfo.isValid && (
                         <Alert severity="warning">
-                          {barcodeInfo.reason || 'Codigo de barras invalido.'}
+                          {labelType === 'CAIXA_FECHADA' && !produto.codigoBarrasCaixaFechada
+                            ? 'Este produto nao possui codigo auxiliar de caixa fechada na API.'
+                            : barcodeInfo.reason || 'Codigo de barras invalido.'}
                         </Alert>
                       )}
 
@@ -359,15 +405,17 @@ export default function CriarEtiquetasPage() {
 
                       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
                         <Button
+                          size="small"
                           variant="contained"
                           startIcon={printing ? <CircularProgress size={18} color="inherit" /> : <LocalPrintshopIcon />}
                           disabled={!canPrint || printing}
                           onClick={() => void handlePrint()}
-                          sx={{ borderRadius: 3, textTransform: 'none', fontWeight: 800 }}
+                          sx={COMPACT_BUTTON_SX}
                         >
                           {printerIsCompatible ? 'Imprimir na Zebra' : 'Imprimir em outra impressora'}
                         </Button>
                         <Button
+                          size="small"
                           variant="outlined"
                           startIcon={checkingQz ? <CircularProgress size={18} color="inherit" /> : <DownloadIcon />}
                           onClick={() => {
@@ -377,7 +425,7 @@ export default function CriarEtiquetasPage() {
                               void refreshPrinters(true);
                             }
                           }}
-                          sx={{ borderRadius: 3, textTransform: 'none', fontWeight: 700 }}
+                          sx={COMPACT_BUTTON_SX}
                         >
                           {qzStatus.code === 'not_installed' ? 'Baixar QZ Tray' : 'Testar conexao QZ'}
                         </Button>
@@ -391,7 +439,7 @@ export default function CriarEtiquetasPage() {
                 <Card sx={{ borderRadius: 4, background: alpha('#ffffff', 0.78), backdropFilter: 'blur(12px)' }}>
                   <CardContent>
                     {previewRequested ? (
-                      <LabelPreview produto={produto} quantidade={quantidade} />
+                      <LabelPreview produto={produto} quantidade={quantidade} labelType={labelType} />
                     ) : (
                       <Typography color="text.secondary">
                         Clique em visualizar etiqueta para gerar a previa.
@@ -407,7 +455,7 @@ export default function CriarEtiquetasPage() {
             <Alert
               severity="warning"
               action={(
-                <Button color="inherit" size="small" onClick={handleInstallQzTray}>
+                <Button color="inherit" size="small" onClick={handleInstallQzTray} sx={COMPACT_BUTTON_SX}>
                   Baixar agora
                 </Button>
               )}
