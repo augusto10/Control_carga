@@ -144,6 +144,7 @@ export function AppLayout({
         { name: 'Relatório de Entregas', href: '/relatorios/entregas' },
         { name: 'Relatório de Pallets', href: '/relatorios/pallets' },
         { name: 'Relatório de Controles', href: '/relatorios/controles-carga' },
+        { name: 'Pendencias de Entrega', href: '/relatorios/pendencias-entrega' },
         { name: 'Fretes', href: '/relatorios/fretes' },
       ]
     },
