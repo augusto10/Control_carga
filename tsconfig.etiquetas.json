@@ -1,0 +1,21 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "next-env.d.ts",
+    "pages/etiquetas-transporte.tsx",
+    "pages/criar-etiquetas.tsx",
+    "pages/api/etiquetas/**/*.ts",
+    "components/layout/AppLayout.tsx",
+    "components/labels/TransportLabelPreview.tsx",
+    "components/labels/PrinterSelector.tsx",
+    "lib/zpl-transport.ts",
+    "lib/etiquetas-transporte.ts",
+    "lib/zpl-generator.ts",
+    "services/browser-label-print.ts",
+    "services/qz-print.ts",
+    "types/labels.ts",
+    "types/auth-types.ts",
+    "types/qz-tray.d.ts",
+    "types/react-input-mask.d.ts"
+  ]
+}

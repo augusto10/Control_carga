@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/router';
 import {
   Alert,
   alpha,
@@ -19,6 +20,7 @@ import {
   Download as DownloadIcon,
   Label as LabelIcon,
   LocalPrintshop as LocalPrintshopIcon,
+  LocalShipping as LocalShippingIcon,
   Search as SearchIcon,
 } from '@mui/icons-material';
 import { useSnackbar } from 'notistack';
@@ -63,6 +65,7 @@ const COMPACT_BUTTON_SX = {
 
 export default function CriarEtiquetasPage() {
   const { enqueueSnackbar } = useSnackbar();
+  const router = useRouter();
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [codigoAdm, setCodigoAdm] = useState('');
   const [produto, setProduto] = useState<ProdutoEtiqueta | null>(null);
@@ -118,13 +121,20 @@ export default function CriarEtiquetasPage() {
       setQzStatus({
         code: result.printers.length > 0 ? 'connected' : 'no_printers',
         message: result.printers.length > 0
-          ? 'QZ Tray conectado e impressoras locais carregadas.'
+          ? result.source === 'windows'
+            ? 'QZ Tray conectado. Impressoras carregadas pelo Windows como apoio.'
+            : 'QZ Tray conectado e impressoras locais carregadas.'
           : 'QZ Tray conectado, mas nenhuma impressora local foi encontrada.',
       });
 
       if (showToasts) {
         if (result.printers.length > 0) {
-          enqueueSnackbar('QZ Tray conectado e impressoras atualizadas.', { variant: 'success' });
+          enqueueSnackbar(
+            result.source === 'windows'
+              ? 'Impressoras encontradas pelo Windows e carregadas na tela.'
+              : 'QZ Tray conectado e impressoras atualizadas.',
+            { variant: 'success' }
+          );
         } else {
           enqueueSnackbar('Nenhuma impressora local foi encontrada.', { variant: 'warning' });
         }
@@ -251,22 +261,33 @@ export default function CriarEtiquetasPage() {
       ]}
     >
       <AppLayout
-        title="Criar Etiquetas"
+        title="Etiquetas de Produto"
         subtitle="Pesquise um produto pelo codigo ADM e imprima etiquetas com codigo de barras."
         breadcrumbs={[
           { label: 'Inicio', href: '/' },
-          { label: 'Criar Etiquetas' },
+          { label: 'Etiquetas de Produto' },
         ]}
         actions={(
-          <Button
-            size="small"
-            variant="outlined"
-            startIcon={checkingQz ? <CircularProgress size={18} color="inherit" /> : <LocalPrintshopIcon />}
-            onClick={() => void refreshPrinters(true)}
-            sx={COMPACT_BUTTON_SX}
-          >
-            Atualizar impressoras
-          </Button>
+          <>
+            <Button
+              size="small"
+              variant="contained"
+              startIcon={<LocalShippingIcon />}
+              onClick={() => void router.push('/etiquetas-transporte')}
+              sx={COMPACT_BUTTON_SX}
+            >
+              Etiquetas de Transporte
+            </Button>
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={checkingQz ? <CircularProgress size={18} color="inherit" /> : <LocalPrintshopIcon />}
+              onClick={() => void refreshPrinters(true)}
+              sx={COMPACT_BUTTON_SX}
+            >
+              Atualizar impressoras
+            </Button>
+          </>
         )}
       >
         <Stack spacing={3}>

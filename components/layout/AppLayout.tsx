@@ -94,10 +94,12 @@ export function AppLayout({
       ]
     },
     {
-      name: 'Criar Etiquetas',
+      name: 'Etiquetas',
       icon: Tags,
       children: [
-        { name: 'Criar Etiquetas', href: '/criar-etiquetas' },
+        { name: 'Etiquetas de Produto', href: '/criar-etiquetas' },
+        { name: 'Etiquetas de Transporte', href: '/etiquetas-transporte' },
+
       ]
     },
     {
@@ -348,8 +350,8 @@ export function AppLayout({
               !sidebarExpanded ? "flex justify-center" : "flex items-center gap-3"
             )}>
               <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center overflow-hidden border-2 border-white">
-                {user?.avatar_url ? (
-                  <img src={user.avatar_url} alt={user.nome} className="w-full h-full object-cover" />
+                {user?.foto ? (
+                  <img src={user.foto} alt={user.nome} className="w-full h-full object-cover" />
                 ) : (
                   <User className="w-6 h-6 text-slate-400" />
                 )}

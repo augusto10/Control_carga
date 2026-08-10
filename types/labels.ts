@@ -43,3 +43,45 @@ export interface QzStatus {
   code: QzStatusCode;
   message: string;
 }
+
+/**
+ * Etiquetas de Transporte - volumes individuais gerados por lote.
+ * Cada volume possui um codigo de barras unico (codigoVolume) usado
+ * na conferencia dos volumes no momento do carregamento/entrega.
+ */
+export interface EtiquetaVolumeData {
+  id: string;
+  loteId: string;
+  indiceVolume: number;
+  totalVolumes: number;
+  codigoVolume: string;
+  impressoEm: string | null;
+}
+
+export interface EtiquetaLoteData {
+  id: string;
+  dataCriacao: string;
+  codigoBarras: string;
+  numeroNota: string;
+  cliente: string;
+  cnpj?: string | null;
+  transportadora: string;
+  numeroPedido: string;
+  volumes: number;
+  observacoes: string | null;
+  criadoPor: string;
+  criadoPorNome?: string;
+  criadoPorUser?: { nome: string } | null;
+  volumesEtiquetas: EtiquetaVolumeData[];
+}
+
+export interface TransportLabelInput {
+  numeroPedido: string;
+  volumes: number;
+  cliente?: string;
+  cnpj?: string;
+  transportadora?: string;
+  numeroNota?: string;
+  codigoBarras?: string;
+  observacoes?: string;
+}

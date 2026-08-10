@@ -1,8 +1,14 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 import { apiExternaService, type ApuracaoExterna } from '@/services/api-externa';
-import { trackingDanfe } from '@/services/sswClient';
+import {
+  fetchMergedTracking,
+  hasPortalCredentials,
+  type SswTrackingResult,
+} from '@/services/sswTracking';
 import { createHash } from 'crypto';
+
+const CONFIRMATION_PREFIX = 'entrega_confirmacao:';
 
 const KANBAN_STATUSES = [
   'EM_PREPARACAO',
@@ -51,11 +57,15 @@ type PedidosExternosResponse = {
   total?: number;
 };
 
-type TrackingInfo = {
-  found: boolean;
-  delivered: boolean;
-  status: string | null;
-  message: string | null;
+type TrackingInfo = Pick<SswTrackingResult, 'found' | 'delivered' | 'status' | 'message'>;
+
+type DeliveryConfirmationInfo = {
+  controleId: string;
+  numeroNota: string;
+  entregue: boolean;
+  confirmadoPor: string | null;
+  dataConfirmacao: string | null;
+  observacao: string | null;
 };
 
 type KanbanCacheEntry = {
@@ -347,6 +357,31 @@ function isPedidoDoKanbanNaData(pedido: Record<string, unknown>, dataReferencia:
   );
 }
 
+function buildConfirmationKey(controleId: string, numeroNota: string): string {
+  return `${controleId}:${normalizeNumeroNota(numeroNota)}`;
+}
+
+function parseDeliveryConfirmation(value: string): DeliveryConfirmationInfo | null {
+  try {
+    const parsed = JSON.parse(value) as Record<string, unknown>;
+    const controleId = pickString(parsed.controleId);
+    const numeroNota = pickString(parsed.numeroNota);
+
+    if (!controleId || !numeroNota) return null;
+
+    return {
+      controleId,
+      numeroNota,
+      entregue: Boolean(parsed.entregue),
+      confirmadoPor: pickString(parsed.confirmadoPor),
+      dataConfirmacao: pickString(parsed.dataConfirmacao),
+      observacao: pickString(parsed.observacao),
+    };
+  } catch {
+    return null;
+  }
+}
+
 function getStatusLabel(status: KanbanStatus): string {
   switch (status) {
     case 'EM_PREPARACAO':
@@ -583,161 +618,6 @@ function enrichPedidoWithLocalNotaPorPedido(
         pedido.CHAVE_NFE,
         notaLocalPorPedido.codigo
       ) || null,
-  };
-}
-
-function extractTrackingText(data: Record<string, unknown>): string {
-  const direct = pickString(
-    data.mensagem,
-    data.MENSAGEM,
-    data.descricao,
-    data.DESCRICAO,
-    data.status,
-    data.STATUS,
-    data.situacao,
-    data.SITUACAO
-  );
-
-  if (direct) return direct;
-
-  for (const value of Object.values(data)) {
-    if (typeof value === 'string' && value.trim()) {
-      return value.trim();
-    }
-
-    if (Array.isArray(value) && value.length > 0) {
-      const last = value[value.length - 1];
-      if (last && typeof last === 'object') {
-        const nested = extractTrackingText(last as Record<string, unknown>);
-        if (nested) return nested;
-      }
-    }
-  }
-
-  return '';
-}
-
-function parseTrackingEventDateMs(event: Record<string, unknown>): number {
-  const raw =
-    pickString(event.data_hora_efetiva, event.data_hora, event.DATA_HORA_EFETIVA, event.DATA_HORA) ||
-    null;
-
-  if (!raw) return -1;
-
-  const parsed = new Date(raw);
-  return Number.isNaN(parsed.getTime()) ? -1 : parsed.getTime();
-}
-
-function isTrackingEventLike(value: unknown): value is Record<string, unknown> {
-  if (!value || typeof value !== 'object') return false;
-  const event = value as Record<string, unknown>;
-
-  return Boolean(
-    pickString(
-      event.ocorrencia,
-      event.OCORRENCIA,
-      event.descricao,
-      event.DESCRICAO,
-      event.data_hora,
-      event.DATA_HORA,
-      event.data_hora_efetiva,
-      event.DATA_HORA_EFETIVA
-    )
-  );
-}
-
-function extractTrackingEvents(payload: unknown): Array<Record<string, unknown>> {
-  const visited = new Set<unknown>();
-
-  const dfs = (node: unknown, depth: number): Array<Record<string, unknown>> | null => {
-    if (!node || typeof node !== 'object') return null;
-    if (visited.has(node) || depth > 8) return null;
-    visited.add(node);
-
-    if (Array.isArray(node)) {
-      const events = node.filter(isTrackingEventLike) as Array<Record<string, unknown>>;
-      if (events.length > 0) return events;
-
-      for (const item of node) {
-        const found = dfs(item, depth + 1);
-        if (found?.length) return found;
-      }
-
-      return null;
-    }
-
-    const objectNode = node as Record<string, unknown>;
-    for (const value of Object.values(objectNode)) {
-      const found = dfs(value, depth + 1);
-      if (found?.length) return found;
-    }
-
-    return null;
-  };
-
-  return dfs(payload, 0) ?? [];
-}
-
-function parseTrackingInfo(data: Record<string, unknown>): TrackingInfo {
-  const events = extractTrackingEvents(data).sort(
-    (a, b) => parseTrackingEventDateMs(a) - parseTrackingEventDateMs(b)
-  );
-  const latestEvent = events.length > 0 ? events[events.length - 1] : null;
-
-  const status =
-    pickString(
-      data.status,
-      data.STATUS,
-      data.situacao,
-      data.SITUACAO,
-      latestEvent?.ocorrencia,
-      latestEvent?.OCORRENCIA,
-      latestEvent?.tipo,
-      latestEvent?.TIPO
-    ) || null;
-
-  const message =
-    pickString(
-      latestEvent?.descricao,
-      latestEvent?.DESCRICAO,
-      latestEvent?.ocorrencia,
-      latestEvent?.OCORRENCIA
-    ) ||
-    extractTrackingText(data) ||
-    null;
-
-  const normalized = normalizeFreeText(
-    `${status || ''} ${message || ''} ${
-      latestEvent
-        ? pickString(
-            latestEvent.ocorrencia,
-            latestEvent.OCORRENCIA,
-            latestEvent.descricao,
-            latestEvent.DESCRICAO
-          ) || ''
-        : ''
-    }`
-  );
-
-  const delivered =
-    normalized.includes('entregue') ||
-    normalized.includes('entrega realizada') ||
-    normalized.includes('mercadoria entregue') ||
-    normalized.includes('recebido pelo destinatario') ||
-    normalized.includes('baixado');
-
-  const notFound =
-    normalized.includes('nenhum documento localizado') ||
-    normalized.includes('nenhum documento') ||
-    normalized.includes('nao encontrado') ||
-    normalized.includes('nao localizada') ||
-    normalized.includes('inexistente');
-
-  return {
-    found: !notFound,
-    delivered,
-    status,
-    message,
   };
 }
 
@@ -1013,71 +893,83 @@ export default async function handler(
       notaPorCodigo.set(onlyDigits(nota.codigo), nota);
     }
 
+    const confirmacaoRows = await prisma.configuracaoSistema.findMany({
+      where: { chave: { startsWith: CONFIRMATION_PREFIX } },
+      select: { valor: true },
+    });
+    const confirmacoes = new Map<string, DeliveryConfirmationInfo>();
+    for (const row of confirmacaoRows) {
+      const item = parseDeliveryConfirmation(row.valor);
+      if (!item?.entregue) continue;
+      confirmacoes.set(buildConfirmationKey(item.controleId, item.numeroNota), item);
+    }
+
     const sswEnabled = Boolean(
-      process.env.SSW_ACCERT_DOMAIN &&
+      (process.env.SSW_ACCERT_DOMAIN &&
         process.env.SSW_ACCERT_USERNAME &&
         process.env.SSW_ACCERT_CNPJ_EDI &&
-        process.env.SSW_ACCERT_PASSWORD
+        process.env.SSW_ACCERT_PASSWORD) ||
+        hasPortalCredentials()
     );
 
-    const chavesComControle = Array.from(
-      new Set(
-        pedidosComNotasLocaisPorPedido
-          .map((pedido) => {
-            const numeroNota =
-              pickString(
-                pedido.NUMERO_NOTA,
-                pedido.NUMERO_NOTA_FISCAL,
-                extractNumeroNotaFromExternalNota(
-                  getNotaCompletaDoPedido(notasFiscaisCompletasMap, pedido)
-                )
-              ) || null;
-            const chave = onlyDigits(pickString(pedido.IDENTIFICACAO_NFE, pedido.CHAVE_NFE));
-            const notaLocal =
-              (numeroNota ? notaPorNumero.get(normalizeNumeroNota(numeroNota)) : undefined) ||
-              notaPorCodigo.get(chave);
-            const pedidoId = extractPedidoId(pedido);
-            const notaLocalPorPedido = localNotasPorPedidoMap.get(pedidoId);
-            const controleIdResolvido = notaLocal?.controleId || notaLocalPorPedido?.controleId || null;
+    const chaveInfoMap = new Map<
+      string,
+      { numeroNota: string | null; transportadora: string | null }
+    >();
 
-            if (!controleIdResolvido || chave.length !== 44 || !sswEnabled) {
-              return null;
-            }
+    for (const pedido of pedidosComNotasLocaisPorPedido) {
+      const numeroNota =
+        pickString(
+          pedido.NUMERO_NOTA,
+          pedido.NUMERO_NOTA_FISCAL,
+          extractNumeroNotaFromExternalNota(
+            getNotaCompletaDoPedido(notasFiscaisCompletasMap, pedido)
+          )
+        ) || null;
+      const chave = onlyDigits(pickString(pedido.IDENTIFICACAO_NFE, pedido.CHAVE_NFE));
+      const notaLocal =
+        (numeroNota ? notaPorNumero.get(normalizeNumeroNota(numeroNota)) : undefined) ||
+        notaPorCodigo.get(chave);
+      const pedidoId = extractPedidoId(pedido);
+      const notaLocalPorPedido = localNotasPorPedidoMap.get(pedidoId);
+      const controleIdResolvido =
+        notaLocal?.controleId || notaLocalPorPedido?.controleId || null;
 
-            return chave;
-          })
-          .filter((value): value is string => Boolean(value))
-      )
-    );
+      if (!controleIdResolvido || chave.length !== 44 || !sswEnabled) {
+        continue;
+      }
 
-    const trackingEntries = await mapWithConcurrency(chavesComControle, 6, async (chave) => {
-      try {
-        const tracking = await trackingDanfe(chave);
-        if (tracking.erro) {
+      chaveInfoMap.set(chave, {
+        numeroNota,
+        transportadora:
+          notaLocal?.controle?.transportadora || notaLocalPorPedido?.controleTransportadora || null,
+      });
+    }
+
+    const trackingEntries = await mapWithConcurrency(
+      Array.from(chaveInfoMap.entries()),
+      6,
+      async ([chave, info]) => {
+        try {
+          const tracking = await fetchMergedTracking({
+            chave,
+            numeroNota: info.numeroNota,
+            transportadora: info.transportadora,
+          });
+          return [chave, tracking] as const;
+        } catch (error) {
           return [
             chave,
             {
               found: false,
               delivered: false,
               status: null,
-              message: pickString(tracking.mensagem, (tracking as Record<string, unknown>).MENSAGEM),
+              message: error instanceof Error ? error.message : 'Erro ao consultar SSW',
             } satisfies TrackingInfo,
           ] as const;
         }
-
-        return [chave, parseTrackingInfo(tracking)] as const;
-      } catch (error) {
-        return [
-          chave,
-          {
-            found: false,
-            delivered: false,
-            status: null,
-            message: error instanceof Error ? error.message : 'Erro ao consultar SSW',
-          } satisfies TrackingInfo,
-        ] as const;
       }
-    });
+    );
     const trackingMap = new Map<string, TrackingInfo>(trackingEntries);
 
     const columns: Record<KanbanStatus, PedidoKanban[]> = {
@@ -1114,6 +1006,10 @@ export default async function handler(
         notaLocal?.controle?.dataCriacao || notaLocalPorPedido?.controleDataCriacao || null;
       const controleTransportadoraResolvida =
         notaLocal?.controle?.transportadora || notaLocalPorPedido?.controleTransportadora || null;
+      const confirmacaoEntrega =
+        controleIdResolvido && numeroNota
+          ? confirmacoes.get(buildConfirmationKey(controleIdResolvido, numeroNota))
+          : null;
 
       const tracking = identificacaoNfe ? trackingMap.get(identificacaoNfe) : undefined;
 
@@ -1134,6 +1030,13 @@ export default async function handler(
         observacaoStatus = tracking.delivered
           ? 'SSW retornou status de entrega concluida'
           : 'Nota localizada no sistema da SSW';
+      }
+
+      if (confirmacaoEntrega?.entregue) {
+        status = 'PEDIDO_ENTREGUE';
+        observacaoStatus =
+          confirmacaoEntrega.observacao ||
+          'Entrega confirmada manualmente no Baixar Entregas';
       }
 
       const itemBase: PedidoKanbanBase = {
@@ -1168,8 +1071,12 @@ export default async function handler(
         controleId: controleIdResolvido,
         controleDataCriacao: controleDataCriacaoResolvida?.toISOString() || null,
         controleTransportadora: controleTransportadoraResolvida || null,
-        sswStatus: tracking?.status || null,
-        sswMensagem: tracking?.message || null,
+        sswStatus: tracking?.status || (confirmacaoEntrega?.entregue ? 'ENTREGA_CONFIRMADA' : null),
+        sswMensagem:
+          tracking?.message ||
+          (confirmacaoEntrega?.entregue
+            ? `Baixa confirmada${confirmacaoEntrega.confirmadoPor ? ` por ${confirmacaoEntrega.confirmadoPor}` : ''}`
+            : null),
       };
 
       columns[status].push(

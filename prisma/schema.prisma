@@ -366,6 +366,7 @@ model EtiquetaLote {
   codigoBarras    String           // Código de barras da NF-e lida
   numeroNota      String           // Número da nota fiscal
   cliente         String           // Nome do cliente
+  cnpj            String?          // CNPJ do cliente
   transportadora  Transportadora   // Transportadora selecionada
   numeroPedido    String           // Número do pedido
   volumes         Int              // Total de volumes/etiquetas

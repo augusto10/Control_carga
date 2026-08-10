@@ -9,6 +9,8 @@ interface PrinterSelectorProps {
   status: QzStatus;
   onInstall: () => void;
   onRetry: () => void;
+  hideDescription?: boolean;
+  hideFooterNote?: boolean;
 }
 
 export function PrinterSelector({
@@ -18,6 +20,8 @@ export function PrinterSelector({
   status,
   onInstall,
   onRetry,
+  hideDescription = false,
+  hideFooterNote = false,
 }: PrinterSelectorProps) {
   return (
     <Stack spacing={2}>
@@ -25,9 +29,11 @@ export function PrinterSelector({
         <Typography variant="subtitle1" fontWeight={800}>
           Impressora para etiquetas
         </Typography>
-        <Typography variant="body2" color="text.secondary">
-          Impressoras Zebra/ZDesigner usam impressao direta em ZPL pelo QZ Tray. As demais impressoras usam a janela de impressao do navegador.
-        </Typography>
+        {!hideDescription && (
+          <Typography variant="body2" color="text.secondary">
+            Impressoras Zebra/ZDesigner usam impressao direta em ZPL pelo QZ Tray. As demais impressoras usam a janela de impressao do navegador.
+          </Typography>
+        )}
       </Box>
 
       {status.code !== 'connected' && (
@@ -79,9 +85,11 @@ export function PrinterSelector({
         </Select>
       </FormControl>
 
-      <Typography variant="caption" color="text.secondary">
-        Fluxo assistido: baixar o QZ Tray, instalar no Windows, abrir o aplicativo, autorizar este site e manter a Zebra como impressora principal quando disponivel.
-      </Typography>
+      {!hideFooterNote && (
+        <Typography variant="caption" color="text.secondary">
+          Fluxo assistido: baixar o QZ Tray, instalar no Windows, abrir o aplicativo, autorizar este site e manter a Zebra como impressora principal quando disponivel.
+        </Typography>
+      )}
     </Stack>
   );
 }

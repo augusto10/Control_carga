@@ -1,16 +1,10 @@
 ﻿import type { NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
-import { apiExternaService } from '@/services/api-externa';
 import { AuthenticatedRequest, withAuth } from '@/lib/middleware/withAuth';
 
 const CONFIRMATION_PREFIX = 'entrega_confirmacao:';
 const SUPERVISOR_ROLES = new Set(['ADMIN', 'GERENTE']);
-const THIRD_PARTY_CARRIERS = [
-  'TERCEIRIZADA',
-  'DETAFRA_TRANSPORTES',
-  'EXPRESSO_GOIAS',
-  'ZANUELO_TRANSPORTE_LOGISTICA',
-] as const;
+const THIRD_PARTY_CARRIERS = ['TERCEIRIZADA'] as const;
 
 const first = (value: string | string[] | undefined) =>
   Array.isArray(value) ? value[0] : value;
@@ -22,103 +16,6 @@ const normalizeNota = (value: unknown) => {
 
 const normalizeName = (value: string) =>
   value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
-
-const pick = (...values: unknown[]) =>
-  values.find(
-    (value) => value !== null && value !== undefined && String(value).trim() !== ''
-  );
-
-const pickString = (...values: unknown[]) => {
-  const value = pick(...values);
-  return value === undefined ? null : String(value);
-};
-
-const pickPedidoId = (...values: unknown[]) => {
-  const value = pick(...values);
-  return value === undefined ? null : (typeof value === 'number' || typeof value === 'string' ? value : String(value));
-};
-
-const resolveNotaDetails = async (
-  nota: { id: string; numeroNota: string; codigo: string | null },
-  username: string,
-  password: string
-) => {
-  const baseDetails = {
-    cliente: nota.codigo || 'Cliente não identificado',
-    codigoCliente: null as string | number | null,
-    pedidoId: null as string | number | null,
-    numeroPedido: null as string | null,
-    vendedor: null as string | null,
-  };
-
-  const accessKey = String(nota.codigo || '').replace(/\D/g, '');
-  const external =
-    accessKey.length === 44
-      ? await apiExternaService.buscarNotaFiscalPorChave(accessKey, username, password)
-      : await apiExternaService.buscarNotaFiscalPorNumeroSerie(
-          nota.numeroNota,
-          '1',
-          username,
-          password
-        );
-
-  const fiscal = external?.nota_fiscal || external?.notaFiscal || {};
-  const order = external?.pedido || external?.pedido_venda || {};
-  const data = { ...(external || {}), ...order, ...fiscal };
-
-  const pedidoId =
-    pickPedidoId(
-      data.ORCAMENTO_ID,
-      data.orcamento_id,
-      data.PEDIDO_ID,
-      data.pedido_id,
-      data.id
-    ) || null;
-
-  let logistica: Record<string, any> | null = null;
-  if (pedidoId !== null) {
-    logistica = await apiExternaService.buscarPedidoLogistica(pedidoId, username, password);
-  }
-
-  const pedidoLogistica = (logistica?.pedido || {}) as Record<string, any>;
-  const notaFiscalLogistica = Array.isArray(logistica?.notas_fiscais) ? logistica.notas_fiscais[0] || {} : {};
-  const merged = { ...data, ...pedidoLogistica, ...notaFiscalLogistica };
-
-  return {
-    cliente:
-      pickString(
-        merged.CLIENTE_NOME,
-        merged.NOME_FANTASIA,
-        merged.NOME_RAZAO_SOCIAL,
-        merged.razaoSocial,
-        merged.cliente?.nome
-      ) || baseDetails.cliente,
-    codigoCliente: pickPedidoId(
-      merged.CLIENTE_ID,
-      merged.CLIENTE_CODIGO,
-      merged.CODIGO_CLIENTE,
-      merged.COD_CLIENTE,
-      merged.cliente?.codigo,
-      merged.cliente?.id
-    ),
-    pedidoId,
-    numeroPedido:
-      pickString(
-        merged.NUMERO_PEDIDO,
-        merged.numero_pedido,
-        merged.PEDIDO_NUMERO,
-        pedidoLogistica.NUMERO_ORCAMENTO,
-        pedidoLogistica.ORCAMENTO_NUMERO
-      ) || null,
-    vendedor:
-      pickString(
-        merged.VENDEDOR_NOME,
-        merged.NOME_REPRESENTANTE,
-        merged.VENDEDOR,
-        merged.REPRESENTANTE_NOME
-      ) || null,
-  };
-};
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -143,6 +40,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     const where: any = {
       finalizado: true,
+      transportadora: { in: [...THIRD_PARTY_CARRIERS] },
     };
 
     if (dataInicio || dataFim) {
@@ -163,13 +61,9 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       orderBy: { dataCriacao: 'desc' },
     });
 
-    const thirdPartyCarrierSet = new Set<string>(THIRD_PARTY_CARRIERS);
-    const controlesTerceirizados = controlesDb.filter((controle) =>
-      thirdPartyCarrierSet.has(controle.transportadora)
-    );
     const controlesFiltrados = isSupervisor
-      ? controlesTerceirizados
-      : controlesTerceirizados.filter(
+      ? controlesDb
+      : controlesDb.filter(
           (controle) => normalizeName(controle.motorista) === normalizeName(user.nome)
         );
     // Motoristas veem somente os tres controles mais recentes por padrao.
@@ -200,16 +94,6 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     const confirmationMap = new Map(
       confirmacoes.map((item) => [`${item.controleId}:${normalizeNota(item.numeroNota)}`, item])
     );
-    const username = process.env.API_EXTERNA_USERNAME;
-    const password = process.env.API_EXTERNA_PASSWORD;
-    const notaDetailsCache = new Map<string, {
-      cliente: string;
-      codigoCliente: string | number | null;
-      pedidoId: string | number | null;
-      numeroPedido: string | null;
-      vendedor: string | null;
-    }>();
-
     const entregas = (
       await Promise.all(
         controles.map(async (controle) => {
@@ -219,24 +103,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
                 `${controle.id}:${normalizeNota(nota.numeroNota)}`
               );
 
-              let externalDetails = notaDetailsCache.get(nota.id);
-              if (!externalDetails) {
-                externalDetails = {
-                  cliente: nota.codigo || 'Cliente não identificado',
-                  codigoCliente: null,
-                  pedidoId: null,
-                  numeroPedido: null,
-                  vendedor: null,
-                };
-
-                if (username && password) {
-                  externalDetails = await resolveNotaDetails(nota, username, password);
-                }
-
-                notaDetailsCache.set(nota.id, externalDetails);
-              }
-
-              const resolvedDetails = externalDetails || {
+              const resolvedDetails = {
                 cliente: nota.codigo || 'Cliente não identificado',
                 codigoCliente: null,
                 pedidoId: null,
@@ -306,7 +173,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     const todasNotas = entregas.flatMap((controle) => controle.notas);
     const motoristas = isSupervisor
-      ? [...new Set(controlesTerceirizados.map((controle) => controle.motorista).filter(Boolean))].sort()
+      ? [...new Set(controlesDb.map((controle) => controle.motorista).filter(Boolean))].sort()
       : [user.nome];
 
     return res.status(200).json({

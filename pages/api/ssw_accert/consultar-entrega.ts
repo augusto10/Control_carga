@@ -1,7 +1,14 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 import { apiExternaService } from '@/services/api-externa';
-import { trackingDanfe } from '@/services/sswClient';
+import {
+  fetchMergedTracking,
+  hasPortalCredentials,
+  type SswTrackingOccurrence,
+  type SswTrackingResult,
+} from '@/services/sswTracking';
+
+const CONFIRMATION_PREFIX = 'entrega_confirmacao:';
 
 const DELIVERY_STATUSES = [
   'EM_PREPARACAO',
@@ -12,14 +19,17 @@ const DELIVERY_STATUSES = [
 
 type DeliveryStatus = typeof DELIVERY_STATUSES[number];
 
-type DeliveryTrackingInfo = {
-  found: boolean;
-  delivered: boolean;
-  status: string | null;
-  message: string | null;
-  deliveredAt: string | null;
-  receiverName: string | null;
-  photoUrl: string | null;
+type DeliveryTrackingInfo = SswTrackingResult;
+
+type DeliveryConfirmationInfo = {
+  controleId: string;
+  numeroNota: string;
+  entregue: boolean;
+  dataConfirmacao: string | null;
+  confirmadoPor: string | null;
+  recebedor: string | null;
+  observacao: string | null;
+  fotoComprovante: string | null;
 };
 
 type DeliveryItem = {
@@ -44,6 +54,7 @@ type DeliveryItem = {
   dataHoraEntrega: string | null;
   recebedor: string | null;
   fotoEntregaUrl: string | null;
+  occurrencias: SswTrackingOccurrence[];
 };
 
 function pickString(...values: Array<unknown>): string | null {
@@ -83,12 +94,8 @@ function normalizeNumeroNota(value: string | null | undefined): string {
   return digits.replace(/^0+/, '') || '0';
 }
 
-function normalizeFreeText(value: string | null | undefined): string {
-  return String(value || '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .trim();
+function buildConfirmationKey(controleId: string, numeroNota: string): string {
+  return `${controleId}:${normalizeNumeroNota(numeroNota)}`;
 }
 
 function extractPedidoId(pedido: Record<string, unknown>): number {
@@ -126,6 +133,29 @@ function extractPedidoCnpj(pedido: Record<string, unknown>): string | null {
 
   const digits = onlyDigits(raw);
   return digits || raw;
+}
+
+function parseDeliveryConfirmation(value: string): DeliveryConfirmationInfo | null {
+  try {
+    const parsed = JSON.parse(value) as Record<string, unknown>;
+    const controleId = pickString(parsed.controleId);
+    const numeroNota = pickString(parsed.numeroNota);
+
+    if (!controleId || !numeroNota) return null;
+
+    return {
+      controleId,
+      numeroNota,
+      entregue: Boolean(parsed.entregue),
+      dataConfirmacao: pickString(parsed.dataConfirmacao),
+      confirmadoPor: pickString(parsed.confirmadoPor),
+      recebedor: pickString(parsed.recebedor),
+      observacao: pickString(parsed.observacao),
+      fotoComprovante: pickString(parsed.fotoComprovante),
+    };
+  } catch {
+    return null;
+  }
 }
 
 function extractVendedorLabel(pedido: Record<string, unknown>): string {
@@ -284,226 +314,6 @@ function enrichPedidoWithNotaFiscalCompleta(
         notaFiscal.valor_total,
         notaFiscal.valor
       ) ?? null,
-  };
-}
-
-function extractTrackingText(data: Record<string, unknown>): string {
-  const direct = pickString(
-    data.mensagem,
-    data.MENSAGEM,
-    data.descricao,
-    data.DESCRICAO,
-    data.status,
-    data.STATUS,
-    data.situacao,
-    data.SITUACAO
-  );
-
-  if (direct) return direct;
-
-  for (const value of Object.values(data)) {
-    if (typeof value === 'string' && value.trim()) {
-      return value.trim();
-    }
-
-    if (Array.isArray(value) && value.length > 0) {
-      const last = value[value.length - 1];
-      if (last && typeof last === 'object') {
-        const nested = extractTrackingText(last as Record<string, unknown>);
-        if (nested) return nested;
-      }
-    }
-  }
-
-  return '';
-}
-
-function parseTrackingEventDateMs(event: Record<string, unknown>): number {
-  const raw =
-    pickString(event.data_hora_efetiva, event.data_hora, event.DATA_HORA_EFETIVA, event.DATA_HORA) ||
-    null;
-
-  if (!raw) return -1;
-
-  const parsed = new Date(raw);
-  return Number.isNaN(parsed.getTime()) ? -1 : parsed.getTime();
-}
-
-function extractTrackingEventPhotoUrl(event: Record<string, unknown> | null | undefined): string | null {
-  if (!event) return null;
-  return (
-    pickString(
-      event.foto,
-      event.FOTO,
-      event.imagem,
-      event.IMAGEM,
-      event.comprovante,
-      event.COMPROVANTE,
-      event.url_foto,
-      event.URL_FOTO,
-      event.link_foto,
-      event.LINK_FOTO,
-      event.url_imagem,
-      event.URL_IMAGEM,
-      event.pod,
-      event.POD
-    ) || null
-  );
-}
-
-function extractTrackingEventReceiver(event: Record<string, unknown> | null | undefined): string | null {
-  if (!event) return null;
-  return (
-    pickString(
-      event.recebedor,
-      event.RECEBEDOR,
-      event.nome_recebedor,
-      event.NOME_RECEBEDOR,
-      event.recebido_por,
-      event.RECEBIDO_POR,
-      event.destinatario,
-      event.DESTINATARIO,
-      event.nome_destinatario,
-      event.NOME_DESTINATARIO
-    ) || null
-  );
-}
-
-function isTrackingEventLike(value: unknown): value is Record<string, unknown> {
-  if (!value || typeof value !== 'object') return false;
-  const event = value as Record<string, unknown>;
-
-  return Boolean(
-    pickString(
-      event.ocorrencia,
-      event.OCORRENCIA,
-      event.descricao,
-      event.DESCRICAO,
-      event.data_hora,
-      event.DATA_HORA,
-      event.data_hora_efetiva,
-      event.DATA_HORA_EFETIVA
-    )
-  );
-}
-
-function extractTrackingEvents(payload: unknown): Array<Record<string, unknown>> {
-  const visited = new Set<unknown>();
-
-  const dfs = (node: unknown, depth: number): Array<Record<string, unknown>> | null => {
-    if (!node || typeof node !== 'object') return null;
-    if (visited.has(node) || depth > 8) return null;
-    visited.add(node);
-
-    if (Array.isArray(node)) {
-      const events = node.filter(isTrackingEventLike) as Array<Record<string, unknown>>;
-      if (events.length > 0) return events;
-
-      for (const item of node) {
-        const found = dfs(item, depth + 1);
-        if (found?.length) return found;
-      }
-
-      return null;
-    }
-
-    const objectNode = node as Record<string, unknown>;
-    for (const value of Object.values(objectNode)) {
-      const found = dfs(value, depth + 1);
-      if (found?.length) return found;
-    }
-
-    return null;
-  };
-
-  return dfs(payload, 0) ?? [];
-}
-
-function parseTrackingInfo(data: Record<string, unknown>): DeliveryTrackingInfo {
-  const events = extractTrackingEvents(data).sort(
-    (a, b) => parseTrackingEventDateMs(a) - parseTrackingEventDateMs(b)
-  );
-  const latestEvent = events.length > 0 ? events[events.length - 1] : null;
-
-  const status =
-    pickString(
-      data.status,
-      data.STATUS,
-      data.situacao,
-      data.SITUACAO,
-      latestEvent?.ocorrencia,
-      latestEvent?.OCORRENCIA,
-      latestEvent?.tipo,
-      latestEvent?.TIPO
-    ) || null;
-
-  const message =
-    pickString(
-      latestEvent?.descricao,
-      latestEvent?.DESCRICAO,
-      latestEvent?.ocorrencia,
-      latestEvent?.OCORRENCIA
-    ) ||
-    extractTrackingText(data) ||
-    null;
-
-  const normalized = normalizeFreeText(
-    `${status || ''} ${message || ''} ${
-      latestEvent
-        ? pickString(
-            latestEvent.ocorrencia,
-            latestEvent.OCORRENCIA,
-            latestEvent.descricao,
-            latestEvent.DESCRICAO
-          ) || ''
-        : ''
-    }`
-  );
-
-  const delivered =
-    normalized.includes('entregue') ||
-    normalized.includes('entrega realizada') ||
-    normalized.includes('mercadoria entregue') ||
-    normalized.includes('recebido pelo destinatario') ||
-    normalized.includes('baixado');
-
-  const deliveredEvent = delivered
-    ? [...events]
-        .reverse()
-        .find((event) =>
-          normalizeFreeText(
-            `${pickString(event.ocorrencia, event.OCORRENCIA, event.descricao, event.DESCRICAO) || ''}`
-          ).match(/entregue|entrega realizada|mercadoria entregue|recebido pelo destinatario|baixado/)
-        ) || latestEvent
-    : null;
-
-  const deliveredAt =
-    pickString(
-      deliveredEvent?.data_hora_efetiva,
-      deliveredEvent?.DATA_HORA_EFETIVA,
-      deliveredEvent?.data_hora,
-      deliveredEvent?.DATA_HORA,
-      deliveredEvent?.data_entrega,
-      deliveredEvent?.DATA_ENTREGA
-    ) || null;
-  const receiverName = extractTrackingEventReceiver(deliveredEvent);
-  const photoUrl = extractTrackingEventPhotoUrl(deliveredEvent);
-
-  const notFound =
-    normalized.includes('nenhum documento localizado') ||
-    normalized.includes('nenhum documento') ||
-    normalized.includes('nao encontrado') ||
-    normalized.includes('nao localizada') ||
-    normalized.includes('inexistente');
-
-  return {
-    found: !notFound,
-    delivered,
-    status,
-    message,
-    deliveredAt,
-    receiverName,
-    photoUrl,
   };
 }
 
@@ -710,77 +520,86 @@ export default async function handler(
       notaPorCodigo.set(onlyDigits(nota.codigo), nota);
     }
 
+    const confirmacaoRows = await prisma.configuracaoSistema.findMany({
+      where: { chave: { startsWith: CONFIRMATION_PREFIX } },
+      select: { valor: true },
+    });
+    const confirmacoes = new Map<string, DeliveryConfirmationInfo>();
+    for (const row of confirmacaoRows) {
+      const item = parseDeliveryConfirmation(row.valor);
+      if (!item?.entregue) continue;
+      confirmacoes.set(buildConfirmationKey(item.controleId, item.numeroNota), item);
+    }
+
     const sswEnabled = Boolean(
-      process.env.SSW_ACCERT_DOMAIN &&
+      (process.env.SSW_ACCERT_DOMAIN &&
         process.env.SSW_ACCERT_USERNAME &&
         process.env.SSW_ACCERT_CNPJ_EDI &&
-        process.env.SSW_ACCERT_PASSWORD
+        process.env.SSW_ACCERT_PASSWORD) ||
+        hasPortalCredentials()
     );
 
     const pedidosComNotasLocaisPorPedido = pedidosResolvidos;
 
-    const chavesComControle = Array.from(
-      new Set(
-        pedidosComNotasLocaisPorPedido
-          .map((pedido) => {
-            const numeroNota =
-              pickString(
-                pedido.NUMERO_NOTA,
-                pedido.NUMERO_NOTA_FISCAL,
-                extractNumeroNotaFromExternalNota(
-                  notasFiscaisCompletasMap.get(extractNotaFiscalId(pedido) || 0) || null
-                )
-              ) || null;
-            const chave = onlyDigits(pickString(pedido.IDENTIFICACAO_NFE, pedido.CHAVE_NFE));
-            const notaLocal =
-              (numeroNota ? notaPorNumero.get(normalizeNumeroNota(numeroNota)) : undefined) ||
-              notaPorCodigo.get(chave);
-            const controleIdResolvido = notaLocal?.controleId || null;
+    const chaveInfoMap = new Map<
+      string,
+      { numeroNota: string | null; transportadora: string | null }
+    >();
 
-            if (!controleIdResolvido || chave.length !== 44 || !sswEnabled) {
-              return null;
-            }
+    for (const pedido of pedidosComNotasLocaisPorPedido) {
+      const numeroNota =
+        pickString(
+          pedido.NUMERO_NOTA,
+          pedido.NUMERO_NOTA_FISCAL,
+          extractNumeroNotaFromExternalNota(
+            notasFiscaisCompletasMap.get(extractNotaFiscalId(pedido) || 0) || null
+          )
+        ) || null;
+      const chave = onlyDigits(pickString(pedido.IDENTIFICACAO_NFE, pedido.CHAVE_NFE));
+      const notaLocal =
+        (numeroNota ? notaPorNumero.get(normalizeNumeroNota(numeroNota)) : undefined) ||
+        notaPorCodigo.get(chave);
+      const controleIdResolvido = notaLocal?.controleId || null;
 
-            return chave;
-          })
-          .filter((value): value is string => Boolean(value))
-      )
-    );
+      if (!controleIdResolvido || chave.length !== 44 || !sswEnabled) {
+        continue;
+      }
 
-    const trackingEntries = await mapWithConcurrency(chavesComControle, 6, async (chave) => {
-      try {
-        const tracking = await trackingDanfe(chave);
-        if (tracking.erro) {
+      chaveInfoMap.set(chave, {
+        numeroNota,
+        transportadora: notaLocal?.controle?.transportadora || null,
+      });
+    }
+
+    const trackingEntries = await mapWithConcurrency(
+      Array.from(chaveInfoMap.entries()),
+      6,
+      async ([chave, info]) => {
+        try {
+          const tracking = await fetchMergedTracking({
+            chave,
+            numeroNota: info.numeroNota,
+            transportadora: info.transportadora,
+          });
+          return [chave, tracking] as const;
+        } catch (error) {
           return [
             chave,
-          {
-            found: false,
-            delivered: false,
-            status: null,
-            message: pickString(tracking.mensagem, (tracking as Record<string, unknown>).MENSAGEM),
-            deliveredAt: null,
-            receiverName: null,
-            photoUrl: null,
-          } satisfies DeliveryTrackingInfo,
-        ] as const;
+            {
+              found: false,
+              delivered: false,
+              status: null,
+              message: error instanceof Error ? error.message : 'Erro ao consultar SSW',
+              deliveredAt: null,
+              receiverName: null,
+              photoUrl: null,
+              occurrences: [],
+              source: null,
+            } satisfies DeliveryTrackingInfo,
+          ] as const;
         }
-
-        return [chave, parseTrackingInfo(tracking)] as const;
-      } catch (error) {
-        return [
-          chave,
-          {
-            found: false,
-            delivered: false,
-            status: null,
-            message: error instanceof Error ? error.message : 'Erro ao consultar SSW',
-            deliveredAt: null,
-            receiverName: null,
-            photoUrl: null,
-          } satisfies DeliveryTrackingInfo,
-        ] as const;
       }
-    });
+    );
     const trackingMap = new Map<string, DeliveryTrackingInfo>(trackingEntries);
 
     const items = pedidosComNotasLocaisPorPedido.map((pedido) => {
@@ -805,6 +624,10 @@ export default async function handler(
       const controleIdResolvido = notaLocal?.controleId || null;
       const controleDataCriacaoResolvida = notaLocal?.controle?.dataCriacao || null;
       const controleTransportadoraResolvida = notaLocal?.controle?.transportadora || null;
+      const confirmacaoEntrega =
+        controleIdResolvido && numeroNota
+          ? confirmacoes.get(buildConfirmationKey(controleIdResolvido, numeroNota))
+          : null;
 
       const tracking = identificacaoNfe ? trackingMap.get(identificacaoNfe) : undefined;
 
@@ -825,6 +648,13 @@ export default async function handler(
         observacaoStatus = tracking.delivered
           ? 'SSW retornou status de entrega concluida'
           : 'Nota localizada no sistema da SSW';
+      }
+
+      if (confirmacaoEntrega?.entregue) {
+        status = 'PEDIDO_ENTREGUE';
+        observacaoStatus =
+          confirmacaoEntrega.observacao ||
+          'Entrega confirmada manualmente no Baixar Entregas';
       }
 
       return {
@@ -860,12 +690,17 @@ export default async function handler(
         controleTransportadora: controleTransportadoraResolvida || null,
         status,
         statusLabel: getStatusLabel(status),
-        sswStatus: tracking?.status || null,
-        sswMensagem: tracking?.message || null,
+        sswStatus: tracking?.status || (confirmacaoEntrega?.entregue ? 'ENTREGA_CONFIRMADA' : null),
+        sswMensagem:
+          tracking?.message ||
+          (confirmacaoEntrega?.entregue
+            ? `Baixa confirmada${confirmacaoEntrega.confirmadoPor ? ` por ${confirmacaoEntrega.confirmadoPor}` : ''}`
+            : null),
         observacaoStatus,
-        dataHoraEntrega: tracking?.deliveredAt || null,
-        recebedor: tracking?.receiverName || null,
-        fotoEntregaUrl: tracking?.photoUrl || null,
+        dataHoraEntrega: tracking?.deliveredAt || confirmacaoEntrega?.dataConfirmacao || null,
+        recebedor: tracking?.receiverName || confirmacaoEntrega?.recebedor || null,
+        fotoEntregaUrl: tracking?.photoUrl || confirmacaoEntrega?.fotoComprovante || null,
+        occurrencias: tracking?.occurrences ?? [],
       } satisfies DeliveryItem;
     });
 

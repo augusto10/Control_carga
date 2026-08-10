@@ -70,9 +70,12 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     const username = process.env.API_EXTERNA_USERNAME;
     const password = process.env.API_EXTERNA_PASSWORD;
+    const externalApiAvailable =
+      Boolean(username && password) &&
+      await apiExternaService.ensureAuthenticated(username as string, password as string);
     let external: any = null;
 
-    if (username && password) {
+    if (externalApiAvailable && username && password) {
       const accessKey = String(nota.codigo || '').replace(/\D/g, '');
       external =
         accessKey.length === 44
@@ -98,7 +101,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       ) || null;
 
     let logistica: Record<string, any> | null = null;
-    if (pedidoId !== null && username && password) {
+    if (pedidoId !== null && externalApiAvailable && username && password) {
       logistica = await apiExternaService.buscarPedidoLogistica(pedidoId, username, password);
     }
 

@@ -3,6 +3,8 @@ import axios, { AxiosInstance } from 'axios';
 const API_EXTERNA_BASE = 'http://ec2-15-229-152-29.sa-east-1.compute.amazonaws.com';
 const API_EXTERNA_TIMEOUT_MS = 45_000;
 const API_EXTERNA_LOGIN_TIMEOUT_MS = 30_000;
+const API_EXTERNA_LOGIN_RETRY_BLOCK_MS = 5 * 60 * 1000;
+const API_EXTERNA_TOKEN_FALLBACK_TTL_MS = 50 * 60 * 1000;
 
 interface LoginResponse {
   access_token: string;
@@ -103,6 +105,9 @@ class APIExternaService {
   private apiInstance: AxiosInstance;
   private token: string | null = null;
   private tokenExpiration: number | null = null;
+  private loginPromise: Promise<string | null> | null = null;
+  private authBlockedUntil: number | null = null;
+  private lastAuthError: string | null = null;
 
   constructor() {
     this.apiInstance = axios.create({
@@ -130,6 +135,8 @@ class APIExternaService {
           console.log('[API Externa] Token expirado, renovando...');
           this.token = null;
           this.tokenExpiration = null;
+          this.authBlockedUntil = null;
+          this.lastAuthError = null;
           return Promise.reject(error);
         }
         return Promise.reject(error);
@@ -137,7 +144,27 @@ class APIExternaService {
     );
   }
 
+  private clearAuthState() {
+    this.token = null;
+    this.tokenExpiration = null;
+    this.authBlockedUntil = null;
+    this.lastAuthError = null;
+  }
+
   async login(username: string, password: string): Promise<string | null> {
+    if (this.loginPromise) {
+      return this.loginPromise;
+    }
+
+    if (this.authBlockedUntil && Date.now() < this.authBlockedUntil) {
+      const remainingSeconds = Math.ceil((this.authBlockedUntil - Date.now()) / 1000);
+      console.warn(
+        `[API Externa] Novo login bloqueado temporariamente por ${remainingSeconds}s após falha anterior.`
+      );
+      return null;
+    }
+
+    this.loginPromise = (async () => {
     try {
       console.log('[API Externa] Tentando login com username:', username);
       
@@ -159,13 +186,19 @@ class APIExternaService {
 
       this.token = response.data.access_token;
       
-      if (response.data.expires_in) {
-        this.tokenExpiration = Date.now() + response.data.expires_in * 1000;
-      }
+      this.tokenExpiration = response.data.expires_in
+        ? Date.now() + response.data.expires_in * 1000
+        : Date.now() + API_EXTERNA_TOKEN_FALLBACK_TTL_MS;
+      this.authBlockedUntil = null;
+      this.lastAuthError = null;
 
       console.log('[API Externa] Login realizado com sucesso');
       return this.token;
     } catch (error: any) {
+      this.token = null;
+      this.tokenExpiration = null;
+      this.authBlockedUntil = Date.now() + API_EXTERNA_LOGIN_RETRY_BLOCK_MS;
+      this.lastAuthError = error?.response?.data?.detail || error?.response?.data?.message || error.message || 'Falha no login';
       console.error('[API Externa] Erro no login:', {
         message: error.message,
         response: error.response ? {
@@ -176,7 +209,12 @@ class APIExternaService {
         url: `${API_EXTERNA_BASE}/token`
       });
       return null;
+    } finally {
+      this.loginPromise = null;
     }
+    })();
+
+    return this.loginPromise;
   }
 
   private isTokenValid(): boolean {
@@ -190,6 +228,9 @@ class APIExternaService {
       return true;
     }
     const token = await this.login(username, password);
+    if (!token && this.lastAuthError) {
+      console.warn('[API Externa] Autenticacao indisponivel:', this.lastAuthError);
+    }
     return token !== null;
   }
 
@@ -361,6 +402,50 @@ class APIExternaService {
     } catch (error: any) {
       console.error(
         '[API Externa] Erro ao buscar pedido:',
+        error.response?.data || error.message
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Busca um pedido pelo id (ORCAMENTO_ID == numero do pedido).
+   * O endpoint /api/v1/pedidos nao aplica o filtro numero_pedido (retorna
+   * sempre os mais recentes), por isso a resolucao direta por id e preferida.
+   */
+  async buscarPedidoPorId(
+    pedidoId: string,
+    username: string,
+    password: string
+  ): Promise<PedidoExterno | null> {
+    try {
+      const authenticated = await this.ensureAuthenticated(username, password);
+      if (!authenticated) {
+        console.error('[API Externa] Falha na autenticação');
+        return null;
+      }
+
+      const url = `/api/v1/pedidos/${encodeURIComponent(pedidoId)}`;
+      console.log('[API Externa] Buscando pedido por id:', url);
+
+      const response = await this.apiInstance.get<PedidoExterno>(url, {
+        validateStatus: (status) => status < 500,
+        timeout: API_EXTERNA_TIMEOUT_MS,
+      });
+
+      if (response.status >= 400) {
+        console.warn(
+          `[API Externa] Pedido ${pedidoId} nao encontrado:`,
+          response.status,
+          response.statusText
+        );
+        return null;
+      }
+
+      return response.data || null;
+    } catch (error: any) {
+      console.error(
+        '[API Externa] Erro ao buscar pedido por id:',
         error.response?.data || error.message
       );
       return null;

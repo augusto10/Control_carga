@@ -20,6 +20,12 @@ import {
   Select,
   Snackbar,
   Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
   TextField,
   Typography,
   useMediaQuery,
@@ -166,17 +172,17 @@ function SummaryCard({
     <Paper
       elevation={0}
       sx={{
-        p: { xs: 1.5, sm: 2 },
-        borderRadius: 3,
+        p: { xs: 1.25, sm: 1.5 },
+        borderRadius: 2,
         border: '1px solid',
         borderColor: 'divider',
-        bgcolor: 'rgba(255,255,255,0.88)',
+        bgcolor: 'rgba(255,255,255,0.94)',
       }}
     >
       <Stack direction="row" spacing={1.25} alignItems="center">
-        <Avatar sx={{ width: 38, height: 38, bgcolor: `${color}18`, color }}>{icon}</Avatar>
+        <Avatar sx={{ width: 34, height: 34, bgcolor: `${color}14`, color }}>{icon}</Avatar>
         <Box>
-          <Typography variant="h5" fontWeight={900} lineHeight={1}>
+          <Typography variant="h6" fontWeight={900} lineHeight={1}>
             {value}
           </Typography>
           <Typography variant="caption" color="text.secondary" fontWeight={700}>
@@ -215,6 +221,7 @@ export default function BaixarEntregasPage() {
     message: '',
     severity: 'success' as 'success' | 'error',
   });
+  const isSupervisorView = Boolean(data?.podeVerTodos);
 
   const loadDeliveries = useCallback(async () => {
     setLoading(true);
@@ -403,37 +410,43 @@ export default function BaixarEntregasPage() {
       }
     >
       <AppLayout
-        title="Minhas entregas"
-        subtitle={`Pedidos atribuídos a ${data?.motoristaLogado || user?.nome || 'você'}`}
-        breadcrumbs={[{ label: 'Minhas entregas' }]}
+        title={isSupervisorView ? 'Entregas dos Motoristas' : 'Minhas entregas'}
+        subtitle={
+          isSupervisorView
+            ? 'Acompanhe e filtre as entregas terceirizadas dos motoristas.'
+            : `Pedidos atribuídos a ${data?.motoristaLogado || user?.nome || 'você'}`
+        }
+        breadcrumbs={[{ label: isSupervisorView ? 'Entregas dos Motoristas' : 'Minhas entregas' }]}
       >
         <Stack spacing={2.5} sx={{ maxWidth: 1120, mx: 'auto' }}>
           <Paper
             elevation={0}
             sx={{
               overflow: 'hidden',
-              borderRadius: 4,
-              color: 'white',
+              borderRadius: 2,
+              color: '#134e4a',
+              border: '1px solid',
+              borderColor: 'rgba(15, 118, 110, 0.14)',
               background:
-                'radial-gradient(circle at 85% 20%, rgba(251,191,36,.38), transparent 28%), linear-gradient(135deg, #0f766e 0%, #115e59 55%, #134e4a 100%)',
+                'radial-gradient(circle at 85% 20%, rgba(251,191,36,.14), transparent 24%), linear-gradient(135deg, #ecfdf5 0%, #dff7f2 55%, #d7f1ed 100%)',
             }}
           >
-            <Box sx={{ p: { xs: 2.5, sm: 3.5 } }}>
+            <Box sx={{ p: { xs: 1.75, sm: 2.25 } }}>
               <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
                 <Box>
                   <Typography variant="overline" sx={{ opacity: 0.82, letterSpacing: 1.5 }}>
-                    Rota de entregas
+                    {isSupervisorView ? 'Entregas monitoradas' : 'Rota de entregas'}
                   </Typography>
-                  <Typography variant="h5" fontWeight={900}>
-                    {data?.motoristaLogado || user?.nome || 'Motorista'}
+                  <Typography variant="h6" fontWeight={900}>
+                    {isSupervisorView ? 'Visão geral dos motoristas' : data?.motoristaLogado || user?.nome || 'Motorista'}
                   </Typography>
-                  <Typography variant="body2" sx={{ opacity: 0.8, mt: 0.5 }}>
-                    Toque em um pedido para conferir e finalizar.
+                  <Typography variant="body2" sx={{ opacity: 0.7, mt: 0.35 }}>
+                    {isSupervisorView ? 'Selecione um motorista ou pedido para acompanhar as entregas terceirizadas.' : 'Toque em um pedido para conferir e finalizar.'}
                   </Typography>
                 </Box>
-                <LocalShipping sx={{ fontSize: { xs: 46, sm: 60 }, opacity: 0.24 }} />
+                <LocalShipping sx={{ fontSize: { xs: 38, sm: 46 }, opacity: 0.16 }} />
               </Stack>
-              <Box sx={{ mt: 3 }}>
+              <Box sx={{ mt: 1.75 }}>
                 <Stack direction="row" justifyContent="space-between" mb={0.75}>
                   <Typography variant="caption" fontWeight={700}>
                     Progresso das entregas exibidas
@@ -446,10 +459,10 @@ export default function BaixarEntregasPage() {
                   variant="determinate"
                   value={totalProgress}
                   sx={{
-                    height: 8,
-                    borderRadius: 99,
-                    bgcolor: 'rgba(255,255,255,.2)',
-                    '& .MuiLinearProgress-bar': { bgcolor: '#fbbf24', borderRadius: 99 },
+                    height: 7,
+                    borderRadius: 1,
+                    bgcolor: 'rgba(15, 118, 110, 0.10)',
+                    '& .MuiLinearProgress-bar': { bgcolor: '#f59e0b', borderRadius: 1 },
                   }}
                 />
               </Box>
@@ -468,7 +481,7 @@ export default function BaixarEntregasPage() {
             <SummaryCard label="Entregues" value={data?.totais.entregues || 0} color="#16a34a" icon={<CheckCircle />} />
           </Box>
 
-          <Paper elevation={0} sx={{ p: 1.5, borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
+          <Paper elevation={0} sx={{ p: 1.25, borderRadius: 2, border: '1px solid', borderColor: 'divider', bgcolor: 'rgba(255,255,255,0.94)' }}>
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.25}>
               <TextField
                 value={search}
@@ -536,7 +549,7 @@ export default function BaixarEntregasPage() {
               <Typography color="text.secondary">Carregando sua rota...</Typography>
             </Stack>
           ) : data?.entregas.length === 0 ? (
-            <Paper elevation={0} sx={{ p: 5, textAlign: 'center', borderRadius: 4, border: '1px dashed', borderColor: 'divider' }}>
+            <Paper elevation={0} sx={{ p: 4, textAlign: 'center', borderRadius: 2, border: '1px dashed', borderColor: 'divider', bgcolor: 'rgba(255,255,255,0.94)' }}>
               <CheckCircle sx={{ fontSize: 56, color: 'success.main', opacity: 0.75 }} />
               <Typography variant="h6" fontWeight={800} mt={1}>
                 Nenhuma entrega encontrada
@@ -549,11 +562,11 @@ export default function BaixarEntregasPage() {
             <Paper
               elevation={0}
               sx={{
-                borderRadius: 4,
+                borderRadius: 2,
                 border: '1px solid',
                 borderColor: 'divider',
                 overflow: 'hidden',
-                bgcolor: 'background.paper',
+                bgcolor: 'rgba(255,255,255,0.94)',
               }}
             >
               {data?.entregas.map((control) => {
@@ -564,8 +577,8 @@ export default function BaixarEntregasPage() {
                   <Box
                     key={control.id}
                     sx={{
-                      px: { xs: 1.5, sm: 2.5 },
-                      py: { xs: 1.5, sm: 2 },
+                      px: { xs: 1.25, sm: 1.75 },
+                      py: { xs: 1.15, sm: 1.35 },
                       '&:not(:last-of-type)': {
                         borderBottom: '1px solid',
                         borderColor: 'divider',
@@ -600,131 +613,75 @@ export default function BaixarEntregasPage() {
                             variant="determinate"
                             value={progress}
                             color={progress === 100 ? 'success' : 'warning'}
-                            sx={{ height: 7, borderRadius: 99, mt: 0.5 }}
+                            sx={{ height: 6, borderRadius: 1, mt: 0.5 }}
                           />
                         </Box>
                       </Stack>
 
-                      <Divider sx={{ my: 2 }} />
+                      <Divider sx={{ my: 1.5 }} />
 
-                    <Stack spacing={0}>
-                      {control.notas.map((note) => (
-                        <Box
-                          key={note.id}
-                          onClick={() => void openDelivery(control, note)}
-                          sx={{
-                            width: '100%',
-                            px: { xs: 0.5, sm: 1 },
-                            py: 1.25,
-                            textAlign: 'left',
-                            cursor: 'pointer',
-                            borderBottom: '1px solid',
-                            borderColor: 'divider',
-                            bgcolor: note.status === 'ENTREGUE' ? 'rgba(22,163,74,.035)' : 'rgba(245,158,11,.035)',
-                            color: 'text.primary',
-                            transition: 'background-color .18s ease',
-                            '&:hover': {
-                              bgcolor: note.status === 'ENTREGUE' ? 'rgba(22,163,74,.07)' : 'rgba(245,158,11,.07)',
-                            },
-                          }}
-                        >
-                          <Stack direction="row" spacing={1} alignItems="center">
-                            <Avatar
+                    <TableContainer>
+                      <Table size="small">
+                        <TableHead>
+                          <TableRow>
+                            <TableCell>Pedido</TableCell>
+                            <TableCell>Nota associada</TableCell>
+                            <TableCell>Código</TableCell>
+                            <TableCell>Cliente</TableCell>
+                            <TableCell align="center">Volumes</TableCell>
+                            <TableCell align="center">Status</TableCell>
+                            <TableCell align="right">Ações</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {control.notas.map((note) => (
+                            <TableRow
+                              key={note.id}
+                              hover
                               sx={{
-                                bgcolor: note.status === 'ENTREGUE' ? 'success.main' : 'warning.main',
-                                width: 36,
-                                height: 36,
-                                flexShrink: 0,
+                                bgcolor: note.status === 'ENTREGUE' ? 'rgba(22,163,74,.018)' : 'rgba(245,158,11,.018)',
+                                '& td': { borderBottomColor: 'divider' },
                               }}
                             >
-                              {note.status === 'ENTREGUE' ? <CheckCircle fontSize="small" /> : <ReceiptLong fontSize="small" />}
-                            </Avatar>
-                            <Box flex={1} minWidth={0}>
-                              <Stack
-                                direction={{ xs: 'column', md: 'row' }}
-                                justifyContent="space-between"
-                                spacing={{ xs: 0.35, md: 1.5 }}
-                              >
-                                <Typography fontWeight={900} sx={{ overflowWrap: 'anywhere' }}>
-                                  Pedido {note.numeroPedido || note.pedidoId || `NF ${note.numeroNota}`}
+                              <TableCell sx={{ fontWeight: 800 }}>
+                                {note.numeroPedido || note.pedidoId || '-'}
+                              </TableCell>
+                              <TableCell>{note.numeroNota}</TableCell>
+                              <TableCell>{note.codigo || '-'}</TableCell>
+                              <TableCell>
+                                <Typography variant="body2" fontWeight={700} noWrap>
+                                  {note.cliente}
                                 </Typography>
-                                <Typography variant="body2" color="text.secondary" noWrap>
-                                  NF {note.numeroNota} • {note.volumes} volume{note.volumes === 1 ? '' : 's'}
+                                <Typography variant="caption" color="text.secondary" noWrap>
+                                  Cod. cliente: {note.codigoCliente || 'não informado'}
                                 </Typography>
-                              </Stack>
-                              <Typography variant="caption" color="text.secondary" noWrap display="block">
-                                {note.cliente} • Código do cliente: {note.codigoCliente || 'não informado'}
-                              </Typography>
-                              {(note.vendedor || note.numeroPedido || note.pedidoId) && (
-                                <Typography variant="caption" color="text.secondary" noWrap display="block">
-                                  Pedido: {note.numeroPedido || note.pedidoId || 'não informado'} • Vendedor:{' '}
-                                  {note.vendedor || 'não informado'}
-                                </Typography>
-                              )}
-                            </Box>
-                            <Stack direction="row" spacing={0.75} alignItems="center" justifyContent="flex-end">
-                              {note.status === 'PENDENTE' ? (
-                                <Button
-                                  variant="contained"
-                                  color="success"
+                              </TableCell>
+                              <TableCell align="center">
+                                {note.volumes}
+                              </TableCell>
+                              <TableCell align="center">
+                                <Chip
                                   size="small"
-                                  startIcon={<AssignmentTurnedIn />}
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    void openDelivery(control, note);
-                                  }}
-                                  sx={{
-                                    whiteSpace: 'nowrap',
-                                    minWidth: 0,
-                                    px: 1.2,
-                                    py: 0.45,
-                                    borderRadius: 2,
-                                    fontSize: '0.72rem',
-                                    lineHeight: 1.1,
-                                    fontWeight: 800,
-                                    '& .MuiButton-startIcon': {
-                                      mr: 0.5,
-                                    },
-                                    '& .MuiSvgIcon-root': {
-                                      fontSize: 16,
-                                    },
-                                  }}
-                                >
-                                  Finalizar entrega
-                                </Button>
-                              ) : (
+                                  color={note.status === 'ENTREGUE' ? 'success' : 'warning'}
+                                  label={note.status === 'ENTREGUE' ? 'Entregue' : 'Pendente'}
+                                />
+                              </TableCell>
+                              <TableCell align="right">
                                 <Button
-                                  variant="contained"
-                                  color="success"
+                                  variant="outlined"
                                   size="small"
-                                  disabled
-                                  startIcon={<CheckCircle />}
-                                  sx={{
-                                    whiteSpace: 'nowrap',
-                                    minWidth: 0,
-                                    px: 1.2,
-                                    py: 0.45,
-                                    borderRadius: 2,
-                                    fontSize: '0.72rem',
-                                    lineHeight: 1.1,
-                                    fontWeight: 800,
-                                    '& .MuiButton-startIcon': {
-                                      mr: 0.5,
-                                    },
-                                    '& .MuiSvgIcon-root': {
-                                      fontSize: 16,
-                                    },
-                                  }}
+                                  startIcon={<Visibility />}
+                                  onClick={() => void openDelivery(control, note)}
+                                  sx={{ borderRadius: 1.5, fontWeight: 700 }}
                                 >
-                                  Entregue
+                                  Detalhes
                                 </Button>
-                              )}
-                              <Visibility fontSize="small" sx={{ color: 'text.disabled', flexShrink: 0 }} />
-                            </Stack>
-                          </Stack>
-                        </Box>
-                      ))}
-                    </Stack>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
                   </Box>
                 );
               })}

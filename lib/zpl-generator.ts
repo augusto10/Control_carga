@@ -8,11 +8,11 @@ const BOX_LABEL_HEIGHT = 480; // 60 mm at 203 dpi
 const COL_POSITIONS = [0, 264, 528];
 const PRINT_DARKNESS = 25; // Zebra range: 0 (light) to 30 (dark)
 
-function sanitizeZpl(value: string): string {
+export function sanitizeZpl(value: string): string {
   return value.replace(/[\^~]/g, '').replace(/\s+/g, ' ').trim();
 }
 
-function splitText(value: string, maxLineLength: number, maxLines: number): string[] {
+export function splitText(value: string, maxLineLength: number, maxLines: number): string[] {
   const original = sanitizeZpl(value);
   const tokens = original.split(' ').filter(Boolean);
   const lines: string[] = [];
@@ -45,7 +45,7 @@ function centerX(labelStart: number, fieldWidth: number, contentWidth: number) {
   return labelStart + Math.max(0, Math.floor((fieldWidth - contentWidth) / 2));
 }
 
-function buildBarcodeField(
+export function buildBarcodeField(
   value: string,
   barcodeType: 'EAN13' | 'EAN8' | 'CODE128',
   x: number,
