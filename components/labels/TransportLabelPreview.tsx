@@ -101,15 +101,36 @@ function TransportLabelCard({
           component="p"
           sx={{
             fontWeight: 900,
-            fontSize: { xs: '2.9rem', sm: '3.5rem', md: '4rem' },
+            fontSize: { xs: '3.1rem', sm: '3.8rem', md: '4.3rem' },
             lineHeight: 1,
             textAlign: 'center',
-            my: { xs: 0.4, sm: 0.8 },
+            my: { xs: 0.35, sm: 0.7 },
             letterSpacing: -1,
           }}
         >
           {lote.numeroPedido}
         </Typography>
+
+        <Box
+          sx={{
+            position: 'absolute',
+            right: { xs: 12, sm: 16 },
+            top: { xs: 48, sm: 54 },
+            width: { xs: 40, sm: 48 },
+            height: { xs: 40, sm: 48 },
+            border: '2px solid #111827',
+            bgcolor: '#ffffff',
+            display: 'grid',
+            placeItems: 'center',
+            p: 0.25,
+          }}
+        >
+          <Typography sx={{ fontSize: '0.42rem', fontWeight: 900, lineHeight: 1, textAlign: 'center', letterSpacing: 0.4 }}>
+            QR
+            <br />
+            PED
+          </Typography>
+        </Box>
 
         <Box sx={{ px: 0.5, my: 0.5 }}>
           <Box component="svg" ref={barcodeRef} sx={{ display: 'block', width: '100%', height: 44, bgcolor: '#ffffff', borderRadius: 1, px: 0.5 }} />

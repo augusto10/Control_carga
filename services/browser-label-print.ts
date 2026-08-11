@@ -320,6 +320,7 @@ export function printTransportLabelsInBrowser(
           <div class="meta">${data}</div>
         </div>
         <div class="pedido">${escapeHtml(lote.numeroPedido)}</div>
+        <div class="qr-placeholder"><span>QR</span><span>PED</span></div>
         <div class="barcode">${barcodeSvg}</div>
         <div class="row">
           <span class="transportadora">${escapeHtml(transportadora)}</span>
@@ -473,6 +474,24 @@ export function printTransportLabelsInBrowser(
             display: flex;
             justify-content: center;
             min-height: 16mm;
+          }
+
+          .qr-placeholder {
+            position: absolute;
+            top: 9mm;
+            right: 4mm;
+            width: 12mm;
+            height: 12mm;
+            border: 1px solid #111827;
+            background: #ffffff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-size: 7px;
+            font-weight: 900;
+            line-height: 1;
+            letter-spacing: 0.4px;
           }
 
           .barcode svg {
