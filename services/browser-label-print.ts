@@ -14,20 +14,28 @@ function escapeHtml(value: string) {
     .replace(/'/g, '&#39;');
 }
 
-function buildBarcodeSvg(value: string, format: 'EAN13' | 'EAN8' | 'CODE128') {
+function buildBarcodeSvg(
+  value: string,
+  format: 'EAN13' | 'EAN8' | 'CODE128',
+  options?: { displayValue?: boolean; height?: number; width?: number; textMargin?: number },
+) {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  const displayValue = options?.displayValue ?? true;
+  const height = options?.height ?? 44;
+  const width = options?.width ?? (format === 'CODE128' ? 1.6 : 1.8);
+  const textMargin = options?.textMargin ?? 6;
 
   JsBarcode(svg, value, {
     format,
-    displayValue: true,
+    displayValue,
     fontOptions: 'bold',
     fontSize: 14,
-    height: 44,
+    height,
     margin: 0,
-    width: format === 'CODE128' ? 1.6 : 1.8,
+    width,
     background: '#ffffff',
     lineColor: '#000000',
-    textMargin: 6,
+    textMargin,
   });
 
   return svg.outerHTML;
@@ -293,8 +301,16 @@ export function printTransportLabelsInBrowser(
   }
 
   const labelsHtml = volumes.map((volume) => {
-    const barcodeSvg = buildBarcodeSvg(volume.codigoVolume, 'CODE128');
+    const barcodeSvg = buildBarcodeSvg(volume.codigoVolume, 'CODE128', {
+      displayValue: false,
+      height: 50,
+      width: 1.7,
+    });
     const data = new Date().toLocaleDateString('pt-BR');
+    const transportadora =
+      lote.transportadora && lote.transportadora !== 'RETIRA_CLIENTE'
+        ? formatarNomeTransportadora(lote.transportadora)
+        : '';
 
     return `
       <article class="label">
@@ -306,10 +322,11 @@ export function printTransportLabelsInBrowser(
         <div class="pedido">${escapeHtml(lote.numeroPedido)}</div>
         <div class="barcode">${barcodeSvg}</div>
         <div class="row">
-          <span class="transportadora">${escapeHtml(formatarNomeTransportadora(lote.transportadora || ''))}</span>
+          <span class="transportadora">${escapeHtml(transportadora)}</span>
           <span class="volume">${volume.indiceVolume}/${volume.totalVolumes}</span>
         </div>
         <div class="footer">
+          ${lote.numeroNota ? `<div class="nota">NF: ${escapeHtml(lote.numeroNota)}</div>` : ''}
           <div class="cliente">${escapeHtml(lote.cliente || 'Sem cliente')}</div>
           ${lote.cnpj ? `<div class="cnpj">CNPJ: ${escapeHtml(lote.cnpj)}</div>` : ''}
         </div>
@@ -445,21 +462,30 @@ export function printTransportLabelsInBrowser(
           }
 
           .pedido {
-            font-size: 32px;
+            font-size: 36px;
             font-weight: 900;
             text-align: center;
-            line-height: 1.1;
+            line-height: 1;
+            margin: 1.5mm 0 1mm;
           }
 
           .barcode {
             display: flex;
             justify-content: center;
+            min-height: 16mm;
           }
 
           .barcode svg {
             width: 100%;
-            max-width: 82mm;
+            max-width: 84mm;
             height: auto;
+          }
+
+          .nota {
+            font-size: 10px;
+            font-weight: 800;
+            line-height: 1.15;
+            color: #111827;
           }
 
           .cliente {
@@ -467,11 +493,11 @@ export function printTransportLabelsInBrowser(
             font-weight: 700;
             line-height: 1.2;
             text-transform: uppercase;
-            max-width: 68mm;
+            max-width: 72mm;
           }
 
           .cnpj {
-            font-size: 10px;
+            font-size: 9.5px;
             font-weight: 700;
             line-height: 1.2;
             color: #000000;
@@ -485,7 +511,7 @@ export function printTransportLabelsInBrowser(
           }
 
           .volume {
-            font-size: 24px;
+            font-size: 26px;
             font-weight: 900;
           }
 
@@ -495,12 +521,13 @@ export function printTransportLabelsInBrowser(
           }
 
           .transportadora {
-            font-size: 16px;
+            font-size: 14px;
             font-weight: 900;
-            max-width: 58mm;
+            max-width: 55mm;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
+            text-transform: uppercase;
           }
 
           .footer {
@@ -508,7 +535,7 @@ export function printTransportLabelsInBrowser(
             flex-direction: column;
             gap: 2px;
             position: relative;
-            min-height: 18mm;
+            min-height: 20mm;
           }
 
           .summary {

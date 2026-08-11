@@ -2,39 +2,59 @@ import { formatarNomeTransportadora } from '@/lib/etiquetas-transporte';
 import { sanitizeZpl, splitText } from '@/lib/zpl-generator';
 import { EtiquetaLoteData, EtiquetaVolumeData } from '@/types/labels';
 
-/**
- * Etiqueta de transporte — layout fiel ao modelo fisico (Zebra ZD-220, 4×3", 203 dpi).
- *
- * ┌──────────────────────────────────────────────────────┐
- * │ PEDIDO              Expedição: DD/MM/AAAA            │
- * │                                                      │
- * │                  196.284                             │  ← numero enorme
- * │                                                      │
- * │  ║║║║║║║║║║║║║║║║║║║║║║║║║║║║║║║║║║║║║║║║║║║║║║║  │  ← barcode CODE128
- * │                                                      │
- * │ ACCERT                       VOLUMES                 │
- * │                               1      /19        [Logo│  ← logo rotacionada
- * │                                                      │
- * │ CLIENTE: VIA BRAZLANDIA MATERIAIS                    │
- * │ CNPJ: 12.345.678/0001-90                             │
- * └──────────────────────────────────────────────────────┘
- *
- * Para incluir o logo na impressora Zebra, o arquivo LOGO_OFICIAL.GRF
- * deve estar carregado na memoria da printer. Descomente o comando ^XG abaixo.
- */
 const PAGE_WIDTH = 812;
 const PAGE_HEIGHT = 609;
-const PRINT_DARKNESS = 28; // Zebra range: 0 (light) to 30 (dark)
+const PRINT_DARKNESS = 28;
 const TRANSPORT_LOGO_GRF = [
-  '~DGLOGO_OFICIAL,00048,048,',
-  '07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,',
-  '07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,',
-  '07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,',
-  '07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,',
-  '07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,',
-  '07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,',
-  '07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,',
-  '07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E',
+  '~DGR:LOGO_OFICIAL.GRF,00672,014,',
+  '0000000000000000000000000000,',
+  '0000000000000000000000000000,',
+  '0000000000000000000000000000,',
+  '0000000000000000000000000000,',
+  '0000000000000000000000000000,',
+  '0000000000000000000000000000,',
+  '0000000000000000000000000000,',
+  '0000000000000000000000000000,',
+  '0000000000000000000000000000,',
+  '0000000000C00003000000000000,',
+  '0000000001E0000F800000000000,',
+  '0000000003F0001FE00000000000,',
+  '000000000FF8003FF00000000000,',
+  '000000001FFC003FF80000000000,',
+  '000000003FF8001FFE0000000000,',
+  '00000000FFF0038FFF0000000000,',
+  '00000001FFE307C7FFC000000000,',
+  '00000003FFC78FE3FFE000000000,',
+  '0000000FFFC7FC2207F000000000,',
+  '0000000FFFCFC00003F800000000,',
+  '0000000F7F8F800003F980000000,',
+  '000000003C0F80000003C0000000,',
+  '00000000039F80000003C0000000,',
+  '0000000003DFFC000003C0000000,',
+  '001F0FCFF3DFFE03FC3FC7C7E000,',
+  '007F9FEFFBDFFF03FE7FCFE7EC00,',
+  '007FFFCFFBDFFF03FFFFDFF7E000,',
+  '00F3FC0F7FDF8003CFFBDEF78000,',
+  '00F7FF8E3FDF8003CFF3FC7F8000,',
+  '00FFFFEE3FCFC083CFF3FC7F8000,',
+  '00FFCFFE3FCFE3C3CFF3FC7F8000,',
+  '00F000FF3FC7FFE3CFF3DCF78000,',
+  '00FF9FFFFFE7FFF3CFFFDFF78000,',
+  '007FFFEFFBE3FFE3CF7FDFF78000,',
+  '003FBFCFF1E0FF83CF7FCFE78000,',
+  '000E0F0E60600001861983830000,',
+  '0000000E00000000000000000000,',
+  '0000000E00000000000000000000,',
+  '0000000E3FFFF000000000000000,',
+  '0000000E3FFFFC00000000000000,',
+  '0000000E3C000000000000000000,',
+  '0000000000000000040060C18000,',
+  '0000000000608183040860418000,',
+  '0000000030408203010810414000,',
+  '000000003041C207060860000000,',
+  '0000000038414180000000000000,',
+  '0000000000000000000000000000,',
+  '0000000000000000000000000000',
 ].join('\n');
 
 function formatDataAtual(): string {
@@ -46,11 +66,16 @@ export function generateZplTransportLabel(
   volume: Pick<EtiquetaVolumeData, 'codigoVolume' | 'indiceVolume' | 'totalVolumes'>,
 ): string {
   const pedido = sanitizeZpl(lote.numeroPedido);
+  const numeroNota = sanitizeZpl(lote.numeroNota || '');
   const cliente = splitText(lote.cliente || 'SEM CLIENTE', 38, 1).join(' ').toUpperCase();
   const cnpj = sanitizeZpl(lote.cnpj || '');
   const transportadora = sanitizeZpl(formatarNomeTransportadora(lote.transportadora || ''));
   const codigoVolume = sanitizeZpl(volume.codigoVolume);
   const data = formatDataAtual();
+  const transportadoraLines =
+    transportadora && transportadora !== 'RETIRA_CLIENTE'
+      ? splitText(transportadora, 24, 2)
+      : [];
 
   const commands = [
     TRANSPORT_LOGO_GRF,
@@ -59,46 +84,27 @@ export function generateZplTransportLabel(
     `^PW${PAGE_WIDTH}`,
     `^LL${PAGE_HEIGHT}`,
     '^LH0,0',
-
-    // ── Fundo cinza claro ──
     '^FO8,8^GB796,593,3^FS',
-
-    // ── Linha de cabecalho ──
-    // "PEDIDO" — topo-esquerda, texto pequeno
     '^FO25,18^A0N,20,20^FDPEDIDO^FS',
-    // "Expedição: DD/MM/AAAA" — topo-centro
-    `^FO320,18^A0N,20,20^FDExpedição: ${data}^FS`,
-
-    // ── Numero do pedido — DOMINANTE ──
-    `^FO20,46^A0N,124,124^FD${pedido}^FS`,
-
-    // ── Codigo de barras (CODE128) ──
-    `^FO25,180^BY3,2,60^BCN,60,Y,N,N^FD${codigoVolume}^FS`,
-
-    // ── Transportadora (lado esquerdo) ──
+    '^FO350,14^XGR:LOGO_OFICIAL.GRF,1,1^FS',
+    `^FO590,18^A0N,20,20^FDExpedicao: ${data}^FS`,
+    `^FO18,52^A0N,132,132^FD${pedido}^FS`,
+    `^FO36,188^BY3,2,72^BCN,72,N,N,N^FD${codigoVolume}^FS`,
   ];
 
-  if (transportadora && transportadora !== 'RETIRA_CLIENTE') {
-    commands.push(`^FO25,270^A0N,40,40^FD${transportadora}^FS`);
-  }
+  transportadoraLines.forEach((line, index) => {
+    commands.push(`^FO25,${282 + (index * 38)}^A0N,34,34^FD${line}^FS`);
+  });
 
   commands.push(
-    // ── Volumes (lado direito) ──
-    '^FO490,258^A0N,16,16^FDVOLUMES^FS',
-    `^FO490,280^A0N,55,55^FD${volume.indiceVolume} /${volume.totalVolumes}^FS`,
-
-    // ── CLIENTE ──
-    `^FO25,365^A0N,28,28^FDCLIENTE: ${cliente}^FS`,
-
-    // ── CNPJ do cliente ──
-    ...(cnpj ? [`^FO25,405^A0N,28,28^FDCNPJ: ${cnpj}^FS`] : []),
-
-    // ── Logo Esplendor (lateral direita, rotacionada 90°) ──
-    // Logo Esplendor enviado junto do ZPL para garantir impressao na Zebra.
-    '^FO690,132^XGLOGO_OFICIAL,1,1^FS',
+    '^FO585,278^A0N,18,18^FDVOLUMES^FS',
+    `^FO545,298^A0N,60,60^FD${volume.indiceVolume}/${volume.totalVolumes}^FS`,
+    ...(numeroNota ? [`^FO25,366^A0N,24,24^FDNF: ${numeroNota}^FS`] : []),
+    `^FO25,400^A0N,26,26^FDCLIENTE: ${cliente}^FS`,
+    ...(cnpj ? [`^FO25,434^A0N,24,24^FDCNPJ: ${cnpj}^FS`] : []),
+    '^PQ1,0,1,Y',
+    '^XZ',
   );
-
-  commands.push('^PQ1,0,1,Y', '^XZ');
 
   return commands.join('\n');
 }

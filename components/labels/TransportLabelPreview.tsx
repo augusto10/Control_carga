@@ -46,6 +46,7 @@ function TransportLabelCard({
   const data = formatDataAtual();
   const cliente = lote.cliente || 'SEM CLIENTE';
   const cnpj = lote.cnpj || '';
+  const numeroNota = lote.numeroNota || '';
   const transportadora =
     lote.transportadora && lote.transportadora !== 'RETIRA_CLIENTE'
       ? formatarNomeTransportadora(lote.transportadora)
@@ -100,10 +101,10 @@ function TransportLabelCard({
           component="p"
           sx={{
             fontWeight: 900,
-            fontSize: { xs: '2.7rem', sm: '3.3rem', md: '3.8rem' },
+            fontSize: { xs: '2.9rem', sm: '3.5rem', md: '4rem' },
             lineHeight: 1,
             textAlign: 'center',
-            my: { xs: 0.5, sm: 1 },
+            my: { xs: 0.4, sm: 0.8 },
             letterSpacing: -1,
           }}
         >
@@ -116,7 +117,7 @@ function TransportLabelCard({
 
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', mt: 0.5 }}>
           {transportadora && (
-            <Typography sx={{ fontWeight: 900, fontSize: { xs: '1rem', sm: '1.2rem' }, lineHeight: 1.1, maxWidth: '55%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <Typography sx={{ fontWeight: 900, fontSize: { xs: '0.95rem', sm: '1.1rem' }, lineHeight: 1.1, maxWidth: '56%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {transportadora}
             </Typography>
           )}
@@ -131,6 +132,11 @@ function TransportLabelCard({
         </Box>
 
         <Box sx={{ mt: 'auto', pt: 0.5 }}>
+          {numeroNota && (
+            <Typography sx={{ fontWeight: 800, fontSize: { xs: '0.6rem', sm: '0.72rem' }, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              NF: {numeroNota}
+            </Typography>
+          )}
           <Typography sx={{ fontWeight: 700, fontSize: { xs: '0.65rem', sm: '0.8rem' }, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             CLIENTE: {cliente}
           </Typography>
