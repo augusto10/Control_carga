@@ -8,8 +8,6 @@ interface TransportLabelPreviewProps {
   lote: EtiquetaLoteData;
 }
 
-const OFFICIAL_LOGO_SRC = '/templates/logo%20oficial.png';
-
 function formatDataAtual(): string {
   return new Date().toLocaleDateString('pt-BR');
 }
@@ -72,18 +70,9 @@ function TransportLabelCard({
           <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 0.5, fontSize: { xs: '0.6rem', sm: '0.7rem' } }}>
             PEDIDO
           </Typography>
-          <Box
-            component="img"
-            src={OFFICIAL_LOGO_SRC}
-            alt="Esplendor"
-            sx={{
-              height: { xs: 14, sm: 16 },
-              width: 'auto',
-              objectFit: 'contain',
-              opacity: 0.75,
-              justifySelf: 'center',
-            }}
-          />
+          <Typography sx={{ fontWeight: 900, fontSize: { xs: '0.9rem', sm: '1.05rem' }, letterSpacing: 0.4, justifySelf: 'center' }}>
+            ESPLENDOR
+          </Typography>
           <Typography
             variant="caption"
             sx={{
@@ -115,7 +104,7 @@ function TransportLabelCard({
           sx={{
             position: 'absolute',
             right: { xs: 12, sm: 16 },
-            top: { xs: 48, sm: 54 },
+            top: { xs: 58, sm: 62 },
             width: { xs: 40, sm: 48 },
             height: { xs: 40, sm: 48 },
             border: '2px solid #111827',
@@ -133,7 +122,7 @@ function TransportLabelCard({
         </Box>
 
         <Box sx={{ px: 0.5, my: 0.5 }}>
-          <Box component="svg" ref={barcodeRef} sx={{ display: 'block', width: '100%', height: 44, bgcolor: '#ffffff', borderRadius: 1, px: 0.5 }} />
+          <Box component="svg" ref={barcodeRef} sx={{ display: 'block', width: '82%', height: 44, bgcolor: '#ffffff', borderRadius: 1, px: 0.5 }} />
         </Box>
 
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', mt: 0.5 }}>

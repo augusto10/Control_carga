@@ -3,8 +3,6 @@ import { analyzeBarcode } from '@/lib/barcode-validation';
 import { formatarNomeTransportadora } from '@/lib/etiquetas-transporte';
 import { LabelType, ProdutoEtiqueta } from '@/types/labels';
 
-const OFFICIAL_TRANSPORT_LOGO_SRC = '/templates/logo%20oficial.png';
-
 function escapeHtml(value: string) {
   return value
     .replace(/&/g, '&amp;')
@@ -316,7 +314,7 @@ export function printTransportLabelsInBrowser(
       <article class="label">
         <div class="header">
           <div class="tag">PEDIDO</div>
-          <img class="top-logo" src="${OFFICIAL_TRANSPORT_LOGO_SRC}" alt="" />
+          <div class="brand">ESPLENDOR</div>
           <div class="meta">${data}</div>
         </div>
         <div class="pedido">${escapeHtml(lote.numeroPedido)}</div>
@@ -447,19 +445,18 @@ export function printTransportLabelsInBrowser(
             gap: 8px;
           }
 
-          .top-logo {
-            height: 5.4mm;
-            width: auto;
-            object-fit: contain;
-            opacity: 0.75;
-            justify-self: center;
-          }
-
           .tag {
             font-size: 10px;
             font-weight: 800;
             letter-spacing: 1px;
             color: #000000;
+          }
+
+          .brand {
+            font-size: 14px;
+            font-weight: 900;
+            letter-spacing: 0.4px;
+            justify-self: center;
           }
 
           .pedido {
@@ -474,11 +471,12 @@ export function printTransportLabelsInBrowser(
             display: flex;
             justify-content: center;
             min-height: 16mm;
+            padding-right: 14mm;
           }
 
           .qr-placeholder {
             position: absolute;
-            top: 9mm;
+            top: 10mm;
             right: 4mm;
             width: 12mm;
             height: 12mm;

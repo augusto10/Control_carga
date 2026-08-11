@@ -34,11 +34,11 @@ export function generateZplTransportLabel(
     '^LH0,0',
     '^FO8,8^GB796,593,3^FS',
     '^FO25,18^A0N,20,20^FDPEDIDO^FS',
-    '^FO470,18^A0N,28,28^FDESPLENDOR^FS',
-    `^FO625,18^A0N,20,20^FDExpedicao: ${data}^FS`,
+    '^FO330,16^FB220,1,0,C,0^A0N,26,26^FDESPLENDOR^FS',
+    `^FO620,18^A0N,20,20^FDExpedicao: ${data}^FS`,
     `^FO12,46^A0N,142,142^FD${pedido}^FS`,
-    `^FO706,86^BQN,2,4^FDLA,${pedido}^FS`,
-    `^FO36,188^BY3,2,72^BCN,72,N,N,N^FD${codigoVolume}^FS`,
+    `^FO700,92^BQN,2,4^FDLA,${pedido}^FS`,
+    `^FO34,188^BY2,2,68^BCN,68,N,N,N^FD${codigoVolume}^FS`,
   ];
 
   transportadoraLines.forEach((line, index) => {
