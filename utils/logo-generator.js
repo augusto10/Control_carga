@@ -11,13 +11,13 @@ async function generateLogoGRF() {
       throw new Error('Arquivo public/templates/logo oficial.png nao encontrado');
     }
 
-    const width = 112;
-    const height = 48;
+    const width = 92;
+    const height = 40;
     const { data, info } = await sharp(logoPath)
       .resize({ width, height, fit: 'contain', background: { r: 255, g: 255, b: 255, alpha: 1 } })
       .flatten({ background: '#ffffff' })
       .grayscale()
-      .threshold(180)
+      .threshold(145)
       .raw()
       .toBuffer({ resolveWithObject: true });
 
@@ -56,8 +56,8 @@ function printConversionInstructions() {
   console.log('2. Execute: node utils/logo-generator.js');
   console.log('3. O arquivo public/templates/LOGO_OFICIAL.GRF sera recriado automaticamente');
   console.log('\n=== DIMENSOES UTILIZADAS ===');
-  console.log('- Largura final: 112 px');
-  console.log('- Altura final: 48 px');
+  console.log('- Largura final: 92 px');
+  console.log('- Altura final: 40 px');
   console.log('- Formato: monocromatico (threshold)');
   console.log('\n=========================================\n');
 }

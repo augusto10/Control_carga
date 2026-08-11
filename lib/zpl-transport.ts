@@ -86,8 +86,8 @@ export function generateZplTransportLabel(
     '^LH0,0',
     '^FO8,8^GB796,593,3^FS',
     '^FO25,18^A0N,20,20^FDPEDIDO^FS',
-    '^FO350,14^XGR:LOGO_OFICIAL.GRF,1,1^FS',
-    `^FO590,18^A0N,20,20^FDExpedicao: ${data}^FS`,
+    '^FO458,16^XGR:LOGO_OFICIAL.GRF,1,1^FS',
+    `^FO598,18^A0N,20,20^FDExpedicao: ${data}^FS`,
     `^FO18,52^A0N,132,132^FD${pedido}^FS`,
     `^FO36,188^BY3,2,72^BCN,72,N,N,N^FD${codigoVolume}^FS`,
   ];
