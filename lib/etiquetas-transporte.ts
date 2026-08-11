@@ -41,7 +41,7 @@ export function formatarNomeTransportadora(value: string | null | undefined): st
     RETIRA_VENDEDOR: 'RETIRA VENDEDOR',
     RETIRA_CLIENTE: 'RETIRA CLIENTE',
     VLOG: 'VLOG',
-    ZANUELO_TRANSPORTE_LOGISTICA: 'ZANUELO TRANSPORTE LOGISTICA',
+    ZANUELO_TRANSPORTE_LOGISTICA: 'ZANUELO TRANSPORTES',
   };
 
   return labels[raw] || raw.replace(/_/g, ' ');

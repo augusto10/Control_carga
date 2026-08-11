@@ -100,7 +100,7 @@ function TransportLabelCard({
           component="p"
           sx={{
             fontWeight: 900,
-            fontSize: { xs: '2.4rem', sm: '3rem', md: '3.4rem' },
+            fontSize: { xs: '2.7rem', sm: '3.3rem', md: '3.8rem' },
             lineHeight: 1,
             textAlign: 'center',
             my: { xs: 0.5, sm: 1 },

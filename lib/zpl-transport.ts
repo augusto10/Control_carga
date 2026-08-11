@@ -25,6 +25,17 @@ import { EtiquetaLoteData, EtiquetaVolumeData } from '@/types/labels';
 const PAGE_WIDTH = 812;
 const PAGE_HEIGHT = 609;
 const PRINT_DARKNESS = 28; // Zebra range: 0 (light) to 30 (dark)
+const TRANSPORT_LOGO_GRF = [
+  '~DGLOGO_OFICIAL,00048,048,',
+  '07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,',
+  '07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,',
+  '07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,',
+  '07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,',
+  '07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,',
+  '07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,',
+  '07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,',
+  '07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E,07E',
+].join('\n');
 
 function formatDataAtual(): string {
   return new Date().toLocaleDateString('pt-BR');
@@ -42,6 +53,7 @@ export function generateZplTransportLabel(
   const data = formatDataAtual();
 
   const commands = [
+    TRANSPORT_LOGO_GRF,
     `~SD${PRINT_DARKNESS}`,
     '^XA',
     `^PW${PAGE_WIDTH}`,
@@ -58,7 +70,7 @@ export function generateZplTransportLabel(
     `^FO320,18^A0N,20,20^FDExpedição: ${data}^FS`,
 
     // ── Numero do pedido — DOMINANTE ──
-    `^FO25,52^A0N,110,110^FD${pedido}^FS`,
+    `^FO20,46^A0N,124,124^FD${pedido}^FS`,
 
     // ── Codigo de barras (CODE128) ──
     `^FO25,180^BY3,2,60^BCN,60,Y,N,N^FD${codigoVolume}^FS`,
@@ -82,9 +94,8 @@ export function generateZplTransportLabel(
     ...(cnpj ? [`^FO25,405^A0N,28,28^FDCNPJ: ${cnpj}^FS`] : []),
 
     // ── Logo Esplendor (lateral direita, rotacionada 90°) ──
-    // Requer LOGO_OFICIAL.GRF carregado na memoria da impressora.
-    // Descomente a linha abaixo apos fazer o upload do GRF:
-    // '^FO680,140^FWB^XGR:LOGO_OFICIAL.GRF,1,1^FS',
+    // Logo Esplendor enviado junto do ZPL para garantir impressao na Zebra.
+    '^FO690,132^XGLOGO_OFICIAL,1,1^FS',
   );
 
   commands.push('^PQ1,0,1,Y', '^XZ');

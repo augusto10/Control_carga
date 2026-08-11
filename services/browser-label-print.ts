@@ -445,7 +445,7 @@ export function printTransportLabelsInBrowser(
           }
 
           .pedido {
-            font-size: 28px;
+            font-size: 32px;
             font-weight: 900;
             text-align: center;
             line-height: 1.1;
