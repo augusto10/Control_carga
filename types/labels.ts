@@ -1,5 +1,10 @@
 export type BarcodeFormat = 'EAN13' | 'EAN8' | 'CODE128' | 'UNSUPPORTED';
-export type LabelType = 'UNITARIA' | 'CAIXA_FECHADA' | 'A4_PRODUTO';
+export type LabelType =
+  | 'UNITARIA'
+  | 'CAIXA_FECHADA'
+  | 'A4_PRODUTO'
+  | 'A4_PRODUTO_VERTICAL'
+  | 'A4_PRODUTO_VERTICAL_DUPLA';
 
 export interface ProdutoEtiqueta {
   produtoId: string;

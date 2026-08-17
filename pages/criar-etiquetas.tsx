@@ -87,12 +87,16 @@ export default function CriarEtiquetasPage() {
     : produto?.codigoBarras;
   const barcodeInfo = useMemo(() => analyzeBarcode(selectedBarcode), [selectedBarcode]);
   const printerIsCompatible = useMemo(() => (printer ? isZplCompatiblePrinter(printer) : false), [printer]);
-  const printsDirectlyInZebra = printerIsCompatible && labelType !== 'A4_PRODUTO';
+  const usesBrowserA4Layout =
+    labelType === 'A4_PRODUTO'
+    || labelType === 'A4_PRODUTO_VERTICAL'
+    || labelType === 'A4_PRODUTO_VERTICAL_DUPLA';
+  const printsDirectlyInZebra = printerIsCompatible && !usesBrowserA4Layout;
   const canPrint = Boolean(
     produto
     && barcodeInfo.isValid
     && quantidade > 0
-    && (labelType === 'A4_PRODUTO' || (printer && qzConnected)),
+    && (usesBrowserA4Layout || (printer && qzConnected)),
   );
 
   useEffect(() => {
@@ -258,7 +262,7 @@ export default function CriarEtiquetasPage() {
   }
 
   async function handleDownloadPdf() {
-    if (!produto || labelType !== 'A4_PRODUTO') return;
+    if (!produto || !usesBrowserA4Layout) return;
 
     try {
       setDownloadingPdf(true);
@@ -351,6 +355,8 @@ export default function CriarEtiquetasPage() {
                     <MenuItem value="UNITARIA">Produto (3 por linha)</MenuItem>
                     <MenuItem value="CAIXA_FECHADA">Caixa fechada 100 x 60 mm</MenuItem>
                     <MenuItem value="A4_PRODUTO">Produto 18 x 11 cm (2 por A4)</MenuItem>
+                    <MenuItem value="A4_PRODUTO_VERTICAL">Produto 15 x 21 cm vertical (1 por A4)</MenuItem>
+                    <MenuItem value="A4_PRODUTO_VERTICAL_DUPLA">Produto vertical 12,5 x 18 cm lado a lado A4 paisagem (2 por A4)</MenuItem>
                   </TextField>
                 </Grid>
                 <Grid item xs={12} md={4}>
@@ -433,10 +439,14 @@ export default function CriarEtiquetasPage() {
                         </Alert>
                       )}
 
-                      {(labelType === 'A4_PRODUTO' || (printer && !printerIsCompatible)) && (
+                      {(usesBrowserA4Layout || (printer && !printerIsCompatible)) && (
                         <Alert severity="info">
-                          {labelType === 'A4_PRODUTO'
-                            ? 'Impressao e PDF usam o mesmo arquivo, com duas etiquetas 18 x 11 cm e espacamento de 4 cm. Use Tamanho real ou escala 100%.'
+                          {usesBrowserA4Layout
+                            ? labelType === 'A4_PRODUTO'
+                              ? 'Impressao e PDF usam o mesmo arquivo, com duas etiquetas 18 x 11 cm e espacamento de 4 cm. Use Tamanho real ou escala 100%.'
+                              : labelType === 'A4_PRODUTO_VERTICAL'
+                                ? 'Impressao e PDF usam o mesmo arquivo, com uma etiqueta vertical 15 x 21 cm, foto em cima e informacoes embaixo. Use Tamanho real ou escala 100%.'
+                                : 'Impressao e PDF usam o mesmo arquivo, com duas etiquetas verticais 12,5 x 18 cm lado a lado em A4 paisagem. Use Tamanho real ou escala 100%.'
                             : 'Esta impressora vai abrir uma previa visual no navegador. Para Zebra/ZDesigner, a impressao continua direta pelo QZ Tray.'}
                         </Alert>
                       )}
@@ -459,13 +469,13 @@ export default function CriarEtiquetasPage() {
                           onClick={() => void handlePrint()}
                           sx={COMPACT_BUTTON_SX}
                         >
-                          {labelType === 'A4_PRODUTO'
+                          {usesBrowserA4Layout
                             ? 'Abrir impressao A4'
                             : printsDirectlyInZebra
                               ? 'Imprimir na Zebra'
                               : 'Imprimir em outra impressora'}
                         </Button>
-                        {labelType === 'A4_PRODUTO' && (
+                        {usesBrowserA4Layout && (
                           <Button
                             size="small"
                             variant="outlined"

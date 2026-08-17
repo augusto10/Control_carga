@@ -40,6 +40,72 @@ function buildBarcodeSvg(
   return svg.outerHTML;
 }
 
+function buildProductLabelMarkup(
+  produto: ProdutoEtiqueta,
+  barcodeSvg: string,
+  barcodeValue: string,
+  variant: 'a4-horizontal' | 'a4-vertical' | 'a4-vertical-double' | 'small',
+  isClosedBox: boolean,
+) {
+  if (variant === 'a4-horizontal') {
+    return `
+      <article class="label label-a4">
+        <section class="product-details">
+          <div class="product-image">
+            <span class="image-placeholder">SEM FOTO</span>
+            ${produto.imagemUrl ? `<img src="${escapeHtml(produto.imagemUrl)}" alt="${escapeHtml(produto.nome)}" />` : ''}
+          </div>
+          <div class="product-copy">
+            <div class="adm-large">CÓDIGO ADM: ${escapeHtml(formatProductAdm(produto.codigoAdm))}</div>
+            <div class="identity">
+              <div class="meta-line"><strong>MARCA:</strong> ${escapeHtml(produto.marca || 'SEM MARCA')}</div>
+              <div class="meta-line"><strong>CÓDIGO ORIGINAL:</strong> ${escapeHtml(produto.codigoOriginal || '-')}</div>
+            </div>
+            <div class="description"><strong>DESCRIÇÃO:</strong> ${escapeHtml(produto.nome)}</div>
+          </div>
+        </section>
+        <div class="barcode barcode-large">
+          ${barcodeSvg}
+          <div class="barcode-number">${escapeHtml(barcodeValue)}</div>
+        </div>
+      </article>
+    `;
+  }
+
+  if (variant === 'a4-vertical' || variant === 'a4-vertical-double') {
+    return `
+      <article class="label ${variant === 'a4-vertical' ? 'label-a4-vertical' : 'label-a4-vertical-double'}">
+        <section class="product-image ${variant === 'a4-vertical' ? 'product-image-vertical' : 'product-image-vertical-double'}">
+          <span class="image-placeholder">SEM FOTO</span>
+          ${produto.imagemUrl ? `<img src="${escapeHtml(produto.imagemUrl)}" alt="${escapeHtml(produto.nome)}" />` : ''}
+        </section>
+        <section class="product-copy ${variant === 'a4-vertical' ? 'product-copy-vertical' : 'product-copy-vertical-double'}">
+          <div class="adm-large ${variant === 'a4-vertical' ? 'adm-large-vertical' : 'adm-large-vertical-double'}">CÓDIGO ADM: ${escapeHtml(formatProductAdm(produto.codigoAdm))}</div>
+          <div class="identity ${variant === 'a4-vertical' ? 'identity-vertical' : 'identity-vertical-double'}">
+            <div class="meta-line ${variant === 'a4-vertical' ? 'meta-line-vertical' : 'meta-line-vertical-double'}"><strong>MARCA:</strong> ${escapeHtml(produto.marca || 'SEM MARCA')}</div>
+            <div class="meta-line ${variant === 'a4-vertical' ? 'meta-line-vertical' : 'meta-line-vertical-double'}"><strong>CÓDIGO ORIGINAL:</strong> ${escapeHtml(produto.codigoOriginal || '-')}</div>
+          </div>
+          <div class="description ${variant === 'a4-vertical' ? 'description-vertical' : 'description-vertical-double'}"><strong>DESCRIÇÃO:</strong> ${escapeHtml(produto.nome)}</div>
+        </section>
+        <div class="barcode barcode-large ${variant === 'a4-vertical' ? 'barcode-large-vertical' : 'barcode-large-vertical-double'}">
+          ${barcodeSvg}
+          <div class="barcode-number ${variant === 'a4-vertical-double' ? 'barcode-number-double' : ''}">${escapeHtml(barcodeValue)}</div>
+        </div>
+      </article>
+    `;
+  }
+
+  return `
+    <article class="label">
+      <div class="title">${escapeHtml(produto.nome)}</div>
+      <div class="brand">${escapeHtml(produto.marca || 'Sem marca')}</div>
+      ${isClosedBox ? `<div class="box-info">CAIXA FECHADA - ${produto.quantidadeCaixaFechada || '-'} UN</div>` : ''}
+      <div class="barcode">${barcodeSvg}</div>
+      <div class="adm">ADM ${escapeHtml(produto.codigoAdm)}</div>
+    </article>
+  `;
+}
+
 export function printProductLabelsInBrowser(
   produtos: ProdutoEtiqueta[],
   printerName: string,
@@ -56,6 +122,10 @@ export function printProductLabelsInBrowser(
 
   const isClosedBox = labelType === 'CAIXA_FECHADA';
   const isA4Product = labelType === 'A4_PRODUTO';
+  const isA4ProductVertical = labelType === 'A4_PRODUTO_VERTICAL';
+  const isA4ProductVerticalDouble = labelType === 'A4_PRODUTO_VERTICAL_DUPLA';
+  const isBrowserA4Product = isA4Product || isA4ProductVertical || isA4ProductVerticalDouble;
+  const isLandscapeA4 = isA4ProductVerticalDouble;
   const targetPrinter = printerName.trim() || 'desejada';
   const duplicateProductsPerSheet = Boolean(options?.duplicateProductsPerSheet && isA4Product);
   const previewTitle = options?.previewTitle?.trim() || (outputMode === 'pdf' ? 'Gerar PDF das etiquetas' : 'Previa de etiquetas');
@@ -69,58 +139,51 @@ export function printProductLabelsInBrowser(
     if (!barcode.isValid || barcode.type === 'UNSUPPORTED') {
       throw new Error(`${produto.nome}: ${barcode.reason || 'codigo de barras invalido.'}`);
     }
+
     const barcodeSvg = buildBarcodeSvg(
       barcode.normalizedValue,
       barcode.type,
-      isA4Product
-        ? { displayValue: false, height: 50, width: barcode.type === 'CODE128' ? 2.1 : 2.4, textMargin: 0 }
+      isBrowserA4Product
+        ? {
+            displayValue: false,
+            height: isA4ProductVerticalDouble ? 42 : 50,
+            width: isA4ProductVerticalDouble ? (barcode.type === 'CODE128' ? 1.7 : 1.9) : (barcode.type === 'CODE128' ? 2.1 : 2.4),
+            textMargin: 0,
+          }
         : undefined,
     );
 
-    const labelMarkup = isA4Product ? `
-    <article class="label label-a4">
-      <section class="product-details">
-        <div class="product-image">
-          <span class="image-placeholder">SEM FOTO</span>
-          ${produto.imagemUrl ? `<img src="${escapeHtml(produto.imagemUrl)}" alt="${escapeHtml(produto.nome)}" />` : ''}
-        </div>
-        <div class="product-copy">
-          <div class="adm-large">CÓDIGO ADM: ${escapeHtml(formatProductAdm(produto.codigoAdm))}</div>
-          <div class="identity">
-            <div class="meta-line"><strong>MARCA:</strong> ${escapeHtml(produto.marca || 'SEM MARCA')}</div>
-            <div class="meta-line"><strong>CÓDIGO ORIGINAL:</strong> ${escapeHtml(produto.codigoOriginal || '-')}</div>
-          </div>
-          <div class="description"><strong>DESCRIÇÃO:</strong> ${escapeHtml(produto.nome)}</div>
-        </div>
-      </section>
-      <div class="barcode barcode-large">
-        ${barcodeSvg}
-        <div class="barcode-number">${escapeHtml(barcode.normalizedValue)}</div>
-      </div>
-    </article>
-  ` : `
-    <article class="label">
-      <div class="title">${escapeHtml(produto.nome)}</div>
-      <div class="brand">${escapeHtml(produto.marca || 'Sem marca')}</div>
-      ${isClosedBox ? `<div class="box-info">CAIXA FECHADA - ${produto.quantidadeCaixaFechada || '-'} UN</div>` : ''}
-      <div class="barcode">${barcodeSvg}</div>
-      <div class="adm">ADM ${escapeHtml(produto.codigoAdm)}</div>
-    </article>
-  `;
+    const variant = isA4Product
+      ? 'a4-horizontal'
+      : isA4ProductVertical
+        ? 'a4-vertical'
+        : isA4ProductVerticalDouble
+          ? 'a4-vertical-double'
+          : 'small';
+
+    const labelMarkup = buildProductLabelMarkup(
+      produto,
+      barcodeSvg,
+      barcode.normalizedValue,
+      variant,
+      isClosedBox,
+    );
+
     return duplicateProductsPerSheet ? [labelMarkup, labelMarkup] : [labelMarkup];
   });
+
   const total = labelItems.length;
   const labelsHtml = labelItems.join('');
-  const sheetsHtml = isA4Product
-    ? Array.from({ length: Math.ceil(labelItems.length / 2) }, (_, pageIndex) => {
-        const labels = labelItems.slice(pageIndex * 2, (pageIndex * 2) + 2).join('');
-        const isLastPage = pageIndex === Math.ceil(labelItems.length / 2) - 1;
+  const labelsPerSheet = isA4Product ? 2 : isA4ProductVertical ? 1 : isA4ProductVerticalDouble ? 2 : labelItems.length;
+  const totalSheets = isBrowserA4Product ? Math.ceil(labelItems.length / labelsPerSheet) : 1;
+  const sheetsHtml = isBrowserA4Product
+    ? Array.from({ length: totalSheets }, (_, pageIndex) => {
+        const labels = labelItems.slice(pageIndex * labelsPerSheet, (pageIndex * labelsPerSheet) + labelsPerSheet).join('');
+        const isLastPage = pageIndex === totalSheets - 1;
         return `<section class="sheet${isLastPage ? ' last-sheet' : ''}">${labels}</section>`;
       }).join('')
     : `<section class="sheet last-sheet">${labelsHtml}</section>`;
 
-  // The popup is opened only after validation so an invalid product does not
-  // leave an empty browser window behind.
   const popup = window.open('', '_blank', 'width=1200,height=900');
   if (!popup) {
     throw new Error('Nao foi possivel abrir a janela de impressao do navegador.');
@@ -135,8 +198,8 @@ export function printProductLabelsInBrowser(
         <title>${escapeHtml(documentTitle)}</title>
         <style>
           @page {
-            size: A4 ${isA4Product ? 'portrait' : 'landscape'};
-            margin: ${isA4Product ? '0' : '10mm'};
+            size: A4 ${isLandscapeA4 ? 'landscape' : isBrowserA4Product ? 'portrait' : 'landscape'};
+            margin: ${isBrowserA4Product ? '0' : '10mm'};
           }
 
           * {
@@ -208,24 +271,24 @@ export function printProductLabelsInBrowser(
 
           .sheet {
             display: grid;
-            grid-template-columns: ${isA4Product ? '180mm' : isClosedBox ? 'repeat(2, 100mm)' : 'repeat(3, 66mm)'};
-            grid-template-rows: ${isA4Product ? 'repeat(2, 110mm)' : 'none'};
-            gap: ${isA4Product ? '40mm 0' : '4mm'};
+            grid-template-columns: ${isA4Product ? '180mm' : isA4ProductVertical ? '150mm' : isA4ProductVerticalDouble ? 'repeat(2, 125mm)' : isClosedBox ? 'repeat(2, 100mm)' : 'repeat(3, 66mm)'};
+            grid-template-rows: ${isA4Product ? 'repeat(2, 110mm)' : isA4ProductVertical ? '210mm' : isA4ProductVerticalDouble ? '180mm' : 'none'};
+            gap: ${isA4Product ? '40mm 0' : isA4ProductVertical ? '0' : isA4ProductVerticalDouble ? '20mm' : '4mm'};
             justify-content: center;
-            align-content: start;
-            width: ${isA4Product ? '210mm' : 'auto'};
-            min-height: ${isA4Product ? '297mm' : 'auto'};
-            padding: ${isA4Product ? '18.5mm 15mm' : '10mm'};
+            align-content: ${isA4ProductVertical || isA4ProductVerticalDouble ? 'center' : 'start'};
+            width: ${isLandscapeA4 ? '297mm' : isBrowserA4Product ? '210mm' : 'auto'};
+            min-height: ${isLandscapeA4 ? '210mm' : isBrowserA4Product ? '297mm' : 'auto'};
+            padding: ${isA4Product ? '18.5mm 15mm' : isA4ProductVertical ? '43.5mm 30mm' : isA4ProductVerticalDouble ? '15mm' : '10mm'};
             border-radius: 18px;
             background: #ffffff;
             box-shadow: 0 24px 60px rgba(15, 23, 42, 0.12);
           }
 
           .label {
-            width: ${isA4Product ? '180mm' : isClosedBox ? '100mm' : '66mm'};
-            height: ${isA4Product ? '110mm' : isClosedBox ? '60mm' : '44mm'};
+            width: ${isA4Product ? '180mm' : isA4ProductVertical ? '150mm' : isA4ProductVerticalDouble ? '125mm' : isClosedBox ? '100mm' : '66mm'};
+            height: ${isA4Product ? '110mm' : isA4ProductVertical ? '210mm' : isA4ProductVerticalDouble ? '180mm' : isClosedBox ? '60mm' : '44mm'};
             border: 1px solid #94a3b8;
-            padding: ${isA4Product ? '0' : '3mm'};
+            padding: ${isBrowserA4Product ? '0' : '3mm'};
             display: flex;
             flex-direction: column;
             justify-content: space-between;
@@ -372,6 +435,164 @@ export function printProductLabelsInBrowser(
             max-height: 16mm;
           }
 
+          .label-a4-vertical,
+          .label-a4-vertical-double {
+            border: 0.6mm solid #172033;
+            border-radius: 3mm;
+            overflow: hidden;
+            display: grid;
+            font-family: "Arial Narrow", "Roboto Condensed", Arial, sans-serif;
+          }
+
+          .label-a4-vertical {
+            grid-template-rows: 100mm 75mm 35mm;
+          }
+
+          .label-a4-vertical-double {
+            grid-template-rows: 82mm 67mm 31mm;
+          }
+
+          .product-image-vertical,
+          .product-image-vertical-double {
+            position: relative;
+            display: grid;
+            place-items: center;
+            border-right: 0;
+            border-bottom: 0.6mm solid #172033;
+            overflow: hidden;
+          }
+
+          .product-image-vertical {
+            padding: 6mm;
+          }
+
+          .product-image-vertical-double {
+            padding: 5mm;
+          }
+
+          .product-image-vertical img,
+          .product-image-vertical-double img {
+            position: absolute;
+            object-fit: contain;
+            background: #ffffff;
+          }
+
+          .product-image-vertical img {
+            inset: 5mm;
+            width: calc(100% - 10mm);
+            height: calc(100% - 10mm);
+          }
+
+          .product-image-vertical-double img {
+            inset: 3.5mm;
+            width: calc(100% - 7mm);
+            height: calc(100% - 7mm);
+          }
+
+          .product-copy-vertical,
+          .product-copy-vertical-double {
+            display: grid;
+            min-width: 0;
+          }
+
+          .product-copy-vertical {
+            grid-template-rows: 18mm 24mm 1fr;
+          }
+
+          .product-copy-vertical-double {
+            grid-template-rows: 16mm 21mm 1fr;
+          }
+
+          .adm-large-vertical,
+          .identity-vertical,
+          .description-vertical,
+          .adm-large-vertical-double,
+          .identity-vertical-double,
+          .description-vertical-double {
+            overflow: hidden;
+          }
+
+          .adm-large-vertical,
+          .identity-vertical,
+          .adm-large-vertical-double,
+          .identity-vertical-double {
+            border-bottom: 0.6mm solid #172033;
+          }
+
+          .adm-large-vertical,
+          .identity-vertical,
+          .description-vertical {
+            padding: 1.5mm 4mm;
+          }
+
+          .adm-large-vertical-double,
+          .identity-vertical-double,
+          .description-vertical-double {
+            padding: 1.4mm 3.6mm;
+          }
+
+          .adm-large-vertical {
+            font-size: 24pt;
+          }
+
+          .adm-large-vertical-double {
+            font-size: 20pt;
+          }
+
+          .identity-vertical {
+            gap: 0.8mm;
+          }
+
+          .identity-vertical-double {
+            gap: 0.55mm;
+          }
+
+          .meta-line-vertical {
+            font-size: 16pt;
+            line-height: 1.08;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+          }
+
+          .meta-line-vertical-double {
+            font-size: 13pt;
+            line-height: 1.08;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+          }
+
+          .description-vertical {
+            font-size: 18pt;
+            line-height: 1.12;
+            padding-top: 2mm;
+          }
+
+          .description-vertical-double {
+            font-size: 14pt;
+            line-height: 1.12;
+            padding-top: 1.6mm;
+          }
+
+          .barcode-large-vertical {
+            padding: 1.5mm 18mm 1mm;
+          }
+
+          .barcode-large-vertical-double {
+            padding: 1.2mm 14mm 0.9mm;
+          }
+
+          .barcode-large-vertical svg {
+            max-width: 112mm;
+            max-height: 16mm;
+          }
+
+          .barcode-large-vertical-double svg {
+            max-width: 104mm;
+            max-height: 15mm;
+          }
+
           .barcode-number {
             margin-top: 1mm;
             font-family: Arial, sans-serif;
@@ -381,6 +602,10 @@ export function printProductLabelsInBrowser(
             letter-spacing: 0;
             white-space: nowrap;
             text-align: center;
+          }
+
+          .barcode-number-double {
+            font-size: 18pt;
           }
 
           .summary {
@@ -405,7 +630,7 @@ export function printProductLabelsInBrowser(
             }
 
             .sheet {
-              padding: ${isA4Product ? '18.5mm 15mm' : '0'};
+              padding: ${isA4Product ? '18.5mm 15mm' : isA4ProductVertical ? '43.5mm 30mm' : isA4ProductVerticalDouble ? '15mm' : '0'};
               border-radius: 0;
               box-shadow: none;
             }
@@ -444,7 +669,6 @@ export function printProductLabelsInBrowser(
   popup.document.close();
   popup.focus();
 
-  // Let the browser paint the preview before the user interacts with it.
   window.setTimeout(() => popup.focus(), 100);
 }
 
@@ -458,6 +682,7 @@ export function printLabelsInBrowser(
   const total = Math.max(1, Math.floor(quantidade));
   printProductLabelsInBrowser(Array.from({ length: total }, () => produto), printerName, labelType, outputMode);
 }
+
 /**
  * Abre a janela de impressao do navegador com as etiquetas de transporte.
  * Uma etiqueta por volume, cada uma com codigo de barras (CODE128) do

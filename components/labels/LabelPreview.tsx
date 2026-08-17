@@ -9,10 +9,107 @@ interface LabelPreviewProps {
   labelType?: LabelType;
 }
 
+function ProductVerticalPreview({
+  produto,
+  selectedBarcode,
+  compact = false,
+}: {
+  produto: ProdutoEtiqueta;
+  selectedBarcode: string | null;
+  compact?: boolean;
+}) {
+  return (
+    <Box
+      sx={{
+        width: '100%',
+        maxWidth: compact ? 420 : 560,
+        mx: 'auto',
+        aspectRatio: compact ? '125 / 180' : '150 / 210',
+        border: '2px solid #172033',
+        borderRadius: 2,
+        overflow: 'hidden',
+        bgcolor: '#fff',
+        color: '#111',
+        display: 'grid',
+        gridTemplateRows: compact ? '46% 38% 16%' : '48% 36% 16%',
+      }}
+    >
+      <Box
+        sx={{
+          borderBottom: '2px solid #172033',
+          display: 'grid',
+          placeItems: 'center',
+          p: compact ? 1.5 : 2,
+          bgcolor: '#fff',
+          position: 'relative',
+        }}
+      >
+        <Typography sx={{ color: '#94a3b8', fontWeight: 800, fontSize: compact ? 12 : 14 }}>SEM FOTO</Typography>
+        {produto.imagemUrl && (
+          <Box
+            component="img"
+            src={produto.imagemUrl}
+            alt={produto.nome}
+            sx={{
+              position: 'absolute',
+              inset: compact ? 10 : 14,
+              width: compact ? 'calc(100% - 20px)' : 'calc(100% - 28px)',
+              height: compact ? 'calc(100% - 20px)' : 'calc(100% - 28px)',
+              objectFit: 'contain',
+              bgcolor: '#fff',
+            }}
+          />
+        )}
+      </Box>
+      <Box sx={{ display: 'grid', gridTemplateRows: compact ? '18% 22% 1fr' : '18% 22% 1fr', minWidth: 0 }}>
+        <Box sx={{ px: compact ? 1.3 : 2, display: 'flex', alignItems: 'center', borderBottom: '2px solid #172033' }}>
+          <Typography sx={{ color: '#07559b', fontWeight: 950, fontSize: compact ? 'clamp(15px, 2.4vw, 22px)' : 'clamp(18px, 3vw, 30px)', lineHeight: 1 }}>
+            CÓDIGO ADM: {formatProductAdm(produto.codigoAdm)}
+          </Typography>
+        </Box>
+        <Box
+          sx={{
+            px: compact ? 1.3 : 2,
+            py: compact ? 0.45 : 0.7,
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            borderBottom: '2px solid #172033',
+            minWidth: 0,
+            gap: compact ? 0.2 : 0.35,
+          }}
+        >
+          <Typography noWrap sx={{ fontSize: compact ? 'clamp(11px, 1.8vw, 16px)' : 'clamp(15px, 2.2vw, 22px)', lineHeight: 1.08 }}>
+            <strong>MARCA:</strong> {produto.marca || 'SEM MARCA'}
+          </Typography>
+          <Typography noWrap sx={{ fontSize: compact ? 'clamp(11px, 1.8vw, 16px)' : 'clamp(15px, 2.2vw, 22px)', lineHeight: 1.08 }}>
+            <strong>CÓDIGO ORIGINAL:</strong> {produto.codigoOriginal || '-'}
+          </Typography>
+        </Box>
+        <Box sx={{ px: compact ? 1.3 : 2, py: compact ? 0.6 : 1, overflow: 'hidden' }}>
+          <Typography sx={{ fontSize: compact ? 'clamp(11px, 1.8vw, 16px)' : 'clamp(15px, 2.2vw, 22px)', lineHeight: 1.15 }}>
+            <strong>DESCRIÇÃO:</strong> {produto.nome}
+          </Typography>
+        </Box>
+      </Box>
+      <Box sx={{ borderTop: '2px solid #172033', display: 'grid', placeItems: 'center', px: compact ? '8%' : '10%', py: compact ? 0.45 : 0.75 }}>
+        <Box sx={{ width: '100%' }}>
+          <Box sx={{ height: compact ? 34 : 44, backgroundImage: 'repeating-linear-gradient(90deg, #000 0 3px, transparent 3px 6px, #000 6px 8px, transparent 8px 11px)' }} />
+          <Typography textAlign="center" fontWeight={800} letterSpacing={0} fontSize={compact ? 16 : 20} sx={{ fontFamily: 'Arial, sans-serif' }}>
+            {selectedBarcode || 'Sem codigo'}
+          </Typography>
+        </Box>
+      </Box>
+    </Box>
+  );
+}
+
 export function LabelPreview({ produto, quantidade, labelType = 'UNITARIA' }: LabelPreviewProps) {
   const theme = useTheme();
   const isClosedBox = labelType === 'CAIXA_FECHADA';
   const isA4Product = labelType === 'A4_PRODUTO';
+  const isA4ProductVertical = labelType === 'A4_PRODUTO_VERTICAL';
+  const isA4ProductVerticalDouble = labelType === 'A4_PRODUTO_VERTICAL_DUPLA';
   const selectedBarcode = isClosedBox ? produto.codigoBarrasCaixaFechada : produto.codigoBarras;
   const barcode = analyzeBarcode(selectedBarcode);
   const total = Math.max(1, quantidade);
@@ -21,12 +118,18 @@ export function LabelPreview({ produto, quantidade, labelType = 'UNITARIA' }: La
     <Stack spacing={2}>
       <Typography variant="subtitle2" color="text.secondary">
         Previa aproximada de {total} etiqueta{total > 1 ? 's' : ''} ({barcode.type})
-        {isA4Product ? ' - 2 por folha A4' : ''}
+        {isA4Product
+          ? ' - 2 por folha A4'
+          : isA4ProductVertical
+            ? ' - 1 por folha A4'
+            : isA4ProductVerticalDouble
+              ? ' - 2 por folha A4 paisagem'
+              : ''}
       </Typography>
       <Box
         sx={{
           display: 'grid',
-          gridTemplateColumns: isA4Product
+          gridTemplateColumns: isA4Product || isA4ProductVertical || isA4ProductVerticalDouble
             ? '1fr'
             : isClosedBox
             ? { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' }
@@ -89,7 +192,7 @@ export function LabelPreview({ produto, quantidade, labelType = 'UNITARIA' }: La
                   </Box>
                   <Box sx={{ px: 1.4, py: 0.25, overflow: 'hidden' }}>
                     <Typography sx={{ fontSize: 'clamp(14px, 2.3vw, 22px)', lineHeight: 1.1 }}>
-                      <strong>DESCRICAO:</strong> {produto.nome}
+                      <strong>DESCRIÇÃO:</strong> {produto.nome}
                     </Typography>
                   </Box>
                 </Box>
@@ -103,52 +206,78 @@ export function LabelPreview({ produto, quantidade, labelType = 'UNITARIA' }: La
                 </Box>
               </Box>
             </Box>
-          ) : (
-          <Box
-            key={index}
-            sx={{
-              aspectRatio: isClosedBox ? '100 / 60' : '33 / 22',
-              borderRadius: 2,
-              p: 1.5,
-              background: `linear-gradient(180deg, ${alpha('#ffffff', 0.95)} 0%, ${alpha(theme.palette.grey[100], 0.95)} 100%)`,
-              border: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
-              boxShadow: '0 12px 30px rgba(15, 23, 42, 0.08)',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'space-between',
-            }}
-          >
-            <Box>
-              <Typography variant="caption" display="block" textAlign="center" fontWeight={800}>
-                {produto.nome}
-              </Typography>
-              <Typography variant="caption" display="block" textAlign="center" color="text.secondary">
-                {produto.marca || 'Sem marca'}
-              </Typography>
-              {isClosedBox && (
-                <Typography variant="caption" display="block" textAlign="center" fontWeight={900}>
-                  CAIXA FECHADA - {produto.quantidadeCaixaFechada || '-'} UN
-                </Typography>
-              )}
-            </Box>
-            <Box sx={{ px: 1 }}>
+          ) : isA4ProductVertical ? (
+            <ProductVerticalPreview key={index} produto={produto} selectedBarcode={selectedBarcode} />
+          ) : isA4ProductVerticalDouble ? (
+            <Box
+              key={index}
+              sx={{
+                width: '100%',
+                maxWidth: 980,
+                mx: 'auto',
+                p: 2,
+                border: '2px dashed #cbd5e1',
+                borderRadius: 2,
+                bgcolor: '#f8fafc',
+              }}
+            >
               <Box
                 sx={{
-                  height: isClosedBox ? 64 : 38,
-                  borderRadius: 1,
-                  backgroundImage:
-                    'repeating-linear-gradient(90deg, #000000 0 2px, transparent 2px 4px, #000000 4px 5px, transparent 5px 7px)',
-                  backgroundSize: '100% 100%',
+                  display: 'grid',
+                  gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' },
+                  gap: 2.5,
                 }}
-              />
-              <Typography variant="caption" display="block" textAlign="center" fontWeight={900} letterSpacing={1}>
-                {selectedBarcode || 'Sem codigo'}
+              >
+                <ProductVerticalPreview produto={produto} selectedBarcode={selectedBarcode} compact />
+                <ProductVerticalPreview produto={produto} selectedBarcode={selectedBarcode} compact />
+              </Box>
+            </Box>
+          ) : (
+            <Box
+              key={index}
+              sx={{
+                aspectRatio: isClosedBox ? '100 / 60' : '33 / 22',
+                borderRadius: 2,
+                p: 1.5,
+                background: `linear-gradient(180deg, ${alpha('#ffffff', 0.95)} 0%, ${alpha(theme.palette.grey[100], 0.95)} 100%)`,
+                border: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
+                boxShadow: '0 12px 30px rgba(15, 23, 42, 0.08)',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+              }}
+            >
+              <Box>
+                <Typography variant="caption" display="block" textAlign="center" fontWeight={800}>
+                  {produto.nome}
+                </Typography>
+                <Typography variant="caption" display="block" textAlign="center" color="text.secondary">
+                  {produto.marca || 'Sem marca'}
+                </Typography>
+                {isClosedBox && (
+                  <Typography variant="caption" display="block" textAlign="center" fontWeight={900}>
+                    CAIXA FECHADA - {produto.quantidadeCaixaFechada || '-'} UN
+                  </Typography>
+                )}
+              </Box>
+              <Box sx={{ px: 1 }}>
+                <Box
+                  sx={{
+                    height: isClosedBox ? 64 : 38,
+                    borderRadius: 1,
+                    backgroundImage:
+                      'repeating-linear-gradient(90deg, #000000 0 2px, transparent 2px 4px, #000000 4px 5px, transparent 5px 7px)',
+                    backgroundSize: '100% 100%',
+                  }}
+                />
+                <Typography variant="caption" display="block" textAlign="center" fontWeight={900} letterSpacing={1}>
+                  {selectedBarcode || 'Sem codigo'}
+                </Typography>
+              </Box>
+              <Typography variant="caption" display="block" textAlign="center" color="text.secondary">
+                ADM {produto.codigoAdm}
               </Typography>
             </Box>
-            <Typography variant="caption" display="block" textAlign="center" color="text.secondary">
-              ADM {produto.codigoAdm}
-            </Typography>
-          </Box>
           )
         ))}
       </Box>
