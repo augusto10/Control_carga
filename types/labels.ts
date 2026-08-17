@@ -1,15 +1,42 @@
 export type BarcodeFormat = 'EAN13' | 'EAN8' | 'CODE128' | 'UNSUPPORTED';
-export type LabelType = 'UNITARIA' | 'CAIXA_FECHADA';
+export type LabelType = 'UNITARIA' | 'CAIXA_FECHADA' | 'A4_PRODUTO';
 
 export interface ProdutoEtiqueta {
   produtoId: string;
   codigoAdm: string;
   nome: string;
   marca: string | null;
+  codigoOriginal: string | null;
+  imagemUrl: string | null;
   codigoBarras: string | null;
   barcodeType: BarcodeFormat;
   codigoBarrasCaixaFechada: string | null;
   quantidadeCaixaFechada: number | null;
+}
+
+export interface ProdutosPorMarcaResponse {
+  marca: string;
+  produtos: ProdutoEtiqueta[];
+  total: number;
+  catalogo?: {
+    total: number;
+    atualizadoEm: string | null;
+  };
+}
+
+export interface ProdutoEtiquetaCatalogo {
+  id: string;
+  codigoAdm: string;
+  nomeVenda: string;
+  marca: string | null;
+  codigoOriginal: string | null;
+  codigoBarras: string | null;
+  codigoBarrasCaixaFechada?: string | null;
+  quantidadeCaixa: number | null;
+  imagemPrincipal: string;
+  imagens: string[];
+  ativo: boolean;
+  updatedAt: string;
 }
 
 export interface BarcodeAnalysis {

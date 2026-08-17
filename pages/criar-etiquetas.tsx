@@ -21,6 +21,7 @@ import {
   Label as LabelIcon,
   LocalPrintshop as LocalPrintshopIcon,
   LocalShipping as LocalShippingIcon,
+  PictureAsPdf as PictureAsPdfIcon,
   Search as SearchIcon,
 } from '@mui/icons-material';
 import { useSnackbar } from 'notistack';
@@ -78,6 +79,7 @@ export default function CriarEtiquetasPage() {
   const [printers, setPrinters] = useState<string[]>([]);
   const [printer, setPrinter] = useState('');
   const [printing, setPrinting] = useState(false);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [qzStatus, setQzStatus] = useState<QzStatus>(INITIAL_QZ_STATUS);
 
   const selectedBarcode = labelType === 'CAIXA_FECHADA'
@@ -85,7 +87,13 @@ export default function CriarEtiquetasPage() {
     : produto?.codigoBarras;
   const barcodeInfo = useMemo(() => analyzeBarcode(selectedBarcode), [selectedBarcode]);
   const printerIsCompatible = useMemo(() => (printer ? isZplCompatiblePrinter(printer) : false), [printer]);
-  const canPrint = Boolean(produto && barcodeInfo.isValid && quantidade > 0 && printer && qzConnected);
+  const printsDirectlyInZebra = printerIsCompatible && labelType !== 'A4_PRODUTO';
+  const canPrint = Boolean(
+    produto
+    && barcodeInfo.isValid
+    && quantidade > 0
+    && (labelType === 'A4_PRODUTO' || (printer && qzConnected)),
+  );
 
   useEffect(() => {
     configureQzSecurity();
@@ -225,7 +233,7 @@ export default function CriarEtiquetasPage() {
 
     try {
       setPrinting(true);
-      if (printerIsCompatible) {
+      if (printsDirectlyInZebra) {
         const zpl = generateZplLabels(produto, quantidade, labelType);
         await printRawZpl(printer, zpl);
       } else {
@@ -235,7 +243,7 @@ export default function CriarEtiquetasPage() {
       savePreferredPrinter(printer);
       await registerHistory('SUCESSO');
       enqueueSnackbar(
-        printerIsCompatible
+        printsDirectlyInZebra
           ? 'Etiquetas enviadas para impressao na Zebra.'
           : 'Previa de impressao aberta. Confira a etiqueta e clique em imprimir na janela.',
         { variant: 'success' }
@@ -246,6 +254,20 @@ export default function CriarEtiquetasPage() {
       enqueueSnackbar('Nao foi possivel imprimir as etiquetas.', { variant: 'error' });
     } finally {
       setPrinting(false);
+    }
+  }
+
+  async function handleDownloadPdf() {
+    if (!produto || labelType !== 'A4_PRODUTO') return;
+
+    try {
+      setDownloadingPdf(true);
+      printLabelsInBrowser(produto, quantidade, printer, labelType, 'pdf');
+      enqueueSnackbar('Arquivo aberto. Escolha Salvar como PDF e mantenha a escala em 100%.', { variant: 'success' });
+    } catch (error: unknown) {
+      enqueueSnackbar(error instanceof Error ? error.message : 'Nao foi possivel gerar o PDF das etiquetas.', { variant: 'error' });
+    } finally {
+      setDownloadingPdf(false);
     }
   }
 
@@ -328,6 +350,7 @@ export default function CriarEtiquetasPage() {
                   >
                     <MenuItem value="UNITARIA">Produto (3 por linha)</MenuItem>
                     <MenuItem value="CAIXA_FECHADA">Caixa fechada 100 x 60 mm</MenuItem>
+                    <MenuItem value="A4_PRODUTO">Produto 18 x 11 cm (2 por A4)</MenuItem>
                   </TextField>
                 </Grid>
                 <Grid item xs={12} md={4}>
@@ -392,6 +415,7 @@ export default function CriarEtiquetasPage() {
                         <Typography><strong>Produto:</strong> {produto.nome}</Typography>
                         <Typography><strong>Marca:</strong> {produto.marca || 'Sem marca'}</Typography>
                         <Typography><strong>Codigo ADM:</strong> {produto.codigoAdm}</Typography>
+                        <Typography><strong>Codigo original:</strong> {produto.codigoOriginal || 'Nao informado'}</Typography>
                         <Typography><strong>Codigo de barras:</strong> {produto.codigoBarras || 'Nao informado'}</Typography>
                         <Typography><strong>Codigo da caixa fechada:</strong> {produto.codigoBarrasCaixaFechada || 'Nao informado'}</Typography>
                         <Typography><strong>Unidades por caixa:</strong> {produto.quantidadeCaixaFechada || 'Nao informado'}</Typography>
@@ -409,9 +433,11 @@ export default function CriarEtiquetasPage() {
                         </Alert>
                       )}
 
-                      {printer && !printerIsCompatible && (
+                      {(labelType === 'A4_PRODUTO' || (printer && !printerIsCompatible)) && (
                         <Alert severity="info">
-                          Esta impressora vai abrir uma previa visual no navegador. Para Zebra/ZDesigner, a impressao continua direta pelo QZ Tray.
+                          {labelType === 'A4_PRODUTO'
+                            ? 'Impressao e PDF usam o mesmo arquivo, com duas etiquetas 18 x 11 cm e espacamento de 4 cm. Use Tamanho real ou escala 100%.'
+                            : 'Esta impressora vai abrir uma previa visual no navegador. Para Zebra/ZDesigner, a impressao continua direta pelo QZ Tray.'}
                         </Alert>
                       )}
 
@@ -424,7 +450,7 @@ export default function CriarEtiquetasPage() {
                         onRetry={() => void refreshPrinters(true)}
                       />
 
-                      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+                      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} useFlexGap flexWrap="wrap">
                         <Button
                           size="small"
                           variant="contained"
@@ -433,8 +459,24 @@ export default function CriarEtiquetasPage() {
                           onClick={() => void handlePrint()}
                           sx={COMPACT_BUTTON_SX}
                         >
-                          {printerIsCompatible ? 'Imprimir na Zebra' : 'Imprimir em outra impressora'}
+                          {labelType === 'A4_PRODUTO'
+                            ? 'Abrir impressao A4'
+                            : printsDirectlyInZebra
+                              ? 'Imprimir na Zebra'
+                              : 'Imprimir em outra impressora'}
                         </Button>
+                        {labelType === 'A4_PRODUTO' && (
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            startIcon={downloadingPdf ? <CircularProgress size={18} color="inherit" /> : <PictureAsPdfIcon />}
+                            disabled={!barcodeInfo.isValid || quantidade <= 0 || downloadingPdf}
+                            onClick={() => void handleDownloadPdf()}
+                            sx={COMPACT_BUTTON_SX}
+                          >
+                            Gerar PDF
+                          </Button>
+                        )}
                         <Button
                           size="small"
                           variant="outlined"

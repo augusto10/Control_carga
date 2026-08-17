@@ -47,6 +47,8 @@ prisma/test-*.sql
 .kilo/
 .kilocode/
 data/
+!src/data/
+!src/data/products-maxima.json
 nul
 map-api.js
 scripts/output*.json

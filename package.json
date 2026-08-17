@@ -10,6 +10,8 @@
     "lint": "next lint --fix || node -e \"process.exit(0)\"",
     "type-check": "tsc --noEmit || node -e \"process.exit(0)\"",
     "test:labels": "ts-node -r tsconfig-paths/register tests/labels.test.ts",
+    "sync:label-products": "node scripts/sync-label-products.mjs --incremental",
+    "sync:label-products-full": "node scripts/sync-label-products.mjs",
     "correcao-temporaria": "ts-node scripts/aplicar-correcao-temporaria.ts",
     "reverter-correcao-temporaria": "ts-node scripts/aplicar-correcao-temporaria.ts reverter",
     "migration-producao": "ts-node scripts/executar-migration-producao.ts"

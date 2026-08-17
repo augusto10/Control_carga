@@ -98,6 +98,7 @@ export function AppLayout({
       icon: Tags,
       children: [
         { name: 'Etiquetas de Produto', href: '/criar-etiquetas' },
+        { name: 'Gerar PDF Etiquetas por Marca', href: '/etiquetas-por-marca' },
         { name: 'Etiquetas de Transporte', href: '/etiquetas-transporte' },
 
       ]

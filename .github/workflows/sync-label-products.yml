@@ -1,0 +1,62 @@
+name: Atualizar produtos das etiquetas
+
+on:
+  schedule:
+    - cron: '17 5 */3 * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-label-products
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      ERP_API_URL: ${{ vars.ERP_API_URL || vars.API_SANTRI_BASE_URL }}
+      ERP_API_USERNAME: ${{ secrets.ERP_API_USERNAME || secrets.API_EXTERNA_USERNAME }}
+      ERP_API_PASSWORD: ${{ secrets.ERP_API_PASSWORD || secrets.API_EXTERNA_PASSWORD }}
+      ERP_EMPRESA_ID: '1'
+      ERP_SYNC_CONCURRENCY: '4'
+      ERP_SYNC_TIMEOUT_MS: '60000'
+      ERP_SYNC_PAGE_SIZE: '250'
+
+    steps:
+      - name: Baixar repositorio
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Atualizar produtos e fotos
+        run: npm run sync:label-products
+
+      - name: Validar etiquetas
+        run: npx tsc --noEmit -p tsconfig.etiquetas.json
+
+      - name: Publicar atualizacao
+        shell: bash
+        run: |
+          if git diff --quiet -- src/data/products-maxima.json public/products/erp; then
+            echo "Nenhuma alteracao encontrada."
+            exit 0
+          fi
+
+          git config user.name "Etiquetas ERP Bot"
+          git config user.email "etiquetas-erp-bot@users.noreply.github.com"
+          git add src/data/products-maxima.json public/products/erp
+          git commit -m "Atualiza produtos das etiquetas"
+          git pull --rebase origin "${GITHUB_REF_NAME}"
+          git push origin "HEAD:${GITHUB_REF_NAME}"

@@ -1,5 +1,6 @@
 import JsBarcode from 'jsbarcode';
 import { analyzeBarcode } from '@/lib/barcode-validation';
+import { formatProductAdm } from '@/lib/product-label';
 import { formatarNomeTransportadora } from '@/lib/etiquetas-transporte';
 import { LabelType, ProdutoEtiqueta } from '@/types/labels';
 
@@ -39,32 +40,65 @@ function buildBarcodeSvg(
   return svg.outerHTML;
 }
 
-export function printLabelsInBrowser(
-  produto: ProdutoEtiqueta,
-  quantidade: number,
+export function printProductLabelsInBrowser(
+  produtos: ProdutoEtiqueta[],
   printerName: string,
   labelType: LabelType = 'UNITARIA',
+  outputMode: 'print' | 'pdf' = 'print',
+  options?: {
+    documentTitle?: string;
+    previewTitle?: string;
+    primaryButtonLabel?: string;
+    duplicateProductsPerSheet?: boolean;
+  },
 ) {
   if (typeof window === 'undefined') return;
 
   const isClosedBox = labelType === 'CAIXA_FECHADA';
-  const selectedBarcode = isClosedBox ? produto.codigoBarrasCaixaFechada : produto.codigoBarras;
-  const barcode = analyzeBarcode(selectedBarcode);
-  if (!barcode.isValid || barcode.type === 'UNSUPPORTED') {
-    throw new Error(barcode.reason || 'Codigo de barras invalido.');
-  }
+  const isA4Product = labelType === 'A4_PRODUTO';
+  const targetPrinter = printerName.trim() || 'desejada';
+  const duplicateProductsPerSheet = Boolean(options?.duplicateProductsPerSheet && isA4Product);
+  const previewTitle = options?.previewTitle?.trim() || (outputMode === 'pdf' ? 'Gerar PDF das etiquetas' : 'Previa de etiquetas');
+  const documentTitle = options?.documentTitle?.trim() || previewTitle;
+  const primaryButtonLabel = options?.primaryButtonLabel?.trim() || (outputMode === 'pdf' ? 'Salvar como PDF' : 'Imprimir agora');
+  if (!produtos.length) throw new Error('Selecione pelo menos um produto.');
 
-  // Keep the popup scriptable while its document is being assembled. Some
-  // browsers leave a noopener/noreferrer about:blank window when document.write
-  // is used immediately after window.open.
-  const popup = window.open('', '_blank', 'width=1200,height=900');
-  if (!popup) {
-    throw new Error('Nao foi possivel abrir a janela de impressao do navegador.');
-  }
+  const labelItems = produtos.flatMap((produto) => {
+    const selectedBarcode = isClosedBox ? produto.codigoBarrasCaixaFechada : produto.codigoBarras;
+    const barcode = analyzeBarcode(selectedBarcode);
+    if (!barcode.isValid || barcode.type === 'UNSUPPORTED') {
+      throw new Error(`${produto.nome}: ${barcode.reason || 'codigo de barras invalido.'}`);
+    }
+    const barcodeSvg = buildBarcodeSvg(
+      barcode.normalizedValue,
+      barcode.type,
+      isA4Product
+        ? { displayValue: false, height: 50, width: barcode.type === 'CODE128' ? 2.1 : 2.4, textMargin: 0 }
+        : undefined,
+    );
 
-  const barcodeSvg = buildBarcodeSvg(barcode.normalizedValue, barcode.type);
-  const total = Math.max(1, quantidade);
-  const labelsHtml = Array.from({ length: total }).map(() => `
+    const labelMarkup = isA4Product ? `
+    <article class="label label-a4">
+      <section class="product-details">
+        <div class="product-image">
+          <span class="image-placeholder">SEM FOTO</span>
+          ${produto.imagemUrl ? `<img src="${escapeHtml(produto.imagemUrl)}" alt="${escapeHtml(produto.nome)}" />` : ''}
+        </div>
+        <div class="product-copy">
+          <div class="adm-large">CÓDIGO ADM: ${escapeHtml(formatProductAdm(produto.codigoAdm))}</div>
+          <div class="identity">
+            <div class="meta-line"><strong>MARCA:</strong> ${escapeHtml(produto.marca || 'SEM MARCA')}</div>
+            <div class="meta-line"><strong>CÓDIGO ORIGINAL:</strong> ${escapeHtml(produto.codigoOriginal || '-')}</div>
+          </div>
+          <div class="description"><strong>DESCRICAO:</strong> ${escapeHtml(produto.nome)}</div>
+        </div>
+      </section>
+      <div class="barcode barcode-large">
+        ${barcodeSvg}
+        <div class="barcode-number">${escapeHtml(barcode.normalizedValue)}</div>
+      </div>
+    </article>
+  ` : `
     <article class="label">
       <div class="title">${escapeHtml(produto.nome)}</div>
       <div class="brand">${escapeHtml(produto.marca || 'Sem marca')}</div>
@@ -72,7 +106,25 @@ export function printLabelsInBrowser(
       <div class="barcode">${barcodeSvg}</div>
       <div class="adm">ADM ${escapeHtml(produto.codigoAdm)}</div>
     </article>
-  `).join('');
+  `;
+    return duplicateProductsPerSheet ? [labelMarkup, labelMarkup] : [labelMarkup];
+  });
+  const total = labelItems.length;
+  const labelsHtml = labelItems.join('');
+  const sheetsHtml = isA4Product
+    ? Array.from({ length: Math.ceil(labelItems.length / 2) }, (_, pageIndex) => {
+        const labels = labelItems.slice(pageIndex * 2, (pageIndex * 2) + 2).join('');
+        const isLastPage = pageIndex === Math.ceil(labelItems.length / 2) - 1;
+        return `<section class="sheet${isLastPage ? ' last-sheet' : ''}">${labels}</section>`;
+      }).join('')
+    : `<section class="sheet last-sheet">${labelsHtml}</section>`;
+
+  // The popup is opened only after validation so an invalid product does not
+  // leave an empty browser window behind.
+  const popup = window.open('', '_blank', 'width=1200,height=900');
+  if (!popup) {
+    throw new Error('Nao foi possivel abrir a janela de impressao do navegador.');
+  }
 
   popup.document.open();
   popup.document.write(`
@@ -80,11 +132,11 @@ export function printLabelsInBrowser(
     <html lang="pt-BR">
       <head>
         <meta charset="utf-8" />
-        <title>Previa de etiquetas</title>
+        <title>${escapeHtml(documentTitle)}</title>
         <style>
           @page {
-            size: A4 landscape;
-            margin: 10mm;
+            size: A4 ${isA4Product ? 'portrait' : 'landscape'};
+            margin: ${isA4Product ? '0' : '10mm'};
           }
 
           * {
@@ -156,20 +208,24 @@ export function printLabelsInBrowser(
 
           .sheet {
             display: grid;
-            grid-template-columns: ${isClosedBox ? 'repeat(2, 100mm)' : 'repeat(3, 66mm)'};
-            gap: 4mm;
+            grid-template-columns: ${isA4Product ? '180mm' : isClosedBox ? 'repeat(2, 100mm)' : 'repeat(3, 66mm)'};
+            grid-template-rows: ${isA4Product ? 'repeat(2, 110mm)' : 'none'};
+            gap: ${isA4Product ? '40mm 0' : '4mm'};
             justify-content: center;
-            padding: 10mm;
+            align-content: start;
+            width: ${isA4Product ? '210mm' : 'auto'};
+            min-height: ${isA4Product ? '297mm' : 'auto'};
+            padding: ${isA4Product ? '18.5mm 15mm' : '10mm'};
             border-radius: 18px;
             background: #ffffff;
             box-shadow: 0 24px 60px rgba(15, 23, 42, 0.12);
           }
 
           .label {
-            width: ${isClosedBox ? '100mm' : '66mm'};
-            height: ${isClosedBox ? '60mm' : '44mm'};
+            width: ${isA4Product ? '180mm' : isClosedBox ? '100mm' : '66mm'};
+            height: ${isA4Product ? '110mm' : isClosedBox ? '60mm' : '44mm'};
             border: 1px solid #94a3b8;
-            padding: 3mm;
+            padding: ${isA4Product ? '0' : '3mm'};
             display: flex;
             flex-direction: column;
             justify-content: space-between;
@@ -214,6 +270,119 @@ export function printLabelsInBrowser(
             height: auto;
           }
 
+          .label-a4 {
+            border: 0.6mm solid #172033;
+            border-radius: 3mm;
+            overflow: hidden;
+            display: grid;
+            grid-template-rows: 74mm 36mm;
+            font-family: "Arial Narrow", "Roboto Condensed", Arial, sans-serif;
+          }
+
+          .product-details {
+            display: grid;
+            grid-template-columns: 56mm 1fr;
+            min-height: 0;
+          }
+
+          .product-image {
+            position: relative;
+            display: grid;
+            place-items: center;
+            padding: 5mm;
+            border-right: 0.6mm solid #172033;
+            overflow: hidden;
+          }
+
+          .product-image img {
+            position: absolute;
+            inset: 4mm;
+            width: calc(100% - 8mm);
+            height: calc(100% - 8mm);
+            object-fit: contain;
+            background: #ffffff;
+          }
+
+          .image-placeholder {
+            color: #94a3b8;
+            font-size: 12pt;
+            font-weight: 800;
+          }
+
+          .product-copy {
+            display: grid;
+            grid-template-rows: 19mm 25mm 30mm;
+            min-width: 0;
+          }
+
+          .adm-large,
+          .identity,
+          .description {
+            padding: 1.2mm 3mm;
+            overflow: hidden;
+          }
+
+          .adm-large,
+          .identity {
+            border-bottom: 0.6mm solid #172033;
+          }
+
+          .adm-large {
+            display: flex;
+            align-items: center;
+            color: #07559b;
+            font-size: 27pt;
+            line-height: 1;
+            font-weight: 950;
+            white-space: nowrap;
+          }
+
+          .identity {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 0.6mm;
+          }
+
+          .meta-line {
+            font-size: 18pt;
+            line-height: 1.05;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+          }
+
+          .description {
+            font-size: 18pt;
+            line-height: 1.12;
+          }
+
+          .barcode-large {
+            margin: 0;
+            padding: 1mm 36mm 0.5mm;
+            border-top: 0.6mm solid #172033;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+          }
+
+          .barcode-large svg {
+            width: 100%;
+            max-width: 100mm;
+            max-height: 16mm;
+          }
+
+          .barcode-number {
+            margin-top: 1mm;
+            font-family: Arial, sans-serif;
+            font-size: 20pt;
+            font-weight: 700;
+            line-height: 1;
+            letter-spacing: 0;
+            white-space: nowrap;
+            text-align: center;
+          }
+
           .summary {
             margin: 14px 0 0;
             font-size: 13px;
@@ -236,9 +405,13 @@ export function printLabelsInBrowser(
             }
 
             .sheet {
-              padding: 0;
+              padding: ${isA4Product ? '18.5mm 15mm' : '0'};
               border-radius: 0;
               box-shadow: none;
+            }
+
+            .sheet:not(.last-sheet) {
+              break-after: page;
             }
           }
         </style>
@@ -247,15 +420,17 @@ export function printLabelsInBrowser(
         <main class="page">
           <section class="toolbar">
             <div>
-              <p class="toolbar-title">Previa da impressao em outra impressora</p>
-              <p class="toolbar-text">Confira o layout abaixo. Quando estiver certo, clique em imprimir e escolha a impressora ${escapeHtml(printerName)}.</p>
+              <p class="toolbar-title">${escapeHtml(previewTitle)}</p>
+              <p class="toolbar-text">${outputMode === 'pdf'
+                ? 'Este e o mesmo arquivo usado na impressao. Clique abaixo e escolha Salvar como PDF, com escala 100%.'
+                : `Confira o layout abaixo. Quando estiver certo, clique em imprimir e escolha a impressora ${escapeHtml(targetPrinter)}.`}</p>
             </div>
             <div class="toolbar-actions">
-              <button class="btn btn-primary" onclick="window.print()">Imprimir agora</button>
+              <button class="btn btn-primary" onclick="window.print()">${escapeHtml(primaryButtonLabel)}</button>
               <button class="btn btn-secondary" onclick="window.close()">Fechar</button>
             </div>
           </section>
-          <section class="sheet">${labelsHtml}</section>
+          ${sheetsHtml}
           <p class="summary">${total} etiqueta${total > 1 ? 's' : ''} pronta${total > 1 ? 's' : ''} para impressao.</p>
         </main>
         <script>
@@ -271,6 +446,17 @@ export function printLabelsInBrowser(
 
   // Let the browser paint the preview before the user interacts with it.
   window.setTimeout(() => popup.focus(), 100);
+}
+
+export function printLabelsInBrowser(
+  produto: ProdutoEtiqueta,
+  quantidade: number,
+  printerName: string,
+  labelType: LabelType = 'UNITARIA',
+  outputMode: 'print' | 'pdf' = 'print',
+) {
+  const total = Math.max(1, Math.floor(quantidade));
+  printProductLabelsInBrowser(Array.from({ length: total }, () => produto), printerName, labelType, outputMode);
 }
 /**
  * Abre a janela de impressao do navegador com as etiquetas de transporte.
