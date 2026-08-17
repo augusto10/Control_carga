@@ -90,7 +90,7 @@ export function printProductLabelsInBrowser(
             <div class="meta-line"><strong>MARCA:</strong> ${escapeHtml(produto.marca || 'SEM MARCA')}</div>
             <div class="meta-line"><strong>CÓDIGO ORIGINAL:</strong> ${escapeHtml(produto.codigoOriginal || '-')}</div>
           </div>
-          <div class="description"><strong>DESCRICAO:</strong> ${escapeHtml(produto.nome)}</div>
+          <div class="description"><strong>DESCRIÇÃO:</strong> ${escapeHtml(produto.nome)}</div>
         </div>
       </section>
       <div class="barcode barcode-large">
