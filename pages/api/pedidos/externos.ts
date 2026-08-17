@@ -112,6 +112,8 @@ export default async function handler(
       ordenacao_valor,
       classificacao_logistica,
       somente_recebidos,
+      somente_entregas,
+      empresa_id,
       preload_month
     } = req.query;
 
@@ -121,6 +123,8 @@ export default async function handler(
     const classificacaoLogistica =
       typeof classificacao_logistica === 'string' ? classificacao_logistica.toLowerCase() : '';
     const somenteRecebidos = somente_recebidos === '1';
+    const somenteEntregas = somente_entregas === '1';
+    const empresaIdFiltro = typeof empresa_id === 'string' ? Number(empresa_id) : null;
 
     const username = process.env.API_EXTERNA_USERNAME;
     const password = process.env.API_EXTERNA_PASSWORD;
@@ -416,7 +420,7 @@ export default async function handler(
       }
     };
 
-    const EMPRESA_ID_ALVO = 1;
+    const EMPRESA_ID_ALVO = Number.isFinite(empresaIdFiltro) ? empresaIdFiltro : 1;
     const parseEmpresaId = (v: any) => {
       if (v === null || v === undefined) return null;
       if (typeof v === 'number' && Number.isFinite(v)) return v;
@@ -865,6 +869,13 @@ export default async function handler(
           return false;
         }
 
+        if (somenteEntregas) {
+          const tipoDoPedido = String(p.TIPO_ENTREGA || '').toUpperCase();
+          if (tipoDoPedido === 'ATO' || tipoDoPedido === 'NDF') {
+            return false;
+          }
+        }
+
         if (cidadeFiltro) {
           const cidadePedido = normalizeText(p.NOME_CIDADE ?? p.CIDADE ?? p.cidade);
           if (!cidadePedido.includes(cidadeFiltro)) return false;
@@ -918,11 +929,15 @@ export default async function handler(
       ordenacaoValor,
       classificacaoLogistica,
       somenteRecebidos,
+      somenteEntregas,
+      empresaIdFiltro: EMPRESA_ID_ALVO,
       stats,
       limit: safeLimit,
       offset: safeOffset
     });
+    const hasDateFilter = Boolean(inicio || fim);
     const isSimpleStatsRequest = stats === '1'
+      && !hasDateFilter
       && !cidadeFiltro
       && !bairroFiltro
       && !ordenacaoValor
@@ -1272,7 +1287,9 @@ export default async function handler(
         bairro: bairroFiltro,
         ordenacaoValor,
         classificacaoLogistica,
-        somenteRecebidos
+        somenteRecebidos,
+        somenteEntregas,
+        empresaIdFiltro: EMPRESA_ID_ALVO
       });
     const cached = fullScanCache.get(cacheKey);
     let filtradosCorrigidos: any[] = [];

@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { format } from 'date-fns';
 import { 
   Users, 
   ClipboardList, 
@@ -55,15 +54,12 @@ function AdminDashboardContent() {
     try {
       setLoading(true);
       
-      const hoje = format(new Date(), 'yyyy-MM-dd');
-      const primeiroDiaMes = format(new Date(new Date().getFullYear(), new Date().getMonth(), 1), 'yyyy-MM-dd');
+      const resumoRes = await fetch('/api/admin/dashboard-resumo', { credentials: 'include' });
+      if (!resumoRes.ok) {
+        throw new Error(`Falha ao carregar dashboard (${resumoRes.status})`);
+      }
 
-      const [usuariosRes, controlesRes, pedidosHojeRes, pedidosMesRes] = await Promise.all([
-        fetch('/api/admin/usuarios', { credentials: 'include' }),
-        fetch('/api/controles', { credentials: 'include' }),
-        fetch(`/api/pedidos/externos?limit=10000&offset=0&data_inicio=${hoje}&data_fim=${hoje}`, { credentials: 'include' }),
-        fetch(`/api/pedidos/externos?limit=10000&offset=0&data_inicio=${primeiroDiaMes}&data_fim=${hoje}`, { credentials: 'include' })
-      ]);
+      const resumo = await resumoRes.json();
 
       const statsData: DashboardStats = {
         totalUsuarios: 0,
@@ -98,22 +94,13 @@ function AdminDashboardContent() {
         statsData.controlesPendentes = controles.filter((c: any) => !c.finalizado).length;
       }
 
-      const filtrarPedidos = (lista: any[]) => {
-        if (!Array.isArray(lista)) return 0;
-        return lista.filter(p => {
-          const fechado = String(p.PEDIDO_FECHADO || '').toUpperCase() === 'S';
-          const isEntrega = p.TIPO_ENTREGA !== 'NDF' && p.TIPO_ENTREGA !== 'ATO';
-          return fechado && isEntrega;
-        }).length;
-      };
-
       if (pedidosHojeRes.ok) {
         const data = await pedidosHojeRes.json();
         if (data.error) {
           console.error('[Dashboard] Erro ao carregar pedidos de hoje:', data.error);
           statsData.pedidosHoje = 0;
         } else {
-          statsData.pedidosHoje = filtrarPedidos(data.data || []);
+          statsData.pedidosHoje = Number(data.total || 0);
         }
       }
 
@@ -123,7 +110,7 @@ function AdminDashboardContent() {
           console.error('[Dashboard] Erro ao carregar pedidos do mês:', data.error);
           statsData.pedidosMes = 0;
         } else {
-          statsData.pedidosMes = filtrarPedidos(data.data || []);
+          statsData.pedidosMes = Number(data.total || 0);
         }
       }
 

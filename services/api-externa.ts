@@ -1,6 +1,7 @@
 import axios, { AxiosInstance } from 'axios';
 
-const API_EXTERNA_BASE = 'http://ec2-15-229-152-29.sa-east-1.compute.amazonaws.com';
+const API_EXTERNA_BASE =
+  process.env.API_EXTERNA_BASE_URL?.trim() || 'http://localhost:8000';
 const API_EXTERNA_TIMEOUT_MS = 45_000;
 const API_EXTERNA_LOGIN_TIMEOUT_MS = 30_000;
 const API_EXTERNA_LOGIN_RETRY_BLOCK_MS = 5 * 60 * 1000;
@@ -83,6 +84,13 @@ interface PedidoLogisticaExterna {
   itens_entregas?: Record<string, any>[];
   notas_fiscais?: Record<string, any>[];
   [key: string]: any;
+}
+
+interface DashboardLogisticaResumoExterna {
+  total: number;
+  totais?: Record<string, number>;
+  filtros?: Record<string, any>;
+  data?: Record<string, any>[];
 }
 
 interface ApuracaoExterna {
@@ -903,6 +911,55 @@ class APIExternaService {
     }
   }
 
+  async listarDashboardLogistica(
+    filtros: {
+      empresa_id?: number;
+      data_inicio?: string;
+      data_fim?: string;
+    },
+    username: string,
+    password: string,
+    timeoutMs = API_EXTERNA_TIMEOUT_MS
+  ): Promise<DashboardLogisticaResumoExterna | null> {
+    try {
+      const authenticated = await this.ensureAuthenticated(username, password);
+      if (!authenticated) {
+        console.error('[API Externa] Falha na autenticação');
+        return null;
+      }
+
+      const params = new URLSearchParams();
+      if (typeof filtros.empresa_id === 'number') params.append('empresa_id', String(filtros.empresa_id));
+      if (filtros.data_inicio) params.append('data_inicio', filtros.data_inicio);
+      if (filtros.data_fim) params.append('data_fim', filtros.data_fim);
+
+      const url = `/api/v1/pedidos/dashboard-logistica${params.toString() ? `?${params.toString()}` : ''}`;
+      console.log('[API Externa] Buscando dashboard logístico consolidado:', url);
+
+      const response = await this.apiInstance.get<DashboardLogisticaResumoExterna>(url, {
+        validateStatus: (status) => status < 500,
+        timeout: timeoutMs,
+      });
+
+      if (response.status >= 400) {
+        console.warn(
+          '[API Externa] Falha ao buscar dashboard logístico consolidado:',
+          response.status,
+          response.statusText
+        );
+        return null;
+      }
+
+      return response.data || null;
+    } catch (error: any) {
+      console.error(
+        '[API Externa] Erro ao buscar dashboard logístico consolidado:',
+        error.response?.data || error.message
+      );
+      return null;
+    }
+  }
+
   async listarApuracoes(
     filtros: {
       data_inicio?: string;
@@ -957,5 +1014,6 @@ export type {
   PedidoExterno,
   PedidoItemExterno,
   PedidoLogisticaExterna,
+  DashboardLogisticaResumoExterna,
   ApuracaoExterna
 };

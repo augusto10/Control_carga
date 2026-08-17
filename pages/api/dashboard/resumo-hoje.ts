@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 import { startOfDay, endOfDay } from 'date-fns';
-import { apiExternaService } from '@/services/api-externa';
+import { getPedidosDashboard } from '@/lib/dashboard-external-cache';
 
 type DashboardResumo = {
   notasHoje: number;
@@ -17,8 +17,9 @@ type DashboardResumo = {
   warning?: string;
 };
 
-const DASHBOARD_CACHE_TTL_MS = 60_000;
-const DASHBOARD_STALE_TTL_MS = 10 * 60_000;
+const DEFAULT_CACHE_KEY = 'sem-inicio:sem-fim';
+const DASHBOARD_CACHE_TTL_MS = 30_000;
+const DASHBOARD_STALE_TTL_MS = 2 * 60_000;
 const DASHBOARD_QUERY_TIMEOUT_MS = 8_000;
 
 let dashboardCache: {
@@ -26,6 +27,14 @@ let dashboardCache: {
   staleAt: number;
   payload: DashboardResumo;
 } | null = null;
+const dashboardCacheByPeriodo = new Map<
+  string,
+  {
+    expiresAt: number;
+    staleAt: number;
+    payload: DashboardResumo;
+  }
+>();
 
 const withTimeout = async <T,>(promise: Promise<T>, timeoutMs: number): Promise<T> => {
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
@@ -48,33 +57,52 @@ const emptyResumo = (): DashboardResumo => ({
   pedidosRetiraAtoHoje: 0,
   controlesPendentes: 0,
   totalNotas: 0,
-  totalControles: 0
+  totalControles: 0,
 });
 
-const getPedidoId = (pedido: Record<string, any>): number | null => {
-  const candidates = [
-    pedido.ORCAMENTO_ID,
-    pedido.ORCAMENTO_BASE_ID,
-    pedido.PEDIDO_ID,
-    pedido.ID,
-    pedido.orcamento_id,
-    pedido.orcamento_base_id,
-    pedido.pedido_id,
-    pedido.id
-  ];
+const parseDateOnly = (value: unknown): Date | null => {
+  if (!value) return null;
+  const raw = String(value).trim();
+  if (!raw) return null;
 
-  for (const candidate of candidates) {
-    if (typeof candidate === 'number' && Number.isFinite(candidate)) return candidate;
-    if (typeof candidate === 'string' && candidate.trim()) {
-      const parsed = Number(candidate);
-      if (Number.isFinite(parsed)) return parsed;
-    }
-  }
-
-  return null;
+  const normalized = raw.length >= 10 ? raw.slice(0, 10) : raw;
+  const parsed = new Date(`${normalized}T00:00:00`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
 };
 
-const isPedidoFechado = (pedido: Record<string, any>) =>
+const formatDateOnly = (value: Date) => value.toISOString().slice(0, 10);
+
+const getPeriodoFiltro = (req: NextApiRequest) => {
+  const dataInicioRaw =
+    typeof req.query.data_inicio === 'string' ? req.query.data_inicio.trim() : '';
+  const dataFimRaw = typeof req.query.data_fim === 'string' ? req.query.data_fim.trim() : '';
+
+  const dataInicio = parseDateOnly(dataInicioRaw);
+  const dataFim = parseDateOnly(dataFimRaw);
+
+  if (dataInicioRaw && !dataInicio) {
+    throw new Error('data_inicio_invalida');
+  }
+
+  if (dataFimRaw && !dataFim) {
+    throw new Error('data_fim_invalida');
+  }
+
+  if (dataInicio && dataFim && dataInicio > dataFim) {
+    throw new Error('periodo_invalido');
+  }
+
+  return {
+    dataInicio,
+    dataFim,
+    cacheKey: `${dataInicio ? formatDateOnly(dataInicio) : 'sem-inicio'}:${dataFim ? formatDateOnly(dataFim) : 'sem-fim'}`,
+  };
+};
+
+const getCacheByPeriodo = (cacheKey: string) =>
+  cacheKey === DEFAULT_CACHE_KEY ? dashboardCache : dashboardCacheByPeriodo.get(cacheKey);
+
+const isPedidoFechado = (pedido: Record<string, unknown>) =>
   String(pedido.PEDIDO_FECHADO ?? pedido.pedido_fechado ?? '').toUpperCase() === 'S';
 
 const parsePedidoDate = (value: unknown): Date | null => {
@@ -86,7 +114,7 @@ const parsePedidoDate = (value: unknown): Date | null => {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 };
 
-const getPedidoDataHoraRecebimento = (pedido: Record<string, any>) =>
+const getPedidoDataHoraRecebimento = (pedido: Record<string, unknown>) =>
   parsePedidoDate(
     pedido.DATA_HORA_RECEBIMENTO ??
       pedido.data_hora_recebimento ??
@@ -95,15 +123,17 @@ const getPedidoDataHoraRecebimento = (pedido: Record<string, any>) =>
       null
   );
 
-const isPedidoRecebido = (pedido: Record<string, any>) => {
+const isPedidoRecebido = (pedido: Record<string, unknown>) => {
   const recebidoFlag = String(pedido.RECEBIDO ?? pedido.recebido ?? '').toUpperCase() === 'S';
   return recebidoFlag && Boolean(getPedidoDataHoraRecebimento(pedido));
 };
 
-const isRetiraNoAto = (pedido: Record<string, any>) =>
-  ['ATO', 'NDF'].includes(String(pedido.TIPO_ENTREGA ?? pedido.tipo_entrega ?? '').toUpperCase());
+const isRetiraNoAto = (pedido: Record<string, unknown>) =>
+  ['ATO', 'NDF', 'RDL'].includes(
+    String(pedido.TIPO_ENTREGA ?? pedido.tipo_entrega ?? '').toUpperCase()
+  );
 
-const getPedidosHojeDetalhados = async (dataReferencia: Date) => {
+const getPedidosPeriodoDetalhados = async (dataInicio: Date, dataFim: Date) => {
   const username = process.env.API_EXTERNA_USERNAME;
   const password = process.env.API_EXTERNA_PASSWORD;
 
@@ -115,49 +145,27 @@ const getPedidosHojeDetalhados = async (dataReferencia: Date) => {
     };
   }
 
-  const data = dataReferencia.toISOString().slice(0, 10);
-  // Uma única página é suficiente para o card e evita bloquear a abertura da
-  // tela com dezenas de chamadas. A página completa de pedidos faz a
-  // paginação detalhada quando o usuário a acessa.
-  const resultado = await withTimeout(
-    apiExternaService.listarPedidos(
-      {
-        limit: 100,
-        offset: 0,
-        data_inicio: data,
-        data_fim: data,
-        tipo_data: 'recebimento',
-      },
-      username,
-      password
-    ),
-    DASHBOARD_QUERY_TIMEOUT_MS
-  );
-  const pedidos: Record<string, any>[] = Array.isArray(resultado?.data) ? resultado.data : [];
+  // A API externa pode retornar vazio quando recebe filtro de periodo.
+  // Para a home, carregamos a pagina recente e filtramos localmente.
+  const pedidos =
+    (await withTimeout(getPedidosDashboard(username, password, 100), DASHBOARD_QUERY_TIMEOUT_MS)) || [];
 
   const pedidosValidos = pedidos.filter((pedido) => {
     const empresaId = Number(pedido.EMPRESA_ID ?? pedido.empresa_id ?? 0);
     const recebimento = getPedidoDataHoraRecebimento(pedido);
+
     return (
       empresaId === 1 &&
       isPedidoFechado(pedido) &&
       isPedidoRecebido(pedido) &&
       Boolean(recebimento) &&
-      recebimento! >= startOfDay(dataReferencia) &&
-      recebimento! <= endOfDay(dataReferencia)
+      recebimento! >= dataInicio &&
+      recebimento! <= dataFim
     );
   });
 
-  let pedidosEntregaHoje = 0;
-  let pedidosRetiraAtoHoje = 0;
-
-  for (const pedido of pedidosValidos) {
-    if (isRetiraNoAto(pedido)) {
-      pedidosRetiraAtoHoje += 1;
-    } else {
-      pedidosEntregaHoje += 1;
-    }
-  }
+  const pedidosEntregaHoje = pedidosValidos.filter((pedido) => !isRetiraNoAto(pedido)).length;
+  const pedidosRetiraAtoHoje = pedidosValidos.filter((pedido) => isRetiraNoAto(pedido)).length;
 
   return {
     pedidosHoje: pedidosValidos.length,
@@ -170,52 +178,58 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method !== 'GET') {
     return res.status(405).json({ message: 'Method not allowed' });
   }
+  const forceRefresh = String(req.query.force || '').trim() === '1';
+  res.setHeader('Cache-Control', 'private, max-age=30, stale-while-revalidate=120');
+  let periodoFiltro: ReturnType<typeof getPeriodoFiltro>;
+  try {
+    periodoFiltro = getPeriodoFiltro(req);
+  } catch (error) {
+    const message =
+      error instanceof Error && error.message === 'periodo_invalido'
+        ? 'Data inicial nao pode ser maior que a data final.'
+        : 'Periodo informado invalido.';
+    return res.status(400).json({ message });
+  }
+  const cacheAtual = getCacheByPeriodo(periodoFiltro.cacheKey);
 
-  res.setHeader('Cache-Control', 'private, max-age=15, stale-while-revalidate=120');
-
-  if (dashboardCache && dashboardCache.expiresAt > Date.now()) {
-    return res.status(200).json({ ...dashboardCache.payload, cached: true });
+  if (!forceRefresh && cacheAtual && cacheAtual.expiresAt > Date.now()) {
+    return res.status(200).json({ ...cacheAtual.payload, cached: true });
   }
 
   try {
     const hoje = new Date();
-    const inicio = startOfDay(hoje);
-    const fim = endOfDay(hoje);
+    const inicio = periodoFiltro.dataInicio ? startOfDay(periodoFiltro.dataInicio) : startOfDay(hoje);
+    const fim = periodoFiltro.dataFim ? endOfDay(periodoFiltro.dataFim) : endOfDay(hoje);
 
-    const [
-      notasHoje,
-      controlesHoje,
-      controlesPendentes,
-      totalNotas,
-      totalControles
-    ] = await withTimeout(
-      Promise.all([
-        prisma.notaFiscal.count({
-          where: {
-            dataCriacao: {
-              gte: inicio,
-              lte: fim
-            }
-          }
-        }),
-        prisma.controleCarga.count({
-          where: {
-            dataCriacao: {
-              gte: inicio,
-              lte: fim
-            }
-          }
-        }),
-        prisma.controleCarga.count({
-          where: {
-            finalizado: false
-          }
-        }),
-        prisma.notaFiscal.count(),
-        prisma.controleCarga.count()
-      ]),
-      DASHBOARD_QUERY_TIMEOUT_MS
-    );
+    const [notasHoje, controlesHoje, controlesPendentes, totalNotas, totalControles] =
+      await withTimeout(
+        Promise.all([
+          prisma.notaFiscal.count({
+            where: {
+              dataCriacao: {
+                gte: inicio,
+                lte: fim,
+              },
+            },
+          }),
+          prisma.controleCarga.count({
+            where: {
+              dataCriacao: {
+                gte: inicio,
+                lte: fim,
+              },
+            },
+          }),
+          prisma.controleCarga.count({
+            where: {
+              finalizado: false,
+            },
+          }),
+          prisma.notaFiscal.count(),
+          prisma.controleCarga.count(),
+        ]),
+        DASHBOARD_QUERY_TIMEOUT_MS
+      );
 
     let pedidosHoje = 0;
     let pedidosEntregaHoje = 0;
@@ -223,10 +237,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     try {
       ({ pedidosHoje, pedidosEntregaHoje, pedidosRetiraAtoHoje } =
-        await getPedidosHojeDetalhados(hoje));
+        await getPedidosPeriodoDetalhados(inicio, fim));
     } catch (error) {
-      // A indisponibilidade da API externa não pode zerar os cards que vêm
-      // do banco local nem impedir o carregamento inicial da tela.
       console.error('Erro ao buscar pedidos de hoje:', error);
     }
 
@@ -238,30 +250,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       pedidosRetiraAtoHoje,
       controlesPendentes,
       totalNotas,
-      totalControles
+      totalControles,
     };
 
     dashboardCache = {
       expiresAt: Date.now() + DASHBOARD_CACHE_TTL_MS,
       staleAt: Date.now() + DASHBOARD_STALE_TTL_MS,
-      payload
+      payload,
     };
+    dashboardCacheByPeriodo.set(periodoFiltro.cacheKey, dashboardCache);
 
     return res.status(200).json(payload);
   } catch (error) {
     console.error('Erro ao buscar resumo de hoje:', error);
+    const cacheStale = getCacheByPeriodo(periodoFiltro.cacheKey);
 
-    if (dashboardCache && dashboardCache.staleAt > Date.now()) {
+    if (cacheStale && cacheStale.staleAt > Date.now()) {
       return res.status(200).json({
-        ...dashboardCache.payload,
+        ...cacheStale.payload,
         stale: true,
-        warning: 'Banco demorou para responder. Exibindo o ultimo resumo em cache.'
+        warning: 'Banco demorou para responder. Exibindo o ultimo resumo em cache.',
       });
     }
 
     return res.status(200).json({
       ...emptyResumo(),
-      warning: 'Banco demorou para responder. Tente atualizar em alguns instantes.'
+      warning: 'Banco demorou para responder. Tente atualizar em alguns instantes.',
     });
   }
 }

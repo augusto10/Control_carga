@@ -84,7 +84,7 @@ async function listWindowsPrintersFallback() {
 
 export async function listLocalPrinters() {
   await ensureQzConnected();
-  let encontrados = await qz.printers.find().catch(() => []);
+  let encontrados: unknown = await qz.printers.find().catch(() => []);
   const printersFromFind = Array.isArray(encontrados)
     ? encontrados
     : typeof encontrados === 'string' && encontrados.trim()
