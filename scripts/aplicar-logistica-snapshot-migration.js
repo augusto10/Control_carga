@@ -14,9 +14,16 @@ const SQL_PATH = path.join(
 );
 
 function getConnectionString() {
-  const connectionString = process.env.DIRECT_URL || process.env.DATABASE_URL;
+  const directUrl = process.env.DIRECT_URL;
+  const databaseUrl = process.env.DATABASE_URL;
+  const connectionString = directUrl || databaseUrl;
   if (!connectionString) {
     throw new Error('Defina DIRECT_URL ou DATABASE_URL antes de aplicar a migration.');
+  }
+  if (!directUrl && databaseUrl?.startsWith('prisma+')) {
+    throw new Error(
+      'A migration exige DIRECT_URL PostgreSQL direta. A DATABASE_URL do Prisma Accelerate nao possui permissao para criar tabelas.'
+    );
   }
   return connectionString;
 }
@@ -29,10 +36,43 @@ function assertConfirmado() {
   );
 }
 
+function lerStatements() {
+  return fs
+    .readFileSync(SQL_PATH, 'utf8')
+    .split(/\r?\n/)
+    .filter((line) => !line.trim().startsWith('--'))
+    .join('\n')
+    .split(';')
+    .map((statement) => statement.trim())
+    .filter(Boolean);
+}
+
+async function aplicarViaPrisma() {
+  const { PrismaClient } = require('@prisma/client');
+  const prisma = new PrismaClient();
+
+  try {
+    console.log('[logistica-snapshot] Conectando via Prisma Client...');
+    await prisma.$connect();
+    for (const statement of lerStatements()) {
+      await prisma.$executeRawUnsafe(statement);
+    }
+  } finally {
+    await prisma.$disconnect().catch(() => undefined);
+  }
+}
+
 async function main() {
   assertConfirmado();
 
   const connectionString = getConnectionString();
+
+  if (connectionString.startsWith('prisma+')) {
+    await aplicarViaPrisma();
+    console.log('[logistica-snapshot] Migration aplicada via Prisma Client.');
+    return;
+  }
+
   const client = new Client({
     connectionString,
     ssl:
