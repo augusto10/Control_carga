@@ -12,6 +12,7 @@
     "test:labels": "ts-node -r tsconfig-paths/register tests/labels.test.ts",
     "sync:label-products": "node scripts/sync-label-products.mjs --incremental",
     "sync:label-products-full": "node scripts/sync-label-products.mjs",
+    "migration:logistica-snapshot": "node scripts/aplicar-logistica-snapshot-migration.js",
     "correcao-temporaria": "ts-node scripts/aplicar-correcao-temporaria.ts",
     "reverter-correcao-temporaria": "ts-node scripts/aplicar-correcao-temporaria.ts reverter",
     "migration-producao": "ts-node scripts/executar-migration-producao.ts"

@@ -764,32 +764,41 @@ export async function montarDashboardPorSnapshot(
   options: { exigirSincronizacaoRecenteMs?: number; warning?: string } = {}
 ) {
   const syncKey = getSnapshotSyncKey(periodo);
-  const sync = await (prisma as any).sincronizacaoLogistica.findUnique({ where: { chave: syncKey } });
+  let snapshots: any[] = [];
 
-  if (options.exigirSincronizacaoRecenteMs && sync?.ultimaSincronizacao) {
-    const idade = Date.now() - new Date(sync.ultimaSincronizacao).getTime();
-    if (idade > options.exigirSincronizacaoRecenteMs) return null;
-  } else if (options.exigirSincronizacaoRecenteMs && !sync) {
-    return null;
+  try {
+    const sync = await (prisma as any).sincronizacaoLogistica.findUnique({ where: { chave: syncKey } });
+
+    if (options.exigirSincronizacaoRecenteMs && sync?.ultimaSincronizacao) {
+      const idade = Date.now() - new Date(sync.ultimaSincronizacao).getTime();
+      if (idade > options.exigirSincronizacaoRecenteMs) return null;
+    } else if (options.exigirSincronizacaoRecenteMs && !sync) {
+      return null;
+    }
+
+    const dataFimLimite = periodo.dataFim
+      ? new Date(periodo.dataFim.getFullYear(), periodo.dataFim.getMonth(), periodo.dataFim.getDate(), 23, 59, 59, 999)
+      : null;
+    snapshots = await (prisma as any).pedidoLogisticaSnapshot.findMany({
+      where: {
+        ...(periodo.dataInicio || dataFimLimite
+          ? {
+              dataRecebimentoDia: {
+                ...(periodo.dataInicio ? { gte: periodo.dataInicio } : {}),
+                ...(dataFimLimite ? { lte: dataFimLimite } : {}),
+              },
+            }
+          : {}),
+      },
+      orderBy: { pedidoId: 'desc' },
+      take: 1500,
+    });
+  } catch (error: any) {
+    if (error?.code === 'P2021' || String(error?.message || '').includes('does not exist')) {
+      return null;
+    }
+    throw error;
   }
-
-  const dataFimLimite = periodo.dataFim
-    ? new Date(periodo.dataFim.getFullYear(), periodo.dataFim.getMonth(), periodo.dataFim.getDate(), 23, 59, 59, 999)
-    : null;
-  const snapshots = await (prisma as any).pedidoLogisticaSnapshot.findMany({
-    where: {
-      ...(periodo.dataInicio || dataFimLimite
-        ? {
-            dataRecebimentoDia: {
-              ...(periodo.dataInicio ? { gte: periodo.dataInicio } : {}),
-              ...(dataFimLimite ? { lte: dataFimLimite } : {}),
-            },
-          }
-        : {}),
-    },
-    orderBy: { pedidoId: 'desc' },
-    take: 1500,
-  });
 
   if (!snapshots.length) return null;
 

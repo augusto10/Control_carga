@@ -1,4 +1,4 @@
-CREATE TABLE "PedidoLogisticaSnapshot" (
+CREATE TABLE IF NOT EXISTS "PedidoLogisticaSnapshot" (
   "id" TEXT NOT NULL,
   "pedidoId" INTEGER NOT NULL,
   "tipoEntrega" TEXT,
@@ -28,12 +28,12 @@ CREATE TABLE "PedidoLogisticaSnapshot" (
   "rawPedido" JSONB,
   "rawLogistica" JSONB,
   "dataCriacao" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  "sincronizadoEm" TIMESTAMP(3) NOT NULL,
+  "sincronizadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
   CONSTRAINT "PedidoLogisticaSnapshot_pkey" PRIMARY KEY ("id")
 );
 
-CREATE TABLE "SincronizacaoLogistica" (
+CREATE TABLE IF NOT EXISTS "SincronizacaoLogistica" (
   "chave" TEXT NOT NULL,
   "dataInicio" TIMESTAMP(3),
   "dataFim" TIMESTAMP(3),
@@ -42,14 +42,14 @@ CREATE TABLE "SincronizacaoLogistica" (
   "totalComErro" INTEGER NOT NULL DEFAULT 0,
   "ultimoErro" TEXT,
   "dataCriacao" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  "ultimaSincronizacao" TIMESTAMP(3) NOT NULL,
+  "ultimaSincronizacao" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
   CONSTRAINT "SincronizacaoLogistica_pkey" PRIMARY KEY ("chave")
 );
 
-CREATE UNIQUE INDEX "PedidoLogisticaSnapshot_pedidoId_key" ON "PedidoLogisticaSnapshot"("pedidoId");
-CREATE INDEX "PedidoLogisticaSnapshot_dataRecebimentoDia_idx" ON "PedidoLogisticaSnapshot"("dataRecebimentoDia");
-CREATE INDEX "PedidoLogisticaSnapshot_sincronizadoEm_idx" ON "PedidoLogisticaSnapshot"("sincronizadoEm");
-CREATE INDEX "PedidoLogisticaSnapshot_statusCodigo_idx" ON "PedidoLogisticaSnapshot"("statusCodigo");
-CREATE INDEX "PedidoLogisticaSnapshot_possuiPendencia_idx" ON "PedidoLogisticaSnapshot"("possuiPendencia");
-CREATE INDEX "PedidoLogisticaSnapshot_embarcadoNoControle_idx" ON "PedidoLogisticaSnapshot"("embarcadoNoControle");
+CREATE UNIQUE INDEX IF NOT EXISTS "PedidoLogisticaSnapshot_pedidoId_key" ON "PedidoLogisticaSnapshot"("pedidoId");
+CREATE INDEX IF NOT EXISTS "PedidoLogisticaSnapshot_dataRecebimentoDia_idx" ON "PedidoLogisticaSnapshot"("dataRecebimentoDia");
+CREATE INDEX IF NOT EXISTS "PedidoLogisticaSnapshot_sincronizadoEm_idx" ON "PedidoLogisticaSnapshot"("sincronizadoEm");
+CREATE INDEX IF NOT EXISTS "PedidoLogisticaSnapshot_statusCodigo_idx" ON "PedidoLogisticaSnapshot"("statusCodigo");
+CREATE INDEX IF NOT EXISTS "PedidoLogisticaSnapshot_possuiPendencia_idx" ON "PedidoLogisticaSnapshot"("possuiPendencia");
+CREATE INDEX IF NOT EXISTS "PedidoLogisticaSnapshot_embarcadoNoControle_idx" ON "PedidoLogisticaSnapshot"("embarcadoNoControle");
