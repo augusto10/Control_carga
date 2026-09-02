@@ -248,7 +248,8 @@ function createPortalPhotoUrl(reference: string, account: SswPortalAccount): str
   const token = Buffer.from(JSON.stringify({
     accountKey: account.key,
     reference,
-    expiresAt: Date.now() + 60 * 60 * 1000,
+    // O kanban persistente pode reutilizar o payload por ate tres dias.
+    expiresAt: Date.now() + 4 * 24 * 60 * 60 * 1000,
   })).toString('base64url');
   return `/api/ssw_accert/public-ssw-photo?token=${encodeURIComponent(token)}&signature=${encodeURIComponent(photoSignature(token, account))}`;
 }
@@ -407,8 +408,8 @@ export async function fetchPortalPhoto(token: string, signature: string): Promis
 
     const isLoadingPlaceholder = (candidateBody: ArrayBuffer, candidateContentType: string) => {
       const bytes = new Uint8Array(candidateBody);
-      return program.toLowerCase() === 'ssw0122'
-        && candidateContentType.toLowerCase().includes('image/png')
+      return candidateContentType.toLowerCase().includes('image/png')
+        && bytes.length >= 24
         && bytes.length < 2000
         && bytes[16] === 0 && bytes[17] === 0 && bytes[18] === 0 && bytes[19] === 125
         && bytes[20] === 0 && bytes[21] === 0 && bytes[22] === 0 && bytes[23] === 18;
@@ -422,8 +423,8 @@ export async function fetchPortalPhoto(token: string, signature: string): Promis
         { url: `https://www.ssw.inf.br/cgi-local/${program}?${requestData}`, method: 'GET' },
       ];
 
-      for (let attempt = 0; attempt < 5 && isLoadingPlaceholder(body, contentType); attempt += 1) {
-        await new Promise((resolve) => setTimeout(resolve, 400 + attempt * 250));
+      for (let attempt = 0; attempt < 8 && isLoadingPlaceholder(body, contentType); attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 750 + attempt * 500));
         const request = photoRequests[attempt % photoRequests.length];
         ({ response, contentType, body } = await requestPhoto(request.url, request.method));
       }
@@ -541,6 +542,12 @@ export async function trackingPortalByNotaFiscal(
   if (!accounts.length) {
     throw new Error('Nenhuma credencial do portal SSW configurada');
   }
+
+  console.info('[SSW Portal] Consultando NF', {
+    numeroNota: normalized,
+    transportadora: transportadora || null,
+    contas: accounts.map((account) => account.key),
+  });
 
   let lastError: Error | null = null;
 

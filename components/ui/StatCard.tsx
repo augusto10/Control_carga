@@ -11,7 +11,7 @@ interface StatCardProps {
   trend?: string;
   loading?: boolean;
   delay?: number;
-  size?: 'md' | 'sm';
+  size?: 'md' | 'sm' | 'xs';
 }
 
 export const StatCard = ({ 
@@ -46,14 +46,31 @@ export const StatCard = ({
     amber: 'text-amber-100'
   };
 
-  const sizeConfig = size === 'sm'
+  const sizeConfig = size === 'xs'
+    ? {
+        padding: 'px-2 py-1.5 sm:px-2 sm:py-1.5',
+        title: 'text-[7px] sm:text-[8px]',
+        value: 'text-sm sm:text-[15px]',
+        icon: 11,
+        trend: 'text-[8px] sm:text-[9px]',
+        space: 'space-y-0.5',
+        iconWrap: 'p-0.5 rounded-md',
+        headerAlign: 'items-center',
+        titleWrap: 'min-w-0 flex-1',
+        minHeight: 'min-h-[54px] sm:min-h-[58px]'
+      }
+    : size === 'sm'
     ? {
         padding: 'p-4 sm:p-5',
         title: 'text-[10px] sm:text-xs',
         value: 'text-xl sm:text-2xl',
         icon: 20,
         trend: 'text-[10px] sm:text-xs',
-        space: 'space-y-3 sm:space-y-4'
+        space: 'space-y-3 sm:space-y-4',
+        iconWrap: 'p-2 rounded-lg',
+        headerAlign: 'items-start',
+        titleWrap: '',
+        minHeight: ''
       }
     : {
         padding: 'p-6',
@@ -61,7 +78,11 @@ export const StatCard = ({
         value: 'text-3xl',
         icon: 24,
         trend: 'text-xs',
-        space: 'space-y-4'
+        space: 'space-y-4',
+        iconWrap: 'p-2 rounded-lg',
+        headerAlign: 'items-start',
+        titleWrap: '',
+        minHeight: ''
       };
 
   return (
@@ -73,7 +94,7 @@ export const StatCard = ({
       className="h-full"
     >
       <Card className={cn("h-full relative overflow-hidden group border-none text-white bg-gradient-to-br", gradientClasses[color] || gradientClasses.blue)}>
-        <div className={cn(sizeConfig.padding)}>
+        <div className={cn(sizeConfig.padding, sizeConfig.minHeight)}>
           {loading ? (
             <div className="space-y-4 animate-pulse">
               <div className="h-2 w-24 bg-white/50 rounded" />
@@ -82,16 +103,16 @@ export const StatCard = ({
             </div>
           ) : (
             <div className={cn(sizeConfig.space)}>
-              <div className="flex justify-between items-start">
-                <div className="space-y-1">
-                  <p className={cn(sizeConfig.title, "font-medium uppercase tracking-wider", textClasses[color] || textClasses.blue)}>
+              <div className={cn("flex justify-between gap-2", sizeConfig.headerAlign)}>
+                <div className={cn("space-y-0.5", sizeConfig.titleWrap)}>
+                  <p className={cn(sizeConfig.title, "font-medium uppercase tracking-wider leading-tight", textClasses[color] || textClasses.blue)}>
                     {title}
                   </p>
-                  <h3 className={cn(sizeConfig.value, "font-extrabold text-white")}>
+                  <h3 className={cn(sizeConfig.value, "font-extrabold leading-none text-white")}>
                     {value}
                   </h3>
                 </div>
-                <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm transition-transform duration-300 group-hover:scale-110">
+                <div className={cn("bg-white/20 backdrop-blur-sm transition-transform duration-300 group-hover:scale-110", sizeConfig.iconWrap)}>
                   <Icon size={sizeConfig.icon} className="text-white" />
                 </div>
               </div>

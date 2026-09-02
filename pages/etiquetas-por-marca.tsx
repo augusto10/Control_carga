@@ -37,7 +37,7 @@ import { USER_TYPES } from '@/types/auth-types';
 const LABEL_OPTIONS: Array<{ value: LabelType; label: string }> = [
   { value: 'A4_PRODUTO', label: 'Produto 18 x 11 cm (2 por A4)' },
   { value: 'A4_PRODUTO_VERTICAL', label: 'Produto 15 x 21 cm vertical (1 por A4)' },
-  { value: 'A4_PRODUTO_VERTICAL_DUPLA', label: 'Produto vertical 12,5 x 18 cm lado a lado A4 paisagem (2 por A4)' },
+  { value: 'A4_PRODUTO_VERTICAL_DUPLA', label: 'Produto vertical 8 x 14 cm A4 paisagem (3 por A4)' },
   { value: 'UNITARIA', label: 'Produto (3 por linha)' },
   { value: 'CAIXA_FECHADA', label: 'Caixa fechada 100 x 60 mm' },
 ];
@@ -160,7 +160,7 @@ export default function EtiquetasPorMarcaPage() {
         previewTitle: selectedBrand ? `Etiquetas da marca ${selectedBrand}` : 'Etiquetas da marca selecionada',
         documentTitle: `pdf-etiquetas-${normalizedBrand}`,
         primaryButtonLabel: 'Salvar as etiquetas',
-        duplicateProductsPerSheet: labelType === 'A4_PRODUTO',
+        copiesPerProduct: labelType === 'A4_PRODUTO' ? 2 : labelType === 'A4_PRODUTO_VERTICAL_DUPLA' ? 3 : 1,
       });
       enqueueSnackbar('Previa aberta. Clique em Salvar como PDF e mantenha a escala em 100%.', { variant: 'success' });
     } catch (error) {

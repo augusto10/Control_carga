@@ -105,6 +105,16 @@ export default function Relatorios() {
         <Grid container spacing={3}>
           <Grid item xs={12} md={3}>
             <RelatorioCard
+              title="Resumo de Pedidos"
+              description="Resumo do fim do dia com separados, conferidos, embarcados, retirados, alertas e pendências."
+              icon={<DescriptionIcon />}
+              href="/relatorios/resumo-pedidos"
+              color="success"
+              delay={0.03}
+            />
+          </Grid>
+          <Grid item xs={12} md={3}>
+            <RelatorioCard
               title="Entregas e Corte"
               description="Pedidos recebidos, entregas geradas, horário de corte e caminhões carregados."
               icon={<TruckIcon />}

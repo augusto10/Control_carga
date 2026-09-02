@@ -179,10 +179,10 @@ function extractTrackingEventPhotoUrl(event: Record<string, unknown> | null | un
   if (!event) return null;
   return (
     pickString(
+      event.imagem_url,
+      event.IMAGEM_URL,
       event.foto,
       event.FOTO,
-      event.imagem,
-      event.IMAGEM,
       event.comprovante,
       event.COMPROVANTE,
       event.url_foto,
@@ -191,6 +191,8 @@ function extractTrackingEventPhotoUrl(event: Record<string, unknown> | null | un
       event.LINK_FOTO,
       event.url_imagem,
       event.URL_IMAGEM,
+      event.imagem,
+      event.IMAGEM,
       event.pod,
       event.POD
     ) || null

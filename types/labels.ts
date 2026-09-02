@@ -17,6 +17,7 @@ export interface ProdutoEtiqueta {
   barcodeType: BarcodeFormat;
   codigoBarrasCaixaFechada: string | null;
   quantidadeCaixaFechada: number | null;
+  quantidadeEstoque: number | null;
 }
 
 export interface ProdutosPorMarcaResponse {

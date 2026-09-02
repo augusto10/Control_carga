@@ -4,7 +4,23 @@ import prisma from '@/lib/prisma';
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'GET') {
     try {
-      const configs = await prisma.configuracaoSistema.findMany();
+      const configs = await prisma.configuracaoSistema.findMany({
+        where: {
+          editavel: true,
+        },
+        select: {
+          id: true,
+          chave: true,
+          valor: true,
+          descricao: true,
+          tipo: true,
+          opcoes: true,
+          editavel: true,
+        },
+        orderBy: {
+          chave: 'asc',
+        },
+      });
       return res.status(200).json({ data: configs });
     } catch (error) {
       console.error('Erro ao buscar configurações:', error);

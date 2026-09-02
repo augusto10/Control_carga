@@ -3,8 +3,9 @@ import axios, { AxiosInstance } from 'axios';
 const API_EXTERNA_BASE =
   process.env.API_EXTERNA_BASE_URL?.trim() || 'http://localhost:8000';
 const API_EXTERNA_TIMEOUT_MS = 45_000;
+// O painel usa cache e deve falhar rapidamente quando a API externa nao responde.
 const API_EXTERNA_LOGIN_TIMEOUT_MS = 30_000;
-const API_EXTERNA_LOGIN_RETRY_BLOCK_MS = 5 * 60 * 1000;
+const API_EXTERNA_LOGIN_RETRY_BLOCK_MS = 30 * 1000;
 const API_EXTERNA_TOKEN_FALLBACK_TTL_MS = 50 * 60 * 1000;
 
 interface LoginResponse {
@@ -297,7 +298,8 @@ class APIExternaService {
   async buscarNotaFiscalPorChave(
     chave: string,
     username: string,
-    password: string
+    password: string,
+    timeoutMs = API_EXTERNA_TIMEOUT_MS
   ): Promise<NotaFiscalExterna | null> {
     try {
       const authenticated = await this.ensureAuthenticated(username, password);
@@ -310,7 +312,7 @@ class APIExternaService {
       try {
         const respIdent = await this.apiInstance.get<NotaFiscalExterna>(
           `/api/v1/notas-fiscais/identificacao-nfe/${chave}`,
-          { validateStatus: (s) => s < 500 }
+          { validateStatus: (s) => s < 500, timeout: timeoutMs }
         );
         if (respIdent.status === 200 && respIdent.data) {
           console.log('[API Externa] Nota fiscal encontrada por identificacao-nfe:', respIdent.data);
@@ -323,7 +325,7 @@ class APIExternaService {
       // Fallback pelo endpoint chave/<chave>
       const response = await this.apiInstance.get<NotaFiscalExterna>(
         `/api/v1/notas-fiscais/chave/${chave}`,
-        { validateStatus: (s) => s < 500 }
+        { validateStatus: (s) => s < 500, timeout: timeoutMs }
       );
 
       if (response.status === 200 && response.data) {
@@ -334,6 +336,38 @@ class APIExternaService {
     } catch (error: any) {
       console.error(
         '[API Externa] Erro ao buscar nota fiscal por chave:',
+        error.response?.data || error.message
+      );
+      return null;
+    }
+  }
+
+  async buscarNotaFiscalPorIdentificacaoNfe(
+    identificacaoNfe: string,
+    username: string,
+    password: string,
+    timeoutMs = API_EXTERNA_TIMEOUT_MS
+  ): Promise<Record<string, any> | null> {
+    try {
+      const authenticated = await this.ensureAuthenticated(username, password);
+      if (!authenticated) {
+        console.error('[API Externa] Falha na autenticacao');
+        return null;
+      }
+
+      const response = await this.apiInstance.get<Record<string, any>>(
+        `/api/v1/notas-fiscais/identificacao-nfe/${identificacaoNfe}`,
+        { validateStatus: (status) => status < 500, timeout: timeoutMs }
+      );
+
+      if (response.status >= 400) {
+        return null;
+      }
+
+      return response.data || null;
+    } catch (error: any) {
+      console.error(
+        '[API Externa] Erro ao buscar nota fiscal por identificacao:',
         error.response?.data || error.message
       );
       return null;

@@ -198,6 +198,21 @@ export function mapSantriProductToEtiqueta(payload: unknown, produtoId: string):
   const analysis = analyzeBarcode(codigoBarras);
   const closedBox = readClosedBoxData(raw, source);
   const resolvedProdutoId = readString(source, ['id', 'produto_id', 'produtoId', 'PRODUTO_ID']) || produtoId;
+  const stock = companyRecord(raw, '1');
+  const quantidadeEstoque = readNumber(
+    stock.ESTOQUE_FISICO ??
+      stock.estoque_fisico ??
+      stock.QUANTIDADE_ESTOQUE ??
+      stock.quantidade_estoque ??
+      stock.ESTOQUE_ATUAL ??
+      stock.estoque_atual ??
+      stock.ESTOQUE ??
+      stock.estoque ??
+      stock.SALDO_ESTOQUE ??
+      stock.saldo_estoque ??
+      stock.DISPONIVEL ??
+      stock.disponivel
+  );
 
   return {
     produtoId: resolvedProdutoId,
@@ -210,6 +225,7 @@ export function mapSantriProductToEtiqueta(payload: unknown, produtoId: string):
     barcodeType: analysis.type,
     codigoBarrasCaixaFechada: closedBox.barcode,
     quantidadeCaixaFechada: closedBox.quantity,
+    quantidadeEstoque,
   };
 }
 
@@ -436,7 +452,9 @@ export async function fetchSantriProductPhoto(produtoId: string, ordem: string) 
 
 export async function fetchSantriProductComplete(produtoId: string): Promise<ProdutoEtiqueta> {
   const token = await getSantriToken();
-  const response = await fetch(`${EXTERNAL_API_BASE_URL}/api/v1/produtos/${encodeURIComponent(produtoId)}/completo`, {
+  const url = new URL(`/api/v1/produtos/${encodeURIComponent(produtoId)}/completo`, EXTERNAL_API_BASE_URL);
+  url.searchParams.set('empresa_id', '1');
+  const response = await fetch(url, {
     method: 'GET',
     headers: {
       accept: 'application/json',
@@ -461,5 +479,9 @@ export async function fetchSantriProductComplete(produtoId: string): Promise<Pro
     throw new Error(detail);
   }
 
-  return mapSantriProductToEtiqueta(payload, produtoId);
+  const normalizedPayload = payload && typeof payload === 'object' && 'data' in payload
+    ? (payload as Record<string, unknown>).data
+    : payload;
+
+  return mapSantriProductToEtiqueta(normalizedPayload, produtoId);
 }

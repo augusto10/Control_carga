@@ -302,7 +302,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         vendedor: pedido.VENDEDOR_NOME ?? pedido.VENDEDOR_ID ?? 'Sem vendedor',
         tipoEntrega: pedido.TIPO_ENTREGA ?? null,
         dataHoraRecebimento: dataRecebimento?.toISOString() ?? null,
-        dentroCorte: segundos <= 16 * 3600,
+        dentroCorte: segundos < (16 * 3600 + 60),
         entregaGerada,
         entregaIds: entregas.map((entrega: any) => entrega.ENTREGA_ID ?? entrega.entrega_id).filter(Boolean),
         entregue: entregas.some((entrega: any) => String(entrega.ENTREGUE ?? '').toUpperCase() === 'S'),
@@ -388,7 +388,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
 
     const payload = {
-      periodo: { dataInicio, dataFim, horarioCorte: '16:00:00', referencia: 'DATA_HORA_RECEBIMENTO' },
+      periodo: { dataInicio, dataFim, horarioCorte: '16:01:00', referencia: 'DATA_HORA_RECEBIMENTO' },
       totais: {
         ...resumoGrupo(pedidos),
         caminhoesCarregados: controles.length,

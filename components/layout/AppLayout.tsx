@@ -62,15 +62,19 @@ export function AppLayout({
   const hiddenMenuNames = new Set([
     'Painel Gerencial',
     'Checklist Recebimento',
-    'Controle de Materiais'
+    'Controle de Materiais',
+    'Pedidos Entregas',
   ]);
 
   const menuItems = [
     { name: 'Início', icon: LayoutDashboard, href: '/', exact: true },
+    { name: 'Painéis', icon: LayoutDashboard, href: '/paineis' },
     { 
       name: 'Pedidos', 
       icon: ShoppingCart, 
       children: [
+        { name: 'Acompanhamento de Pedidos', href: '/acompanhamento-pedidos' },
+        { name: 'Lista de Separações', href: '/lista-separacoes' },
         { name: 'Pedidos Entregas', href: '/admin/pedidos' },
         { name: 'Kanban de Pedidos', href: '/kanban-pedidos' },
         { name: 'Rastrear Pedidos Entrega', href: '/ssw-accert' },
@@ -147,7 +151,8 @@ export function AppLayout({
         { name: 'Relatório de Entregas', href: '/relatorios/entregas' },
         { name: 'Relatório de Pallets', href: '/relatorios/pallets' },
         { name: 'Relatório de Controles', href: '/relatorios/controles-carga' },
-        { name: 'Pendencias de Entrega', href: '/relatorios/pendencias-entrega' },
+        { name: 'Pendências de Entrega', href: '/relatorios/pendencias-entrega' },
+        { name: 'Resumo de Pedidos', href: '/relatorios/resumo-pedidos' },
         { name: 'Fretes', href: '/relatorios/fretes' },
       ]
     },
@@ -158,24 +163,6 @@ export function AppLayout({
   const isActive = (path: string, exact?: boolean) => {
     return exact ? router.pathname === path : router.pathname.startsWith(path);
   };
-
-  useEffect(() => {
-    if (!user || typeof window === 'undefined') return;
-
-    const monthKey = new Date().toISOString().slice(0, 7);
-    const warmKey = `pedidos_month_cache_warm:${monthKey}`;
-    if (window.sessionStorage.getItem(warmKey)) return;
-
-    window.sessionStorage.setItem(warmKey, '1');
-    void fetch('/api/pedidos/externos?preload_month=1', {
-      credentials: 'include',
-      headers: { accept: 'application/json' }
-    }).then((response) => {
-      if (!response.ok) throw new Error('Falha ao aquecer cache de pedidos');
-    }).catch(() => {
-      window.sessionStorage.removeItem(warmKey);
-    });
-  }, [user]);
 
   const toggleSubmenu = (key: string) => {
     setOpenSubmenus((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -317,6 +304,7 @@ export function AppLayout({
                       <div className="pl-8 space-y-1">
                         {item.children
                           .filter((c: any) => {
+                            if (hiddenMenuNames.has(c.name)) return false;
                             if (c.adminOnly && user?.tipo !== 'ADMIN' && user?.tipo !== 'GERENTE') return false;
                             if (c.roles && Array.isArray(c.roles)) return c.roles.includes(user?.tipo);
                             return true;
@@ -409,7 +397,7 @@ export function AppLayout({
 
           <div className="flex items-center gap-3">
             <span className="text-sm text-textMuted hidden md:block">
-              {(!showHeader && subtitle) ? subtitle : 'Acompanhamento detalhado de vendas e entregas'}
+              {(!showHeader && subtitle) ? subtitle : 'Controle de pedidos'}
             </span>
             <button className="hidden sm:flex p-2 rounded-lg hover:bg-slate-100 transition-colors relative">
               <Bell className="w-5 h-5 text-textMuted" />

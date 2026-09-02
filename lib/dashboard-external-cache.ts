@@ -1,19 +1,25 @@
 import { apiExternaService } from '@/services/api-externa';
 
-const PEDIDOS_CACHE_TTL_MS = 10 * 60_000;
+const PEDIDOS_CACHE_TTL_MS = 30_000;
+const PEDIDOS_STALE_TTL_MS = 10 * 60_000;
 const PEDIDOS_TIMEOUT_MS = 8_000;
 
 type PedidoDashboard = Record<string, unknown>;
 
-const cache = new Map<string, { expiresAt: number; data: PedidoDashboard[] }>();
+const cache = new Map<
+  string,
+  { expiresAt: number; staleAt: number; data: PedidoDashboard[] }
+>();
 const pending = new Map<string, Promise<PedidoDashboard[] | null>>();
 
 export async function getPedidosDashboard(
   username: string,
   password: string,
-  limit = 100
+  limit = 100,
+  timeoutMs = PEDIDOS_TIMEOUT_MS,
+  filtros: Pick<Parameters<typeof apiExternaService.listarPedidos>[0], 'data_inicio' | 'data_fim'> = {}
 ): Promise<PedidoDashboard[] | null> {
-  const key = `${username}:${limit}`;
+  const key = `${username}:${limit}:${filtros.data_inicio || ''}:${filtros.data_fim || ''}`;
   const cached = cache.get(key);
   if (cached && cached.expiresAt > Date.now()) return cached.data;
 
@@ -22,16 +28,55 @@ export async function getPedidosDashboard(
 
   const request = (async () => {
     try {
-      const response = await apiExternaService.listarPedidos(
-        { limit, offset: 0 },
-        username,
-        password,
-        PEDIDOS_TIMEOUT_MS
+      const pageSize = Math.min(Math.max(limit, 1), 100);
+      const offsets = Array.from(
+        { length: Math.ceil(limit / pageSize) },
+        (_, index) => index * pageSize
       );
-      if (!response) return null;
+      let responses = await Promise.all(
+        offsets.map((offset) =>
+          apiExternaService.listarPedidos(
+            { ...filtros, limit: Math.min(pageSize, limit - offset), offset },
+            username,
+            password,
+            timeoutMs
+          )
+        )
+      );
 
-      const data = (response.data || []) as PedidoDashboard[];
-      cache.set(key, { expiresAt: Date.now() + PEDIDOS_CACHE_TTL_MS, data });
+      const failedOffsets = offsets.filter((_, index) => !responses[index]);
+      if (failedOffsets.length > 0) {
+        const retries = await Promise.all(
+          failedOffsets.map((offset) =>
+            apiExternaService.listarPedidos(
+              { ...filtros, limit: Math.min(pageSize, limit - offset), offset },
+              username,
+              password,
+              timeoutMs
+            )
+          )
+        );
+        responses = responses.map((response, index) => {
+          if (response) return response;
+          const retryIndex = failedOffsets.indexOf(offsets[index]);
+          return retryIndex >= 0 ? retries[retryIndex] : response;
+        });
+      }
+
+      const data = responses.flatMap(
+        (response) => ((response?.data || []) as PedidoDashboard[])
+      );
+
+      if (data.length === 0) {
+        const stale = cache.get(key);
+        return stale && stale.staleAt > Date.now() ? stale.data : null;
+      }
+
+      cache.set(key, {
+        expiresAt: Date.now() + PEDIDOS_CACHE_TTL_MS,
+        staleAt: Date.now() + PEDIDOS_STALE_TTL_MS,
+        data,
+      });
       return data;
     } finally {
       pending.delete(key);

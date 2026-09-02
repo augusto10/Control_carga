@@ -102,6 +102,22 @@ const getPeriodoFiltro = (req: NextApiRequest) => {
 const getCacheByPeriodo = (cacheKey: string) =>
   cacheKey === DEFAULT_CACHE_KEY ? dashboardCache : dashboardCacheByPeriodo.get(cacheKey);
 
+const setCacheByPeriodo = (cacheKey: string, payload: DashboardResumo) => {
+  const cacheEntry = {
+    expiresAt: Date.now() + DASHBOARD_CACHE_TTL_MS,
+    staleAt: Date.now() + DASHBOARD_STALE_TTL_MS,
+    payload,
+  };
+
+  if (cacheKey === DEFAULT_CACHE_KEY) {
+    dashboardCache = cacheEntry;
+  } else {
+    dashboardCacheByPeriodo.set(cacheKey, cacheEntry);
+  }
+
+  return cacheEntry;
+};
+
 const isPedidoFechado = (pedido: Record<string, unknown>) =>
   String(pedido.PEDIDO_FECHADO ?? pedido.pedido_fechado ?? '').toUpperCase() === 'S';
 
@@ -129,7 +145,7 @@ const isPedidoRecebido = (pedido: Record<string, unknown>) => {
 };
 
 const isRetiraNoAto = (pedido: Record<string, unknown>) =>
-  ['ATO', 'NDF', 'RDL'].includes(
+  ['ATO', 'NDF', 'RDL', 'RLR'].includes(
     String(pedido.TIPO_ENTREGA ?? pedido.tipo_entrega ?? '').toUpperCase()
   );
 
@@ -253,12 +269,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       totalControles,
     };
 
-    dashboardCache = {
-      expiresAt: Date.now() + DASHBOARD_CACHE_TTL_MS,
-      staleAt: Date.now() + DASHBOARD_STALE_TTL_MS,
-      payload,
-    };
-    dashboardCacheByPeriodo.set(periodoFiltro.cacheKey, dashboardCache);
+    setCacheByPeriodo(periodoFiltro.cacheKey, payload);
 
     return res.status(200).json(payload);
   } catch (error) {

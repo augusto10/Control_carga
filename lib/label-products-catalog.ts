@@ -24,6 +24,7 @@ function toLabelProduct(product: ProdutoEtiquetaCatalogo): ProdutoEtiqueta {
     barcodeType: barcode.type,
     codigoBarrasCaixaFechada: product.codigoBarrasCaixaFechada ?? null,
     quantidadeCaixaFechada: product.quantidadeCaixa,
+    quantidadeEstoque: null,
   };
 }
 

@@ -32,6 +32,8 @@ type PedidoKanban = {
   tipoEntrega: string | null;
   status: KanbanStatus;
   statusLabel: string;
+  separacaoStatus: string | null;
+  separacaoStatusLabel: string | null;
   numeroNota: string | null;
   identificacaoNfe: string | null;
   controleId: string | null;
@@ -39,6 +41,16 @@ type PedidoKanban = {
   controleTransportadora: string | null;
   sswStatus: string | null;
   sswMensagem: string | null;
+  trackingDeliveredAt: string | null;
+  trackingReceiverName: string | null;
+  trackingPhotoUrl: string | null;
+  trackingOccurrences: Array<{
+    dataHora: string | null;
+    ocorrencia: string | null;
+    descricao: string | null;
+    cidade: string | null;
+    dominio: string | null;
+  }>;
   observacaoStatus: string | null;
 };
 
@@ -57,7 +69,10 @@ type PedidosExternosResponse = {
   total?: number;
 };
 
-type TrackingInfo = Pick<SswTrackingResult, 'found' | 'delivered' | 'status' | 'message'>;
+type TrackingInfo = Pick<
+  SswTrackingResult,
+  'found' | 'delivered' | 'status' | 'message' | 'deliveredAt' | 'receiverName' | 'photoUrl' | 'occurrences'
+>;
 
 type DeliveryConfirmationInfo = {
   controleId: string;
@@ -83,7 +98,7 @@ type PersistedKanbanCacheRow = {
 const kanbanResponseCache = new Map<string, KanbanCacheEntry>();
 
 function getKanbanCacheKey(dataReferencia: string): string {
-  return `kanban:v8:notas-completas:${dataReferencia}`;
+  return `kanban:v10:notas-completas:${dataReferencia}`;
 }
 
 function getPersistedKanbanCacheConfigKey(cacheKey: string): string {
@@ -397,6 +412,44 @@ function getStatusLabel(status: KanbanStatus): string {
   }
 }
 
+function deriveSeparacaoStatus(pedido: Record<string, unknown>): string | null {
+  const ultimoStatusSeparacao = pickString(pedido.ultimo_status_separacao)?.toUpperCase() || null;
+  const statusSeparacoes = new Set(
+    String(pickString(pedido.status_separacoes) || '')
+      .split(',')
+      .map((item) => item.trim().toUpperCase())
+      .filter(Boolean)
+  );
+  const entregaConfirmada = String(pedido.entrega_confirmada || '').trim().toUpperCase() === 'S';
+
+  if (entregaConfirmada) return 'G';
+  if (ultimoStatusSeparacao && ['A', 'S', 'E', 'G'].includes(ultimoStatusSeparacao)) {
+    return ultimoStatusSeparacao;
+  }
+
+  if (statusSeparacoes.has('G')) return 'G';
+  if (statusSeparacoes.has('E')) return 'E';
+  if (statusSeparacoes.has('S')) return 'S';
+  if (statusSeparacoes.has('A')) return 'A';
+
+  return null;
+}
+
+function getSeparacaoStatusLabel(status: string | null): string | null {
+  switch (status) {
+    case 'A':
+      return 'Aguardando separacao';
+    case 'S':
+      return 'Em separacao';
+    case 'E':
+      return 'Separado aguardando conferencia';
+    case 'G':
+      return 'Conferido / entrega gerada';
+    default:
+      return null;
+  }
+}
+
 function buildPedidoKanban(
   base: PedidoKanbanBase,
   status: KanbanStatus,
@@ -650,39 +703,80 @@ async function fetchPedidosDoDia(
   username: string,
   password: string
 ): Promise<Array<Record<string, unknown>>> {
-  const pedidos: Array<Record<string, unknown>> = [];
-  const seen = new Set<number>();
-  const limit = 100;
-  for (let offset = 0; offset < 1500; offset += limit) {
-    const resultado = await apiExternaService.listarPedidos(
+  try {
+    const dashboard = await apiExternaService.listarDashboardLogistica(
       {
-        limit,
-        offset,
+        empresa_id: 1,
+        data_inicio: dataReferencia,
+        data_fim: dataReferencia,
       },
       username,
-      password
+      password,
+      8_000
     );
 
-    if (!resultado) break;
-    const page = Array.isArray(resultado.data) ? resultado.data : [];
-    if (page.length === 0) break;
+    const dashboardItems = Array.isArray(dashboard?.data)
+      ? dashboard.data.filter(
+          (item): item is Record<string, unknown> =>
+            Boolean(item) &&
+            typeof item === 'object' &&
+            Boolean(extractPedidoId(item as Record<string, unknown>))
+        )
+      : [];
 
-    for (const item of page) {
-      if (!isPedidoDoKanbanNaData(item, dataReferencia)) continue;
-      const pedidoId = extractPedidoId(item);
-      if (!pedidoId || seen.has(pedidoId)) continue;
-      seen.add(pedidoId);
-      pedidos.push({ ...item, _KANBAN_CONSULTA_CONSOLIDADA: true });
+    if (dashboardItems.length > 0) {
+      const dashboardPorPedido = new Map<number, Record<string, unknown>>();
+      for (const item of dashboardItems) {
+        const pedidoId = extractPedidoId(item);
+        if (pedidoId && !dashboardPorPedido.has(pedidoId)) {
+          dashboardPorPedido.set(pedidoId, item);
+        }
+      }
+
+      const pedidosEnriquecidos: Array<Record<string, unknown>> = [];
+      const idsPendentes = new Set(dashboardPorPedido.keys());
+      const limit = 100;
+
+      for (let offset = 0; offset < 500 && idsPendentes.size > 0; offset += limit) {
+        const resultado = await apiExternaService.listarPedidos(
+          {
+            limit,
+            offset,
+          },
+          username,
+          password,
+          8_000
+        );
+
+        const page = Array.isArray(resultado?.data) ? resultado.data : [];
+        if (page.length === 0) break;
+
+        for (const pedidoCompleto of page) {
+          const pedidoId = extractPedidoId(pedidoCompleto);
+          if (!pedidoId || !idsPendentes.has(pedidoId)) continue;
+          const dashboardItem = dashboardPorPedido.get(pedidoId) || {};
+          const combinado = {
+            ...dashboardItem,
+            ...pedidoCompleto,
+            _KANBAN_CONSULTA_CONSOLIDADA: true,
+          };
+          if (isPedidoDoKanbanNaData(combinado, dataReferencia)) {
+            pedidosEnriquecidos.push(combinado);
+          }
+          idsPendentes.delete(pedidoId);
+        }
+
+        if (page.length < limit) break;
+      }
+
+      if (pedidosEnriquecidos.length > 0) {
+        return pedidosEnriquecidos;
+      }
     }
-
-    // A API intermediÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ria filtra localmente e pode devolver uma pÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡gina vazia
-    // mesmo quando ainda existem pedidos em offsets seguintes.
-    // A API pode retornar registros fora de ordem; continue a paginação até
-    // o fim para não perder pedidos de datas anteriores.
-    if (page.length < limit) break;
+  } catch (error) {
+    console.warn('[Kanban Pedidos] Dashboard consolidado indisponivel:', error);
+    return [];
   }
-
-  return pedidos;
 }
 
 async function fetchApuracoesFallback(
@@ -717,9 +811,36 @@ async function fetchNotasFiscaisCompletas(
   if (notaIds.size === 0 && pedidoIds.size === 0) return new Map();
 
   const notasMap = new Map<number, Record<string, unknown>>();
+  if (notaIds.size > 0) {
+    const notasDiretas = await mapWithConcurrency(
+      Array.from(notaIds),
+      4,
+      async (notaId) => {
+        try {
+          return await apiExternaService.buscarNotaFiscalCompleta(notaId, username, password);
+        } catch {
+          return null;
+        }
+      }
+    );
+
+    for (const nota of notasDiretas) {
+      if (!nota) continue;
+      const notaId = extractNotaFiscalId(nota);
+      const pedidoId = extractPedidoIdFromNotaCompleta(nota);
+      if (notaId && notaIds.has(notaId)) notasMap.set(notaId, nota);
+      if (pedidoId && pedidoIds.has(pedidoId)) notasMap.set(-pedidoId, nota);
+    }
+
+    const encontrados = pedidos.filter((pedido) => Boolean(getNotaCompletaDoPedido(notasMap, pedido))).length;
+    if (encontrados >= pedidos.length || notaIds.size >= pedidos.length) {
+      return notasMap;
+    }
+  }
+
   const limit = 500;
 
-  for (let offset = 0; offset < 5000; offset += limit) {
+  for (let offset = 0; offset < 1000; offset += limit) {
     const resultado = await apiExternaService.listarNotasFiscaisCompletas(
       { limit, offset },
       username,
@@ -946,7 +1067,7 @@ export default async function handler(
       });
     }
 
-    const trackingEntries = await mapWithConcurrency(
+    const trackingEntries: Array<readonly [string, TrackingInfo]> = await mapWithConcurrency(
       Array.from(chaveInfoMap.entries()),
       6,
       async ([chave, info]) => {
@@ -965,6 +1086,10 @@ export default async function handler(
               delivered: false,
               status: null,
               message: error instanceof Error ? error.message : 'Erro ao consultar SSW',
+              deliveredAt: null,
+              receiverName: null,
+              photoUrl: null,
+              occurrences: [],
             } satisfies TrackingInfo,
           ] as const;
         }
@@ -1012,13 +1137,24 @@ export default async function handler(
           : null;
 
       const tracking = identificacaoNfe ? trackingMap.get(identificacaoNfe) : undefined;
+      const separacaoStatus = deriveSeparacaoStatus(pedido);
+      const separacaoStatusLabel = getSeparacaoStatusLabel(separacaoStatus);
 
       let status: KanbanStatus = 'EM_PREPARACAO';
       let observacaoStatus: string | null = null;
 
-      if (controleIdResolvido) {
+      if (separacaoStatus === 'G' || controleIdResolvido) {
         status = 'ENVIADO_TRANSPORTADORA';
-        observacaoStatus = 'Nota vinculada a um controle de carga';
+        observacaoStatus =
+          controleIdResolvido
+            ? 'Nota vinculada a um controle de carga'
+            : 'Pedido conferido e pronto para seguir para embarque';
+      } else if (separacaoStatus === 'E') {
+        observacaoStatus = 'Pedido separado aguardando conferencia';
+      } else if (separacaoStatus === 'S') {
+        observacaoStatus = 'Pedido em separacao';
+      } else if (separacaoStatus === 'A') {
+        observacaoStatus = 'Pedido novo aguardando separacao';
       } else if (!numeroNota) {
         observacaoStatus = 'Pedido sem nota fiscal identificada ate o momento';
       } else {
@@ -1066,6 +1202,8 @@ export default async function handler(
         ),
         dataEntrega: pickString(pedido.DATA_ENTREGA, pedido.DATA_HORA_ENTREGA),
         tipoEntrega: pickString(pedido.TIPO_ENTREGA),
+        separacaoStatus,
+        separacaoStatusLabel,
         numeroNota,
         identificacaoNfe,
         controleId: controleIdResolvido,
@@ -1077,6 +1215,16 @@ export default async function handler(
           (confirmacaoEntrega?.entregue
             ? `Baixa confirmada${confirmacaoEntrega.confirmadoPor ? ` por ${confirmacaoEntrega.confirmadoPor}` : ''}`
             : null),
+        trackingDeliveredAt: tracking?.deliveredAt || confirmacaoEntrega?.dataConfirmacao || null,
+        trackingReceiverName: tracking?.receiverName || null,
+        trackingPhotoUrl: tracking?.photoUrl || null,
+        trackingOccurrences: (tracking?.occurrences || []).map((occurrence) => ({
+          dataHora: occurrence.dataHoraEfetiva || occurrence.dataHora,
+          ocorrencia: occurrence.ocorrencia || occurrence.ocorrenciaSsw,
+          descricao: occurrence.descricao || occurrence.detalhe,
+          cidade: occurrence.cidade,
+          dominio: occurrence.dominio,
+        })),
       };
 
       columns[status].push(

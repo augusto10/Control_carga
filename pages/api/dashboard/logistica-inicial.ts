@@ -1,27 +1,33 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiExternaService } from '@/services/api-externa';
+import { getPedidosDashboard } from '@/lib/dashboard-external-cache';
 import prisma from '@/lib/prisma';
-import { fetchMergedTracking, hasPortalCredentials } from '@/services/sswTracking';
 
 const DASHBOARD_PREVISAO_FINAL = '2050-12-31';
 const DEFAULT_CACHE_KEY = 'sem-inicio:sem-fim';
-const DASHBOARD_CACHE_TTL_MS = 30_000;
-const DASHBOARD_STALE_TTL_MS = 2 * 60_000;
-const DELIVERY_STATUS_CACHE_TTL_MS = 5 * 60_000;
-const CONFIRMATION_PREFIX = 'entrega_confirmacao:';
+const DASHBOARD_CACHE_TTL_MS = 3 * 60_000;
+const DASHBOARD_STALE_TTL_MS = 60 * 60_000;
+const MAX_NOTAS_EM_CONTROLE_DETALHE = 500;
+const DASHBOARD_EXTERNAL_TIMEOUT_MS = 15_000;
+const DASHBOARD_ENRICH_CONCURRENCY = 20;
+const MAX_LOGISTICA_LOOKUPS_PER_REQUEST = 40;
 const STATUS_ORDER = [
   'PEDIDO_NOVO',
   'PEDIDO_EM_SEPARACAO',
   'PEDIDO_SEPARADO',
-  'AGUARDANDO_CONFERENCIA',
-  'PRONTO_PARA_EMBARQUE',
   'PEDIDO_EMBARCADO',
+  'PEDIDOS_EMBARCADOS',
+  'PENDENCIAS',
+  'ALERTAS_NAO_SEPARADOS',
+  'ALERTAS_NAO_CONFERIDOS',
+  'ALERTAS_NAO_EMBARCADOS',
 ] as const;
 
 type StatusCode = (typeof STATUS_ORDER)[number];
 
 type DashboardPedidoItem = {
   pedidoId: number;
+  tipoEntrega: string | null;
   clienteNome: string;
   nomeFantasia: string | null;
   valorPedido: number | null;
@@ -31,24 +37,11 @@ type DashboardPedidoItem = {
   statusCodigo: string;
   statusDescricao: string;
   statusSeparacao: string | null;
+  situacaoAtual: string;
   usuarioConfirmacaoNome: string | null;
   dataHoraConfirmacao: string | null;
-  retirada: {
-    foiRetirado: boolean;
-    dataHoraRetirada: string | null;
-    usuarioRetirada: string | null;
-    usuarioRetiradaNome: string | null;
-    nomePessoaRecebeu: string | null;
-    origem: string | null;
-  } | null;
-  entregaStatus: {
-    codigo: 'EM_PREPARACAO' | 'ENVIADO_TRANSPORTADORA' | 'EM_ROTA_ENTREGA' | 'PEDIDO_ENTREGUE';
-    label: string;
-    sswStatus: string | null;
-    sswMensagem: string | null;
-    dataHoraEntrega: string | null;
-    recebedor: string | null;
-  } | null;
+  dataHoraControle: string | null;
+  transportadoraNome: string | null;
   possuiProdutosFaltando: boolean;
   totalItensPendentes: number;
   produtosPendentes: {
@@ -79,7 +72,7 @@ type DashboardResponse = {
     totalPedidos: number;
     totalEmbarcados: number;
     totalPendentes: number;
-    totalAguardandoConferencia: number;
+    totalPendencias: number;
   };
   indicadores: DashboardStatusItem[];
   cached?: boolean;
@@ -90,39 +83,57 @@ type DashboardResponse = {
 const STATUS_META: Record<StatusCode, Omit<DashboardStatusItem, 'total' | 'pedidos'>> = {
   PEDIDO_NOVO: {
     codigo: 'PEDIDO_NOVO',
-    titulo: 'Pedidos Novos',
+    titulo: 'PEDIDOS PARA SEPARAÇÃO',
     descricao: 'Status da separacao de pendencias: ABERTO',
     statusSeparacao: 'ABERTO',
   },
   PEDIDO_EM_SEPARACAO: {
     codigo: 'PEDIDO_EM_SEPARACAO',
-    titulo: 'Pedidos em Separacao',
+    titulo: 'PEDIDOS EM SEPARAÇÃO',
     descricao: 'Status da separacao de pendencias: EM SEPARACAO',
     statusSeparacao: 'EM SEPARACAO',
   },
   PEDIDO_SEPARADO: {
     codigo: 'PEDIDO_SEPARADO',
-    titulo: 'Pedidos Separados',
-    descricao: 'Status da separacao de pendencias: SEPARADO',
+    titulo: 'PEDIDOS SEPARADOS AGUARDANDO CONFERÊNCIA',
+    descricao: 'Pedidos com status E aguardando conferência',
     statusSeparacao: 'SEPARADO',
-  },
-  AGUARDANDO_CONFERENCIA: {
-    codigo: 'AGUARDANDO_CONFERENCIA',
-    titulo: 'Aguardando Conferencia',
-    descricao: 'Status da separacao de pendencias: SEP., AG. GER. ENT.',
-    statusSeparacao: 'SEP., AG. GER. ENT.',
-  },
-  PRONTO_PARA_EMBARQUE: {
-    codigo: 'PRONTO_PARA_EMBARQUE',
-    titulo: 'Prontos para Embarque',
-    descricao: 'Status da separacao de pendencias: ENT. GERADA',
-    statusSeparacao: 'ENT. GERADA',
   },
   PEDIDO_EMBARCADO: {
     codigo: 'PEDIDO_EMBARCADO',
-    titulo: 'Pedidos Embarcados',
+    titulo: 'PEDIDOS CONFERIDOS AGUARDANDO EMBARQUE',
     descricao: 'Usuario de confirmacao com data e hora',
     statusSeparacao: 'EMBARCADO',
+  },
+  PEDIDOS_EMBARCADOS: {
+    codigo: 'PEDIDOS_EMBARCADOS',
+    titulo: 'PEDIDOS EMBARCADOS',
+    descricao: 'Nota fiscal incluida em um controle de cargas',
+    statusSeparacao: 'EMBARCADO NO CONTROLE',
+  },
+  PENDENCIAS: {
+    codigo: 'PENDENCIAS',
+    titulo: 'PENDÊNCIAS',
+    descricao: 'Pedidos com pendencias, independentemente do periodo informado',
+    statusSeparacao: 'PENDENCIA',
+  },
+  ALERTAS_NAO_SEPARADOS: {
+    codigo: 'ALERTAS_NAO_SEPARADOS',
+    titulo: 'ALERTAS: NÃO SEPARADOS',
+    descricao: 'Pedidos novos e em separação (A e S) recebidos em dias anteriores ou, no dia atual, após passar o corte de 16:00',
+    statusSeparacao: 'ALERTA_NAO_SEPARADO',
+  },
+  ALERTAS_NAO_CONFERIDOS: {
+    codigo: 'ALERTAS_NAO_CONFERIDOS',
+    titulo: 'ALERTAS: NÃO CONFERIDOS',
+    descricao: 'Pedidos separados (E) recebidos em dias anteriores ou, no dia atual, após passar o corte de 16:00',
+    statusSeparacao: 'ALERTA_NAO_CONFERIDO',
+  },
+  ALERTAS_NAO_EMBARCADOS: {
+    codigo: 'ALERTAS_NAO_EMBARCADOS',
+    titulo: 'ALERTAS: NÃO EMBARCADOS',
+    descricao: 'Pedidos conferidos (G) recebidos em dias anteriores ou, no dia atual, após passar o corte de 16:00',
+    statusSeparacao: 'ALERTA_NAO_EMBARCADO',
   },
 };
 
@@ -139,14 +150,9 @@ const dashboardCacheByPeriodo = new Map<
     payload: DashboardResponse;
   }
 >();
-const deliveryStatusCache = new Map<
-  number,
-  {
-    expiresAt: number;
-    payload: DashboardPedidoItem['entregaStatus'];
-  }
->();
-
+const PEDIDO_LOGISTICA_CACHE_TTL_MS = 5 * 60_000;
+const pedidoLogisticaCache = new Map<number, { expiresAt: number; payload: Record<string, any> | null }>();
+const pedidoLogisticaPending = new Map<number, Promise<Record<string, any> | null>>();
 const toNumber = (value: unknown): number | null => {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
   if (typeof value === 'string') {
@@ -183,87 +189,14 @@ const pickString = (...values: Array<unknown>): string | null => {
   return null;
 };
 
-const getDeliveryStatusLabel = (
-  status: 'EM_PREPARACAO' | 'ENVIADO_TRANSPORTADORA' | 'EM_ROTA_ENTREGA' | 'PEDIDO_ENTREGUE'
-) => {
-  switch (status) {
-    case 'EM_PREPARACAO':
-      return 'Em preparacao';
-    case 'ENVIADO_TRANSPORTADORA':
-      return 'Enviado para transportadora';
-    case 'EM_ROTA_ENTREGA':
-      return 'Em rota de entrega';
-    case 'PEDIDO_ENTREGUE':
-      return 'Pedido entregue';
-    default:
-      return status;
-  }
+type ControleVinculoInfo = {
+  numeroManifesto: string | null;
+  transportadoraNome: string | null;
+  dataHoraControle: string | null;
 };
 
-type DeliveryConfirmationInfo = {
-  controleId: string;
-  numeroNota: string;
-  entregue: boolean;
-  dataConfirmacao: string | null;
-  recebedor: string | null;
-  observacao: string | null;
-};
-
-const buildConfirmationKey = (controleId: string, numeroNota: string) =>
-  `${controleId}:${normalizeNumeroNota(numeroNota)}`;
-
-const parseDeliveryConfirmation = (value: string): DeliveryConfirmationInfo | null => {
-  try {
-    const parsed = JSON.parse(value) as Record<string, unknown>;
-    const controleId = pickString(parsed.controleId);
-    const numeroNota = pickString(parsed.numeroNota);
-    if (!controleId || !numeroNota) return null;
-    return {
-      controleId,
-      numeroNota,
-      entregue: Boolean(parsed.entregue),
-      dataConfirmacao: pickString(parsed.dataConfirmacao),
-      recebedor: pickString(parsed.recebedor),
-      observacao: pickString(parsed.observacao),
-    };
-  } catch {
-    return null;
-  }
-};
-
-const getNumeroNotaFromNota = (nota: Record<string, unknown> | null): string | null => {
-  if (!nota) return null;
-  const notaFiscal =
-    (nota.nota_fiscal as Record<string, unknown> | undefined) ||
-    (nota.notaFiscal as Record<string, unknown> | undefined) ||
-    nota;
-
-  return pickString(
-    notaFiscal.NUMERO_NOTA,
-    notaFiscal.NUMERO_NOTA_FISCAL,
-    notaFiscal.numero,
-    notaFiscal.NUMERO,
-    notaFiscal.numeroNota,
-    notaFiscal.NOTA_FISCAL_NUMERO,
-    notaFiscal.NF_NUMERO
-  );
-};
-
-const getIdentificacaoNfe = (
-  pedido: Record<string, unknown>,
-  notaPrincipal: Record<string, unknown> | null
-) => {
-  const chave = onlyDigits(
-    pickString(
-      pedido.IDENTIFICACAO_NFE,
-      pedido.CHAVE_NFE,
-      pedido.identificacao_nfe,
-      notaPrincipal?.IDENTIFICACAO_NFE,
-      notaPrincipal?.CHAVE_NFE
-    )
-  );
-  return chave.length === 44 ? chave : null;
-};
+const getControleLocalNome = (controle: ControleVinculoInfo | null) =>
+  controle?.numeroManifesto ? `Controle ${controle.numeroManifesto}` : 'Controle de carga';
 
 const mapWithConcurrency = async <T, R>(
   values: T[],
@@ -284,120 +217,28 @@ const mapWithConcurrency = async <T, R>(
   return results;
 };
 
-const resolveEntregaStatus = async (
-  pedidoId: number,
-  username: string,
-  password: string,
-  confirmationMap: Map<string, DeliveryConfirmationInfo>,
-  sswEnabled: boolean
-): Promise<DashboardPedidoItem['entregaStatus']> => {
-  const cached = deliveryStatusCache.get(pedidoId);
-  if (cached && cached.expiresAt > Date.now()) {
-    return cached.payload;
-  }
+const getPedidoLogisticaCached = async (pedidoId: number, username: string, password: string) => {
+  const cached = pedidoLogisticaCache.get(pedidoId);
+  if (cached && cached.expiresAt > Date.now()) return cached.payload;
 
-  try {
-    const logistica = await apiExternaService.buscarPedidoLogistica(pedidoId, username, password, 8_000);
-    const pedido = ((logistica?.pedido as Record<string, unknown>) || {}) as Record<string, unknown>;
-    const notas = Array.isArray(logistica?.notas_fiscais)
-      ? (logistica.notas_fiscais as Array<Record<string, unknown>>)
-      : [];
-    const notaPrincipal = notas[0] || null;
-    const numeroNota =
-      pickString(pedido.NUMERO_NOTA, pedido.NUMERO_NOTA_FISCAL, getNumeroNotaFromNota(notaPrincipal)) || null;
-    const identificacaoNfe = getIdentificacaoNfe(pedido, notaPrincipal);
+  const pending = pedidoLogisticaPending.get(pedidoId);
+  if (pending) return pending;
 
-    const notaWhereClauses: Array<Record<string, unknown>> = [];
-    if (identificacaoNfe) notaWhereClauses.push({ codigo: identificacaoNfe });
-    if (numeroNota) {
-      notaWhereClauses.push({ numeroNota });
-      notaWhereClauses.push({ numeroNota: normalizeNumeroNota(numeroNota) });
-    }
-
-    const notaLocal =
-      notaWhereClauses.length > 0
-        ? await prisma.notaFiscal.findFirst({
-            where: { OR: notaWhereClauses as any },
-            include: {
-              controle: {
-                select: {
-                  id: true,
-                  transportadora: true,
-                },
-              },
-            },
-          })
-        : null;
-
-    const controleId = notaLocal?.controleId || null;
-    const confirmacaoEntrega =
-      controleId && numeroNota
-        ? confirmationMap.get(buildConfirmationKey(controleId, numeroNota))
-        : null;
-
-    if (confirmacaoEntrega?.entregue) {
-      const payload: DashboardPedidoItem['entregaStatus'] = {
-        codigo: 'PEDIDO_ENTREGUE',
-        label: getDeliveryStatusLabel('PEDIDO_ENTREGUE'),
-        sswStatus: 'ENTREGA_CONFIRMADA',
-        sswMensagem: confirmacaoEntrega.observacao || 'Entrega confirmada manualmente',
-        dataHoraEntrega: confirmacaoEntrega.dataConfirmacao,
-        recebedor: confirmacaoEntrega.recebedor,
-      };
-      deliveryStatusCache.set(pedidoId, {
-        expiresAt: Date.now() + DELIVERY_STATUS_CACHE_TTL_MS,
-        payload,
+  const request = (async () => {
+    try {
+      const payload = await apiExternaService.buscarPedidoLogistica(pedidoId, username, password, 3_000);
+      pedidoLogisticaCache.set(pedidoId, {
+        expiresAt: Date.now() + PEDIDO_LOGISTICA_CACHE_TTL_MS,
+        payload: (payload as Record<string, any> | null) || null,
       });
-      return payload;
+      return (payload as Record<string, any> | null) || null;
+    } finally {
+      pedidoLogisticaPending.delete(pedidoId);
     }
+  })();
 
-    if (!identificacaoNfe || !controleId || !sswEnabled) {
-      const fallbackCode = controleId ? 'ENVIADO_TRANSPORTADORA' : 'EM_PREPARACAO';
-      const payload: DashboardPedidoItem['entregaStatus'] = {
-        codigo: fallbackCode,
-        label: getDeliveryStatusLabel(fallbackCode),
-        sswStatus: null,
-        sswMensagem: !identificacaoNfe ? 'Pedido sem chave NF-e para consultar rastreio' : null,
-        dataHoraEntrega: null,
-        recebedor: null,
-      };
-      deliveryStatusCache.set(pedidoId, {
-        expiresAt: Date.now() + DELIVERY_STATUS_CACHE_TTL_MS,
-        payload,
-      });
-      return payload;
-    }
-
-    const tracking = await fetchMergedTracking({
-      chave: identificacaoNfe,
-      numeroNota,
-      transportadora: notaLocal?.controle?.transportadora || null,
-    });
-
-    const code = tracking.found
-      ? tracking.delivered
-        ? 'PEDIDO_ENTREGUE'
-        : 'EM_ROTA_ENTREGA'
-      : 'ENVIADO_TRANSPORTADORA';
-
-    const payload: DashboardPedidoItem['entregaStatus'] = {
-      codigo: code,
-      label: getDeliveryStatusLabel(code),
-      sswStatus: tracking.status,
-      sswMensagem: tracking.message,
-      dataHoraEntrega: tracking.deliveredAt,
-      recebedor: tracking.receiverName,
-    };
-
-    deliveryStatusCache.set(pedidoId, {
-      expiresAt: Date.now() + DELIVERY_STATUS_CACHE_TTL_MS,
-      payload,
-    });
-
-    return payload;
-  } catch {
-    return null;
-  }
+  pedidoLogisticaPending.set(pedidoId, request);
+  return request;
 };
 
 const parsePedidoDate = (value: unknown): Date | null => {
@@ -453,6 +294,56 @@ const getPeriodoFiltro = (req: NextApiRequest) => {
 const getCacheByPeriodo = (cacheKey: string) =>
   cacheKey === DEFAULT_CACHE_KEY ? dashboardCache : dashboardCacheByPeriodo.get(cacheKey);
 
+const setCacheByPeriodo = (cacheKey: string, payload: DashboardResponse) => {
+  const cacheEntry = {
+    expiresAt: Date.now() + DASHBOARD_CACHE_TTL_MS,
+    staleAt: Date.now() + DASHBOARD_STALE_TTL_MS,
+    payload,
+  };
+
+  if (cacheKey === DEFAULT_CACHE_KEY) {
+    dashboardCache = cacheEntry;
+  } else {
+    dashboardCacheByPeriodo.set(cacheKey, cacheEntry);
+  }
+
+  return cacheEntry;
+};
+
+const getEmptyDashboardPayload = (warning: string): DashboardResponse => ({
+  generatedAt: new Date().toISOString(),
+  filtros: {
+    localProduto: 'Todos',
+    dataFim: '',
+  },
+  resumo: {
+    totalPedidos: 0,
+    totalEmbarcados: 0,
+    totalPendentes: 0,
+    totalPendencias: 0,
+  },
+  indicadores: STATUS_ORDER.map((codigo) => ({
+    ...STATUS_META[codigo],
+    total: 0,
+    pedidos: [],
+  })),
+  warning,
+});
+
+const listarDashboardComRetry = async (
+  filtros: { empresa_id?: number; data_inicio?: string; data_fim?: string },
+  username: string,
+  password: string,
+  timeoutMs = DASHBOARD_EXTERNAL_TIMEOUT_MS
+) => {
+  return apiExternaService.listarDashboardLogistica(
+    filtros,
+    username,
+    password,
+    timeoutMs
+  );
+};
+
 const getPedidoDataHoraRecebimento = (pedido: Record<string, unknown>) =>
   parsePedidoDate(
     pedido.DATA_HORA_RECEBIMENTO ??
@@ -472,9 +363,38 @@ const isPedidoEmpresa1Recebido = (pedido: Record<string, unknown>) => {
   return empresaId === 1 && isPedidoRecebido(pedido);
 };
 
+const hasResumoPendenciaNoPedido = (pedido: Record<string, unknown>) =>
+  (toNumber(pedido.total_itens_pendentes) || 0) > 0 ||
+  (toNumber(pedido.itens_em_separacao) || 0) > 0 ||
+  (toNumber(pedido.quantidade_em_separacao_total) || 0) > 0 ||
+  ['S', 'SIM', 'TRUE', '1'].includes(
+    String(pedido.possui_produtos_faltando ?? pedido.POSSUI_PRODUTO_FALTANDO ?? '').trim().toUpperCase()
+  );
+
+const isPedidoSomenteComSeparacaoAberta = (pedido: Record<string, unknown>) => {
+  const ultimoStatus = toStringValue(pedido.ultimo_status_separacao)?.trim().toUpperCase() || null;
+  const statusSeparacoes = (toStringValue(pedido.status_separacoes) || '')
+    .split(',')
+    .map((status) => status.trim().toUpperCase())
+    .filter(Boolean);
+  const statusLogistico = toStringValue(
+    (pedido.status_logistico as Record<string, unknown> | undefined)?.codigo
+  )?.trim().toUpperCase();
+  const possuiStatusConcluido =
+    ['E', 'G'].includes(ultimoStatus || '') ||
+    statusSeparacoes.some((status) => ['E', 'G'].includes(status));
+  const possuiStatusAberto =
+    ['A', 'S'].includes(ultimoStatus || '') ||
+    statusSeparacoes.some((status) => ['A', 'S'].includes(status)) ||
+    ['PEDIDO_NOVO', 'PEDIDO_EM_SEPARACAO'].includes(statusLogistico || '');
+
+  return possuiStatusAberto && !possuiStatusConcluido;
+};
+
 const deriveDashboardStatus = (
   pedido: Record<string, unknown>,
-  statusLogistico: Record<string, unknown>
+  statusLogistico: Record<string, unknown>,
+  logistica: Record<string, any> | null
 ): StatusCode | null => {
   const statusApi = toStringValue(statusLogistico.codigo);
   const ultimoStatusSeparacao = toStringValue(pedido.ultimo_status_separacao)?.toUpperCase() || null;
@@ -487,8 +407,6 @@ const deriveDashboardStatus = (
       .filter(Boolean)
   );
   const entregaConfirmada = String(pedido.entrega_confirmada || '').trim().toUpperCase() === 'S';
-  const itensGerar = toNumber(pedido.itens_gerar) || 0;
-
   if (entregaConfirmada) {
     return 'PEDIDO_EMBARCADO';
   }
@@ -497,35 +415,163 @@ const deriveDashboardStatus = (
     return 'PEDIDO_NOVO';
   }
 
-  if (ultimoStatusSeparacao === 'R') {
-    return 'AGUARDANDO_CONFERENCIA';
-  }
-
   if (ultimoStatusSeparacao === 'S') {
     return 'PEDIDO_EM_SEPARACAO';
   }
 
-  if (ultimoStatusSeparacao === 'G' && ultimaEntregaId) {
-    return 'PRONTO_PARA_EMBARQUE';
-  }
-
-  if (ultimoStatusSeparacao === 'G' || ultimoStatusSeparacao === 'E') {
+  if (ultimoStatusSeparacao === 'E') {
     return 'PEDIDO_SEPARADO';
   }
 
-  if (itensGerar > 0) {
-    return 'AGUARDANDO_CONFERENCIA';
+  if (ultimoStatusSeparacao === 'G' || statusSeparacoes.has('G')) {
+    return 'PEDIDO_EMBARCADO';
   }
 
-  if (statusSeparacoes.has('G') && ultimaEntregaId) {
-    return 'PRONTO_PARA_EMBARQUE';
-  }
-
-  if (statusSeparacoes.has('G') || statusSeparacoes.has('E')) {
+  if (statusSeparacoes.has('E')) {
     return 'PEDIDO_SEPARADO';
   }
 
-  return statusApi && STATUS_ORDER.includes(statusApi as StatusCode) ? (statusApi as StatusCode) : null;
+  if (statusApi === 'SEM_LOGISTICA') {
+    return 'PEDIDO_NOVO';
+  }
+
+  return statusApi && statusApi !== 'PENDENCIAS' && STATUS_ORDER.includes(statusApi as StatusCode)
+    ? (statusApi as StatusCode)
+    : null;
+};
+
+const isPedidoComPendencias = (
+  pedido: Record<string, unknown>,
+  logistica: Record<string, any> | null
+) => {
+  const statusLogisticoCodigo = toStringValue(
+    (pedido.status_logistico as Record<string, unknown> | undefined)?.codigo
+  )?.toUpperCase();
+  const ultimoStatusSeparacao = toStringValue(pedido.ultimo_status_separacao)?.toUpperCase() || null;
+  const statusSeparacoes = (toStringValue(pedido.status_separacoes) || '')
+    .split(',')
+    .map((item) => item.trim().toUpperCase())
+    .filter(Boolean);
+
+  const possuiProdutoFaltando = (item: Record<string, unknown>) =>
+    ['S', 'SIM', 'TRUE', '1'].includes(
+      String(item.POSSUI_PRODUTO_FALTANDO ?? item.possui_produto_faltando ?? '').trim().toUpperCase()
+    );
+  const itensComparativo = Array.isArray(logistica?.comparativo_separacao_pendentes)
+    ? logistica.comparativo_separacao_pendentes
+    : [];
+  const itensEntregasPendentes = Array.isArray(logistica?.itens_entregas_pendentes)
+    ? logistica.itens_entregas_pendentes
+    : [];
+  const totalItensPendentes = toNumber(logistica?.resumo_pendencias_logisticas?.total_itens_pendentes) || 0;
+  const separacoes = Array.isArray(logistica?.separacoes) ? logistica.separacoes : [];
+  const itensSeparacoes = Array.isArray(logistica?.itens_separacoes) ? logistica.itens_separacoes : [];
+  const possuiSeparacaoEfetivada =
+    separacoes.some((separacao) => {
+      const status = String(separacao.STATUS ?? '').trim().toUpperCase();
+      return (
+        status === 'G' ||
+        Boolean(separacao.DATA_HORA_BAIXA ?? separacao.DATA_BAIXA) ||
+        (toNumber(separacao.QUANTIDADE_BAIXADA) || 0) > 0
+      );
+    }) ||
+    itensSeparacoes.some((item) => (toNumber(item.QUANTIDADE_BAIXADA) || 0) > 0);
+  const possuiSaldoPendente =
+    itensComparativo.some((item) =>
+      (toNumber(item.SALDO_PENDENTE) || 0) > 0 ||
+      (toNumber(item.QUANTIDADE_PENDENTE_TOTAL) || 0) > 0 ||
+      (toNumber(item.EM_SEPARACAO_PENDENTE) || 0) > 0 ||
+      (toNumber(item.SALDO_NA_SEPARACAO) || 0) > 0
+    ) ||
+    itensEntregasPendentes.some((item) =>
+      (toNumber(item.SALDO) || 0) > 0 ||
+      (toNumber(item.QUANTIDADE_EM_SEPARACAO) || 0) > 0 ||
+      (toNumber(item.QTD_EM_SEPARACAO_TRAN_ENT_PEN) || 0) > 0
+    );
+
+  const possuiProdutosFaltando =
+    possuiProdutoFaltando(pedido) ||
+    possuiProdutoFaltando(logistica?.resumo_pendencias_logisticas || {}) ||
+    itensComparativo.some(possuiProdutoFaltando) ||
+    itensEntregasPendentes.some(possuiProdutoFaltando);
+
+  const possuiIndicadorDePendencia =
+    possuiProdutosFaltando ||
+    totalItensPendentes > 0 ||
+    possuiSaldoPendente ||
+    statusLogisticoCodigo === 'PENDENCIAS' ||
+    ultimoStatusSeparacao === 'PENDENCIA' ||
+    statusSeparacoes.includes('PENDENCIA');
+
+  // Saldo de uma separacao ainda aberta nao e pendencia. So entra no card
+  // quando outra separacao do pedido ja foi efetivamente baixada.
+  return possuiSeparacaoEfetivada && possuiIndicadorDePendencia;
+};
+
+const hasStatusSeparacao = (pedido: Record<string, unknown>, status: string) => {
+  const statusNormalizado = status.trim().toUpperCase();
+  const ultimoStatusSeparacao = toStringValue(pedido.ultimo_status_separacao)?.toUpperCase() || null;
+  if (ultimoStatusSeparacao === statusNormalizado) return true;
+
+  return (toStringValue(pedido.status_separacoes) || '')
+    .split(',')
+    .map((item) => item.trim().toUpperCase())
+    .filter(Boolean)
+    .includes(statusNormalizado);
+};
+
+const shouldOcultarPedidoNoCardSeparado = (
+  pedido: Record<string, unknown>,
+  logistica: Record<string, any> | null
+) => isPedidoComPendencias(pedido, logistica) && hasStatusSeparacao(pedido, 'G') && hasStatusSeparacao(pedido, 'E');
+
+// Helper: verifica se o pedido deve aparecer nos alertas.
+// Pedidos de dias anteriores entram sempre.
+// Pedidos do dia atual entram somente depois que o horario de corte passar
+// e apenas se tiverem sido recebidos antes de 16:01.
+const isPedidoParaAlerta = (pedido: Record<string, unknown>): boolean => {
+  const dataHoraRecebimento = getPedidoDataHoraRecebimento(pedido);
+  if (!dataHoraRecebimento) return true; // Se não tem data, considera para alerta
+
+  const agora = new Date();
+  const hoje = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate());
+  const corte16h01 = new Date(hoje);
+  corte16h01.setHours(16, 1, 0, 0);
+
+  if (dataHoraRecebimento < hoje) {
+    return true;
+  }
+
+  if (agora < corte16h01) {
+    return false;
+  }
+
+  return dataHoraRecebimento < corte16h01;
+};
+
+// Helper: deriva o status de alerta baseado no status de separação
+const deriveAlertaStatus = (
+  statusCodigo: StatusCode,
+  possuiPendencia: boolean,
+  embarcadoNoControle: boolean
+): StatusCode | null => {
+  if (embarcadoNoControle || possuiPendencia) {
+    return null;
+  }
+
+  if (statusCodigo === 'PEDIDO_NOVO' || statusCodigo === 'PEDIDO_EM_SEPARACAO') {
+    return 'ALERTAS_NAO_SEPARADOS';
+  }
+
+  if (statusCodigo === 'PEDIDO_SEPARADO') {
+    return 'ALERTAS_NAO_CONFERIDOS';
+  }
+
+  if (statusCodigo === 'PEDIDO_EMBARCADO') {
+    return 'ALERTAS_NAO_EMBARCADOS';
+  }
+
+  return null;
 };
 
 const getAssinaturaPedido = (pedido: Record<string, unknown>) =>
@@ -557,6 +603,21 @@ const pickLocalNome = (logistica: Record<string, any> | null): string | null => 
 
 const getProdutosPendentes = (logistica: Record<string, any> | null, statusSeparacao: string | null) => {
   const status = (statusSeparacao || '').toUpperCase();
+  const itensEntregasPendentes = Array.isArray(logistica?.itens_entregas_pendentes)
+    ? logistica.itens_entregas_pendentes
+    : [];
+  const itensComparativoPendentes = Array.isArray(logistica?.comparativo_separacao_pendentes)
+    ? logistica.comparativo_separacao_pendentes
+    : [];
+
+  if (status === 'PENDENCIA') {
+    // As duas listas representam os mesmos saldos em formatos diferentes.
+    // Priorizar o comparativo evita duplicar a quantidade exibida no card.
+    return agruparProdutosPendentes(
+      itensComparativoPendentes.length > 0 ? itensComparativoPendentes : itensEntregasPendentes
+    );
+  }
+
   const separacoesAtivas = Array.isArray(logistica?.separacoes)
     ? logistica.separacoes.filter((separacao: Record<string, any>) =>
         ['S', 'A', 'ATIVO'].includes(String(separacao.STATUS ?? '').toUpperCase())
@@ -568,14 +629,25 @@ const getProdutosPendentes = (logistica: Record<string, any> | null, statusSepar
   }
 
   const itens = [
-    ...(Array.isArray(logistica?.itens_entregas_pendentes) ? logistica.itens_entregas_pendentes : []),
+    ...itensEntregasPendentes,
     ...(Array.isArray(logistica?.itens_separacoes) ? logistica.itens_separacoes : []),
   ];
+
+  return agruparProdutosPendentes(itens);
+};
+
+const agruparProdutosPendentes = (itens: Record<string, any>[]) => {
   const agrupados = new Map<string, { produtoId: number | null; codigo: string | null; nome: string; quantidade: number }>();
 
   for (const item of itens as Record<string, any>[]) {
     const quantidade =
+      toNumber(item.SALDO_PENDENTE) ??
+      toNumber(item.QUANTIDADE_PENDENTE_TOTAL) ??
+      toNumber(item.EM_SEPARACAO_PENDENTE) ??
+      toNumber(item.SALDO_NA_SEPARACAO) ??
       toNumber(item.SALDO) ??
+      toNumber(item.QUANTIDADE_EM_SEPARACAO) ??
+      toNumber(item.SALDO_GERAR_SEPARACAO) ??
       Math.max(0, (toNumber(item.QUANTIDADE) || 0) - (toNumber(item.QUANTIDADE_BAIXADA) || 0));
     if (quantidade <= 0) continue;
 
@@ -591,26 +663,115 @@ const getProdutosPendentes = (logistica: Record<string, any> | null, statusSepar
   return Array.from(agrupados.values()).sort((a, b) => a.nome.localeCompare(b.nome));
 };
 
-const buildEmptyResponse = (warning?: string): DashboardResponse => ({
-  generatedAt: new Date().toISOString(),
-  filtros: {
-    localProduto: 'Pedidos recebidos no caixa - Empresa 1',
-    dataInicio: null,
-    dataFim: DASHBOARD_PREVISAO_FINAL,
-  },
-  resumo: {
-    totalPedidos: 0,
-    totalEmbarcados: 0,
-    totalPendentes: 0,
-    totalAguardandoConferencia: 0,
-  },
-  indicadores: STATUS_ORDER.map((statusCode) => ({
-    ...STATUS_META[statusCode],
-    total: 0,
-    pedidos: [],
-  })),
-  ...(warning ? { warning } : {}),
-});
+const getTiposEntrega = (pedido: Record<string, unknown>, logistica?: Record<string, unknown>) =>
+  [
+    pedido.tipo_entrega,
+    pedido.TIPO_ENTREGA,
+    pedido.tipoEntrega,
+    pedido.TIPO_ENTREGA_DESCRICAO,
+    pedido.tipo_entrega_descricao,
+    pedido.DESCRICAO_TIPO_ENTREGA,
+    pedido.descricao_tipo_entrega,
+    pedido.DESCRICAO_ENTREGA,
+    pedido.descricao_entrega,
+    (pedido.logistica as Record<string, any> | undefined)?.pedido?.TIPO_ENTREGA,
+    (pedido.logistica as Record<string, any> | undefined)?.pedido?.tipo_entrega,
+    (pedido.logistica as Record<string, any> | undefined)?.pedido?.TIPO_ENTREGA_DESCRICAO,
+    logistica?.TIPO_ENTREGA,
+    logistica?.tipo_entrega,
+    logistica?.TIPO_ENTREGA_DESCRICAO,
+    (logistica?.pedido as Record<string, any> | undefined)?.TIPO_ENTREGA,
+    (logistica?.pedido as Record<string, any> | undefined)?.tipo_entrega,
+    (logistica?.pedido as Record<string, any> | undefined)?.TIPO_ENTREGA_DESCRICAO,
+  ]
+    .map(toStringValue)
+    .filter((value): value is string => Boolean(value))
+    .map((value) => value.trim().toUpperCase());
+
+const hasEntregaNoAto = (pedido: Record<string, unknown>, logistica?: Record<string, unknown>) => {
+  const direto = [
+    pedido.ENTREGA_NO_ATO,
+    pedido.entrega_no_ato,
+    (pedido.logistica as Record<string, any> | undefined)?.pedido?.ENTREGA_NO_ATO,
+    (pedido.logistica as Record<string, any> | undefined)?.pedido?.entrega_no_ato,
+    logistica?.ENTREGA_NO_ATO,
+    logistica?.entrega_no_ato,
+    (logistica?.pedido as Record<string, any> | undefined)?.ENTREGA_NO_ATO,
+    (logistica?.pedido as Record<string, any> | undefined)?.entrega_no_ato,
+  ];
+
+  if (direto.some((value) => ['S', 'SIM', 'TRUE', '1'].includes(String(value ?? '').trim().toUpperCase()))) {
+    return true;
+  }
+
+  const entregas = [
+    ...(
+      Array.isArray((pedido.logistica as Record<string, any> | undefined)?.entregas)
+        ? ((pedido.logistica as Record<string, any>).entregas as Record<string, any>[])
+        : []
+    ),
+    ...(Array.isArray(logistica?.entregas) ? (logistica.entregas as Record<string, any>[]) : []),
+  ];
+
+  return entregas.some((entrega) =>
+    ['S', 'SIM', 'TRUE', '1'].includes(
+      String(entrega?.ENTREGA_NO_ATO ?? entrega?.entrega_no_ato ?? '').trim().toUpperCase()
+    )
+  );
+};
+
+const isPedidoSomenteEntrega = (pedido: Record<string, unknown>, logistica?: Record<string, unknown>) => {
+  const tiposEntrega = getTiposEntrega(pedido, logistica);
+  if (hasEntregaNoAto(pedido, logistica)) return false;
+  return tiposEntrega.some((tipo) => ['ENT', 'EPG'].includes(tipo));
+};
+
+const getTipoEntregaPrincipal = (pedido: Record<string, unknown>, logistica?: Record<string, unknown>) =>
+  getTiposEntrega(pedido, logistica)[0] || null;
+
+const isPedidoPermitidoNoDashboard = (pedido: Record<string, unknown>, logistica?: Record<string, unknown>) => {
+  const tiposEntrega = getTiposEntrega(pedido, logistica);
+  if (tiposEntrega.length === 0) return false;
+  return isPedidoSomenteEntrega(pedido, logistica);
+};
+
+const getPedidoId = (pedido: Record<string, unknown>) =>
+  toNumber(
+    pedido.pedido_id ??
+      pedido.ORCAMENTO_ID ??
+      pedido.orcamento_id ??
+      pedido.ORCAMENTO_BASE_ID ??
+      pedido.orcamento_base_id ??
+      pedido.PEDIDO_ID ??
+      pedido.ID ??
+      pedido.id
+  );
+
+const getNotaDoPedido = (nota: Record<string, unknown>) => {
+  const notaFiscal =
+    (nota.nota_fiscal as Record<string, unknown> | undefined) ||
+    (nota.notaFiscal as Record<string, unknown> | undefined) ||
+    nota;
+  const pedido =
+    (nota.pedido as Record<string, unknown> | undefined) ||
+    (nota.pedido_venda as Record<string, unknown> | undefined) ||
+    (nota.pedidoVenda as Record<string, unknown> | undefined) ||
+    nota;
+
+  return {
+    pedidoId: getPedidoId(pedido),
+    numeroNota: pickString(
+      notaFiscal.NUMERO_NOTA,
+      notaFiscal.NUMERO_NOTA_FISCAL,
+      notaFiscal.numero,
+      notaFiscal.NUMERO,
+      notaFiscal.numeroNota
+    ),
+    chave: onlyDigits(
+      pickString(notaFiscal.IDENTIFICACAO_NFE, notaFiscal.CHAVE_NFE, notaFiscal.codigo)
+    ),
+  };
+};
 
 export default async function handler(
   req: NextApiRequest,
@@ -624,6 +785,7 @@ export default async function handler(
   const username = process.env.API_EXTERNA_USERNAME;
   const password = process.env.API_EXTERNA_PASSWORD;
   const forceRefresh = String(req.query.force || '').trim() === '1';
+  const escopoPrincipal = String(req.query.escopo || '').trim() === 'principal';
 
   let periodoFiltro: ReturnType<typeof getPeriodoFiltro>;
   try {
@@ -637,123 +799,591 @@ export default async function handler(
   }
 
   if (!username || !password) {
-    return res.status(200).json(buildEmptyResponse('API externa nao configurada.'));
+    const cacheFallback = getCacheByPeriodo(periodoFiltro.cacheKey);
+    if (cacheFallback) {
+      return res.status(200).json({ ...cacheFallback.payload, stale: true });
+    }
+
+    return res.status(503).json({
+      error: 'Credenciais da API externa nao configuradas. Nao ha cache anterior para exibir o dashboard.',
+    });
   }
 
-  res.setHeader('Cache-Control', 'private, max-age=30, stale-while-revalidate=120');
+  res.setHeader('Cache-Control', 'private, no-store, max-age=0');
   const cacheAtual = getCacheByPeriodo(periodoFiltro.cacheKey);
 
   // Mesmo a atualizacao manual respeita o cache curto para nao sobrecarregar a API externa.
-  if (!forceRefresh && cacheAtual && cacheAtual.expiresAt > Date.now()) {
-    return res.status(200).json({ ...cacheAtual.payload, cached: true });
+  if (!forceRefresh && cacheAtual && cacheAtual.staleAt > Date.now()) {
+    return res.status(200).json({
+      ...cacheAtual.payload,
+      cached: true,
+      stale: cacheAtual.expiresAt <= Date.now(),
+    });
   }
 
   try {
-    const confirmacaoRows = await prisma.configuracaoSistema.findMany({
-      where: { chave: { startsWith: CONFIRMATION_PREFIX } },
-      select: { valor: true },
-    });
-    const confirmationMap = new Map<string, DeliveryConfirmationInfo>();
-    for (const row of confirmacaoRows) {
-      const item = parseDeliveryConfirmation(row.valor);
-      if (!item?.entregue) continue;
-      confirmationMap.set(buildConfirmationKey(item.controleId, item.numeroNota), item);
-    }
-    const sswEnabled = hasPortalCredentials();
-
-    const dashboardExterno = await apiExternaService.listarDashboardLogistica(
-      {
-        empresa_id: 1,
-        data_inicio: periodoFiltro.dataInicioIso || undefined,
-        data_fim: periodoFiltro.dataFimIso || undefined,
-      },
-      username,
-      password,
-      15_000
+    const dataFimDashboard = periodoFiltro.dataFimIso || undefined;
+    const timings: Record<string, number> = {};
+    const timed = async <T,>(name: string, request: Promise<T>) => {
+      const startedAt = Date.now();
+      try {
+        return await request;
+      } finally {
+        timings[name] = Date.now() - startedAt;
+      }
+    };
+    const [dashboardExterno, pedidosComTipoResult, notasCompletasResult, notasEmControles] =
+      await Promise.all([
+      timed('dashboard_externo', listarDashboardComRetry(
+        {
+          empresa_id: 1,
+          data_inicio: periodoFiltro.dataInicioIso || undefined,
+          data_fim: dataFimDashboard,
+        },
+        username,
+        password,
+        escopoPrincipal ? 10_000 : 8_000
+      )),
+      timed('pedidos_tipo', getPedidosDashboard(
+        username,
+        password,
+        escopoPrincipal ? 100 : 500,
+        8_000,
+        {
+          data_inicio: periodoFiltro.dataInicioIso || undefined,
+          data_fim: dataFimDashboard,
+        }
+      )),
+      timed(
+        'notas_externas',
+        // Sempre buscar notas externas para poder vincular com controles locais
+        // mesmo em escopo principal, mas com limite menor
+        apiExternaService.listarNotasFiscaisCompletas(
+          { limit: escopoPrincipal ? 100 : 500, offset: 0 },
+          username,
+          password,
+          escopoPrincipal ? 4_000 : 6_000
+        ).catch(() => null) // Se falhar em escopo principal, continua sem notas
+      ),
+      timed('notas_locais', prisma.notaFiscal.findMany({
+        where: {
+          controleId: { not: null },
+          ...(periodoFiltro.dataInicio || periodoFiltro.dataFim
+            ? {
+                controle: {
+                  dataCriacao: {
+                    ...(periodoFiltro.dataInicio ? { gte: periodoFiltro.dataInicio } : {}),
+                    ...(periodoFiltro.dataFim
+                      ? {
+                          lte: new Date(
+                            periodoFiltro.dataFim.getFullYear(),
+                            periodoFiltro.dataFim.getMonth(),
+                            periodoFiltro.dataFim.getDate(),
+                            23,
+                            59,
+                            59,
+                            999
+                          ),
+                        }
+                      : {}),
+                  },
+                },
+              }
+            : {}),
+        },
+        select: {
+          numeroNota: true,
+          codigo: true,
+          dataCriacao: true,
+          controle: {
+            select: {
+              dataCriacao: true,
+              numeroManifesto: true,
+              transportadora: true,
+            },
+          },
+        },
+        orderBy: { dataCriacao: 'desc' },
+        take: MAX_NOTAS_EM_CONTROLE_DETALHE,
+      })),
+    ]);
+    res.setHeader(
+      'Server-Timing',
+      Object.entries(timings).map(([name, duration]) => `${name};dur=${duration}`).join(', ')
     );
 
     if (!dashboardExterno || !Array.isArray(dashboardExterno.data)) {
-      throw new Error('api_externa_indisponivel');
+      throw new Error('api_externa_dashboard_periodo_indisponivel');
     }
-    const enrichedEntries = await mapWithConcurrency(
-      dashboardExterno.data as Record<string, unknown>[],
-      4,
-      async (entry) => {
-        const pedido = entry as Record<string, unknown>;
-        const pedidoId = toNumber(pedido.pedido_id);
-        const statusLogistico = (pedido.status_logistico || {}) as Record<string, unknown>;
-        const statusCodigo = deriveDashboardStatus(pedido, statusLogistico);
-        if (!pedidoId || !statusCodigo) {
-          return null;
+
+    const pedidosComTipo = pedidosComTipoResult || [];
+    const dashboardEntries = [
+      ...(dashboardExterno.data as Record<string, unknown>[]),
+      ...pedidosComTipo,
+    ].filter((item, index, entries) => {
+      const pedidoId = getPedidoId(item);
+      return !pedidoId || entries.findIndex((candidate) => getPedidoId(candidate) === pedidoId) === index;
+    });
+    const notasCompletas = notasCompletasResult || null;
+    const dashboardPedidoIds = new Set(
+      (dashboardExterno.data as Record<string, unknown>[])
+        .map((item) => getPedidoId(item))
+        .filter((pedidoId): pedidoId is number => Boolean(pedidoId))
+    );
+    const tipoEntregaPorPedido = new Map<number, string>();
+    for (const pedidoTipo of pedidosComTipo || []) {
+      const pedidoId = getPedidoId(pedidoTipo);
+      const tipoEntrega = pickString(
+        pedidoTipo.TIPO_ENTREGA,
+        pedidoTipo.tipo_entrega,
+        pedidoTipo.tipoEntrega,
+        pedidoTipo.TIPO_ENTREGA_DESCRICAO,
+        pedidoTipo.tipo_entrega_descricao
+      );
+      if (pedidoId && tipoEntrega) tipoEntregaPorPedido.set(pedidoId, tipoEntrega);
+    }
+
+    const totalTiposCorrespondentes = Array.from(dashboardPedidoIds).filter((pedidoId) =>
+      tipoEntregaPorPedido.has(pedidoId)
+    ).length;
+    if (dashboardPedidoIds.size > 0 && totalTiposCorrespondentes === 0) {
+      throw new Error('tipos_pedidos_indisponiveis');
+    }
+
+    const notaPorPedido = new Map<number, { numeroNota: string | null; chave: string }>();
+    for (const dashboardItem of dashboardExterno.data as Record<string, any>[]) {
+      const pedidoId = getPedidoId(dashboardItem);
+      const logistica = (dashboardItem.logistica || {}) as Record<string, any>;
+      const nota = Array.isArray(logistica.notas_fiscais) ? logistica.notas_fiscais[0] || {} : {};
+      const pedidoLogistica = (logistica.pedido || {}) as Record<string, any>;
+      const numeroNota = pickString(
+        dashboardItem.NUMERO_NOTA,
+        dashboardItem.numero_nota,
+        pedidoLogistica.NUMERO_NOTA,
+        nota.NUMERO_NOTA,
+        nota.NUMERO_NOTA_FISCAL
+      );
+      const chave = onlyDigits(
+        pickString(
+          dashboardItem.IDENTIFICACAO_NFE,
+          dashboardItem.identificacao_nfe,
+          pedidoLogistica.IDENTIFICACAO_NFE,
+          nota.IDENTIFICACAO_NFE,
+          nota.CHAVE_NFE
+        )
+      );
+      if (pedidoId && (numeroNota || chave.length === 44)) {
+        notaPorPedido.set(pedidoId, { numeroNota, chave });
+      }
+    }
+    for (const nota of notasCompletas?.data || []) {
+      const referencia = getNotaDoPedido(nota);
+      if (referencia.pedidoId && !notaPorPedido.has(referencia.pedidoId)) {
+        notaPorPedido.set(referencia.pedidoId, referencia);
+      }
+    }
+
+    const controleInfoPorNumeroNota = new Map<string, ControleVinculoInfo>();
+    const controleInfoPorChaveNota = new Map<string, ControleVinculoInfo>();
+    for (const nota of notasEmControles) {
+      const controleInfo: ControleVinculoInfo = {
+        numeroManifesto: nota.controle?.numeroManifesto || null,
+        transportadoraNome: nota.controle?.transportadora ? String(nota.controle.transportadora) : null,
+        dataHoraControle: nota.controle?.dataCriacao?.toISOString?.() || nota.dataCriacao?.toISOString?.() || null,
+      };
+      const numeroNormalizado = normalizeNumeroNota(nota.numeroNota);
+      const chaveNormalizada = onlyDigits(nota.codigo);
+      if (numeroNormalizado) controleInfoPorNumeroNota.set(numeroNormalizado, controleInfo);
+      if (chaveNormalizada) controleInfoPorChaveNota.set(chaveNormalizada, controleInfo);
+    }
+
+    const numerosEmbarcados = new Set(controleInfoPorNumeroNota.keys());
+    const chavesEmbarcadas = new Set(controleInfoPorChaveNota.keys());
+    const isNotaEmControle = (referencia: { numeroNota: string | null; chave: string } | null) =>
+      Boolean(
+        referencia &&
+          ((referencia.numeroNota &&
+            numerosEmbarcados.has(normalizeNumeroNota(referencia.numeroNota))) ||
+            (referencia.chave.length === 44 && chavesEmbarcadas.has(referencia.chave)))
+      );
+    const getControleInfoByReferencia = (referencia: { numeroNota: string | null; chave: string } | null) => {
+      if (!referencia) return null;
+      if (referencia.chave.length === 44) {
+        const porChave = controleInfoPorChaveNota.get(referencia.chave);
+        if (porChave) return porChave;
+      }
+      if (referencia.numeroNota) {
+        const porNumero = controleInfoPorNumeroNota.get(normalizeNumeroNota(referencia.numeroNota));
+        if (porNumero) return porNumero;
+        
+        // Tentar também busca pelo número bruto (sem normalização) para casos onde notasCompletas é null
+        const porNumeroBruto = controleInfoPorNumeroNotaBruto.get(String(referencia.numeroNota).trim());
+        if (porNumeroBruto) return porNumeroBruto;
+      }
+      return null;
+    };
+
+    const pedidosEmbarcadosPorNota = new Set<number>();
+    const pedidosEmbarcadosLocais = new Map<number, DashboardPedidoItem>();
+
+    for (const nota of notasCompletas?.data || []) {
+      const referencia = getNotaDoPedido(nota);
+      if (referencia.pedidoId && isNotaEmControle(referencia)) {
+        pedidosEmbarcadosPorNota.add(referencia.pedidoId);
+      }
+    }
+
+    const notaCompletaPorChave = new Map<string, Record<string, any>>();
+    const notaCompletaPorNumero = new Map<string, Record<string, any>>();
+    for (const nota of notasCompletas?.data || []) {
+      const referencia = getNotaDoPedido(nota);
+      if (referencia.chave) notaCompletaPorChave.set(referencia.chave, nota);
+      if (referencia.numeroNota) notaCompletaPorNumero.set(normalizeNumeroNota(referencia.numeroNota), nota);
+    }
+
+    // Criar mapa adicional de controleInfo indexado por número de nota SEM normalização
+    // para melhor busca quando notasCompletas é null
+    const controleInfoPorNumeroNotaBruto = new Map<string, ControleVinculoInfo>();
+    for (const nota of notasEmControles) {
+      const controleInfo: ControleVinculoInfo = {
+        numeroManifesto: nota.controle?.numeroManifesto || null,
+        transportadoraNome: nota.controle?.transportadora ? String(nota.controle.transportadora) : null,
+        dataHoraControle: nota.controle?.dataCriacao?.toISOString?.() || nota.dataCriacao?.toISOString?.() || null,
+      };
+      // Indexar também pelo número bruto para busca melhor
+      controleInfoPorNumeroNotaBruto.set(String(nota.numeroNota), controleInfo);
+    }
+
+    for (const notaLocal of notasEmControles) {
+      const notaExterna =
+        notaCompletaPorChave.get(onlyDigits(notaLocal.codigo)) ||
+        notaCompletaPorNumero.get(normalizeNumeroNota(notaLocal.numeroNota));
+      if (!notaExterna) {
+        const numeroNotaLocal = normalizeNumeroNota(notaLocal.numeroNota);
+        const pedidoIdLocal = toNumber(numeroNotaLocal);
+        if (pedidoIdLocal && !pedidosEmbarcadosLocais.has(pedidoIdLocal)) {
+          const controleInfo =
+            getControleInfoByReferencia({
+              numeroNota: notaLocal.numeroNota,
+              chave: onlyDigits(notaLocal.codigo),
+            }) || null;
+          pedidosEmbarcadosLocais.set(pedidoIdLocal, {
+            pedidoId: pedidoIdLocal,
+            tipoEntrega: 'EPG',
+            clienteNome: `Nota fiscal ${notaLocal.numeroNota}`,
+            nomeFantasia: null,
+            valorPedido: null,
+            dataHoraRecebimento: notaLocal.dataCriacao?.toISOString?.() || null,
+            previsaoEntrega: null,
+            localNome: getControleLocalNome(controleInfo),
+            statusCodigo: 'PEDIDOS_EMBARCADOS',
+            statusDescricao: STATUS_META.PEDIDOS_EMBARCADOS.titulo,
+            statusSeparacao: STATUS_META.PEDIDOS_EMBARCADOS.statusSeparacao,
+            situacaoAtual: STATUS_META.PEDIDOS_EMBARCADOS.titulo,
+            usuarioConfirmacaoNome: null,
+            dataHoraConfirmacao: null,
+            dataHoraControle: controleInfo?.dataHoraControle || null,
+            transportadoraNome: controleInfo?.transportadoraNome || null,
+            possuiProdutosFaltando: false,
+            totalItensPendentes: 0,
+            produtosPendentes: [],
+          });
         }
+        continue;
+      }
 
-        const previsaoEntrega = toStringValue(pedido.previsao_entrega);
-        if (previsaoEntrega && previsaoEntrega.slice(0, 10) > DASHBOARD_PREVISAO_FINAL) {
-          return null;
-        }
+      const pedidoId = getPedidoId(notaExterna);
+      if (!pedidoId) continue;
 
-        const retirada =
-          pedido.retirada && typeof pedido.retirada === 'object'
-            ? {
-                foiRetirado: Boolean((pedido.retirada as Record<string, unknown>).foi_retirado),
-                dataHoraRetirada: toStringValue(
-                  (pedido.retirada as Record<string, unknown>).data_hora_retirada
-                ),
-                usuarioRetirada: toStringValue(
-                  (pedido.retirada as Record<string, unknown>).usuario_retirada
-                ),
-                usuarioRetiradaNome: toStringValue(
-                  (pedido.retirada as Record<string, unknown>).usuario_retirada_nome
-                ),
-                nomePessoaRecebeu: toStringValue(
-                  (pedido.retirada as Record<string, unknown>).nome_pessoa_recebeu
-                ),
-                origem: toStringValue((pedido.retirada as Record<string, unknown>).origem),
-              }
-            : null;
+      const tipoEntregaLocal =
+        pickString(
+          tipoEntregaPorPedido.get(pedidoId),
+          notaExterna.TIPO_ENTREGA,
+          notaExterna.tipo_entrega,
+          notaExterna.tipoEntrega,
+          notaExterna.TIPO_ENTREGA_DESCRICAO,
+          notaExterna.tipo_entrega_descricao
+        ) || null;
+      if (
+        !isPedidoPermitidoNoDashboard(
+          {
+            tipo_entrega: tipoEntregaLocal,
+            TIPO_ENTREGA: tipoEntregaLocal,
+          },
+          undefined
+        )
+      ) {
+        continue;
+      }
 
-        const entregaStatus =
-          statusCodigo === 'PEDIDO_EMBARCADO' && !retirada?.foiRetirado
-            ? await resolveEntregaStatus(pedidoId, username, password, confirmationMap, sswEnabled)
-            : null;
+      if (dashboardPedidoIds.has(pedidoId)) {
+        pedidosEmbarcadosPorNota.add(pedidoId);
+      }
 
-        return {
-          statusCodigo: statusCodigo as StatusCode,
-          item: {
+      if (!pedidosEmbarcadosLocais.has(pedidoId)) {
+        const controleInfo =
+          getControleInfoByReferencia({
+            numeroNota: notaLocal.numeroNota,
+            chave: onlyDigits(notaLocal.codigo),
+          }) || null;
+        pedidosEmbarcadosLocais.set(pedidoId, {
+          pedidoId,
+          tipoEntrega: tipoEntregaLocal,
+          clienteNome: toStringValue(notaExterna.NOME_RAZAO_SOCIAL) || 'Cliente nao informado',
+          nomeFantasia: toStringValue(notaExterna.NOME_FANTASIA),
+          valorPedido: toNumber(notaExterna.VALOR_TOTAL_NOTA),
+          dataHoraRecebimento:
+            toStringValue(notaExterna.DATA_EMISSAO) ||
+            toStringValue(notaExterna.DATA_CADASTRO),
+          previsaoEntrega: toStringValue(notaExterna.DATA_ENTREGA),
+          localNome: getControleLocalNome(controleInfo),
+          statusCodigo: 'PEDIDOS_EMBARCADOS',
+          statusDescricao: STATUS_META.PEDIDOS_EMBARCADOS.titulo,
+          statusSeparacao: STATUS_META.PEDIDOS_EMBARCADOS.statusSeparacao,
+          situacaoAtual: STATUS_META.PEDIDOS_EMBARCADOS.titulo,
+          usuarioConfirmacaoNome: null,
+          dataHoraConfirmacao: null,
+          dataHoraControle: controleInfo?.dataHoraControle || null,
+          transportadoraNome: controleInfo?.transportadoraNome || null,
+          possuiProdutosFaltando: false,
+          totalItensPendentes: 0,
+          produtosPendentes: [],
+        });
+      }
+    }
+
+    type EnrichedDashboardEntry = {
+      statusCodigo: StatusCode;
+      item: DashboardPedidoItem;
+      alertaStatus: StatusCode | null;
+      possuiPendencia: boolean;
+      embarcadoNoControle: boolean;
+    };
+
+    let detailedLookupCount = 0;
+
+    const enrichDashboardEntries = async (sourceEntries: Record<string, unknown>[]) =>
+      mapWithConcurrency(
+        sourceEntries,
+        DASHBOARD_ENRICH_CONCURRENCY,
+        async (entry): Promise<EnrichedDashboardEntry | null> => {
+          let pedido = entry as Record<string, unknown>;
+          const pedidoId = toNumber(pedido.pedido_id);
+          const statusLogistico = (pedido.status_logistico || {}) as Record<string, unknown>;
+          let logistica = (pedido.logistica || {}) as Record<string, any>;
+          const tipoEntregaInicial = getTipoEntregaPrincipal(pedido, logistica);
+          const tipoEntregaLista = pedidoId ? tipoEntregaPorPedido.get(pedidoId) : undefined;
+          const precisaLogisticaDetalhada =
+            (!tipoEntregaInicial && !tipoEntregaLista) ||
+            (hasResumoPendenciaNoPedido(pedido) && !isPedidoSomenteComSeparacaoAberta(pedido));
+
+          if (
+            pedidoId &&
+            precisaLogisticaDetalhada &&
+            detailedLookupCount < MAX_LOGISTICA_LOOKUPS_PER_REQUEST
+          ) {
+            detailedLookupCount += 1;
+            const logisticaDetalhada = await getPedidoLogisticaCached(pedidoId, username, password);
+            if (logisticaDetalhada) {
+              logistica = { ...logistica, ...logisticaDetalhada };
+            }
+          }
+          const statusCodigoBase = deriveDashboardStatus(pedido, statusLogistico, logistica);
+          if (!pedidoId || !statusCodigoBase) {
+            return null;
+          }
+
+          if (tipoEntregaLista) {
+            pedido = {
+              ...pedido,
+              tipo_entrega: tipoEntregaLista,
+              TIPO_ENTREGA: tipoEntregaLista,
+            };
+          }
+
+          const previsaoEntrega = toStringValue(pedido.previsao_entrega);
+          if (previsaoEntrega && previsaoEntrega.slice(0, 10) > DASHBOARD_PREVISAO_FINAL) {
+            return null;
+          }
+
+          if (!isPedidoPermitidoNoDashboard(pedido, logistica)) {
+            return null;
+          }
+
+          const possuiPendencia = isPedidoComPendencias(pedido, logistica);
+          const ocultarNoCardSeparado =
+            statusCodigoBase === 'PEDIDO_SEPARADO' && shouldOcultarPedidoNoCardSeparado(pedido, logistica);
+          const statusCodigo = ocultarNoCardSeparado ? 'PEDIDO_EMBARCADO' : statusCodigoBase;
+          const statusSeparacaoAtual = STATUS_META[statusCodigo].statusSeparacao;
+          let referenciaNota = notaPorPedido.get(pedidoId) || null;
+
+          if (!referenciaNota) {
+            const notaLogistica = Array.isArray((logistica as Record<string, any>).notas_fiscais)
+              ? (logistica as Record<string, any>).notas_fiscais[0] || {}
+              : {};
+            const pedidoLogistica = ((logistica as Record<string, any>).pedido || {}) as Record<string, any>;
+            const numeroNota = pickString(
+              pedidoLogistica.NUMERO_NOTA,
+              notaLogistica.NUMERO_NOTA,
+              notaLogistica.NUMERO_NOTA_FISCAL
+            );
+            const chave = onlyDigits(
+              pickString(
+                pedidoLogistica.IDENTIFICACAO_NFE,
+                notaLogistica.IDENTIFICACAO_NFE,
+                notaLogistica.CHAVE_NFE
+              )
+            );
+            if (numeroNota || chave.length === 44) referenciaNota = { numeroNota, chave };
+          }
+
+          const embarcadoNoControle =
+            pedidosEmbarcadosPorNota.has(pedidoId) || isNotaEmControle(referenciaNota);
+          const controleInfo = getControleInfoByReferencia(referenciaNota);
+          const produtosPendentes = possuiPendencia ? getProdutosPendentes(logistica, 'PENDENCIA') : [];
+
+          const pedidoItem: DashboardPedidoItem = {
             pedidoId,
+            tipoEntrega: getTipoEntregaPrincipal(pedido, logistica),
             clienteNome: toStringValue(pedido.cliente_nome) || 'Cliente nao informado',
             nomeFantasia: toStringValue(pedido.nome_fantasia),
             valorPedido: toNumber(pedido.valor_pedido),
             dataHoraRecebimento: toStringValue(pedido.data_hora_recebimento),
             previsaoEntrega,
-            localNome: toStringValue(pedido.local_nome),
+            localNome: embarcadoNoControle && controleInfo
+              ? getControleLocalNome(controleInfo)
+              : toStringValue(pedido.local_nome),
             statusCodigo,
             statusDescricao: STATUS_META[statusCodigo].titulo,
-            statusSeparacao: STATUS_META[statusCodigo].statusSeparacao,
+            statusSeparacao: statusSeparacaoAtual,
+            situacaoAtual: STATUS_META[statusCodigo].titulo,
             usuarioConfirmacaoNome: toStringValue(statusLogistico.usuario_confirmacao_nome),
             dataHoraConfirmacao: toStringValue(statusLogistico.data_hora_confirmacao),
-            retirada,
-            entregaStatus,
-            possuiProdutosFaltando: Boolean(pedido.possui_produtos_faltando),
-            totalItensPendentes: toNumber(pedido.total_itens_pendentes) || 0,
-            produtosPendentes: [],
-          } as DashboardPedidoItem,
-        };
-      }
-    );
+            dataHoraControle: controleInfo?.dataHoraControle || null,
+            transportadoraNome: controleInfo?.transportadoraNome || null,
+            possuiProdutosFaltando:
+              possuiPendencia ||
+              produtosPendentes.length > 0 ||
+              isPedidoComPendencias(pedido, logistica),
+            totalItensPendentes: produtosPendentes.length > 0
+              ? produtosPendentes.reduce((acc, p) => acc + p.quantidade, 0)
+              : toNumber(pedido.total_itens_pendentes) || 0,
+            produtosPendentes,
+          };
 
-    const entradasValidas: { statusCodigo: StatusCode; item: DashboardPedidoItem }[] = enrichedEntries
+          const alertaStatus = isPedidoParaAlerta(pedido)
+            ? deriveAlertaStatus(statusCodigo, possuiPendencia, embarcadoNoControle)
+            : null;
+
+          return {
+            statusCodigo,
+            item: pedidoItem,
+            alertaStatus,
+            possuiPendencia,
+            embarcadoNoControle,
+          };
+        }
+      );
+
+    const entradasValidas: EnrichedDashboardEntry[] = (await enrichDashboardEntries(dashboardEntries))
       .filter(
         (
           entry
         ): entry is {
           statusCodigo: StatusCode;
           item: DashboardPedidoItem;
+          alertaStatus: StatusCode | null;
+          possuiPendencia: boolean;
+          embarcadoNoControle: boolean;
         } => Boolean(entry)
       );
 
+    const entradasPendenciasGlobais = entradasValidas;
+
+    // Agrupar pedidos para os quadros de alerta
+    const alertaEntries: { statusCodigo: StatusCode; item: DashboardPedidoItem }[] = [];
+    for (const entry of entradasValidas) {
+      if (entry.alertaStatus && STATUS_META[entry.alertaStatus]) {
+        alertaEntries.push({
+          statusCodigo: entry.alertaStatus,
+          item: {
+            ...entry.item,
+            statusCodigo: entry.alertaStatus,
+            statusDescricao: STATUS_META[entry.alertaStatus].titulo,
+            statusSeparacao: STATUS_META[entry.alertaStatus].statusSeparacao,
+          },
+        });
+      }
+    }
+
+    const pendenciaPorPedido = new Map<number, DashboardPedidoItem>();
+    for (const entry of [...entradasPendenciasGlobais, ...entradasValidas]) {
+      if (
+        !entry.possuiPendencia ||
+        !isPedidoPermitidoNoDashboard(
+          {
+            tipo_entrega: entry.item.tipoEntrega,
+            TIPO_ENTREGA: entry.item.tipoEntrega,
+          },
+          undefined
+        )
+      ) {
+        continue;
+      }
+      if (!pendenciaPorPedido.has(entry.item.pedidoId)) {
+        pendenciaPorPedido.set(entry.item.pedidoId, {
+          ...entry.item,
+          statusCodigo: 'PENDENCIAS',
+          statusDescricao: STATUS_META.PENDENCIAS.titulo,
+          statusSeparacao: STATUS_META.PENDENCIAS.statusSeparacao,
+        });
+      }
+    }
+
+    const pendenciaEntries = Array.from(pendenciaPorPedido.values()).map((item) => ({
+        statusCodigo: 'PENDENCIAS' as StatusCode,
+        item,
+      }));
+
+    const embarcadosEntries = entradasValidas
+      .filter((entry) => entry.embarcadoNoControle)
+      .map((entry) => ({
+        statusCodigo: 'PEDIDOS_EMBARCADOS' as StatusCode,
+        item: {
+          ...entry.item,
+          statusCodigo: 'PEDIDOS_EMBARCADOS',
+          statusDescricao: STATUS_META.PEDIDOS_EMBARCADOS.titulo,
+          statusSeparacao: STATUS_META.PEDIDOS_EMBARCADOS.statusSeparacao,
+        },
+      }));
+    const pedidosJaEmbarcados = new Set(embarcadosEntries.map((entry) => entry.item.pedidoId));
+    const embarcadosLocaisEntries = Array.from(pedidosEmbarcadosLocais.values())
+      .filter((item) => !pedidosJaEmbarcados.has(item.pedidoId))
+      .map((item) => ({
+        statusCodigo: 'PEDIDOS_EMBARCADOS' as StatusCode,
+        item,
+      }));
+
+    const allEntries = [
+      ...entradasValidas
+        .filter((entry) => !(entry.statusCodigo === 'PEDIDO_EMBARCADO' && entry.embarcadoNoControle))
+        .map((e) => ({ statusCodigo: e.statusCodigo, item: e.item })),
+      ...pendenciaEntries,
+      ...embarcadosEntries,
+      ...embarcadosLocaisEntries,
+      ...alertaEntries,
+    ].filter((entry) =>
+      isPedidoPermitidoNoDashboard(
+        {
+          tipo_entrega: entry.item.tipoEntrega,
+          TIPO_ENTREGA: entry.item.tipoEntrega,
+        },
+        undefined
+      )
+    );
+
     const indicadores: DashboardStatusItem[] = STATUS_ORDER.map((statusCode) => {
-      const pedidosStatus = entradasValidas
+      const pedidosStatus = allEntries
         .filter((entry) => entry.statusCodigo === statusCode)
         .map((entry) => entry.item)
         .sort((a, b) => b.pedidoId - a.pedidoId);
@@ -766,9 +1396,8 @@ export default async function handler(
     });
 
     const totalPedidos = indicadores.reduce((acc, item) => acc + item.total, 0);
-    const totalEmbarcados = indicadores.find((item) => item.codigo === 'PEDIDO_EMBARCADO')?.total || 0;
-    const totalAguardandoConferencia =
-      indicadores.find((item) => item.codigo === 'AGUARDANDO_CONFERENCIA')?.total || 0;
+    const totalEmbarcados = indicadores.find((item) => item.codigo === 'PEDIDOS_EMBARCADOS')?.total || 0;
+    const totalPendencias = indicadores.find((item) => item.codigo === 'PENDENCIAS')?.total || 0;
 
     const payload: DashboardResponse = {
       generatedAt: new Date().toISOString(),
@@ -781,17 +1410,12 @@ export default async function handler(
         totalPedidos,
         totalEmbarcados,
         totalPendentes: totalPedidos - totalEmbarcados,
-        totalAguardandoConferencia,
+        totalPendencias,
       },
       indicadores,
     };
 
-    dashboardCache = {
-      expiresAt: Date.now() + DASHBOARD_CACHE_TTL_MS,
-      staleAt: Date.now() + DASHBOARD_STALE_TTL_MS,
-      payload,
-    };
-    dashboardCacheByPeriodo.set(periodoFiltro.cacheKey, dashboardCache);
+    setCacheByPeriodo(periodoFiltro.cacheKey, payload);
 
     return res.status(200).json(payload);
   } catch (error) {
@@ -799,25 +1423,11 @@ export default async function handler(
     const cacheStale = getCacheByPeriodo(periodoFiltro.cacheKey);
 
     if (cacheStale && cacheStale.staleAt > Date.now()) {
-      return res.status(200).json({
-        ...cacheStale.payload,
-        stale: true,
-        warning: 'Painel logistico indisponivel no momento. Exibindo o ultimo resultado em cache.',
-      });
+      return res.status(200).json({ ...cacheStale.payload, stale: true });
     }
 
-    const fallback = buildEmptyResponse(
-      'Painel logistico indisponivel no momento. Tente atualizar em alguns instantes.'
+    return res.status(200).json(
+      getEmptyDashboardPayload('API externa indisponivel. O dashboard sera atualizado quando o servico retornar.')
     );
-
-    // Evita novas tentativas a cada render enquanto a API externa estiver fora do ar.
-    dashboardCache = {
-      expiresAt: Date.now() + DASHBOARD_CACHE_TTL_MS,
-      staleAt: Date.now() + DASHBOARD_STALE_TTL_MS,
-      payload: fallback,
-    };
-    dashboardCacheByPeriodo.set(periodoFiltro.cacheKey, dashboardCache);
-
-    return res.status(200).json(fallback);
   }
 }
