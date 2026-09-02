@@ -124,6 +124,57 @@ model ConfiguracaoSistema {
   @@index([chave])
 }
 
+model PedidoLogisticaSnapshot {
+  id                      String   @id @default(uuid())
+  pedidoId                Int      @unique
+  tipoEntrega             String?
+  clienteNome             String?
+  nomeFantasia            String?
+  valorPedido             Float?
+  dataHoraRecebimento     DateTime?
+  dataRecebimentoDia      DateTime?
+  previsaoEntrega         DateTime?
+  localNome               String?
+  statusCodigo            String?
+  statusSeparacao         String?
+  statusLogisticoCodigo   String?
+  situacaoAtual           String?
+  usuarioConfirmacaoNome  String?
+  dataHoraConfirmacao     DateTime?
+  numeroNota              String?
+  chaveNfe                String?
+  embarcadoNoControle     Boolean  @default(false)
+  numeroManifesto         String?
+  transportadoraNome      String?
+  dataHoraControle        DateTime?
+  possuiPendencia         Boolean  @default(false)
+  totalItensPendentes     Int      @default(0)
+  produtosPendentes       Json?
+  assinatura              String
+  rawPedido               Json?
+  rawLogistica            Json?
+  dataCriacao             DateTime @default(now())
+  sincronizadoEm          DateTime @updatedAt
+
+  @@index([dataRecebimentoDia])
+  @@index([sincronizadoEm])
+  @@index([statusCodigo])
+  @@index([possuiPendencia])
+  @@index([embarcadoNoControle])
+}
+
+model SincronizacaoLogistica {
+  chave              String   @id
+  dataInicio         DateTime?
+  dataFim            DateTime?
+  totalLidos         Int      @default(0)
+  totalAtualizados   Int      @default(0)
+  totalComErro       Int      @default(0)
+  ultimoErro         String?
+  dataCriacao        DateTime @default(now())
+  ultimaSincronizacao DateTime @updatedAt
+}
+
 model Motorista {
   id               String         @id @default(uuid())
   dataCriacao      DateTime       @default(now())

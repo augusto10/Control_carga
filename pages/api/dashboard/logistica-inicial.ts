@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiExternaService } from '@/services/api-externa';
 import { getPedidosDashboard } from '@/lib/dashboard-external-cache';
+import { montarDashboardPorSnapshot } from '@/lib/logistica-snapshot';
 import prisma from '@/lib/prisma';
 
 const DASHBOARD_PREVISAO_FINAL = '2050-12-31';
@@ -821,6 +822,16 @@ export default async function handler(
     });
   }
 
+  if (!forceRefresh) {
+    const snapshotRecente = await montarDashboardPorSnapshot(periodoFiltro, {
+      exigirSincronizacaoRecenteMs: DASHBOARD_CACHE_TTL_MS + 30_000,
+    });
+    if (snapshotRecente) {
+      setCacheByPeriodo(periodoFiltro.cacheKey, snapshotRecente);
+      return res.status(200).json(snapshotRecente);
+    }
+  }
+
   try {
     const dataFimDashboard = periodoFiltro.dataFimIso || undefined;
     const timings: Record<string, number> = {};
@@ -1424,6 +1435,15 @@ export default async function handler(
 
     if (cacheStale && cacheStale.staleAt > Date.now()) {
       return res.status(200).json({ ...cacheStale.payload, stale: true });
+    }
+
+    const snapshotFallback = await montarDashboardPorSnapshot(periodoFiltro, {
+      warning: 'API externa indisponivel. Exibindo ultima base local sincronizada.',
+    });
+
+    if (snapshotFallback) {
+      setCacheByPeriodo(periodoFiltro.cacheKey, snapshotFallback);
+      return res.status(200).json(snapshotFallback);
     }
 
     return res.status(200).json(
