@@ -813,22 +813,21 @@ export default async function handler(
   res.setHeader('Cache-Control', 'private, no-store, max-age=0');
   const cacheAtual = getCacheByPeriodo(periodoFiltro.cacheKey);
 
-  // Mesmo a atualizacao manual respeita o cache curto para nao sobrecarregar a API externa.
-  if (!forceRefresh && cacheAtual && cacheAtual.staleAt > Date.now()) {
-    return res.status(200).json({
-      ...cacheAtual.payload,
-      cached: true,
-      stale: cacheAtual.expiresAt <= Date.now(),
-    });
-  }
-
   if (!forceRefresh) {
-    const snapshotRecente = await montarDashboardPorSnapshot(periodoFiltro, {
-      exigirSincronizacaoRecenteMs: DASHBOARD_CACHE_TTL_MS + 30_000,
-    });
-    if (snapshotRecente) {
-      setCacheByPeriodo(periodoFiltro.cacheKey, snapshotRecente);
-      return res.status(200).json(snapshotRecente);
+    // A tabela local e a fonte preferencial; a API externa alimenta o snapshot.
+    const snapshotLocal = await montarDashboardPorSnapshot(periodoFiltro);
+    if (snapshotLocal) {
+      setCacheByPeriodo(periodoFiltro.cacheKey, snapshotLocal);
+      return res.status(200).json(snapshotLocal);
+    }
+
+    // Mesmo sem snapshot recente, aproveitamos o cache em memoria antes da API.
+    if (cacheAtual && cacheAtual.staleAt > Date.now()) {
+      return res.status(200).json({
+        ...cacheAtual.payload,
+        cached: true,
+        stale: cacheAtual.expiresAt <= Date.now(),
+      });
     }
   }
 
