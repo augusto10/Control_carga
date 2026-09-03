@@ -87,7 +87,7 @@ const getDashboardQueries = () => {
   };
 };
 
-const PAINEL_AUTO_REFRESH_INTERVAL_MS = 5 * 60_000;
+const PAINEL_AUTO_REFRESH_INTERVAL_MS = 3 * 60_000;
 const DASHBOARD_LOCAL_CACHE_KEY = 'dashboard-logistica-cache-v8';
 const DASHBOARD_ALERTAS_LOCAL_CACHE_KEY = 'dashboard-logistica-alertas-cache-v1';
 
