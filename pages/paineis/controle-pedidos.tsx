@@ -3,7 +3,6 @@ import { Loader2 } from 'lucide-react';
 import { ExpedicaoCards } from '@/components/dashboard/ExpedicaoCards';
 import {
   AlertCircle,
-  CheckCircle2,
   ClipboardList,
   Package,
   PackageCheck,
