@@ -44,12 +44,12 @@ type DashboardResponse = {
   warning?: string;
 };
 
-const statusConfig: Record<StatusCode, { icon: typeof Package; colorClass: string; iconClassName?: string }> = {
-  PEDIDO_NOVO: { icon: Package, colorClass: 'from-[#3d8df0] via-[#2472d8] to-[#1b5cb6]', iconClassName: 'text-[#2472d8]' },
-  PEDIDO_EM_SEPARACAO: { icon: ClipboardList, colorClass: 'from-[#ffcf35] via-[#ffbf18] to-[#f4a300]', iconClassName: 'text-[#f2a900]' },
-  PEDIDO_SEPARADO: { icon: PackageCheck, colorClass: 'from-[#67c857] via-[#47b44b] to-[#2d9640]', iconClassName: 'text-[#39a64a]' },
-  PEDIDO_EMBARCADO: { icon: UserCheck, colorClass: 'from-[#ffcf35] via-[#ffbf18] to-[#f4a300]', iconClassName: 'text-[#f2a900]' },
-  PEDIDOS_EMBARCADOS: { icon: PackageCheck, colorClass: 'from-[#43c962] via-[#29b551] to-[#229043]', iconClassName: 'text-[#29b551]' },
+const statusConfig: Record<StatusCode, { icon: typeof Package; colorClass: string; iconClassName?: string; backgroundColor?: string; backgroundImage?: string }> = {
+  PEDIDO_NOVO: { icon: Package, colorClass: 'from-[#3d8df0] via-[#2472d8] to-[#1b5cb6]', iconClassName: 'text-[#2472d8]', backgroundColor: '#2472d8', backgroundImage: 'linear-gradient(180deg, #3d8df0 0%, #2472d8 52%, #1b5cb6 100%)' },
+  PEDIDO_EM_SEPARACAO: { icon: ClipboardList, colorClass: 'from-[#ffcf35] via-[#ffbf18] to-[#f4a300]', iconClassName: 'text-[#f2a900]', backgroundColor: '#ffbf18', backgroundImage: 'linear-gradient(180deg, #ffcf35 0%, #ffbf18 52%, #f4a300 100%)' },
+  PEDIDO_SEPARADO: { icon: PackageCheck, colorClass: 'from-[#67c857] via-[#47b44b] to-[#2d9640]', iconClassName: 'text-[#39a64a]', backgroundColor: '#47b44b', backgroundImage: 'linear-gradient(180deg, #67c857 0%, #47b44b 52%, #2d9640 100%)' },
+  PEDIDO_EMBARCADO: { icon: UserCheck, colorClass: 'from-[#ffcf35] via-[#ffbf18] to-[#f4a300]', iconClassName: 'text-[#f2a900]', backgroundColor: '#ffbf18', backgroundImage: 'linear-gradient(180deg, #ffcf35 0%, #ffbf18 52%, #f4a300 100%)' },
+  PEDIDOS_EMBARCADOS: { icon: PackageCheck, colorClass: 'from-[#43c962] via-[#29b551] to-[#229043]', iconClassName: 'text-[#29b551]', backgroundColor: '#29b551', backgroundImage: 'linear-gradient(180deg, #43c962 0%, #29b551 52%, #229043 100%)' },
   PENDENCIAS: { icon: AlertCircle, colorClass: 'from-purple-700 to-purple-950' },
   ALERTAS_NAO_SEPARADOS: { icon: AlertCircle, colorClass: 'from-red-700 to-red-950' },
   ALERTAS_NAO_CONFERIDOS: { icon: AlertCircle, colorClass: 'from-amber-500 to-amber-800' },
@@ -214,7 +214,10 @@ export default function ControlePedidosPainel() {
   }).slice(0, 6);
 
   return (
-    <div className="min-h-screen bg-slate-950 px-4 py-5 text-white md:px-8 md:py-6">
+    <div
+      className="min-h-screen bg-slate-950 px-4 py-5 text-white md:px-8 md:py-6"
+      style={{ backgroundColor: '#020617' }}
+    >
         <div className="mx-auto max-w-[1800px]">
           {loading ? (
             <div className="flex min-h-screen items-center justify-center">
@@ -229,6 +232,7 @@ export default function ControlePedidosPainel() {
                 <p className="mb-4 text-center text-sm font-semibold text-amber-300">{error}</p>
               )}
               <ExpedicaoCards
+                wideLayout
                 loadingStages={false}
                 loadingSecondary={loadingSecondary}
                 stageCards={stageCards.map((card, index) => ({
@@ -238,6 +242,8 @@ export default function ControlePedidosPainel() {
                   icon: card.icon,
                   colorClass: statusConfig[card.codigo].colorClass,
                   iconClassName: statusConfig[card.codigo].iconClassName,
+                  backgroundColor: statusConfig[card.codigo].backgroundColor,
+                  backgroundImage: statusConfig[card.codigo].backgroundImage,
                   onClick: () => undefined,
                 }))}
                 alertas={{

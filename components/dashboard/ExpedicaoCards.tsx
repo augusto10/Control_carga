@@ -9,6 +9,8 @@ interface StageCardItem {
   icon: LucideIcon;
   iconClassName?: string;
   colorClass: string;
+  backgroundColor?: string;
+  backgroundImage?: string;
   onClick: () => void;
 }
 
@@ -32,6 +34,7 @@ interface ExpedicaoCardsProps {
   pendencias: PendenciasSummary;
   loadingStages?: boolean;
   loadingSecondary?: boolean;
+  wideLayout?: boolean;
 }
 
 const StageCard = ({
@@ -52,6 +55,10 @@ const StageCard = ({
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.05, duration: 0.35 }}
       onClick={item.onClick}
+      style={{
+        backgroundColor: item.backgroundColor,
+        backgroundImage: item.backgroundImage,
+      }}
       className={cn(
         'group relative min-h-[220px] overflow-hidden rounded-[18px] p-3.5 text-left text-white shadow-[0_10px_24px_rgba(15,23,42,0.14)] transition',
         'hover:-translate-y-1 hover:shadow-[0_14px_30px_rgba(15,23,42,0.2)]',
@@ -94,25 +101,33 @@ export function ExpedicaoCards({
   pendencias,
   loadingStages = false,
   loadingSecondary = false,
+  wideLayout = false,
 }: ExpedicaoCardsProps) {
   const hasAlertas = alertas.total > 0;
   const hasPendencias = pendencias.total > 0;
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+      <div className={cn(
+        'grid gap-3',
+        wideLayout ? 'grid-cols-5' : 'md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5'
+      )}>
         {stageCards.map((item, index) => (
           <StageCard key={item.key} item={item} index={index} loading={loadingStages} />
         ))}
       </div>
 
-      <div className="grid gap-3 xl:grid-cols-2">
+      <div className={cn('grid gap-3', wideLayout ? 'grid-cols-2' : 'xl:grid-cols-2')}>
         <motion.button
           type="button"
           initial={{ opacity: 0, y: 18 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3, duration: 0.35 }}
           onClick={alertas.onClick}
+          style={{
+            backgroundColor: '#991b1b',
+            backgroundImage: 'linear-gradient(135deg, #450a0a 0%, #b91c1c 52%, #4c0519 100%)',
+          }}
           className="group relative min-h-[180px] overflow-hidden rounded-[18px] bg-gradient-to-br from-red-950 via-red-800 to-rose-950 p-4 text-left text-white shadow-[0_10px_24px_rgba(239,68,68,0.3)] transition hover:-translate-y-1 hover:shadow-[0_16px_34px_rgba(239,68,68,0.45)]"
         >
           <div className="absolute bottom-6 right-6 opacity-[0.09] transition group-hover:opacity-[0.14]">
@@ -167,6 +182,10 @@ export function ExpedicaoCards({
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.36, duration: 0.35 }}
           onClick={pendencias.onClick}
+          style={{
+            backgroundColor: '#7f1d1d',
+            backgroundImage: 'linear-gradient(135deg, #450a0a 0%, #991b1b 52%, #4c0519 100%)',
+          }}
           className="group relative min-h-[180px] overflow-hidden rounded-[18px] bg-gradient-to-br from-red-950 via-red-900 to-rose-950 p-4 text-left text-white shadow-[0_10px_24px_rgba(239,68,68,0.3)] transition hover:-translate-y-1 hover:shadow-[0_16px_34px_rgba(239,68,68,0.45)]"
         >
           <div className="absolute bottom-6 right-6 opacity-[0.09] transition group-hover:opacity-[0.14]">
