@@ -102,7 +102,7 @@ const normalizeTransportadora = (value: string | null | undefined) => {
 
   if (normalized.includes('ACCERT')) return 'ACCERT';
   if (normalized.includes('EXPRESSO') || normalized.includes('GOIAS')) return 'EXPRESSO GOIAS';
-  if (normalized.includes('ZANUELLO') || normalized.includes('ZANEULO')) return 'ZANUELLO';
+  if (normalized.includes('ZANUELLO') || normalized.includes('ZANUELO') || normalized.includes('ZANEULO')) return 'ZANUELLO';
   if (normalized.includes('DETAFRA')) return 'DETAFRA';
   if (normalized.includes('TERCEIRIZADA')) return 'TERCEIRIZADA';
   return null;
@@ -440,11 +440,12 @@ export default function ResumoPedidosPage() {
                 </label>
                 <button
                   type="button"
-                  onClick={() => setAplicado(periodo)}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90"
+                  onClick={aplicarPeriodo}
+                  disabled={aplicando}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-wait disabled:opacity-70"
                 >
-                  <CalendarRange className="h-4 w-4" />
-                  Aplicar
+                  {aplicando ? <Loader2 className="h-4 w-4 animate-spin" /> : <CalendarRange className="h-4 w-4" />}
+                  {aplicando ? 'Atualizando relatório...' : 'Aplicar'}
                 </button>
                 <button
                   type="button"
