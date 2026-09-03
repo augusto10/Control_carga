@@ -23,7 +23,7 @@ async function buscarDadosDoSnapshot(numeroPedido: string) {
   return {
     pedidoId: String(snapshot.pedidoId),
     numeroPedido: String(snapshot.pedidoId),
-    cliente: String(snapshot.nomeFantasia || snapshot.clienteNome || rawPedido.cliente_nome || ''),
+    cliente: String(snapshot.clienteNome || snapshot.nomeFantasia || rawPedido.cliente_nome || ''),
     cnpj: String(rawPedido.cnpj || rawPedido.CNPJ || ''),
     transportadora: snapshot.transportadoraNome || rawPedido.transportadora || null,
     volumes: Number(rawPedido.itens_gerar || rawPedido.volumes || 1) || 1,
