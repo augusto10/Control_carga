@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import ProtectedRoute from '../../components/ProtectedRoute';
 import { Card } from '@/components/ui/Card';
@@ -120,6 +120,7 @@ export default function ResumoPedidosPage() {
   const [gerandoPdf, setGerandoPdf] = useState(false);
   const [compartilhandoPdf, setCompartilhandoPdf] = useState(false);
   const [pdfPreview, setPdfPreview] = useState<{ url: string; arquivo: File } | null>(null);
+  const forcarProximaConsultaRef = useRef(false);
 
   const carregar = useCallback(async (forceRefresh = false, alvo = aplicado) => {
     if (alvo.dataInicio > alvo.dataFim) {
@@ -173,14 +174,17 @@ export default function ResumoPedidosPage() {
   const aplicarPeriodo = useCallback(() => {
     setAplicando(true);
     if (periodo.dataInicio === aplicado.dataInicio && periodo.dataFim === aplicado.dataFim) {
-      void carregar(false, periodo);
+      void carregar(true, periodo);
       return;
     }
+    forcarProximaConsultaRef.current = true;
     setAplicado(periodo);
   }, [aplicado.dataFim, aplicado.dataInicio, carregar, periodo]);
 
   useEffect(() => {
-    void carregar(false, aplicado);
+    const forceRefresh = forcarProximaConsultaRef.current;
+    forcarProximaConsultaRef.current = false;
+    void carregar(forceRefresh, aplicado);
   }, [aplicado, carregar]);
 
   const pedidosRetiradosPorId = useMemo(() => {
@@ -207,12 +211,12 @@ export default function ResumoPedidosPage() {
 
   const pedidosEmbarcados = getIndicador(dashboardEtapas, 'PEDIDOS_EMBARCADOS');
   const pedidosEmbarcadosAjustados = useMemo(() => {
-    const pedidos = (pedidosEmbarcados?.pedidos || []).filter((pedido) => !pedidosRetiradosPorId.has(pedido.pedidoId));
+    const pedidos = pedidosEmbarcados?.pedidos || [];
     return {
       total: pedidos.length,
       pedidos,
     };
-  }, [pedidosEmbarcados, pedidosRetiradosPorId]);
+  }, [pedidosEmbarcados]);
 
   const transportadoras = useMemo(() => {
     const totais = {
@@ -281,7 +285,7 @@ export default function ResumoPedidosPage() {
       'PENDÊNCIAS',
       ...(itensPendentes.length > 0 ? itensPendentes.map((item) => `- ${item.texto}`) : ['- Nenhuma pendência encontrada']),
     ].join('\n');
-  }, [aplicado, dashboardAlertas, dashboardEtapas, itensPendentes, pedidosEmbarcados?.total, pedidosRetirados, transportadoras.accert, transportadoras.detafra, transportadoras.expressoGoias, transportadoras.terceirizada, transportadoras.zanuello]);
+  }, [aplicado, dashboardAlertas, dashboardEtapas, itensPendentes, pedidosEmbarcadosAjustados.total, pedidosRetirados, transportadoras.accert, transportadoras.detafra, transportadoras.expressoGoias, transportadoras.terceirizada, transportadoras.zanuello]);
 
   const criarArquivoPdf = useCallback(async () => {
     const { PDFDocument, StandardFonts, rgb } = await import('pdf-lib');
