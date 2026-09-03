@@ -20,14 +20,49 @@ async function buscarDadosDoSnapshot(numeroPedido: string) {
   if (!snapshot) return null;
 
   const rawPedido = (snapshot.rawPedido || {}) as Record<string, any>;
+  const rawLogistica = (snapshot.rawLogistica || {}) as Record<string, any>;
+  const rawLogisticaPedido = (rawLogistica.pedido || {}) as Record<string, any>;
+  const notaFiscal = Array.isArray(rawLogistica.notas_fiscais)
+    ? (rawLogistica.notas_fiscais[0] || {}) as Record<string, any>
+    : {};
+  const cliente = (rawLogisticaPedido.cliente || rawPedido.cliente || {}) as Record<string, any>;
+  const primeiroCampo = (...values: unknown[]) => {
+    const value = values.find((item) => item !== null && item !== undefined && String(item).trim());
+    return String(value ?? '').trim();
+  };
+
+  const cnpj = primeiroCampo(
+    rawPedido.cnpj,
+    rawPedido.CNPJ,
+    rawPedido.cnpj_cpf,
+    rawPedido.CNPJ_CPF,
+    rawLogisticaPedido.cnpj,
+    rawLogisticaPedido.CNPJ,
+    notaFiscal.cnpj,
+    notaFiscal.CNPJ,
+    cliente.cnpj,
+    cliente.CNPJ,
+  );
+  const numeroNota = primeiroCampo(
+    snapshot.numeroNota,
+    rawPedido.numero_nota,
+    rawPedido.NUMERO_NOTA,
+    rawLogisticaPedido.numero_nota,
+    rawLogisticaPedido.NUMERO_NOTA,
+    notaFiscal.numero,
+    notaFiscal.numeroNota,
+    notaFiscal.NUMERO,
+    notaFiscal.NUMERO_NOTA,
+  );
+
   return {
     pedidoId: String(snapshot.pedidoId),
     numeroPedido: String(snapshot.pedidoId),
     cliente: String(snapshot.clienteNome || snapshot.nomeFantasia || rawPedido.cliente_nome || ''),
-    cnpj: String(rawPedido.cnpj || rawPedido.CNPJ || ''),
+    cnpj,
     transportadora: snapshot.transportadoraNome || rawPedido.transportadora || null,
-    volumes: Number(rawPedido.itens_gerar || rawPedido.volumes || 1) || 1,
-    numeroNota: String(snapshot.numeroNota || rawPedido.numero_nota || rawPedido.NUMERO_NOTA || ''),
+    volumes: Number(rawPedido.itens_gerar || rawPedido.volumes || notaFiscal.volumes || 1) || 1,
+    numeroNota,
     fonte: 'snapshot_local',
   };
 }
