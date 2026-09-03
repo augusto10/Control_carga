@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../contexts/AuthContext';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { ExpedicaoCards } from '@/components/dashboard/ExpedicaoCards';
 import { Card } from '@/components/ui/Card';
 import { StatCard } from '@/components/ui/StatCard';
 import { Badge } from '@/components/ui/Badge';
@@ -20,6 +19,7 @@ import {
   Package,
   PackageCheck,
   RefreshCw,
+  Search,
   UserCheck,
 } from 'lucide-react';
 
@@ -558,8 +558,7 @@ function Home() {
       }
     }
 
-    const possuiDadosPrincipais = Boolean(dashboardRef.current);
-    setError(isTransientDashboardError(nextError) || possuiDadosPrincipais ? null : nextError);
+    setError(isTransientDashboardError(nextError) ? null : nextError);
     setLoadingDashboard(false);
     setRefreshingDashboard(false);
     setAcaoFiltroAtiva(null);
@@ -845,11 +844,20 @@ function Home() {
     {
       id: 'PEDIDO_SEPARADO_CARD',
       codigo: 'PEDIDO_SEPARADO' as StatusCode,
-      titulo: 'PEDIDOS SEPARADOS AGUARDANDO CONFERENCIA',
+      titulo: 'PEDIDOS SEPARADOS',
       descricao: 'Pedidos separados e aguardando conferencia.',
       color: 'from-[#67c857] via-[#47b44b] to-[#2d9640]',
       icon: PackageCheck,
       iconClassName: 'text-[#39a64a]',
+    },
+    {
+      id: 'PEDIDO_AGUARDANDO_CONFERENCIA_CARD',
+      codigo: 'PEDIDO_SEPARADO' as StatusCode,
+      titulo: 'PEDIDOS AGUARDANDO CONFERENCIA',
+      descricao: 'Mesma etapa operacional atual usada ate existir separacao propria no backend.',
+      color: 'from-[#3d8df0] via-[#2472d8] to-[#1b5cb6]',
+      icon: Search,
+      iconClassName: 'text-[#2472d8]',
     },
     {
       id: 'PEDIDO_EMBARCADO_CARD',
@@ -1055,52 +1063,7 @@ function Home() {
         </Card>
         */}
 
-        <ExpedicaoCards
-          loadingStages={loadingDashboard && !dashboard}
-          loadingSecondary={!dashboardAlertas}
-          stageCards={cardsHome.map((card) => {
-            const item = indicadoresOrdenados.find((indicador) => indicador.codigo === card.codigo);
-            const visual = STATUS_VISUAL[card.codigo];
-
-            return {
-              key: card.id,
-              titulo: card.titulo,
-              total: item?.total || 0,
-              icon: card.icon || visual.icon,
-              iconClassName: card.iconClassName,
-              colorClass: card.color,
-              onClick: () => item && abrirListaPedidos(item),
-            };
-          })}
-          alertas={{
-            naoSeparado: totaisAlertas.naoSeparado,
-            naoConferido: totaisAlertas.naoConferido,
-            naoEmbarcado: totaisAlertas.naoEmbarcado,
-            total: pedidosAlertasCombinados.length,
-            onClick: () =>
-              abrirListaPedidos({
-                codigo: 'ALERTAS_NAO_SEPARADOS',
-                titulo: 'ALERTAS',
-                descricao: 'Pedidos em atraso de separacao, conferencia ou embarque.',
-                statusSeparacao: 'ALERTAS',
-                total: pedidosAlertasCombinados.length,
-                pedidos: pedidosAlertasCombinados,
-              }),
-          }}
-          pendencias={{
-            total: pendencias?.total || 0,
-            previewItems: previewPendencias,
-            onClick: () =>
-              pendencias &&
-              abrirListaPedidos({
-                ...pendencias,
-                titulo: 'Pendencias',
-                descricao: 'Pedidos com itens pendentes nos ultimos 30 dias.',
-              }),
-          }}
-        />
-
-        <div className="hidden">
+        <div>
           <Card className="border-slate-200 shadow-sm" noPadding>
             <div className="border-b border-slate-100 px-6 py-5">
               <div className="flex items-center justify-between gap-4">
