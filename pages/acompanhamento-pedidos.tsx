@@ -558,7 +558,8 @@ function Home() {
       }
     }
 
-    setError(isTransientDashboardError(nextError) ? null : nextError);
+    const possuiDadosPrincipais = Boolean(dashboardRef.current);
+    setError(isTransientDashboardError(nextError) || possuiDadosPrincipais ? null : nextError);
     setLoadingDashboard(false);
     setRefreshingDashboard(false);
     setAcaoFiltroAtiva(null);
