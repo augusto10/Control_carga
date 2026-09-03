@@ -230,7 +230,7 @@ const isPedidoPermitidoNoDashboard = (
   permitirTipoAusente = false
 ) => {
   if (hasEntregaNoAto(pedido, logistica)) return false;
-  if (isRetiradaConfirmada(pedido)) return false;
+  if (isRetiradaConfirmada(pedido)) return permitirTipoAusente;
   const tipos = getTiposEntrega(pedido, logistica);
   return tipos.some((tipo) => ['ENT', 'EPG'].includes(tipo)) || (permitirTipoAusente && tipos.length === 0);
 };
@@ -591,7 +591,7 @@ export async function sincronizarLogisticaSnapshot(options: {
     }
 
     let detalhesUsados = 0;
-    const snapshots = await mapWithConcurrency(entradas, 5, async (entry) => {
+    const snapshots = await mapWithConcurrency(entradas, 10, async (entry) => {
       const pedidoId = getPedidoId(entry);
       if (!pedidoId) return null;
 
