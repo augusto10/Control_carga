@@ -7,7 +7,6 @@ import {
   ClipboardList,
   Package,
   PackageCheck,
-  Search,
   UserCheck,
 } from 'lucide-react';
 
@@ -124,10 +123,6 @@ export default function ControlePedidosPainel() {
       if (!etapasResponse.ok) throw new Error('Falha ao carregar as etapas do painel');
 
       const etapasData = await etapasResponse.json();
-      if (isDashboardFallbackVazio(etapasData)) {
-        throw new Error(etapasData.warning || 'Nao foi possivel atualizar as etapas do painel');
-      }
-
       setDashboard(etapasData);
       setLoading(false);
       saveSnapshot(DASHBOARD_LOCAL_CACHE_KEY, etapasData);
@@ -201,8 +196,7 @@ export default function ControlePedidosPainel() {
   const stageCards = [
     { codigo: 'PEDIDO_NOVO' as StatusCode, titulo: 'PEDIDOS NOVOS', icon: Package },
     { codigo: 'PEDIDO_EM_SEPARACAO' as StatusCode, titulo: 'PEDIDOS EM SEPARACAO', icon: ClipboardList },
-    { codigo: 'PEDIDO_SEPARADO' as StatusCode, titulo: 'PEDIDOS SEPARADOS', icon: PackageCheck },
-    { codigo: 'PEDIDO_SEPARADO' as StatusCode, titulo: 'PEDIDOS AGUARDANDO CONFERENCIA', icon: Search },
+    { codigo: 'PEDIDO_SEPARADO' as StatusCode, titulo: 'PEDIDOS SEPARADOS AGUARDANDO CONFERENCIA', icon: PackageCheck },
     { codigo: 'PEDIDO_EMBARCADO' as StatusCode, titulo: 'PEDIDOS CONFERIDOS', icon: UserCheck },
     { codigo: 'PEDIDOS_EMBARCADOS' as StatusCode, titulo: 'PEDIDOS EMBARCADOS', icon: PackageCheck },
   ];
