@@ -1,7 +1,9 @@
 import axios, { AxiosInstance } from 'axios';
 
 const API_EXTERNA_BASE =
-  process.env.API_EXTERNA_BASE_URL?.trim() || 'http://localhost:8000';
+  process.env.API_EXTERNA_BASE_URL?.trim() ||
+  process.env.API_URL?.trim() ||
+  'http://localhost:8000';
 const API_EXTERNA_TIMEOUT_MS = 45_000;
 // O painel usa cache e deve falhar rapidamente quando a API externa nao responde.
 const API_EXTERNA_LOGIN_TIMEOUT_MS = 30_000;
