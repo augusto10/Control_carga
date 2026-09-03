@@ -824,12 +824,14 @@ export async function montarDashboardPorSnapshot(
   if (!snapshots.length) return null;
 
   const entries: { statusCodigo: StatusCode; item: DashboardPedidoItem }[] = [];
+  let totalRetirados = 0;
 
   for (const snapshot of snapshots) {
     const tipoEntrega = String(snapshot.tipoEntrega || '').trim().toUpperCase();
     const rawPedido = (snapshot.rawPedido || {}) as Record<string, unknown>;
     const ehRetirada = ['ATO', 'NDF', 'RDL', 'RLR'].includes(tipoEntrega) || isRetiradaConfirmada(rawPedido);
     const ehEntrega = ['ENT', 'EPG'].includes(tipoEntrega) || (!tipoEntrega && !ehRetirada);
+    if (ehRetirada) totalRetirados += 1;
     if (!ehEntrega) continue;
 
     const statusBase = STATUS_ORDER.includes(snapshot.statusCodigo as StatusCode)
@@ -937,6 +939,7 @@ export async function montarDashboardPorSnapshot(
       totalEmbarcados,
       totalPendentes: totalPedidos - totalEmbarcados,
       totalPendencias,
+      pedidosRetirados: totalRetirados,
     },
     indicadores,
     cached: true,

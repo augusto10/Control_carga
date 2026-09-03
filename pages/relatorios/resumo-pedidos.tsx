@@ -46,6 +46,9 @@ type DashboardLogisticaData = {
     dataFim: string;
   };
   indicadores: DashboardStatusItem[];
+  resumo?: {
+    pedidosRetirados?: number;
+  };
   error?: string;
   warning?: string;
 };
@@ -200,7 +203,7 @@ export default function ResumoPedidosPage() {
     return retirados;
   }, [dashboardEtapas]);
 
-  const pedidosRetirados = pedidosRetiradosPorId.size;
+  const pedidosRetirados = dashboardEtapas?.resumo?.pedidosRetirados ?? pedidosRetiradosPorId.size;
 
   const pedidosEmbarcados = getIndicador(dashboardEtapas, 'PEDIDOS_EMBARCADOS');
   const pedidosEmbarcadosAjustados = useMemo(() => {
