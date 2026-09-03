@@ -451,6 +451,32 @@ const getNotaReferencia = (pedido: Record<string, unknown>, logistica: Record<st
   return { numeroNota, chave };
 };
 
+const getNotaDoPedido = (nota: Record<string, unknown>) => {
+  const notaFiscal =
+    (nota.nota_fiscal as Record<string, unknown> | undefined) ||
+    (nota.notaFiscal as Record<string, unknown> | undefined) ||
+    nota;
+  const pedido =
+    (nota.pedido as Record<string, unknown> | undefined) ||
+    (nota.pedido_venda as Record<string, unknown> | undefined) ||
+    (nota.pedidoVenda as Record<string, unknown> | undefined) ||
+    nota;
+
+  return {
+    pedidoId: getPedidoId(pedido),
+    numeroNota: pickString(
+      notaFiscal.NUMERO_NOTA,
+      notaFiscal.NUMERO_NOTA_FISCAL,
+      notaFiscal.numero,
+      notaFiscal.NUMERO,
+      notaFiscal.numeroNota
+    ),
+    chave: onlyDigits(
+      pickString(notaFiscal.IDENTIFICACAO_NFE, notaFiscal.CHAVE_NFE, notaFiscal.codigo)
+    ),
+  };
+};
+
 const getControleInfoPorNotasLocais = async (periodo: PeriodoSnapshot) => {
   const whereControle =
     periodo.dataInicio || periodo.dataFim
@@ -550,7 +576,7 @@ export async function sincronizarLogisticaSnapshot(options: {
   let totalComErro = 0;
 
   try {
-    const [dashboardExterno, controles] = await Promise.all([
+    const [dashboardExterno, controles, notasCompletas] = await Promise.all([
       apiExternaService.listarDashboardLogistica(
         {
           empresa_id: 1,
@@ -562,6 +588,9 @@ export async function sincronizarLogisticaSnapshot(options: {
         timeoutMs
       ),
       getControleInfoPorNotasLocais(periodo),
+      apiExternaService
+        .listarNotasFiscaisCompletas({ limit: 100, offset: 0 }, options.username, options.password, 6_000)
+        .catch(() => null),
     ]);
 
     // A rota consolidada ja traz os pedidos operacionais. A rota /pedidos
@@ -583,6 +612,12 @@ export async function sincronizarLogisticaSnapshot(options: {
       throw new Error('API externa retornou indisponibilidade nas consultas de dashboard e pedidos');
     }
 
+    const notaPorPedido = new Map<number, { numeroNota: string | null; chave: string }>();
+    for (const nota of notasCompletas?.data || []) {
+      const referencia = getNotaDoPedido(nota);
+      if (referencia.pedidoId) notaPorPedido.set(referencia.pedidoId, referencia);
+    }
+
     const tipoEntregaPorPedido = new Map<number, string>();
     for (const pedido of pedidosComTipo || []) {
       const pedidoId = getPedidoId(pedido);
@@ -600,7 +635,11 @@ export async function sincronizarLogisticaSnapshot(options: {
       const tipoEntregaLista = tipoEntregaPorPedido.get(pedidoId);
       const statusLogisticoInicial = ((pedido.status_logistico || {}) as Record<string, unknown>) || {};
       const statusInicial = deriveDashboardStatus(pedido, statusLogisticoInicial, logistica);
-      const referenciaInicial = getNotaReferencia(pedido, logistica);
+      const referenciaInicialDireta = getNotaReferencia(pedido, logistica);
+      const referenciaInicial =
+        referenciaInicialDireta.numeroNota || referenciaInicialDireta.chave.length === 44
+          ? referenciaInicialDireta
+          : notaPorPedido.get(pedidoId) || referenciaInicialDireta;
       const precisaDetalhe =
         (!getTipoEntregaPrincipal(pedido, logistica) && !tipoEntregaLista) ||
         (hasResumoPendenciaNoPedido(pedido) && !isPedidoSomenteComSeparacaoAberta(pedido)) ||
@@ -636,7 +675,11 @@ export async function sincronizarLogisticaSnapshot(options: {
           ? 'PEDIDO_EMBARCADO'
           : statusCodigoBase;
       const produtosPendentes = possuiPendencia ? getProdutosPendentes(logistica) : [];
-      const referenciaNota = getNotaReferencia(pedido, logistica);
+      const referenciaDireta = getNotaReferencia(pedido, logistica);
+      const referenciaNota =
+        referenciaDireta.numeroNota || referenciaDireta.chave.length === 44
+          ? referenciaDireta
+          : notaPorPedido.get(pedidoId) || referenciaDireta;
       const controleInfo =
         (referenciaNota.chave.length === 44 ? controles.porChave.get(referenciaNota.chave) : null) ||
         (referenciaNota.numeroNota ? controles.porNumero.get(normalizeNumeroNota(referenciaNota.numeroNota)) : null) ||
