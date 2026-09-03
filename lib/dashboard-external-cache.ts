@@ -17,9 +17,12 @@ export async function getPedidosDashboard(
   password: string,
   limit = 100,
   timeoutMs = PEDIDOS_TIMEOUT_MS,
-  filtros: Pick<Parameters<typeof apiExternaService.listarPedidos>[0], 'data_inicio' | 'data_fim'> = {}
+  filtros: Pick<
+    Parameters<typeof apiExternaService.listarPedidos>[0],
+    'data_inicio' | 'data_fim' | 'tipo_data'
+  > = {}
 ): Promise<PedidoDashboard[] | null> {
-  const key = `${username}:${limit}:${filtros.data_inicio || ''}:${filtros.data_fim || ''}`;
+  const key = `${username}:${limit}:${filtros.data_inicio || ''}:${filtros.data_fim || ''}:${filtros.tipo_data || ''}`;
   const cached = cache.get(key);
   if (cached && cached.expiresAt > Date.now()) return cached.data;
 

@@ -550,6 +550,7 @@ export async function sincronizarLogisticaSnapshot(options: {
       getPedidosDashboard(options.username, options.password, limit, timeoutMs, {
         data_inicio: options.dataInicioIso || undefined,
         data_fim: options.dataFimIso || undefined,
+        tipo_data: 'recebimento',
       }),
       getControleInfoPorNotasLocais(periodo),
     ]);
@@ -561,6 +562,10 @@ export async function sincronizarLogisticaSnapshot(options: {
       const pedidoId = getPedidoId(item);
       return Boolean(pedidoId) && entries.findIndex((candidate) => getPedidoId(candidate) === pedidoId) === index;
     });
+
+    if (!dashboardExterno && !pedidosComTipo) {
+      throw new Error('API externa retornou indisponibilidade nas consultas de dashboard e pedidos');
+    }
 
     const tipoEntregaPorPedido = new Map<number, string>();
     for (const pedido of pedidosComTipo || []) {
