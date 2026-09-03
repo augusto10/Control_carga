@@ -826,6 +826,12 @@ export async function montarDashboardPorSnapshot(
   const entries: { statusCodigo: StatusCode; item: DashboardPedidoItem }[] = [];
 
   for (const snapshot of snapshots) {
+    const tipoEntrega = String(snapshot.tipoEntrega || '').trim().toUpperCase();
+    const rawPedido = (snapshot.rawPedido || {}) as Record<string, unknown>;
+    const ehRetirada = ['ATO', 'NDF', 'RDL', 'RLR'].includes(tipoEntrega) || isRetiradaConfirmada(rawPedido);
+    const ehEntrega = ['ENT', 'EPG'].includes(tipoEntrega) || (!tipoEntrega && !ehRetirada);
+    if (!ehEntrega) continue;
+
     const statusBase = STATUS_ORDER.includes(snapshot.statusCodigo as StatusCode)
       ? (snapshot.statusCodigo as StatusCode)
       : null;
