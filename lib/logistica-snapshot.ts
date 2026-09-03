@@ -1,7 +1,6 @@
 import type { Prisma } from '@prisma/client';
 import prisma from '@/lib/prisma';
 import { apiExternaService } from '@/services/api-externa';
-import { getPedidosDashboard } from '@/lib/dashboard-external-cache';
 
 const STATUS_ORDER = [
   'PEDIDO_NOVO',
@@ -218,9 +217,22 @@ const hasEntregaNoAto = (pedido: Record<string, unknown>, logistica?: Record<str
   );
 };
 
-const isPedidoPermitidoNoDashboard = (pedido: Record<string, unknown>, logistica?: Record<string, any> | null) => {
+const isRetiradaConfirmada = (pedido: Record<string, unknown>) => {
+  const retirada = pedido.retirada as Record<string, unknown> | undefined;
+  return ['S', 'SIM', 'TRUE', '1'].includes(
+    String(retirada?.foi_retirado ?? '').trim().toUpperCase()
+  );
+};
+
+const isPedidoPermitidoNoDashboard = (
+  pedido: Record<string, unknown>,
+  logistica?: Record<string, any> | null,
+  permitirTipoAusente = false
+) => {
   if (hasEntregaNoAto(pedido, logistica)) return false;
-  return getTiposEntrega(pedido, logistica).some((tipo) => ['ENT', 'EPG'].includes(tipo));
+  if (isRetiradaConfirmada(pedido)) return false;
+  const tipos = getTiposEntrega(pedido, logistica);
+  return tipos.some((tipo) => ['ENT', 'EPG'].includes(tipo)) || (permitirTipoAusente && tipos.length === 0);
 };
 
 const getTipoEntregaPrincipal = (pedido: Record<string, unknown>, logistica?: Record<string, any> | null) =>
@@ -528,7 +540,6 @@ export async function sincronizarLogisticaSnapshot(options: {
     dataInicioIso: options.dataInicioIso || null,
     dataFimIso: options.dataFimIso || null,
   };
-  const limit = Math.min(Math.max(options.limit || 150, 1), 500);
   const maxDetalhes = Math.min(Math.max(options.maxDetalhes ?? 30, 0), 100);
   // A API Santri pode levar mais de 10s para montar as consultas consolidadas.
   // Mantemos um limite finito para a funcao serverless, mas evitamos falsos
@@ -539,7 +550,7 @@ export async function sincronizarLogisticaSnapshot(options: {
   let totalComErro = 0;
 
   try {
-    const [dashboardExterno, pedidosComTipo, controles] = await Promise.all([
+    const [dashboardExterno, controles] = await Promise.all([
       apiExternaService.listarDashboardLogistica(
         {
           empresa_id: 1,
@@ -550,23 +561,25 @@ export async function sincronizarLogisticaSnapshot(options: {
         options.password,
         timeoutMs
       ),
-      getPedidosDashboard(options.username, options.password, limit, timeoutMs, {
-        data_inicio: options.dataInicioIso || undefined,
-        data_fim: options.dataFimIso || undefined,
-        tipo_data: 'recebimento',
-      }),
       getControleInfoPorNotasLocais(periodo),
     ]);
 
+    // A rota consolidada ja traz os pedidos operacionais. A rota /pedidos
+    // rejeita filtros de data na API atual e nao deve bloquear o cron.
+    const pedidosComTipo: Record<string, unknown>[] = [];
+
     const entradas = [
-      ...((dashboardExterno?.data || []) as Record<string, unknown>[]),
+      ...((dashboardExterno?.data || []) as Record<string, unknown>[]).map((item) => ({
+        ...item,
+        __origemDashboardLogistica: true,
+      })),
       ...((pedidosComTipo || []) as Record<string, unknown>[]),
     ].filter((item, index, entries) => {
       const pedidoId = getPedidoId(item);
       return Boolean(pedidoId) && entries.findIndex((candidate) => getPedidoId(candidate) === pedidoId) === index;
     });
 
-    if (!dashboardExterno && !pedidosComTipo) {
+    if (!dashboardExterno && pedidosComTipo.length === 0) {
       throw new Error('API externa retornou indisponibilidade nas consultas de dashboard e pedidos');
     }
 
@@ -608,7 +621,7 @@ export async function sincronizarLogisticaSnapshot(options: {
         pedido = { ...pedido, tipo_entrega: tipoEntregaLista, TIPO_ENTREGA: tipoEntregaLista };
       }
 
-      if (!isPedidoPermitidoNoDashboard(pedido, logistica)) return null;
+      if (!isPedidoPermitidoNoDashboard(pedido, logistica, pedido.__origemDashboardLogistica === true)) return null;
 
       const statusLogistico = ((pedido.status_logistico || {}) as Record<string, unknown>) || {};
       const statusCodigoBase = deriveDashboardStatus(pedido, statusLogistico, logistica);

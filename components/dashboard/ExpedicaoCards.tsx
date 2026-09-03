@@ -95,6 +95,9 @@ export function ExpedicaoCards({
   loadingStages = false,
   loadingSecondary = false,
 }: ExpedicaoCardsProps) {
+  const hasAlertas = alertas.total > 0;
+  const hasPendencias = pendencias.total > 0;
+
   return (
     <div className="space-y-4">
       <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
@@ -112,22 +115,6 @@ export function ExpedicaoCards({
           onClick={alertas.onClick}
           className="group relative min-h-[180px] overflow-hidden rounded-[18px] bg-gradient-to-br from-red-950 via-red-800 to-rose-950 p-4 text-left text-white shadow-[0_10px_24px_rgba(239,68,68,0.3)] transition hover:-translate-y-1 hover:shadow-[0_16px_34px_rgba(239,68,68,0.45)]"
         >
-          <motion.div
-            className="pointer-events-none absolute inset-0 rounded-[18px] border-[4px] border-red-400 bg-gradient-to-br from-red-500 via-red-600 to-red-700"
-            animate={{
-              opacity: [0.05, 0.9, 0.08, 0.95, 0.05, 0.05],
-              scale: [1, 1.015, 1, 1.015, 1, 1],
-              boxShadow: [
-                'inset 0 0 0 rgba(255, 0, 0, 0)',
-                'inset 0 0 70px rgba(255, 35, 35, 1)',
-                'inset 0 0 5px rgba(255, 0, 0, 0.1)',
-                'inset 0 0 80px rgba(255, 35, 35, 1)',
-                'inset 0 0 0 rgba(255, 0, 0, 0)',
-                'inset 0 0 0 rgba(255, 0, 0, 0)',
-              ],
-            }}
-            transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut', times: [0, 0.1, 0.22, 0.32, 0.44, 1] }}
-          />
           <div className="absolute bottom-6 right-6 opacity-[0.09] transition group-hover:opacity-[0.14]">
             <AlertCircle className="h-20 w-20" strokeWidth={1.2} />
           </div>
@@ -136,7 +123,7 @@ export function ExpedicaoCards({
             <div className="flex items-center gap-3">
               <motion.div
                 className="flex h-12 w-12 items-center justify-center rounded-full bg-red-500/20 ring-4 ring-red-200/10"
-                animate={{
+                animate={hasAlertas ? {
                   backgroundColor: ['rgba(127, 29, 29, 0.4)', 'rgba(255, 30, 30, 1)', 'rgba(127, 29, 29, 0.4)', 'rgba(255, 30, 30, 1)', 'rgba(127, 29, 29, 0.4)', 'rgba(127, 29, 29, 0.4)'],
                   boxShadow: [
                     '0 0 0 rgba(255, 50, 50, 0)',
@@ -146,8 +133,8 @@ export function ExpedicaoCards({
                     '0 0 0 rgba(255, 50, 50, 0)',
                     '0 0 0 rgba(255, 50, 50, 0)',
                   ],
-                }}
-                transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut', times: [0, 0.1, 0.22, 0.32, 0.44, 1] }}
+                } : undefined}
+                transition={hasAlertas ? { duration: 2.4, repeat: Infinity, ease: 'easeInOut', times: [0, 0.1, 0.22, 0.32, 0.44, 1] } : undefined}
               >
                 <Siren className="h-6 w-6 text-white" />
               </motion.div>
@@ -159,15 +146,15 @@ export function ExpedicaoCards({
 
             <div className="mt-3 space-y-1 text-[11px] font-bold sm:text-xs">
               <div className="grid grid-cols-[1fr_auto] items-center gap-3">
-                <span className="uppercase">Nao separado:</span>
+                <span className="uppercase">Pedidos não separados:</span>
                 <strong className="text-lg sm:text-xl">{loadingSecondary ? '-' : alertas.naoSeparado}</strong>
               </div>
               <div className="grid grid-cols-[1fr_auto] items-center gap-3">
-                <span className="uppercase">Nao conferido:</span>
+                <span className="uppercase">Pedidos não conferidos:</span>
                 <strong className="text-lg sm:text-xl">{loadingSecondary ? '-' : alertas.naoConferido}</strong>
               </div>
               <div className="grid grid-cols-[1fr_auto] items-center gap-3">
-                <span className="uppercase">Nao embarcado:</span>
+                <span className="uppercase">Pedidos não embarcados:</span>
                 <strong className="text-lg sm:text-xl">{loadingSecondary ? '-' : alertas.naoEmbarcado}</strong>
               </div>
             </div>
@@ -182,22 +169,6 @@ export function ExpedicaoCards({
           onClick={pendencias.onClick}
           className="group relative min-h-[180px] overflow-hidden rounded-[18px] bg-gradient-to-br from-red-950 via-red-900 to-rose-950 p-4 text-left text-white shadow-[0_10px_24px_rgba(239,68,68,0.3)] transition hover:-translate-y-1 hover:shadow-[0_16px_34px_rgba(239,68,68,0.45)]"
         >
-          <motion.div
-            className="pointer-events-none absolute inset-0 rounded-[18px] border-[4px] border-red-400 bg-gradient-to-br from-red-500 via-red-600 to-red-700"
-            animate={{
-              opacity: [0.05, 0.9, 0.08, 0.95, 0.05, 0.05],
-              scale: [1, 1.015, 1, 1.015, 1, 1],
-              boxShadow: [
-                'inset 0 0 0 rgba(255, 0, 0, 0)',
-                'inset 0 0 70px rgba(255, 35, 35, 1)',
-                'inset 0 0 5px rgba(255, 0, 0, 0.1)',
-                'inset 0 0 80px rgba(255, 35, 35, 1)',
-                'inset 0 0 0 rgba(255, 0, 0, 0)',
-                'inset 0 0 0 rgba(255, 0, 0, 0)',
-              ],
-            }}
-            transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut', times: [0, 0.1, 0.22, 0.32, 0.44, 1] }}
-          />
           <div className="absolute bottom-6 right-6 opacity-[0.09] transition group-hover:opacity-[0.14]">
             <ShieldAlert className="h-20 w-20" strokeWidth={1.2} />
           </div>
@@ -206,7 +177,7 @@ export function ExpedicaoCards({
             <div className="flex items-center gap-3">
               <motion.div
                 className="flex h-12 w-12 items-center justify-center rounded-full bg-red-500/20 ring-4 ring-red-200/10"
-                animate={{
+                animate={hasPendencias ? {
                   backgroundColor: ['rgba(127, 29, 29, 0.4)', 'rgba(255, 30, 30, 1)', 'rgba(127, 29, 29, 0.4)', 'rgba(255, 30, 30, 1)', 'rgba(127, 29, 29, 0.4)', 'rgba(127, 29, 29, 0.4)'],
                   boxShadow: [
                     '0 0 0 rgba(255, 50, 50, 0)',
@@ -216,8 +187,8 @@ export function ExpedicaoCards({
                     '0 0 0 rgba(255, 50, 50, 0)',
                     '0 0 0 rgba(255, 50, 50, 0)',
                   ],
-                }}
-                transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut', times: [0, 0.1, 0.22, 0.32, 0.44, 1] }}
+                } : undefined}
+                transition={hasPendencias ? { duration: 2.4, repeat: Infinity, ease: 'easeInOut', times: [0, 0.1, 0.22, 0.32, 0.44, 1] } : undefined}
               >
                 <ShieldAlert className="h-6 w-6 text-white" />
               </motion.div>

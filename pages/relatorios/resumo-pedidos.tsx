@@ -101,6 +101,7 @@ const normalizeTransportadora = (value: string | null | undefined) => {
   if (normalized.includes('EXPRESSO') || normalized.includes('GOIAS')) return 'EXPRESSO GOIAS';
   if (normalized.includes('ZANUELLO') || normalized.includes('ZANEULO')) return 'ZANUELLO';
   if (normalized.includes('DETAFRA')) return 'DETAFRA';
+  if (normalized.includes('TERCEIRIZADA')) return 'TERCEIRIZADA';
   return null;
 };
 
@@ -216,6 +217,7 @@ export default function ResumoPedidosPage() {
       expressoGoias: 0,
       zanuello: 0,
       detafra: 0,
+      terceirizada: 0,
     };
 
     for (const pedido of pedidosEmbarcadosAjustados.pedidos) {
@@ -224,6 +226,7 @@ export default function ResumoPedidosPage() {
       if (transportadora === 'EXPRESSO GOIAS') totais.expressoGoias += 1;
       if (transportadora === 'ZANUELLO') totais.zanuello += 1;
       if (transportadora === 'DETAFRA') totais.detafra += 1;
+      if (transportadora === 'TERCEIRIZADA') totais.terceirizada += 1;
     }
 
     return totais;
@@ -257,13 +260,12 @@ export default function ResumoPedidosPage() {
       `RESUMO DE PEDIDOS ${dataTitulo}`,
       '',
       'ENTREGUES',
-      `- PEDIDOS SEPARADOS: ${getIndicador(dashboardEtapas, 'PEDIDO_SEPARADO')?.total || 0}`,
-      `- PEDIDOS CONFERIDOS: ${getIndicador(dashboardEtapas, 'PEDIDO_EMBARCADO')?.total || 0}`,
       `- PEDIDOS EMBARCADOS: ${pedidosEmbarcadosAjustados.total}`,
       `  -> ACCERT: ${transportadoras.accert}`,
       `  -> EXPRESSO GOIAS: ${transportadoras.expressoGoias}`,
       `  -> ZANUELLO: ${transportadoras.zanuello}`,
       `  -> DETAFRA: ${transportadoras.detafra}`,
+      `  -> TERCEIRIZADA: ${transportadoras.terceirizada}`,
       '',
       'RETIRADOS',
       `- PEDIDOS RETIRADOS: ${pedidosRetirados}`,
@@ -276,7 +278,7 @@ export default function ResumoPedidosPage() {
       'PENDÊNCIAS',
       ...(itensPendentes.length > 0 ? itensPendentes.map((item) => `- ${item.texto}`) : ['- Nenhuma pendência encontrada']),
     ].join('\n');
-  }, [aplicado, dashboardAlertas, dashboardEtapas, itensPendentes, pedidosEmbarcados?.total, pedidosRetirados, transportadoras.accert, transportadoras.detafra, transportadoras.expressoGoias, transportadoras.zanuello]);
+  }, [aplicado, dashboardAlertas, dashboardEtapas, itensPendentes, pedidosEmbarcados?.total, pedidosRetirados, transportadoras.accert, transportadoras.detafra, transportadoras.expressoGoias, transportadoras.terceirizada, transportadoras.zanuello]);
 
   const criarArquivoPdf = useCallback(async () => {
     const { PDFDocument, StandardFonts, rgb } = await import('pdf-lib');
@@ -462,15 +464,7 @@ export default function ResumoPedidosPage() {
             </Card>
           )}
 
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <Card className="border-slate-200 shadow-sm">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Pedidos separados</p>
-              <p className="mt-2 text-3xl font-black text-slate-900">{relatorioIndisponivel ? '-' : getIndicador(dashboardEtapas, 'PEDIDO_SEPARADO')?.total || 0}</p>
-            </Card>
-            <Card className="border-slate-200 shadow-sm">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Pedidos conferidos</p>
-              <p className="mt-2 text-3xl font-black text-slate-900">{relatorioIndisponivel ? '-' : getIndicador(dashboardEtapas, 'PEDIDO_EMBARCADO')?.total || 0}</p>
-            </Card>
+          <div className="grid gap-4 md:grid-cols-2">
             <Card className="border-slate-200 shadow-sm">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Pedidos embarcados</p>
               <p className="mt-2 text-3xl font-black text-slate-900">{relatorioIndisponivel ? '-' : pedidosEmbarcadosAjustados.total}</p>
