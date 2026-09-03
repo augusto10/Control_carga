@@ -468,6 +468,8 @@ const isPedidoComPendencias = (
   const separacoes = Array.isArray(logistica?.separacoes) ? logistica.separacoes : [];
   const itensSeparacoes = Array.isArray(logistica?.itens_separacoes) ? logistica.itens_separacoes : [];
   const possuiSeparacaoEfetivada =
+    ultimoStatusSeparacao === 'G' ||
+    statusSeparacoes.includes('G') ||
     separacoes.some((separacao) => {
       const status = String(separacao.STATUS ?? '').trim().toUpperCase();
       return (
