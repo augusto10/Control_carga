@@ -530,7 +530,10 @@ export async function sincronizarLogisticaSnapshot(options: {
   };
   const limit = Math.min(Math.max(options.limit || 150, 1), 500);
   const maxDetalhes = Math.min(Math.max(options.maxDetalhes ?? 30, 0), 100);
-  const timeoutMs = options.timeoutMs || 10_000;
+  // A API Santri pode levar mais de 10s para montar as consultas consolidadas.
+  // Mantemos um limite finito para a funcao serverless, mas evitamos falsos
+  // indisponiveis antes que a API consiga responder.
+  const timeoutMs = options.timeoutMs || 30_000;
   const syncKey = getSnapshotSyncKey(periodo);
 
   let totalComErro = 0;
