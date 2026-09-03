@@ -2,12 +2,35 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { TipoUsuario } from '@prisma/client';
 import { apiExternaService } from '@/services/api-externa';
 import { getAuthenticatedUser } from '@/lib/server-auth';
+import prisma from '@/lib/prisma';
 import {
   mapearDadosPedidoParaEtiqueta,
   sanitizeNumeroPedido,
 } from '@/lib/etiquetas-transporte';
 
 const ALLOWED_ROLES: TipoUsuario[] = ['ADMIN', 'GERENTE', 'USUARIO', 'SEPARADOR', 'CONFERENTE', 'AUDITOR', 'FUNCIONARIO'];
+
+async function buscarDadosDoSnapshot(numeroPedido: string) {
+  const pedidoId = Number(numeroPedido.replace(/\D/g, ''));
+  if (!Number.isInteger(pedidoId) || pedidoId <= 0) return null;
+
+  const snapshot = await (prisma as any).pedidoLogisticaSnapshot.findUnique({
+    where: { pedidoId },
+  });
+  if (!snapshot) return null;
+
+  const rawPedido = (snapshot.rawPedido || {}) as Record<string, any>;
+  return {
+    pedidoId: String(snapshot.pedidoId),
+    numeroPedido: String(snapshot.pedidoId),
+    cliente: String(snapshot.nomeFantasia || snapshot.clienteNome || rawPedido.cliente_nome || ''),
+    cnpj: String(rawPedido.cnpj || rawPedido.CNPJ || ''),
+    transportadora: snapshot.transportadoraNome || rawPedido.transportadora || null,
+    volumes: Number(rawPedido.itens_gerar || rawPedido.volumes || 1) || 1,
+    numeroNota: String(snapshot.numeroNota || rawPedido.numero_nota || rawPedido.NUMERO_NOTA || ''),
+    fonte: 'snapshot_local',
+  };
+}
 
 /**
  * Resolve os dados de um pedido para autopreencher o formulario de etiquetas.
@@ -43,12 +66,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const username = process.env.API_EXTERNA_USERNAME;
   const password = process.env.API_EXTERNA_PASSWORD;
 
-  if (!username || !password) {
-    return res.status(503).json({ message: 'Credenciais da API externa nao configuradas.' });
-  }
-
   try {
     const numeroDigitos = numeroPedido.replace(/\D/g, '');
+
+    if (!username || !password) {
+      const snapshot = await buscarDadosDoSnapshot(numeroPedido);
+      return snapshot
+        ? res.status(200).json(snapshot)
+        : res.status(503).json({ message: 'Credenciais da API externa nao configuradas.' });
+    }
 
     // 1) Resolve o pedido pelo id (ORCAMENTO_ID == numero do pedido).
     //    O endpoint /api/v1/pedidos?numero_pedido=... nao aplica o filtro
@@ -69,7 +95,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (!pedido) {
-      return res.status(404).json({ message: 'Pedido nao encontrado na API externa.' });
+      const snapshot = await buscarDadosDoSnapshot(numeroPedido);
+      return snapshot
+        ? res.status(200).json(snapshot)
+        : res.status(404).json({ message: 'Pedido nao encontrado na API externa.' });
     }
 
     const pedidoId = String(
@@ -81,7 +110,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       : null;
 
     if (!logistica) {
-      return res.status(404).json({ message: 'Logistica do pedido nao encontrada.' });
+      const snapshot = await buscarDadosDoSnapshot(numeroPedido);
+      return snapshot
+        ? res.status(200).json(snapshot)
+        : res.status(404).json({ message: 'Logistica do pedido nao encontrada.' });
     }
 
     // 3) Enriquecimento com o cadastro do cliente (CNPJ/CPF e razao social).
