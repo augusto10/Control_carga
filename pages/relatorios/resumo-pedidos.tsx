@@ -351,24 +351,50 @@ export default function ResumoPedidosPage() {
     return new File([blob], nome, { type: 'application/pdf' });
   }, [aplicado.dataFim, aplicado.dataInicio, textoRelatorio]);
 
-  const baixarPdf = useCallback(async () => {
+  const gerarPdfParaVisualizacao = useCallback(async () => {
     setGerandoPdf(true);
     try {
       const arquivo = await criarArquivoPdf();
-      const url = URL.createObjectURL(arquivo);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = arquivo.name;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      setPdfPreview((atual) => {
+        if (atual) URL.revokeObjectURL(atual.url);
+        return { url: URL.createObjectURL(arquivo), arquivo };
+      });
     } catch {
       setError('Nao foi possivel gerar o PDF do relatorio.');
     } finally {
       setGerandoPdf(false);
     }
   }, [criarArquivoPdf]);
+
+  const fecharPdfPreview = useCallback(() => {
+    setPdfPreview((atual) => {
+      if (atual) URL.revokeObjectURL(atual.url);
+      return null;
+    });
+  }, []);
+
+  const baixarPdfPreview = useCallback(() => {
+    if (!pdfPreview) return;
+    const link = document.createElement('a');
+    link.href = pdfPreview.url;
+    link.download = pdfPreview.arquivo.name;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }, [pdfPreview]);
+
+  const compartilharPdfPreview = useCallback(async () => {
+    if (!pdfPreview || !navigator.share) return;
+    const podeCompartilharArquivo =
+      typeof navigator.canShare !== 'function' || navigator.canShare({ files: [pdfPreview.arquivo] });
+
+    if (!podeCompartilharArquivo) return;
+    try {
+      await navigator.share({ title: 'Resumo de Pedidos', files: [pdfPreview.arquivo] });
+    } catch {
+      // O usuario pode fechar a janela nativa de compartilhamento sem concluir.
+    }
+  }, [pdfPreview]);
 
   const compartilharPdf = useCallback(async () => {
     setCompartilhandoPdf(true);
@@ -498,7 +524,7 @@ export default function ResumoPedidosPage() {
               <div className="flex flex-wrap justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => void baixarPdf()}
+                  onClick={() => void gerarPdfParaVisualizacao()}
                   disabled={loading || relatorioIndisponivel || gerandoPdf}
                   className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
                 >
@@ -530,6 +556,59 @@ export default function ResumoPedidosPage() {
             </div>
           </Card>
         </div>
+
+        {pdfPreview && (
+          <div className="fixed inset-0 z-50 flex flex-col bg-slate-950/80 p-3 sm:p-6">
+            <div className="mx-auto flex h-full w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3 sm:px-6">
+                <div>
+                  <h2 className="text-base font-bold text-slate-900">Visualizar resumo de pedidos</h2>
+                  <p className="text-xs text-slate-500">Confira o relatório e escolha uma opção.</p>
+                </div>
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => window.open(pdfPreview.url, '_blank', 'noopener,noreferrer')}
+                    className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-white hover:opacity-90"
+                  >
+                    <Printer className="h-4 w-4" />
+                    Imprimir
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void compartilharPdfPreview()}
+                    disabled={typeof navigator === 'undefined' || !navigator.share}
+                    className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <Share2 className="h-4 w-4" />
+                    Compartilhar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={baixarPdfPreview}
+                    className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                  >
+                    <Download className="h-4 w-4" />
+                    Baixar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={fecharPdfPreview}
+                    className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                    aria-label="Fechar visualizacao do PDF"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+              </div>
+              <iframe
+                src={pdfPreview.url}
+                title="Visualizacao do resumo de pedidos"
+                className="min-h-0 flex-1 bg-slate-100"
+              />
+            </div>
+          </div>
+        )}
       </AppLayout>
     </ProtectedRoute>
   );
