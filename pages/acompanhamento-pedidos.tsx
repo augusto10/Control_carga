@@ -100,6 +100,8 @@ interface PedidoDetalheApiResponse {
     status_logistico?: Record<string, unknown> | null;
     separacoes?: Record<string, unknown>[];
     itens_separacoes?: Record<string, unknown>[];
+    itens_entregas_pendentes?: Record<string, unknown>[];
+    comparativo_separacao_pendentes?: Record<string, unknown>[];
     entregas?: Record<string, unknown>[];
     notas_fiscais?: Record<string, unknown>[];
   } | null;
@@ -785,25 +787,48 @@ function Home() {
       : [],
     [pedidoDetalhe]
   );
+  const pedidoItensPendentes = useMemo(() => {
+    const comparativo = Array.isArray(pedidoDetalhe?.logistica?.comparativo_separacao_pendentes)
+      ? pedidoDetalhe.logistica.comparativo_separacao_pendentes
+      : [];
+    const entregasPendentes = Array.isArray(pedidoDetalhe?.logistica?.itens_entregas_pendentes)
+      ? pedidoDetalhe.logistica.itens_entregas_pendentes
+      : [];
+    return comparativo.length > 0 ? comparativo : entregasPendentes;
+  }, [pedidoDetalhe]);
   const itensPendentesModal = useMemo(() => {
     if (!pedidoSelecionado?.possuiProdutosFaltando) return [];
     if (pedidoSelecionado.produtosPendentes.length > 0) return pedidoSelecionado.produtosPendentes;
 
-    return pedidoItensSeparacao
+    const itens = pedidoItensPendentes.length > 0 ? pedidoItensPendentes : pedidoItensSeparacao;
+    return itens
       .map((item) => {
         const saldo =
-          parseQuantity(item.SALDO) ||
-          Math.max(0, parseQuantity(item.QUANTIDADE) - parseQuantity(item.QUANTIDADE_BAIXADA));
+          parseQuantity(item.SALDO ?? item.saldo) ||
+          parseQuantity(item.SALDO_PENDENTE ?? item.saldo_pendente) ||
+          Math.max(
+            0,
+            parseQuantity(item.QUANTIDADE ?? item.quantidade ?? item.QTD) -
+              parseQuantity(item.QUANTIDADE_BAIXADA ?? item.quantidade_baixada ?? item.QTD_BAIXADA)
+          );
 
         return {
-          produtoId: typeof item.PRODUTO_ID === 'number' ? item.PRODUTO_ID : null,
-          codigo: formatText(item.CODIGO_ORIGINAL, formatText(item.CODIGO_BARRAS, '')),
-          nome: formatText(item.PRODUTO_NOME, 'Produto nao informado'),
+          produtoId: typeof (item.PRODUTO_ID ?? item.produto_id) === 'number'
+            ? (item.PRODUTO_ID ?? item.produto_id) as number
+            : null,
+          codigo: formatText(
+            item.CODIGO_ORIGINAL ?? item.codigo_original,
+            formatText(item.CODIGO_BARRAS ?? item.codigo_barras, formatText(item.CODIGO, ''))
+          ),
+          nome: formatText(
+            item.PRODUTO_NOME ?? item.produto_nome,
+            formatText(item.NOME_PRODUTO ?? item.nome_produto, formatText(item.NOME ?? item.nome, 'Produto nao informado'))
+          ),
           quantidade: saldo,
         };
       })
       .filter((produto) => produto.quantidade > 0);
-  }, [pedidoItensSeparacao, pedidoSelecionado]);
+  }, [pedidoItensPendentes, pedidoItensSeparacao, pedidoSelecionado]);
   const pedidoEntregas = Array.isArray(pedidoDetalhe?.logistica?.entregas)
     ? pedidoDetalhe.logistica?.entregas || []
     : [];

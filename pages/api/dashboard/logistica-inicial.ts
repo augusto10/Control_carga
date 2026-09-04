@@ -75,6 +75,7 @@ type DashboardResponse = {
     totalPendentes: number;
     totalPendencias: number;
     pedidosRetirados?: number;
+    transportadoras?: Record<string, number>;
   };
   indicadores: DashboardStatusItem[];
   cached?: boolean;
@@ -646,18 +647,43 @@ const agruparProdutosPendentes = (itens: Record<string, any>[]) => {
   for (const item of itens as Record<string, any>[]) {
     const quantidade =
       toNumber(item.SALDO_PENDENTE) ??
+      toNumber(item.saldo_pendente) ??
       toNumber(item.QUANTIDADE_PENDENTE_TOTAL) ??
+      toNumber(item.quantidade_pendente_total) ??
+      toNumber(item.QUANTIDADE_PENDENTE) ??
+      toNumber(item.quantidade_pendente) ??
       toNumber(item.EM_SEPARACAO_PENDENTE) ??
+      toNumber(item.em_separacao_pendente) ??
       toNumber(item.SALDO_NA_SEPARACAO) ??
+      toNumber(item.saldo_na_separacao) ??
       toNumber(item.SALDO) ??
+      toNumber(item.saldo) ??
       toNumber(item.QUANTIDADE_EM_SEPARACAO) ??
+      toNumber(item.quantidade_em_separacao) ??
       toNumber(item.SALDO_GERAR_SEPARACAO) ??
-      Math.max(0, (toNumber(item.QUANTIDADE) || 0) - (toNumber(item.QUANTIDADE_BAIXADA) || 0));
+      toNumber(item.saldo_gerar_separacao) ??
+      Math.max(
+        0,
+        (toNumber(item.QUANTIDADE ?? item.quantidade ?? item.QTD ?? item.qtd) || 0) -
+          (toNumber(item.QUANTIDADE_BAIXADA ?? item.quantidade_baixada ?? item.QTD_BAIXADA) || 0)
+      );
     if (quantidade <= 0) continue;
 
-    const produtoId = toNumber(item.PRODUTO_ID);
-    const codigo = toStringValue(item.CODIGO_ORIGINAL) || toStringValue(item.CODIGO_BARRAS);
-    const nome = toStringValue(item.PRODUTO_NOME) || 'Produto nao informado';
+    const produtoId = toNumber(item.PRODUTO_ID ?? item.produto_id ?? item.ITEM_ID ?? item.item_id);
+    const codigo =
+      toStringValue(item.CODIGO_ORIGINAL) ||
+      toStringValue(item.codigo_original) ||
+      toStringValue(item.CODIGO_BARRAS) ||
+      toStringValue(item.codigo_barras) ||
+      toStringValue(item.CODIGO);
+    const nome =
+      toStringValue(item.PRODUTO_NOME) ||
+      toStringValue(item.produto_nome) ||
+      toStringValue(item.NOME_PRODUTO) ||
+      toStringValue(item.nome_produto) ||
+      toStringValue(item.NOME) ||
+      toStringValue(item.nome) ||
+      'Produto nao informado';
     const chave = String(produtoId ?? codigo ?? nome);
     const atual = agrupados.get(chave);
     if (atual) atual.quantidade += quantidade;
@@ -1425,6 +1451,36 @@ export default async function handler(
       notasEmControles.map((nota) => `${normalizeNumeroNota(nota.numeroNota)}:${onlyDigits(nota.codigo)}`)
     );
     const totalEmbarcadosComBaseLocal = Math.max(totalEmbarcados, notasLocaisUnicas.size);
+    const embarcadosPorTransportadora: Record<string, number> = {
+      ACCERT: 0,
+      'EXPRESSO GOIAS': 0,
+      ZANUELLO: 0,
+      DETAFRA: 0,
+      TERCEIRIZADA: 0,
+    };
+    const notasTransportadorasContadas = new Set<string>();
+    for (const nota of notasEmControles) {
+      const transportadora = String(nota.controle?.transportadora || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toUpperCase();
+      const nome = transportadora.includes('ACCERT')
+        ? 'ACCERT'
+        : transportadora.includes('EXPRESSO') || transportadora.includes('GOIAS')
+          ? 'EXPRESSO GOIAS'
+          : transportadora.includes('ZANUELLO') || transportadora.includes('ZANUELO') || transportadora.includes('ZANEULO')
+            ? 'ZANUELLO'
+            : transportadora.includes('DETAFRA')
+              ? 'DETAFRA'
+              : transportadora.includes('TERCEIRIZADA')
+                ? 'TERCEIRIZADA'
+                : null;
+      const chave = `${normalizeNumeroNota(nota.numeroNota)}:${onlyDigits(nota.codigo)}:${nome || 'OUTRA'}`;
+      if (nome && !notasTransportadorasContadas.has(chave)) {
+        notasTransportadorasContadas.add(chave);
+        embarcadosPorTransportadora[nome] += 1;
+      }
+    }
     const totalPendencias = indicadores.find((item) => item.codigo === 'PENDENCIAS')?.total || 0;
 
     const payload: DashboardResponse = {
@@ -1440,6 +1496,7 @@ export default async function handler(
         totalPendentes: totalPedidos - totalEmbarcadosComBaseLocal,
         totalPendencias,
         pedidosRetirados: pedidosRetiradosIds.size,
+        transportadoras: embarcadosPorTransportadora,
       },
       indicadores,
     };

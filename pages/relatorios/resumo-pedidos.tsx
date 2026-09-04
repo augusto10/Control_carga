@@ -49,6 +49,7 @@ type DashboardLogisticaData = {
   resumo?: {
     pedidosRetirados?: number;
     totalEmbarcados?: number;
+    transportadoras?: Record<string, number>;
   };
   error?: string;
   warning?: string;
@@ -228,6 +229,17 @@ export default function ResumoPedidosPage() {
       terceirizada: 0,
     };
 
+    const transportadorasDoResumo = dashboardEtapas?.resumo?.transportadoras;
+    if (transportadorasDoResumo) {
+      return {
+        accert: transportadorasDoResumo.ACCERT || 0,
+        expressoGoias: transportadorasDoResumo['EXPRESSO GOIAS'] || 0,
+        zanuello: transportadorasDoResumo.ZANUELLO || 0,
+        detafra: transportadorasDoResumo.DETAFRA || 0,
+        terceirizada: transportadorasDoResumo.TERCEIRIZADA || 0,
+      };
+    }
+
     for (const pedido of pedidosEmbarcadosAjustados.pedidos) {
       const transportadora = normalizeTransportadora(pedido.transportadoraNome);
       if (transportadora === 'ACCERT') totais.accert += 1;
@@ -238,7 +250,7 @@ export default function ResumoPedidosPage() {
     }
 
     return totais;
-  }, [pedidosEmbarcadosAjustados]);
+  }, [dashboardEtapas?.resumo?.transportadoras, pedidosEmbarcadosAjustados]);
 
   const pendencias = getIndicador(dashboardAlertas, 'PENDENCIAS');
   const itensPendentes = useMemo(
@@ -298,6 +310,7 @@ export default function ResumoPedidosPage() {
     const templateBytes = await templateResponse.arrayBuffer();
     const template = await PDFDocument.load(templateBytes);
     const documento = await PDFDocument.create();
+    documento.setTitle('Resumo de Pedidos');
     const fonte = await documento.embedFont(StandardFonts.Helvetica);
     const fonteNegrito = await documento.embedFont(StandardFonts.HelveticaBold);
     const margem = 46;
