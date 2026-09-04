@@ -553,6 +553,9 @@ const ListarControlesContent: React.FC = () => {
   };
 
   const gerarPdf = async (controle: ControleComNotas) => {
+    const pdfLoadingKey = `pdf_${controle.id}`;
+    setLoadingButtons((atual) => ({ ...atual, [pdfLoadingKey]: true }));
+
     try {
       const controlePdfPromise = api
         .get(`/api/controles/${controle.id}/pdf-dados`)
@@ -1373,6 +1376,8 @@ const ListarControlesContent: React.FC = () => {
     } catch (error) {
       console.error('Erro ao gerar PDF:', error);
       enqueueSnackbar('Erro ao gerar PDF', { variant: 'error' });
+    } finally {
+      setLoadingButtons((atual) => ({ ...atual, [pdfLoadingKey]: false }));
     }
   };
 
@@ -2263,10 +2268,14 @@ const ListarControlesContent: React.FC = () => {
                           onClick={() => gerarPdf(controle)}
                           color="primary"
                           size="small"
-                          disabled={loadingButtons[controle.id]}
+                          disabled={loadingButtons[controle.id] || loadingButtons[`pdf_${controle.id}`]}
                           sx={buttonStyles}
                         >
-                          <PictureAsPdfIcon fontSize="small" />
+                          {loadingButtons[`pdf_${controle.id}`] ? (
+                            <CircularProgress size={20} />
+                          ) : (
+                            <PictureAsPdfIcon fontSize="small" />
+                          )}
                         </IconButton>
                       </Tooltip>
 
@@ -2956,7 +2965,12 @@ const ListarControlesContent: React.FC = () => {
             <Button 
               variant="contained" 
               onClick={() => detalhesModal.controle && gerarPdf(detalhesModal.controle)}
-              startIcon={<PictureAsPdfIcon />}
+              disabled={Boolean(detalhesModal.controle && loadingButtons[`pdf_${detalhesModal.controle.id}`])}
+              startIcon={
+                detalhesModal.controle && loadingButtons[`pdf_${detalhesModal.controle.id}`]
+                  ? <CircularProgress size={18} color="inherit" />
+                  : <PictureAsPdfIcon />
+              }
               sx={{
                 borderRadius: '8px',
                 textTransform: 'none',
