@@ -48,6 +48,7 @@ type DashboardLogisticaData = {
   indicadores: DashboardStatusItem[];
   resumo?: {
     pedidosRetirados?: number;
+    totalEmbarcados?: number;
   };
   error?: string;
   warning?: string;
@@ -213,10 +214,10 @@ export default function ResumoPedidosPage() {
   const pedidosEmbarcadosAjustados = useMemo(() => {
     const pedidos = pedidosEmbarcados?.pedidos || [];
     return {
-      total: pedidos.length,
+      total: dashboardEtapas?.resumo?.totalEmbarcados ?? pedidos.length,
       pedidos,
     };
-  }, [pedidosEmbarcados]);
+  }, [dashboardEtapas?.resumo?.totalEmbarcados, pedidosEmbarcados]);
 
   const transportadoras = useMemo(() => {
     const totais = {
@@ -312,10 +313,10 @@ export default function ResumoPedidosPage() {
       // A área do texto fica no centro do cabeçalho e precisa cobrir um pouco mais para
       // garantir que o texto desapareça mesmo com variações de renderização do template.
       paginaAtual.drawRectangle({
-        x: 110,
-        y: 86,
-        width: 380,
-        height: 36,
+        x: 0,
+        y: 78,
+        width: largura,
+        height: 48,
         color: rgb(1, 1, 1),
       });
     };
@@ -438,13 +439,6 @@ export default function ResumoPedidosPage() {
         <div className="space-y-6">
           <Card className="border-slate-200 shadow-sm">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-              <div>
-                <h2 className="text-xl font-bold text-slate-900">Resumo de Pedidos</h2>
-                <p className="text-sm text-slate-500">
-                  As etapas, alertas e pendências usam o período selecionado no filtro.
-                </p>
-              </div>
-
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_auto_auto]">
                 <label className="space-y-1 text-sm">
                   <span className="block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">

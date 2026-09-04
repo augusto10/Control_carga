@@ -74,6 +74,7 @@ type DashboardResponse = {
     totalEmbarcados: number;
     totalPendentes: number;
     totalPendencias: number;
+    pedidosRetirados?: number;
   };
   indicadores: DashboardStatusItem[];
   cached?: boolean;
@@ -962,6 +963,17 @@ export default async function handler(
       throw new Error('tipos_pedidos_indisponiveis');
     }
 
+    const pedidosRetiradosIds = new Set<number>();
+    for (const pedido of dashboardEntries) {
+      const pedidoId = getPedidoId(pedido);
+      const tipoEntrega = pedidoId
+        ? tipoEntregaPorPedido.get(pedidoId) || getTipoEntregaPrincipal(pedido, (pedido.logistica || {}) as Record<string, any>)
+        : null;
+      if (pedidoId && (['ATO', 'NDF', 'RDL', 'RLR'].includes(String(tipoEntrega || '').toUpperCase()) || hasEntregaNoAto(pedido))) {
+        pedidosRetiradosIds.add(pedidoId);
+      }
+    }
+
     const notaPorPedido = new Map<number, { numeroNota: string | null; chave: string }>();
     for (const dashboardItem of dashboardExterno.data as Record<string, any>[]) {
       const pedidoId = getPedidoId(dashboardItem);
@@ -1409,6 +1421,10 @@ export default async function handler(
 
     const totalPedidos = indicadores.reduce((acc, item) => acc + item.total, 0);
     const totalEmbarcados = indicadores.find((item) => item.codigo === 'PEDIDOS_EMBARCADOS')?.total || 0;
+    const notasLocaisUnicas = new Set(
+      notasEmControles.map((nota) => `${normalizeNumeroNota(nota.numeroNota)}:${onlyDigits(nota.codigo)}`)
+    );
+    const totalEmbarcadosComBaseLocal = Math.max(totalEmbarcados, notasLocaisUnicas.size);
     const totalPendencias = indicadores.find((item) => item.codigo === 'PENDENCIAS')?.total || 0;
 
     const payload: DashboardResponse = {
@@ -1420,9 +1436,10 @@ export default async function handler(
       },
       resumo: {
         totalPedidos,
-        totalEmbarcados,
-        totalPendentes: totalPedidos - totalEmbarcados,
+        totalEmbarcados: totalEmbarcadosComBaseLocal,
+        totalPendentes: totalPedidos - totalEmbarcadosComBaseLocal,
         totalPendencias,
+        pedidosRetirados: pedidosRetiradosIds.size,
       },
       indicadores,
     };

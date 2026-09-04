@@ -115,6 +115,10 @@ export default function ControlePedidosPainel() {
     setError('');
     try {
       const queries = getDashboardQueries();
+      queries.etapas.set('force', '1');
+      queries.etapas.set('t', String(Date.now()));
+      queries.alertas.set('force', '1');
+      queries.alertas.set('t', String(Date.now()));
       const etapasResponse = await fetch(
         `/api/dashboard/logistica-inicial?${queries.etapas.toString()}`,
         { credentials: 'include', cache: 'no-store' }
