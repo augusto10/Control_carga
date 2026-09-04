@@ -327,7 +327,7 @@ export default function ResumoPedidosPage() {
       // garantir que o texto desapareça mesmo com variações de renderização do template.
       paginaAtual.drawRectangle({
         x: 0,
-        y: 78,
+        y: 700,
         width: largura,
         height: 48,
         color: rgb(1, 1, 1),
