@@ -75,6 +75,11 @@ import ModalAssinaturaDigitalPro from './ModalAssinaturaDigitalPro';
 import ModalAssinaturaSimplesAlternativo from './ModalAssinaturaSimplesAlternativo';
 import ImageCapture from './ImageCapture';
 
+const modeloRomaneioPdfPromise = fetch('/templates/modelo-romaneio.pdf').then((response) => {
+  if (!response.ok) throw new Error('Falha ao carregar o modelo do romaneio.');
+  return response.arrayBuffer();
+});
+
 interface Controle extends Omit<PrismaControleCarga, 'notas' | 'numeroManifesto' | 'assinaturaMotorista' | 'assinaturaResponsavel' | 'dataAssinaturaMotorista' | 'dataAssinaturaResponsavel'> {
   numeroManifesto: string | null;
   assinaturaMotorista: string | null;
@@ -548,13 +553,15 @@ const ListarControlesContent: React.FC = () => {
   };
 
   const gerarPdf = async (controle: ControleComNotas) => {
-    // Importar dependências necessárias
-    const { PDFDocument, rgb, StandardFonts } = await import('pdf-lib');
     try {
-      const controlePdf = await api
+      const controlePdfPromise = api
         .get(`/api/controles/${controle.id}/pdf-dados`)
         .then((response) => response.data as ControleComNotas)
         .catch(() => controle);
+      const [controlePdf, existingBytes] = await Promise.all([
+        controlePdfPromise,
+        modeloRomaneioPdfPromise,
+      ]);
 
       // Garante que as propriedades opcionais estejam definidas
       const controleCompleto: ControleComNotas = {
@@ -715,7 +722,6 @@ const ListarControlesContent: React.FC = () => {
           return base;
         })
       );
-      const existingBytes = await fetch('/templates/modelo-romaneio.pdf').then(res => res.arrayBuffer());
       const doc = await PDFDocument.load(existingBytes);
       let page = doc.getPage(0);
       let { width, height } = page.getSize();
