@@ -1,3 +1,4 @@
+import { buscarLogisticaAtual } from '@/lib/pedido-logistica-atual';
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiExternaService } from '@/services/api-externa';
 
@@ -117,7 +118,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const logistica = await apiExternaService.buscarPedidoLogistica(id, username, password);
+    const logistica = await buscarLogisticaAtual(id, username, password);
     const pedidoBase = await apiExternaService.buscarPedidoPorId(String(id), username, password);
 
     if (!logistica && !pedidoBase) {

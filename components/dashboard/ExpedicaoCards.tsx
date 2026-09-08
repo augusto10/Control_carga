@@ -154,7 +154,7 @@ export function ExpedicaoCards({
                 <Siren className="h-6 w-6 text-white" />
               </motion.div>
               <div>
-                <h3 className="text-lg font-black uppercase leading-tight sm:text-xl">Alertas</h3>
+                <h3 className="text-lg font-black uppercase leading-tight sm:text-xl">Atrasados</h3>
                 <div className="mt-2 h-px w-32 bg-white/28" />
               </div>
             </div>
@@ -162,15 +162,15 @@ export function ExpedicaoCards({
             <div className="mt-3 space-y-1 text-[11px] font-bold sm:text-xs">
               <div className="grid grid-cols-[1fr_auto] items-center gap-3">
                 <span className="uppercase">Pedidos não separados:</span>
-                <strong className="text-lg sm:text-xl">{loadingSecondary ? '-' : alertas.naoSeparado}</strong>
+                <strong className="text-lg sm:text-xl">{loadingSecondary ? '-' : alertas.naoSeparado || ''}</strong>
               </div>
               <div className="grid grid-cols-[1fr_auto] items-center gap-3">
-                <span className="uppercase">Pedidos não conferidos:</span>
-                <strong className="text-lg sm:text-xl">{loadingSecondary ? '-' : alertas.naoConferido}</strong>
+                <span className="uppercase">Pedidos separados e não conferidos:</span>
+                <strong className="text-lg sm:text-xl">{loadingSecondary ? '-' : alertas.naoConferido || ''}</strong>
               </div>
               <div className="grid grid-cols-[1fr_auto] items-center gap-3">
                 <span className="uppercase">Pedidos não embarcados:</span>
-                <strong className="text-lg sm:text-xl">{loadingSecondary ? '-' : alertas.naoEmbarcado}</strong>
+                <strong className="text-lg sm:text-xl">{loadingSecondary ? '-' : alertas.naoEmbarcado || ''}</strong>
               </div>
             </div>
           </div>
@@ -212,7 +212,7 @@ export function ExpedicaoCards({
                 <ShieldAlert className="h-6 w-6 text-white" />
               </motion.div>
               <div>
-                <h3 className="text-lg font-black uppercase leading-tight sm:text-xl">Pendencias</h3>
+                <h3 className="text-lg font-black uppercase leading-tight sm:text-xl">Produtos não encontrados</h3>
                 <div className="mt-2 h-px w-28 bg-white/28" />
               </div>
             </div>
@@ -221,7 +221,7 @@ export function ExpedicaoCards({
               {loadingSecondary ? (
                 <div className="flex items-center gap-2 font-bold">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>Carregando pendencias...</span>
+                  <span>Carregando produtos não encontrados...</span>
                 </div>
               ) : pendencias.previewItems.length > 0 ? (
                 pendencias.previewItems.map((item) => (
@@ -229,12 +229,12 @@ export function ExpedicaoCards({
                     <strong className="text-xs sm:text-sm">{item}</strong>
                   </div>
                 ))
-              ) : (
+              ) : hasPendencias ? (
                 <div className="grid grid-cols-[1fr_auto] items-center gap-2 font-bold leading-tight">
                   <span className="uppercase">Pedido:</span>
                   <strong className="text-sm sm:text-base">{pendencias.total}</strong>
                 </div>
-              )}
+              ) : null}
             </div>
           </div>
         </motion.button>

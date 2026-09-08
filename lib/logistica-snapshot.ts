@@ -1,3 +1,7 @@
+import { buscarEmbarquesAtuais } from '@/lib/pedido-embarques-atuais';
+import { buscarLogisticaAtual } from '@/lib/pedido-logistica-atual';
+import { dadosPedido } from '@/lib/pedido-apresentacao';
+import { saldoPendente, saldoDetalhadoPendente, itensComSaldoPendente } from '@/lib/pedido-pendencias';
 import type { Prisma } from '@prisma/client';
 import prisma from '@/lib/prisma';
 import { apiExternaService } from '@/services/api-externa';
@@ -25,6 +29,7 @@ type PeriodoSnapshot = {
 };
 
 type DashboardPedidoItem = {
+  statusOperacionalCodigo?: string;
   pedidoId: number;
   tipoEntrega: string | null;
   clienteNome: string;
@@ -84,25 +89,25 @@ const STATUS_META: Record<StatusCode, { codigo: StatusCode; titulo: string; desc
   },
   PENDENCIAS: {
     codigo: 'PENDENCIAS',
-    titulo: 'PENDENCIAS',
+    titulo: 'PRODUTOS NÃO ENCONTRADOS',
     descricao: 'Pedidos com pendencias',
     statusSeparacao: 'PENDENCIA',
   },
   ALERTAS_NAO_SEPARADOS: {
     codigo: 'ALERTAS_NAO_SEPARADOS',
-    titulo: 'ALERTAS: NAO SEPARADOS',
+    titulo: 'ATRASADOS: NAO SEPARADOS',
     descricao: 'Pedidos recebidos no prazo de alerta sem separacao concluida',
     statusSeparacao: 'ALERTA_NAO_SEPARADO',
   },
   ALERTAS_NAO_CONFERIDOS: {
     codigo: 'ALERTAS_NAO_CONFERIDOS',
-    titulo: 'ALERTAS: NAO CONFERIDOS',
+    titulo: 'ATRASADOS: NAO CONFERIDOS',
     descricao: 'Pedidos separados aguardando conferencia',
     statusSeparacao: 'ALERTA_NAO_CONFERIDO',
   },
   ALERTAS_NAO_EMBARCADOS: {
     codigo: 'ALERTAS_NAO_EMBARCADOS',
-    titulo: 'ALERTAS: NAO EMBARCADOS',
+    titulo: 'ATRASADOS: NAO EMBARCADOS',
     descricao: 'Pedidos conferidos aguardando embarque no controle',
     statusSeparacao: 'ALERTA_NAO_EMBARCADO',
   },
@@ -303,15 +308,7 @@ const agruparProdutosPendentes = (itens: Record<string, any>[]) => {
   const agrupados = new Map<string, { produtoId: number | null; codigo: string | null; nome: string; quantidade: number }>();
 
   for (const item of itens) {
-    const quantidade =
-      toNumber(item.SALDO_PENDENTE) ??
-      toNumber(item.QUANTIDADE_PENDENTE_TOTAL) ??
-      toNumber(item.EM_SEPARACAO_PENDENTE) ??
-      toNumber(item.SALDO_NA_SEPARACAO) ??
-      toNumber(item.SALDO) ??
-      toNumber(item.QUANTIDADE_EM_SEPARACAO) ??
-      toNumber(item.SALDO_GERAR_SEPARACAO) ??
-      Math.max(0, (toNumber(item.QUANTIDADE) || 0) - (toNumber(item.QUANTIDADE_BAIXADA) || 0));
+    const quantidade = saldoPendente(item);
     if (quantidade <= 0) continue;
 
     const produtoId = toNumber(item.PRODUTO_ID);
@@ -326,16 +323,8 @@ const agruparProdutosPendentes = (itens: Record<string, any>[]) => {
   return Array.from(agrupados.values()).sort((a, b) => a.nome.localeCompare(b.nome));
 };
 
-const getProdutosPendentes = (logistica: Record<string, any> | null) => {
-  const comparativo = Array.isArray(logistica?.comparativo_separacao_pendentes)
-    ? logistica.comparativo_separacao_pendentes
-    : [];
-  const entregas = Array.isArray(logistica?.itens_entregas_pendentes)
-    ? logistica.itens_entregas_pendentes
-    : [];
-
-  return agruparProdutosPendentes(comparativo.length > 0 ? comparativo : entregas);
-};
+const getProdutosPendentes = (logistica: Record<string, any> | null) =>
+  agruparProdutosPendentes(itensComSaldoPendente(logistica) || []);
 
 const isPedidoComPendencias = (pedido: Record<string, unknown>, logistica: Record<string, any> | null) => {
   const statusLogisticoCodigo = toStringValue(
@@ -387,7 +376,7 @@ const isPedidoComPendencias = (pedido: Record<string, unknown>, logistica: Recor
     ultimoStatusSeparacao === 'PENDENCIA' ||
     statusSeparacoes.includes('PENDENCIA');
 
-  return possuiSeparacaoEfetivada && possuiIndicador;
+  return possuiSeparacaoEfetivada && (saldoDetalhadoPendente(logistica) ?? possuiIndicador);
 };
 
 const isPedidoParaAlerta = (dataHoraRecebimento: Date | null) => {
@@ -479,35 +468,10 @@ const getNotaDoPedido = (nota: Record<string, unknown>) => {
   };
 };
 
-const getControleInfoPorNotasLocais = async (periodo: PeriodoSnapshot) => {
-  const whereControle =
-    periodo.dataInicio || periodo.dataFim
-      ? {
-          controle: {
-            dataCriacao: {
-              ...(periodo.dataInicio ? { gte: periodo.dataInicio } : {}),
-              ...(periodo.dataFim
-                ? {
-                    lte: new Date(
-                      periodo.dataFim.getFullYear(),
-                      periodo.dataFim.getMonth(),
-                      periodo.dataFim.getDate(),
-                      23,
-                      59,
-                      59,
-                      999
-                    ),
-                  }
-                : {}),
-            },
-          },
-        }
-      : {};
-
+const getControleInfoPorNotasLocais = async () => {
   const notas = await prisma.notaFiscal.findMany({
     where: {
       controleId: { not: null },
-      ...whereControle,
     },
     select: {
       numeroNota: true,
@@ -521,7 +485,6 @@ const getControleInfoPorNotasLocais = async (periodo: PeriodoSnapshot) => {
         },
       },
     },
-    take: 800,
     orderBy: { dataCriacao: 'desc' },
   });
 
@@ -589,7 +552,7 @@ export async function sincronizarLogisticaSnapshot(options: {
         options.password,
         timeoutMs
       ),
-      getControleInfoPorNotasLocais(periodo),
+      getControleInfoPorNotasLocais(),
       apiExternaService
         .listarNotasFiscaisCompletas({ limit: 100, offset: 0 }, options.username, options.password, 6_000)
         .catch(() => null),
@@ -696,7 +659,7 @@ export async function sincronizarLogisticaSnapshot(options: {
       const totalItensPendentes =
         produtosPendentes.length > 0
           ? produtosPendentes.reduce((acc, produto) => acc + produto.quantidade, 0)
-          : toNumber(pedido.total_itens_pendentes) || 0;
+          : possuiPendencia ? toNumber(pedido.total_itens_pendentes) || 0 : 0;
       const assinatura = buildAssinatura({
         pedidoId,
         tipoEntrega: getTipoEntregaPrincipal(pedido, logistica),
@@ -868,6 +831,24 @@ export async function montarDashboardPorSnapshot(
 
   if (!snapshots.length) return null;
 
+  const username = process.env.API_EXTERNA_USERNAME;
+  const password = process.env.API_EXTERNA_PASSWORD;
+  let pendenciasNaoVerificadas = false;
+  const [embarques] = await Promise.all([
+    buscarEmbarquesAtuais(snapshots, username, password),
+    mapWithConcurrency(snapshots.filter((snapshot) => snapshot.possuiPendencia), 2, async (snapshot) => {
+      if (!username || !password) { pendenciasNaoVerificadas = true; return; }
+      const atual = await buscarLogisticaAtual(snapshot.pedidoId, username, password);
+      if (!atual) { pendenciasNaoVerificadas = true; return; }
+      snapshot.rawLogistica = atual;
+      const statusAtual = atual.status_logistico?.codigo;
+      if (typeof statusAtual === 'string' && STATUS_ORDER.includes(statusAtual as StatusCode)) {
+        snapshot.statusCodigo = statusAtual;
+        snapshot.situacaoAtual = STATUS_META[statusAtual as StatusCode].titulo;
+      }
+    }),
+  ]);
+
   const entries: { statusCodigo: StatusCode; item: DashboardPedidoItem }[] = [];
   let totalRetirados = 0;
 
@@ -884,19 +865,26 @@ export async function montarDashboardPorSnapshot(
       : null;
     if (!statusBase) continue;
 
-    const produtosPendentes = Array.isArray(snapshot.produtosPendentes)
-      ? snapshot.produtosPendentes
-      : [];
+    const controleAtual = embarques.porPedido.get(snapshot.pedidoId);
+    const embarcadoNoControle = Boolean(controleAtual || snapshot.embarcadoNoControle);
+    const numeroManifesto = controleAtual?.numeroManifesto || snapshot.numeroManifesto;
+    const possuiPendencia = Boolean(snapshot.possuiPendencia) &&
+      (saldoDetalhadoPendente(snapshot.rawLogistica) ?? true);
+    const produtosPendentes = !possuiPendencia ? []
+      : saldoDetalhadoPendente(snapshot.rawLogistica) !== null ? getProdutosPendentes(snapshot.rawLogistica)
+      : Array.isArray(snapshot.produtosPendentes) ? snapshot.produtosPendentes : [];
     const itemBase: DashboardPedidoItem = {
+      ...dadosPedido(rawPedido, snapshot.rawLogistica),
       pedidoId: snapshot.pedidoId,
+      statusOperacionalCodigo: embarcadoNoControle ? 'PEDIDOS_EMBARCADOS' : statusBase,
       tipoEntrega: snapshot.tipoEntrega,
       clienteNome: snapshot.clienteNome || 'Cliente nao informado',
       nomeFantasia: snapshot.nomeFantasia,
       valorPedido: snapshot.valorPedido,
       dataHoraRecebimento: toIso(snapshot.dataHoraRecebimento),
       previsaoEntrega: toIso(snapshot.previsaoEntrega),
-      localNome: snapshot.embarcadoNoControle && snapshot.numeroManifesto
-        ? `Controle ${snapshot.numeroManifesto}`
+      localNome: embarcadoNoControle && numeroManifesto
+        ? `Controle ${numeroManifesto}`
         : snapshot.localNome,
       statusCodigo: statusBase,
       statusDescricao: STATUS_META[statusBase].titulo,
@@ -904,14 +892,18 @@ export async function montarDashboardPorSnapshot(
       situacaoAtual: snapshot.situacaoAtual || STATUS_META[statusBase].titulo,
       usuarioConfirmacaoNome: snapshot.usuarioConfirmacaoNome,
       dataHoraConfirmacao: toIso(snapshot.dataHoraConfirmacao),
-      dataHoraControle: toIso(snapshot.dataHoraControle),
-      transportadoraNome: snapshot.transportadoraNome,
-      possuiProdutosFaltando: Boolean(snapshot.possuiPendencia || snapshot.totalItensPendentes > 0),
-      totalItensPendentes: snapshot.totalItensPendentes || 0,
+      dataHoraControle: toIso(controleAtual?.dataHoraControle || snapshot.dataHoraControle),
+      transportadoraNome: controleAtual?.transportadoraNome || snapshot.transportadoraNome,
+      possuiProdutosFaltando: possuiPendencia,
+      totalItensPendentes: possuiPendencia
+        ? produtosPendentes.length > 0
+          ? produtosPendentes.reduce((total: number, produto: { quantidade: number }) => total + produto.quantidade, 0)
+          : snapshot.totalItensPendentes || 0
+        : 0,
       produtosPendentes,
     };
 
-    if (snapshot.embarcadoNoControle) {
+    if (embarcadoNoControle) {
       entries.push({
         statusCodigo: 'PEDIDOS_EMBARCADOS',
         item: {
@@ -926,7 +918,7 @@ export async function montarDashboardPorSnapshot(
       entries.push({ statusCodigo: statusBase, item: itemBase });
     }
 
-    if (snapshot.possuiPendencia) {
+    if (possuiPendencia) {
       entries.push({
         statusCodigo: 'PENDENCIAS',
         item: {
@@ -940,7 +932,7 @@ export async function montarDashboardPorSnapshot(
     }
 
     const alertaStatus = isPedidoParaAlerta(snapshot.dataHoraRecebimento)
-      ? deriveAlertaStatus(statusBase, Boolean(snapshot.possuiPendencia), Boolean(snapshot.embarcadoNoControle))
+      ? deriveAlertaStatus(statusBase, possuiPendencia, embarcadoNoControle)
       : null;
     if (alertaStatus) {
       entries.push({
@@ -989,6 +981,6 @@ export async function montarDashboardPorSnapshot(
     indicadores,
     cached: true,
     stale: Boolean(options.warning),
-    warning: options.warning,
+    warning: [options.warning, embarques.verificacaoIncompleta ? 'Alguns vinculos de embarque nao puderam ser atualizados.' : null, pendenciasNaoVerificadas ? 'Algumas pendencias nao puderam ser verificadas no ERP.' : null].filter(Boolean).join(' ') || undefined,
   };
 }

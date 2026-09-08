@@ -1,3 +1,8 @@
+import { resumirPedidosPorStatus } from '@/lib/pedido-resumo-status';
+import { PedidoInformacoes } from '@/components/dashboard/PedidoInformacoes';
+import { ResumoStatusPedidos } from '@/components/dashboard/ResumoStatusPedidos';
+import { saldoPendente } from '@/lib/pedido-pendencias';
+import { dadosPedido } from '@/lib/pedido-apresentacao';
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../contexts/AuthContext';
@@ -35,6 +40,12 @@ type StatusCode =
   | 'ALERTAS_NAO_EMBARCADOS';
 
 interface DashboardPedidoItem {
+  statusOperacionalCodigo?: string;
+  cidade?: string | null;
+  bairro?: string | null;
+  uf?: string | null;
+  separadorNome?: string | null;
+  conferenteNome?: string | null;
   pedidoId: number;
   tipoEntrega?: string | null;
   clienteNome: string;
@@ -223,22 +234,22 @@ const STATUS_DEFAULTS: Record<
     statusSeparacao: 'EMBARCADO NO CONTROLE',
   },
   PENDENCIAS: {
-    titulo: 'PENDÊNCIAS',
+    titulo: 'PRODUTOS NÃO ENCONTRADOS',
     descricao: 'Pedidos com pendencias, independentemente do periodo informado',
     statusSeparacao: 'PENDENCIA',
   },
   ALERTAS_NAO_SEPARADOS: {
-    titulo: 'ALERTAS: NÃO SEPARADOS',
+    titulo: 'ATRASADOS: NÃO SEPARADOS',
     descricao: 'Pedidos novos e em separação (A e S) recebidos em dias anteriores ou, no dia atual, após passar o corte de 16:00',
     statusSeparacao: 'ALERTA_NAO_SEPARADO',
   },
   ALERTAS_NAO_CONFERIDOS: {
-    titulo: 'ALERTAS: N??O CONFERIDOS',
+    titulo: 'ATRASADOS: SEPARADOS E NÃO CONFERIDOS',
     descricao: 'Pedidos separados (E) recebidos em dias anteriores ou, no dia atual, após passar o corte de 16:00',
     statusSeparacao: 'ALERTA_NAO_CONFERIDO',
   },
   ALERTAS_NAO_EMBARCADOS: {
-    titulo: 'ALERTAS: NÃO EMBARCADOS',
+    titulo: 'ATRASADOS: NÃO EMBARCADOS',
     descricao: 'Pedidos conferidos (G) recebidos em dias anteriores ou, no dia atual, após passar o corte de 16:00',
     statusSeparacao: 'ALERTA_NAO_EMBARCADO',
   },
@@ -250,8 +261,8 @@ const EMPTY_RESUMO_HOJE: ResumoHojeData = {
   pedidosHoje: 0,
   pedidosEntregaHoje: 0,
 };
-const DASHBOARD_LOCAL_CACHE_KEY = 'dashboard-logistica-cache-v8';
-const DASHBOARD_ALERTAS_LOCAL_CACHE_KEY = 'dashboard-logistica-alertas-cache-v1';
+const DASHBOARD_LOCAL_CACHE_KEY = 'dashboard-logistica-cache-v10';
+const DASHBOARD_ALERTAS_LOCAL_CACHE_KEY = 'dashboard-logistica-alertas-cache-v3';
 const DASHBOARD_AUTO_REFRESH_INTERVAL_MS = 3 * 60_000;
 const DASHBOARD_LEGACY_CACHE_KEYS = [
   'dashboard-logistica-cache-v3',
@@ -260,24 +271,6 @@ const DASHBOARD_LEGACY_CACHE_KEYS = [
   'dashboard-logistica-cache-v6',
   'dashboard-logistica-cache-v7',
 ];
-
-const formatDateLabel = (value: string | null | undefined) => {
-  if (!value) return null;
-  const date = new Date(`${value}T00:00:00`);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat('pt-BR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  }).format(date);
-};
-
-const formatCurrency = (value: number | null) =>
-  new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
-    maximumFractionDigits: 0,
-  }).format(value || 0);
 
 const formatDateTime = (value: string | null) => {
   if (!value) return '-';
@@ -291,6 +284,18 @@ const formatDateTime = (value: string | null) => {
   }).format(date);
 };
 
+
+const formatDateLabel = (value: string | null | undefined) => {
+  if (!value) return null;
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(date);
+};
+
 const formatTimeOnlyFromDateTime = (value: string | null) => {
   if (!value) return '-';
   const date = new Date(value);
@@ -298,17 +303,6 @@ const formatTimeOnlyFromDateTime = (value: string | null) => {
   return new Intl.DateTimeFormat('pt-BR', {
     hour: '2-digit',
     minute: '2-digit',
-  }).format(date);
-};
-
-const formatDateOnlyFromDateTime = (value: string | null) => {
-  if (!value) return '-';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat('pt-BR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
   }).format(date);
 };
 
@@ -327,16 +321,6 @@ const formatQuantity = (value: unknown) => {
   if (typeof value === 'number' && Number.isFinite(value)) return String(value);
   if (typeof value === 'string' && value.trim()) return value;
   return '-';
-};
-
-const parseQuantity = (value: unknown) => {
-  if (typeof value === 'number' && Number.isFinite(value)) return value;
-  if (typeof value === 'string') {
-    const normalized = value.trim().replace(/\./g, '').replace(',', '.');
-    const parsed = Number(normalized);
-    return Number.isFinite(parsed) ? parsed : 0;
-  }
-  return 0;
 };
 
 const formatDateInputValue = (date: Date) => {
@@ -650,6 +634,11 @@ function Home() {
     [dashboardAlertas]
   );
 
+  const resumoStatus = useMemo(() => [
+    ...indicadoresOrdenados.filter((item) => !item.codigo.startsWith('ALERTAS_') && item.codigo !== 'PENDENCIAS'),
+    ...indicadoresAlertasOrdenados.filter((item) => item.codigo.startsWith('ALERTAS_') || item.codigo === 'PENDENCIAS'),
+  ], [indicadoresOrdenados, indicadoresAlertasOrdenados]);
+
   const pendencias = indicadoresAlertasOrdenados.find(
     (item) => item.codigo === 'PENDENCIAS'
   );
@@ -799,9 +788,7 @@ function Home() {
 
     return pedidoItensSeparacao
       .map((item) => {
-        const saldo =
-          parseQuantity(item.SALDO) ||
-          Math.max(0, parseQuantity(item.QUANTIDADE) - parseQuantity(item.QUANTIDADE_BAIXADA));
+        const saldo = saldoPendente(item);
 
         return {
           produtoId: typeof item.PRODUTO_ID === 'number' ? item.PRODUTO_ID : null,
@@ -929,7 +916,7 @@ function Home() {
               <div className="relative flex flex-wrap items-center justify-between gap-2">
                 <div className="hidden">
                   <p className="text-sm font-semibold text-blue-100/90">
-                    Etapas principais no dia atual. Alertas e pendências consideram os últimos 30 dias.
+                    Etapas principais no dia atual. Atrasados e produtos não encontrados consideram os últimos 30 dias.
                   </p>
                   <p className="mt-1 text-xs text-blue-100/75 sm:text-sm">
                     Período filtrado pela data de recebimento no caixa: {periodoAtivo}.
@@ -1033,8 +1020,8 @@ function Home() {
               onClick: () =>
                 abrirListaPedidos({
                   codigo: 'ALERTAS_NAO_SEPARADOS',
-                  titulo: 'ALERTAS',
-                  descricao: 'Pedidos em atraso de separacao, conferencia ou embarque.',
+                  titulo: 'ATRASADOS',
+                  descricao: '',
                   statusSeparacao: 'ALERTAS',
                   total: pedidosAlertasCombinados.length,
                   pedidos: pedidosAlertasCombinados,
@@ -1047,7 +1034,7 @@ function Home() {
                 pendencias &&
                 abrirListaPedidos({
                   ...pendencias,
-                  titulo: 'Pendências',
+                  titulo: 'Produtos não encontrados',
                   descricao: 'Pedidos com itens pendentes nos últimos 30 dias.',
                 }),
             }}
@@ -1160,7 +1147,7 @@ function Home() {
               size="xs"
             />
             <StatCard
-              title="Pendências"
+              title="Produtos não encontrados"
               value={dashboard?.resumo?.totalPendencias || 0}
               icon={AlertCircle}
               color="purple"
@@ -1266,12 +1253,10 @@ function Home() {
                           >
                             <div className="space-y-1">
                               <div className="flex items-start justify-between gap-2">
-                                <p className="text-xs font-bold text-slate-900">
+                                <p className="text-lg font-bold text-slate-900">
                                   Pedido #{pedido.pedidoId}
                                 </p>
-                                <span className="shrink-0 text-[10px] font-semibold uppercase text-slate-400">
-                                  {pedido.localNome || 'Sem local'}
-                                </span>
+
                               </div>
                               <p className="truncate text-[11px] text-slate-500">
                                 {pedido.nomeFantasia || pedido.clienteNome}
@@ -1290,23 +1275,10 @@ function Home() {
                               )}
                             </div>
 
-                            <div className="mt-2 grid grid-cols-2 gap-2 text-[11px] text-slate-500">
-                              <div>
-                                <span className="block text-[10px] uppercase tracking-wide text-slate-400">
-                                  Previsao
-                                </span>
-                                <span className="font-medium text-slate-700">
-                                  {formatDateOnlyFromDateTime(pedido.previsaoEntrega)}
-                                </span>
-                              </div>
-                              <div>
-                                <span className="block text-[10px] uppercase tracking-wide text-slate-400">
-                                  Valor
-                                </span>
-                                <span className="font-medium text-slate-700">
-                                  {formatCurrency(pedido.valorPedido)}
-                                </span>
-                              </div>
+                            <p className="mt-2 text-[11px] text-slate-500">Recebimento: <strong>{formatDateTime(pedido.dataHoraRecebimento)}</strong></p>
+                            <PedidoInformacoes pedido={pedido} carregarDetalhe={fetchPedidoDetalhe} />
+                            <div className="mt-3 flex items-center justify-end gap-1 text-xs font-medium text-primary">
+                              Ver detalhes <ClipboardList className="h-3.5 w-3.5" />
                             </div>
 
                             {item.codigo === 'PENDENCIAS' && pedido.possuiProdutosFaltando && (
@@ -1428,7 +1400,7 @@ function Home() {
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <p className="text-sm font-bold text-slate-900">Pedido #{pedido.pedidoId}</p>
+                          <p className="text-xl font-bold text-slate-900">Pedido #{pedido.pedidoId}</p>
                           <p className="text-xs text-slate-500">
                             {pedido.nomeFantasia || pedido.clienteNome}
                           </p>
@@ -1467,7 +1439,7 @@ function Home() {
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <p className="text-sm font-bold text-slate-900">Pedido #{pedido.pedidoId}</p>
+                          <p className="text-xl font-bold text-slate-900">Pedido #{pedido.pedidoId}</p>
                           <p className="text-xs text-slate-500">
                             {pedido.nomeFantasia || pedido.clienteNome}
                           </p>
@@ -1506,7 +1478,7 @@ function Home() {
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <p className="text-sm font-bold text-slate-900">Pedido #{pedido.pedidoId}</p>
+                          <p className="text-xl font-bold text-slate-900">Pedido #{pedido.pedidoId}</p>
                           <p className="text-xs text-slate-500">
                             {pedido.nomeFantasia || pedido.clienteNome}
                           </p>
@@ -1567,6 +1539,7 @@ function Home() {
         isOpen={Boolean(pedidoSelecionado)}
         onClose={fecharModalPedido}
         title={pedidoSelecionado ? `Pedido #${pedidoSelecionado.pedidoId}` : 'Detalhes do pedido'}
+        titleClassName="text-2xl sm:text-3xl"
         size="xl"
       >
         {pedidoSelecionado && (
@@ -1588,15 +1561,17 @@ function Home() {
                 </p>
               </div>
               <div className="rounded-2xl bg-slate-50 p-4">
-                <p className="text-xs uppercase tracking-[0.16em] text-slate-400">Previsao</p>
+                <p className="text-xs uppercase tracking-[0.16em] text-slate-400">Data do recebimento e horário</p>
                 <p className="mt-2 text-sm font-bold text-slate-900">
-                  {formatDateOnlyFromDateTime(pedidoSelecionado.previsaoEntrega)}
+                  {formatDateTime(pedidoSelecionado.dataHoraRecebimento)}
                 </p>
               </div>
               <div className="rounded-2xl bg-slate-50 p-4">
-                <p className="text-xs uppercase tracking-[0.16em] text-slate-400">Valor</p>
+                <p className="text-xs uppercase tracking-[0.16em] text-slate-400">Cidade / Bairro / UF</p>
                 <p className="mt-2 text-sm font-bold text-slate-900">
-                  {formatCurrency(pedidoSelecionado.valorPedido)}
+                  {[dadosPedido(pedidoDetalhe?.pedido, pedidoDetalhe?.logistica).cidade || pedidoSelecionado.cidade,
+                    dadosPedido(pedidoDetalhe?.pedido, pedidoDetalhe?.logistica).bairro || pedidoSelecionado.bairro,
+                    dadosPedido(pedidoDetalhe?.pedido, pedidoDetalhe?.logistica).uf || pedidoSelecionado.uf].filter(Boolean).join(' / ') || 'Não informado'}
                 </p>
               </div>
             </div>
@@ -1660,19 +1635,18 @@ function Home() {
                             {formatDateTime(formatText(pedidoDetalhe?.pedido?.DATA_HORA_RECEBIMENTO, '') || null)}
                           </p>
                         </div>
-                        <div>
-                          <p className="text-xs uppercase tracking-wide text-slate-400">Local</p>
-                          <p className="mt-1 text-sm font-medium text-slate-700">
-                            {pedidoSelecionado.localNome || 'Sem local informado'}
-                          </p>
-                        </div>
+
                       </div>
                     </div>
 
                     <div className="rounded-2xl border border-slate-200 p-4">
                       <div className="flex items-center gap-2">
                         <PackageCheck className="h-4 w-4 text-slate-500" />
-                        <h4 className="text-sm font-bold text-slate-900">Separacoes</h4>
+                        <h4 className="text-sm font-bold text-slate-900">Separações</h4>
+                      </div>
+                      <div className="mt-4 grid gap-3 sm:grid-cols-2 text-sm">
+                        <p><span className="block text-xs text-slate-500">Nome do separador</span><strong>{dadosPedido(pedidoDetalhe?.pedido, pedidoDetalhe?.logistica).separadorNome || pedidoSelecionado.separadorNome || 'Não informado'}</strong></p>
+                        <p><span className="block text-xs text-slate-500">Nome do conferente</span><strong>{dadosPedido(pedidoDetalhe?.pedido, pedidoDetalhe?.logistica).conferenteNome || pedidoSelecionado.conferenteNome || pedidoSelecionado.usuarioConfirmacaoNome || 'Não informado'}</strong></p>
                       </div>
                       {pedidoSeparacoes.length === 0 ? (
                         <p className="mt-4 text-sm text-slate-500">Nenhuma separacao retornada pela API.</p>
@@ -1684,12 +1658,7 @@ function Home() {
                               className="rounded-xl bg-slate-50 px-4 py-3"
                             >
                               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                                <div>
-                                  <p className="text-[11px] uppercase tracking-wide text-slate-400">Local</p>
-                                  <p className="mt-1 text-sm font-medium text-slate-700">
-                                    {formatText(separacao.LOCAL_NOME)}
-                                  </p>
-                                </div>
+
                                 <div>
                                   <p className="text-[11px] uppercase tracking-wide text-slate-400">Status</p>
                                   <p className="mt-1 text-sm font-medium text-slate-700">
@@ -1700,7 +1669,7 @@ function Home() {
                                   <p className="text-[11px] uppercase tracking-wide text-slate-400">Separador</p>
                                   <p className="mt-1 text-sm font-medium text-slate-700">
                                     {formatText(
-                                      separacao.USUARIO_NOME,
+                                      separacao.FUNCIONARIO_SEPARACAO_NOME || separacao.USUARIO_NOME,
                                       formatText(separacao.USUARIO_SEPARACAO_NOME)
                                     )}
                                   </p>
@@ -1896,12 +1865,15 @@ function Home() {
         >
           {listaPedidos && (
             <div className="space-y-4">
-              <p className="text-sm text-slate-500">{listaPedidos.descricao}</p>
+              <ResumoStatusPedidos itens={resumirPedidosPorStatus(listaPedidos.pedidos)} />
+              {listaPedidos.descricao && <p className="text-sm text-slate-500">{listaPedidos.descricao}</p>}
 
+              {listaPedidos.pedidos.length > 0 && (
               <p className="text-sm font-semibold text-slate-700">
                 {listaPedidos.pedidos.length}{' '}
                 {listaPedidos.pedidos.length === 1 ? 'pedido encontrado' : 'pedidos encontrados'}
               </p>
+              )}
 
               {listaPedidos.pedidos.length === 0 ? (
                 <div className="rounded-xl bg-slate-50 px-4 py-6 text-center text-sm text-slate-400">
@@ -1909,7 +1881,15 @@ function Home() {
                 </div>
               ) : (
                 <div className="divide-y divide-slate-200 overflow-hidden rounded-xl border border-slate-200 bg-white">
-                  {listaPedidos.pedidos.map((pedido) => {
+                  {(listaPedidos.titulo === 'ATRASADOS' ? [
+                    { titulo: 'PEDIDOS NÃO SEPARADOS', pedidos: listaPedidos.pedidos.filter((pedido) => pedido.statusCodigo === 'ALERTAS_NAO_SEPARADOS') },
+                    { titulo: 'PEDIDOS SEPARADOS E NÃO CONFERIDOS', pedidos: listaPedidos.pedidos.filter((pedido) => pedido.statusCodigo === 'ALERTAS_NAO_CONFERIDOS') },
+                    { titulo: 'PEDIDOS NÃO EMBARCADOS', pedidos: listaPedidos.pedidos.filter((pedido) => pedido.statusCodigo === 'ALERTAS_NAO_EMBARCADOS') },
+                  ] : [{ titulo: '', pedidos: listaPedidos.pedidos }]).map((grupo) => (
+                    <div key={grupo.titulo}>
+                      {grupo.titulo && <h4 className="bg-slate-100 px-4 py-3 text-sm font-bold text-slate-800">{grupo.pedidos.length > 0 ? `${grupo.pedidos.length} ` : ''}{grupo.titulo}</h4>}
+                      {grupo.titulo && grupo.pedidos.length === 0 && <p className="px-4 py-3 text-sm text-slate-500">Nenhum pedido nesta etapa.</p>}
+                      {grupo.pedidos.map((pedido) => {
                     const ehAlerta = pedido.statusCodigo.startsWith('ALERTAS_');
                     const ehPendencia = pedido.statusCodigo === 'PENDENCIAS' || pedido.possuiProdutosFaltando;
 
@@ -1923,7 +1903,7 @@ function Home() {
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                           <div className="min-w-0">
                             <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                              <p className="text-sm font-bold text-slate-900">Pedido #{pedido.pedidoId}</p>
+                              <p className="text-xl font-bold text-slate-900">Pedido #{pedido.pedidoId}</p>
                               <span className="text-xs font-semibold text-slate-600">
                                 Recebimento: {formatDateTime(pedido.dataHoraRecebimento)}
                               </span>
@@ -1954,29 +1934,10 @@ function Home() {
                               </div>
                             )}
                           </div>
-                          <span className="shrink-0 text-xs font-semibold text-slate-500">
-                            {pedido.localNome || 'Sem local'}
-                          </span>
+
                         </div>
 
-                        <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-500">
-                          <div>
-                            <span className="block text-[11px] uppercase tracking-wide text-slate-400">
-                              Previsão
-                            </span>
-                            <span className="font-medium text-slate-700">
-                              {formatDateOnlyFromDateTime(pedido.previsaoEntrega)}
-                            </span>
-                          </div>
-                          <div>
-                            <span className="block text-[11px] uppercase tracking-wide text-slate-400">
-                              Valor
-                            </span>
-                            <span className="font-medium text-slate-700">
-                              {formatCurrency(pedido.valorPedido)}
-                            </span>
-                          </div>
-                        </div>
+                        <PedidoInformacoes pedido={pedido} carregarDetalhe={fetchPedidoDetalhe} />
 
                         {ehPendencia && pedido.produtosPendentes.length > 0 && (
                           <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">
@@ -1999,13 +1960,15 @@ function Home() {
                           </div>
                         )}
 
-                        <div className="mt-3 flex items-center gap-1 text-xs font-medium text-primary">
+                        <div className="mt-3 flex items-center justify-end gap-1 text-xs font-medium text-primary">
                           Ver detalhes
                           <ClipboardList className="h-3.5 w-3.5" />
                         </div>
                       </button>
                     );
                   })}
+                    </div>
+                  ))}
                 </div>
               )}
             </div>

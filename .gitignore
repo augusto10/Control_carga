@@ -28,6 +28,8 @@ test-*.js
 test-*.ts
 *test*.js
 *test*.ts
+!tests/pedido-pendencias.test.ts
+!tests/pedido-cards.test.ts
 create-test-*.js
 scripts/teste-*.ts
 scripts/test-*.js
