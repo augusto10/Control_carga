@@ -2,7 +2,12 @@ import { useEffect, useRef, useState } from 'react';
 import { dadosPedido } from '@/lib/pedido-apresentacao';
 
 type Informacoes = ReturnType<typeof dadosPedido>;
-type Pedido = Partial<Informacoes> & { pedidoId: number; usuarioConfirmacaoNome?: string | null };
+type Pedido = Partial<Informacoes> & {
+  pedidoId: number;
+  usuarioConfirmacaoNome?: string | null;
+  statusCodigo?: string;
+  statusOperacionalCodigo?: string;
+};
 type Detalhe = Parameters<typeof dadosPedido>;
 type CarregarDetalhe = (id: number) => Promise<{ pedido: NonNullable<Detalhe[0]>; logistica: Detalhe[1] }>;
 
@@ -60,12 +65,14 @@ export function PedidoInformacoes({ pedido, carregarDetalhe }: { pedido: Pedido;
 
   const ausente = situacao === 'carregando' ? 'Carregando...' : situacao === 'erro' ? 'Indisponível' : 'Não informado';
   const valor = (campo: keyof Informacoes) => informacoes?.[campo] || pedido[campo] || (campo === 'conferenteNome' ? pedido.usuarioConfirmacaoNome : null) || ausente;
+  const emSeparacao = pedido.statusCodigo === 'PEDIDO_EM_SEPARACAO' ||
+    pedido.statusOperacionalCodigo === 'PEDIDO_EM_SEPARACAO';
 
   return (
     <div ref={elemento} className="mt-2 grid gap-1 text-xs text-slate-600">
       <p>Cidade / UF: <strong>{valor('cidade')} / {valor('uf')}</strong></p>
       <p>Bairro: <strong>{valor('bairro')}</strong></p>
-      <p>Separador: <strong>{valor('separadorNome')}</strong></p>
+      {!emSeparacao && <p>Separador: <strong>{valor('separadorNome')}</strong></p>}
       <p>Conferente: <strong>{valor('conferenteNome')}</strong></p>
     </div>
   );

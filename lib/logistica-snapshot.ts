@@ -65,13 +65,13 @@ const STATUS_META: Record<StatusCode, { codigo: StatusCode; titulo: string; desc
   },
   PEDIDO_EM_SEPARACAO: {
     codigo: 'PEDIDO_EM_SEPARACAO',
-    titulo: 'PEDIDOS EM SEPARACAO',
+    titulo: 'PEDIDOS EM SEPARAÇÃO',
     descricao: 'Status da separacao de pendencias: EM SEPARACAO',
     statusSeparacao: 'EM SEPARACAO',
   },
   PEDIDO_SEPARADO: {
     codigo: 'PEDIDO_SEPARADO',
-    titulo: 'PEDIDOS SEPARADOS AGUARDANDO CONFERENCIA',
+    titulo: 'PEDIDOS SEPARADOS AGUARDANDO CONFERÊNCIA',
     descricao: 'Pedidos com status E aguardando conferencia',
     statusSeparacao: 'SEPARADO',
   },
@@ -89,25 +89,25 @@ const STATUS_META: Record<StatusCode, { codigo: StatusCode; titulo: string; desc
   },
   PENDENCIAS: {
     codigo: 'PENDENCIAS',
-    titulo: 'PRODUTOS NÃO ENCONTRADOS',
+    titulo: 'PEDIDOS COM PRODUTOS NÃO ENCONTRADOS',
     descricao: 'Pedidos com pendencias',
     statusSeparacao: 'PENDENCIA',
   },
   ALERTAS_NAO_SEPARADOS: {
     codigo: 'ALERTAS_NAO_SEPARADOS',
-    titulo: 'ATRASADOS: NAO SEPARADOS',
+    titulo: 'PEDIDOS ATRASADOS: NÃO SEPARADOS',
     descricao: 'Pedidos recebidos no prazo de alerta sem separacao concluida',
     statusSeparacao: 'ALERTA_NAO_SEPARADO',
   },
   ALERTAS_NAO_CONFERIDOS: {
     codigo: 'ALERTAS_NAO_CONFERIDOS',
-    titulo: 'ATRASADOS: NAO CONFERIDOS',
+    titulo: 'PEDIDOS ATRASADOS: NÃO CONFERIDOS',
     descricao: 'Pedidos separados aguardando conferencia',
     statusSeparacao: 'ALERTA_NAO_CONFERIDO',
   },
   ALERTAS_NAO_EMBARCADOS: {
     codigo: 'ALERTAS_NAO_EMBARCADOS',
-    titulo: 'ATRASADOS: NAO EMBARCADOS',
+    titulo: 'PEDIDOS ATRASADOS: CONFERIDOS E NÃO EMBARCADOS',
     descricao: 'Pedidos conferidos aguardando embarque no controle',
     statusSeparacao: 'ALERTA_NAO_EMBARCADO',
   },
@@ -562,7 +562,7 @@ export async function sincronizarLogisticaSnapshot(options: {
     // rejeita filtros de data na API atual e nao deve bloquear o cron.
     const pedidosComTipo: Record<string, unknown>[] = [];
 
-    const entradas = [
+    const entradas: Record<string, unknown>[] = [
       ...((dashboardExterno?.data || []) as Record<string, unknown>[]).map((item) => ({
         ...item,
         __origemDashboardLogistica: true,
@@ -836,7 +836,10 @@ export async function montarDashboardPorSnapshot(
   let pendenciasNaoVerificadas = false;
   const [embarques] = await Promise.all([
     buscarEmbarquesAtuais(snapshots, username, password),
-    mapWithConcurrency(snapshots.filter((snapshot) => snapshot.possuiPendencia), 2, async (snapshot) => {
+    mapWithConcurrency(snapshots.filter((snapshot) =>
+      snapshot.possuiPendencia ||
+      (snapshot.rawPedido as Record<string, unknown> | null)?.possui_produtos_faltando === true
+    ), 2, async (snapshot) => {
       if (!username || !password) { pendenciasNaoVerificadas = true; return; }
       const atual = await buscarLogisticaAtual(snapshot.pedidoId, username, password);
       if (!atual) { pendenciasNaoVerificadas = true; return; }
@@ -868,8 +871,11 @@ export async function montarDashboardPorSnapshot(
     const controleAtual = embarques.porPedido.get(snapshot.pedidoId);
     const embarcadoNoControle = Boolean(controleAtual || snapshot.embarcadoNoControle);
     const numeroManifesto = controleAtual?.numeroManifesto || snapshot.numeroManifesto;
-    const possuiPendencia = Boolean(snapshot.possuiPendencia) &&
-      (saldoDetalhadoPendente(snapshot.rawLogistica) ?? true);
+    const saldoAtual = saldoDetalhadoPendente(snapshot.rawLogistica);
+    const resumoIndicaPendencia =
+      (rawPedido.possui_produtos_faltando === true || rawPedido.POSSUI_PRODUTO_FALTANDO === true) &&
+      ['G', 'PENDENCIA'].includes(String(rawPedido.ultimo_status_separacao || '').toUpperCase());
+    const possuiPendencia = saldoAtual ?? (Boolean(snapshot.possuiPendencia) || resumoIndicaPendencia);
     const produtosPendentes = !possuiPendencia ? []
       : saldoDetalhadoPendente(snapshot.rawLogistica) !== null ? getProdutosPendentes(snapshot.rawLogistica)
       : Array.isArray(snapshot.produtosPendentes) ? snapshot.produtosPendentes : [];

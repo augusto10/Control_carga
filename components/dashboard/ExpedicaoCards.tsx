@@ -24,7 +24,16 @@ interface AlertSummary {
 
 interface PendenciasSummary {
   total: number;
-  previewItems: string[];
+  pedidos: Array<{
+    pedidoId: number;
+    totalItensPendentes: number;
+    produtosPendentes?: Array<{
+      produtoId?: number | null;
+      codigo?: string | null;
+      nome: string;
+      quantidade: number;
+    }>;
+  }>;
   onClick: () => void;
 }
 
@@ -35,16 +44,30 @@ interface ExpedicaoCardsProps {
   loadingStages?: boolean;
   loadingSecondary?: boolean;
   wideLayout?: boolean;
+  atualizadoEtapasEm?: string | null;
+  atualizadoAlertasEm?: string | null;
 }
+
+const formatAtualizacao = (value?: string | null) => {
+  if (!value) return 'aguardando atualização';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat('pt-BR', {
+    day: '2-digit', month: '2-digit', year: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  }).format(date);
+};
 
 const StageCard = ({
   item,
   index,
   loading,
+  atualizadoEm,
 }: {
   item: StageCardItem;
   index: number;
   loading: boolean;
+  atualizadoEm?: string | null;
 }) => {
   const Icon = item.icon;
 
@@ -90,6 +113,10 @@ const StageCard = ({
             </p>
           )}
         </div>
+
+        <p className="text-[10px] font-semibold text-white/75">
+          Atualizado em {formatAtualizacao(atualizadoEm)}
+        </p>
       </div>
     </motion.button>
   );
@@ -102,6 +129,8 @@ export function ExpedicaoCards({
   loadingStages = false,
   loadingSecondary = false,
   wideLayout = false,
+  atualizadoEtapasEm,
+  atualizadoAlertasEm,
 }: ExpedicaoCardsProps) {
   const hasAlertas = alertas.total > 0;
   const hasPendencias = pendencias.total > 0;
@@ -113,7 +142,7 @@ export function ExpedicaoCards({
         wideLayout ? 'grid-cols-5' : 'md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5'
       )}>
         {stageCards.map((item, index) => (
-          <StageCard key={item.key} item={item} index={index} loading={loadingStages} />
+          <StageCard key={item.key} item={item} index={index} loading={loadingStages} atualizadoEm={atualizadoEtapasEm} />
         ))}
       </div>
 
@@ -154,7 +183,7 @@ export function ExpedicaoCards({
                 <Siren className="h-6 w-6 text-white" />
               </motion.div>
               <div>
-                <h3 className="text-lg font-black uppercase leading-tight sm:text-xl">Atrasados</h3>
+                <h3 className="text-lg font-black uppercase leading-tight sm:text-xl">PEDIDOS ATRASADOS</h3>
                 <div className="mt-2 h-px w-32 bg-white/28" />
               </div>
             </div>
@@ -169,10 +198,13 @@ export function ExpedicaoCards({
                 <strong className="text-lg sm:text-xl">{loadingSecondary ? '-' : alertas.naoConferido || ''}</strong>
               </div>
               <div className="grid grid-cols-[1fr_auto] items-center gap-3">
-                <span className="uppercase">Pedidos não embarcados:</span>
+                <span className="uppercase">Pedidos conferidos e não embarcados:</span>
                 <strong className="text-lg sm:text-xl">{loadingSecondary ? '-' : alertas.naoEmbarcado || ''}</strong>
               </div>
             </div>
+            <p className="mt-auto pt-2 text-[10px] font-semibold text-white/75">
+              Atualizado em {formatAtualizacao(atualizadoAlertasEm)}
+            </p>
           </div>
         </motion.button>
 
@@ -212,7 +244,7 @@ export function ExpedicaoCards({
                 <ShieldAlert className="h-6 w-6 text-white" />
               </motion.div>
               <div>
-                <h3 className="text-lg font-black uppercase leading-tight sm:text-xl">Produtos não encontrados</h3>
+                <h3 className="text-lg font-black uppercase leading-tight sm:text-xl">PEDIDOS COM PRODUTOS NÃO ENCONTRADOS</h3>
                 <div className="mt-2 h-px w-28 bg-white/28" />
               </div>
             </div>
@@ -223,10 +255,23 @@ export function ExpedicaoCards({
                   <Loader2 className="h-4 w-4 animate-spin" />
                   <span>Carregando produtos não encontrados...</span>
                 </div>
-              ) : pendencias.previewItems.length > 0 ? (
-                pendencias.previewItems.map((item) => (
-                  <div key={item} className="grid grid-cols-1 items-center gap-2 font-bold leading-tight">
-                    <strong className="text-xs sm:text-sm">{item}</strong>
+              ) : pendencias.pedidos.length > 0 ? (
+                pendencias.pedidos.slice(0, 6).map((pedido) => (
+                  <div key={pedido.pedidoId} className="rounded-lg border border-white/20 bg-black/10 px-2.5 py-2">
+                    <strong className="text-xs uppercase sm:text-sm">Pedido #{pedido.pedidoId}</strong>
+                    <div className="mt-1 space-y-0.5 font-semibold">
+                      {pedido.produtosPendentes?.length ? pedido.produtosPendentes.map((produto) => (
+                        <div key={`${pedido.pedidoId}-${produto.produtoId ?? produto.codigo ?? produto.nome}`} className="grid grid-cols-[1fr_auto] gap-2">
+                          <span className="truncate">{produto.codigo ? `${produto.codigo} - ` : ''}{produto.nome}</span>
+                          <strong>Qtd. {produto.quantidade}</strong>
+                        </div>
+                      )) : (
+                        <div className="grid grid-cols-[1fr_auto] gap-2">
+                          <span>Itens pendentes</span>
+                          <strong>{pedido.totalItensPendentes}</strong>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ))
               ) : hasPendencias ? (
@@ -236,6 +281,9 @@ export function ExpedicaoCards({
                 </div>
               ) : null}
             </div>
+            <p className="mt-auto pt-2 text-[10px] font-semibold text-white/75">
+              Atualizado em {formatAtualizacao(atualizadoAlertasEm)}
+            </p>
           </div>
         </motion.button>
       </div>

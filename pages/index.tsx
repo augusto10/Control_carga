@@ -1,7 +1,7 @@
 import { resumirPedidosPorStatus } from '@/lib/pedido-resumo-status';
 import { PedidoInformacoes } from '@/components/dashboard/PedidoInformacoes';
 import { ResumoStatusPedidos } from '@/components/dashboard/ResumoStatusPedidos';
-import { saldoPendente } from '@/lib/pedido-pendencias';
+import { saldoPendente, itensComSaldoPendente } from '@/lib/pedido-pendencias';
 import { dadosPedido } from '@/lib/pedido-apresentacao';
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useRouter } from 'next/router';
@@ -234,22 +234,22 @@ const STATUS_DEFAULTS: Record<
     statusSeparacao: 'EMBARCADO NO CONTROLE',
   },
   PENDENCIAS: {
-    titulo: 'PRODUTOS NÃO ENCONTRADOS',
+    titulo: 'PEDIDOS COM PRODUTOS NÃO ENCONTRADOS',
     descricao: 'Pedidos com pendencias, independentemente do periodo informado',
     statusSeparacao: 'PENDENCIA',
   },
   ALERTAS_NAO_SEPARADOS: {
-    titulo: 'ATRASADOS: NÃO SEPARADOS',
+    titulo: 'PEDIDOS ATRASADOS: NÃO SEPARADOS',
     descricao: 'Pedidos novos e em separação (A e S) recebidos em dias anteriores ou, no dia atual, após passar o corte de 16:00',
     statusSeparacao: 'ALERTA_NAO_SEPARADO',
   },
   ALERTAS_NAO_CONFERIDOS: {
-    titulo: 'ATRASADOS: SEPARADOS E NÃO CONFERIDOS',
+    titulo: 'PEDIDOS ATRASADOS: SEPARADOS E NÃO CONFERIDOS',
     descricao: 'Pedidos separados (E) recebidos em dias anteriores ou, no dia atual, após passar o corte de 16:00',
     statusSeparacao: 'ALERTA_NAO_CONFERIDO',
   },
   ALERTAS_NAO_EMBARCADOS: {
-    titulo: 'ATRASADOS: NÃO EMBARCADOS',
+    titulo: 'PEDIDOS ATRASADOS: CONFERIDOS E NÃO EMBARCADOS',
     descricao: 'Pedidos conferidos (G) recebidos em dias anteriores ou, no dia atual, após passar o corte de 16:00',
     statusSeparacao: 'ALERTA_NAO_EMBARCADO',
   },
@@ -372,7 +372,7 @@ const isDashboardFallbackVazio = (dashboard: DashboardLogisticaData) =>
   Boolean(dashboard.warning) && (dashboard.resumo?.totalPedidos || 0) === 0;
 
 const isTransientDashboardError = (message: string | null) =>
-  Boolean(message) && (
+  message !== null && (
     message.includes('API externa indisponivel') ||
     message.includes('Nao foi possivel carregar o painel logistico agora') ||
     message.includes('Nao foi possivel carregar alertas e pendencias agora') ||
@@ -739,6 +739,70 @@ function Home() {
     return request;
   }, []);
 
+  useEffect(() => {
+    const pedidosSemProdutos = (pendencias?.pedidos || []).filter(
+      (pedido) => pedido.produtosPendentes.length === 0
+    );
+    if (pedidosSemProdutos.length === 0) return;
+
+    let ativo = true;
+    void Promise.all(pedidosSemProdutos.map(async (pedido) => {
+      try {
+        const detalhe = await fetchPedidoDetalhe(pedido.pedidoId);
+        const itens = itensComSaldoPendente(detalhe.logistica);
+        if (itens === null) return null;
+
+        const produtos = new Map<string, DashboardPedidoItem['produtosPendentes'][number]>();
+        itens.forEach((item) => {
+          const quantidade = saldoPendente(item);
+          if (quantidade <= 0) return;
+          const produtoId = Number(item.PRODUTO_ID ?? item.produto_id);
+          const codigo = formatText(item.CODIGO_ORIGINAL, formatText(item.CODIGO_BARRAS, '')) || null;
+          const nome = formatText(item.PRODUTO_NOME, 'Produto não informado');
+          const chave = String(Number.isFinite(produtoId) ? produtoId : codigo || nome);
+          const existente = produtos.get(chave);
+          if (existente) existente.quantidade += quantidade;
+          else produtos.set(chave, {
+            produtoId: Number.isFinite(produtoId) ? produtoId : null,
+            codigo,
+            nome,
+            quantidade,
+          });
+        });
+        return { pedidoId: pedido.pedidoId, produtos: Array.from(produtos.values()) };
+      } catch {
+        return null;
+      }
+    })).then((confirmacoes) => {
+      if (!ativo || confirmacoes.every((item) => item === null)) return;
+      const porPedido = new Map(confirmacoes.filter(Boolean).map((item) => [item!.pedidoId, item!.produtos]));
+      setDashboardAlertas((atual) => {
+        if (!atual) return atual;
+        return {
+          ...atual,
+          generatedAt: new Date().toISOString(),
+          indicadores: atual.indicadores.map((indicador) => {
+            if (indicador.codigo !== 'PENDENCIAS') return indicador;
+            const pedidosConfirmados = indicador.pedidos
+              .filter((pedido) => !porPedido.has(pedido.pedidoId) || porPedido.get(pedido.pedidoId)!.length > 0)
+              .map((pedido) => {
+                const produtos = porPedido.get(pedido.pedidoId);
+                return produtos ? {
+                  ...pedido,
+                  possuiProdutosFaltando: true,
+                  produtosPendentes: produtos,
+                  totalItensPendentes: produtos.reduce((total, produto) => total + produto.quantidade, 0),
+                } : pedido;
+              });
+            return { ...indicador, pedidos: pedidosConfirmados, total: pedidosConfirmados.length };
+          }),
+        };
+      });
+    });
+
+    return () => { ativo = false; };
+  }, [fetchPedidoDetalhe, pendencias]);
+
   const abrirDetalhePedido = useCallback(async (pedido: DashboardPedidoItem) => {
     pedidoSelecionadoRef.current = pedido.pedidoId;
     setPedidoSelecionado(pedido);
@@ -784,9 +848,10 @@ function Home() {
   );
   const itensPendentesModal = useMemo(() => {
     if (!pedidoSelecionado?.possuiProdutosFaltando) return [];
-    if (pedidoSelecionado.produtosPendentes.length > 0) return pedidoSelecionado.produtosPendentes;
+    const itensDetalhados = itensComSaldoPendente(pedidoDetalhe?.logistica || null);
+    if (itensDetalhados === null) return pedidoSelecionado.produtosPendentes;
 
-    return pedidoItensSeparacao
+    return itensDetalhados
       .map((item) => {
         const saldo = saldoPendente(item);
 
@@ -798,7 +863,7 @@ function Home() {
         };
       })
       .filter((produto) => produto.quantidade > 0);
-  }, [pedidoItensSeparacao, pedidoSelecionado]);
+  }, [pedidoDetalhe, pedidoSelecionado]);
   const pedidoEntregas = Array.isArray(pedidoDetalhe?.logistica?.entregas)
     ? pedidoDetalhe.logistica?.entregas || []
     : [];
@@ -830,8 +895,8 @@ function Home() {
     {
       id: 'PEDIDO_EM_SEPARACAO_CARD',
       codigo: 'PEDIDO_EM_SEPARACAO' as StatusCode,
-      titulo: 'PEDIDOS EM SEPARACAO',
-      descricao: 'Pedidos em andamento no processo de separacao.',
+      titulo: 'PEDIDOS EM SEPARAÇÃO',
+      descricao: 'Pedidos em andamento no processo de separação.',
       color: 'from-[#ffcf35] via-[#ffbf18] to-[#f4a300]',
       icon: ClipboardList,
       iconClassName: 'text-[#f2a900]',
@@ -839,8 +904,8 @@ function Home() {
     {
       id: 'PEDIDO_SEPARADO_CARD',
       codigo: 'PEDIDO_SEPARADO' as StatusCode,
-      titulo: 'PEDIDOS SEPARADOS AGUARDANDO CONFERENCIA',
-      descricao: 'Pedidos separados e aguardando conferencia.',
+      titulo: 'PEDIDOS SEPARADOS AGUARDANDO CONFERÊNCIA',
+      descricao: 'Pedidos separados e aguardando conferência.',
       color: 'from-[#67c857] via-[#47b44b] to-[#2d9640]',
       icon: PackageCheck,
       iconClassName: 'text-[#39a64a]',
@@ -876,21 +941,9 @@ function Home() {
     () => [...alertasNaoSeparados, ...alertasNaoConferidos, ...alertasNaoEmbarcados],
     [alertasNaoConferidos, alertasNaoEmbarcados, alertasNaoSeparados]
   );
-  const previewPendencias = useMemo(
-    () =>
-      (pendencias?.pedidos || [])
-        .flatMap((pedido) => {
-          if (pedido.produtosPendentes?.length) {
-            return pedido.produtosPendentes.slice(0, 2).map(
-              (produto) => `Pedido ${pedido.pedidoId}: ${produto.nome} (${produto.quantidade})`
-            );
-          }
-
-          return [`Pedido ${pedido.pedidoId}: ${pedido.totalItensPendentes} item(ns)`];
-        })
-        .slice(0, 6),
-    [pendencias]
-  );
+  const dataHojeLabel = useMemo(() => new Intl.DateTimeFormat('pt-BR', {
+    day: '2-digit', month: '2-digit', year: '2-digit',
+  }).format(new Date()), []);
 
   if (isLoading) {
     return (
@@ -904,8 +957,8 @@ function Home() {
 
   return (
     <AppLayout
-      title="CONTROLE DE PEDIDOS"
-      subtitle="CONTROLE DE PEDIDOS"
+      title={`CONTROLE DE PEDIDOS - ${dataHojeLabel}`}
+      subtitle={`CONTROLE DE PEDIDOS - ${dataHojeLabel}`}
       showHeader={false}
     >
       <div className="space-y-6 max-w-[1600px] mx-auto">
@@ -923,7 +976,7 @@ function Home() {
                   </p>
                 </div>
                 <h1 className="text-base font-black tracking-[0.08em] text-white sm:text-lg">
-                  CONTROLE DE PEDIDOS
+                  CONTROLE DE PEDIDOS - {dataHojeLabel}
                 </h1>
 
                 <div className="flex items-center gap-3 [&>label]:hidden [&>button:nth-of-type(1)]:hidden [&>button:nth-of-type(2)]:hidden">
@@ -996,6 +1049,8 @@ function Home() {
           </Card>
 
           <ExpedicaoCards
+            atualizadoEtapasEm={dashboard?.generatedAt}
+            atualizadoAlertasEm={dashboardAlertas?.generatedAt}
             loadingStages={loadingDashboard && !dashboard}
             loadingSecondary={!dashboardAlertas}
             stageCards={cardsHome.map((card) => {
@@ -1020,7 +1075,7 @@ function Home() {
               onClick: () =>
                 abrirListaPedidos({
                   codigo: 'ALERTAS_NAO_SEPARADOS',
-                  titulo: 'ATRASADOS',
+                  titulo: 'PEDIDOS ATRASADOS',
                   descricao: '',
                   statusSeparacao: 'ALERTAS',
                   total: pedidosAlertasCombinados.length,
@@ -1029,12 +1084,12 @@ function Home() {
             }}
             pendencias={{
               total: pendencias?.total || 0,
-              previewItems: previewPendencias,
+              pedidos: pendencias?.pedidos || [],
               onClick: () =>
                 pendencias &&
                 abrirListaPedidos({
                   ...pendencias,
-                  titulo: 'Produtos não encontrados',
+                  titulo: 'PEDIDOS COM PRODUTOS NÃO ENCONTRADOS',
                   descricao: 'Pedidos com itens pendentes nos últimos 30 dias.',
                 }),
             }}
@@ -1881,10 +1936,10 @@ function Home() {
                 </div>
               ) : (
                 <div className="divide-y divide-slate-200 overflow-hidden rounded-xl border border-slate-200 bg-white">
-                  {(listaPedidos.titulo === 'ATRASADOS' ? [
+                  {(listaPedidos.titulo === 'PEDIDOS ATRASADOS' ? [
                     { titulo: 'PEDIDOS NÃO SEPARADOS', pedidos: listaPedidos.pedidos.filter((pedido) => pedido.statusCodigo === 'ALERTAS_NAO_SEPARADOS') },
                     { titulo: 'PEDIDOS SEPARADOS E NÃO CONFERIDOS', pedidos: listaPedidos.pedidos.filter((pedido) => pedido.statusCodigo === 'ALERTAS_NAO_CONFERIDOS') },
-                    { titulo: 'PEDIDOS NÃO EMBARCADOS', pedidos: listaPedidos.pedidos.filter((pedido) => pedido.statusCodigo === 'ALERTAS_NAO_EMBARCADOS') },
+                    { titulo: 'PEDIDOS CONFERIDOS E NÃO EMBARCADOS', pedidos: listaPedidos.pedidos.filter((pedido) => pedido.statusCodigo === 'ALERTAS_NAO_EMBARCADOS') },
                   ] : [{ titulo: '', pedidos: listaPedidos.pedidos }]).map((grupo) => (
                     <div key={grupo.titulo}>
                       {grupo.titulo && <h4 className="bg-slate-100 px-4 py-3 text-sm font-bold text-slate-800">{grupo.pedidos.length > 0 ? `${grupo.pedidos.length} ` : ''}{grupo.titulo}</h4>}

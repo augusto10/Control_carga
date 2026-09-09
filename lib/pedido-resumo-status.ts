@@ -6,8 +6,8 @@ const titulos: Record<string, string> = {
   PEDIDOS_EMBARCADOS: 'Pedidos embarcados',
   ALERTAS_NAO_SEPARADOS: 'Pedidos não separados',
   ALERTAS_NAO_CONFERIDOS: 'Separados e não conferidos',
-  ALERTAS_NAO_EMBARCADOS: 'Pedidos não embarcados',
-  PENDENCIAS: 'Produtos não encontrados',
+  ALERTAS_NAO_EMBARCADOS: 'Pedidos conferidos e não embarcados',
+  PENDENCIAS: 'Pedidos com produtos não encontrados',
 };
 
 export function resumirPedidosPorStatus(pedidos: {

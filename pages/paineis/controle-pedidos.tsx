@@ -198,8 +198,8 @@ export default function ControlePedidosPainel() {
     dashboard.indicadores.find((item) => item.codigo === codigo)?.total || 0;
   const stageCards = [
     { codigo: 'PEDIDO_NOVO' as StatusCode, titulo: 'PEDIDOS NOVOS', icon: Package },
-    { codigo: 'PEDIDO_EM_SEPARACAO' as StatusCode, titulo: 'PEDIDOS EM SEPARACAO', icon: ClipboardList },
-    { codigo: 'PEDIDO_SEPARADO' as StatusCode, titulo: 'PEDIDOS SEPARADOS AGUARDANDO CONFERENCIA', icon: PackageCheck },
+    { codigo: 'PEDIDO_EM_SEPARACAO' as StatusCode, titulo: 'PEDIDOS EM SEPARAÇÃO', icon: ClipboardList },
+    { codigo: 'PEDIDO_SEPARADO' as StatusCode, titulo: 'PEDIDOS SEPARADOS AGUARDANDO CONFERÊNCIA', icon: PackageCheck },
     { codigo: 'PEDIDO_EMBARCADO' as StatusCode, titulo: 'PEDIDOS CONFERIDOS', icon: UserCheck },
     { codigo: 'PEDIDOS_EMBARCADOS' as StatusCode, titulo: 'PEDIDOS EMBARCADOS', icon: PackageCheck },
   ];
@@ -208,14 +208,9 @@ export default function ControlePedidosPainel() {
   const pendenciasAlertasItem = dashboardAlertas.indicadores.find(
     (item) => item.codigo === 'PENDENCIAS'
   );
-  const previewPendencias = (pendenciasAlertasItem?.pedidos || []).flatMap((pedido) => {
-    if (pedido.produtosPendentes?.length) {
-      return pedido.produtosPendentes.slice(0, 2).map(
-        (produto) => `Pedido ${pedido.pedidoId}: ${produto.nome} (${produto.quantidade})`
-      );
-    }
-    return [`Pedido ${pedido.pedidoId}: ${pedido.totalItensPendentes} item(ns)`];
-  }).slice(0, 6);
+  const dataHojeLabel = new Intl.DateTimeFormat('pt-BR', {
+    day: '2-digit', month: '2-digit', year: '2-digit',
+  }).format(new Date());
 
   return (
     <div
@@ -230,12 +225,14 @@ export default function ControlePedidosPainel() {
           ) : (
             <>
               <h1 className="mb-5 text-center text-2xl font-black uppercase tracking-[0.12em] text-white md:text-3xl">
-                Controle de Pedidos
+                CONTROLE DE PEDIDOS - {dataHojeLabel}
               </h1>
               {error && (
                 <p className="mb-4 text-center text-sm font-semibold text-amber-300">{error}</p>
               )}
               <ExpedicaoCards
+                atualizadoEtapasEm={dashboard.generatedAt}
+                atualizadoAlertasEm={dashboardAlertas.generatedAt}
                 wideLayout
                 loadingStages={false}
                 loadingSecondary={loadingSecondary}
@@ -259,7 +256,7 @@ export default function ControlePedidosPainel() {
                 }}
                 pendencias={{
                   total: getTotalAlerta('PENDENCIAS'),
-                  previewItems: previewPendencias,
+                  pedidos: pendenciasAlertasItem?.pedidos || [],
                   onClick: () => undefined,
                 }}
               />
