@@ -42,8 +42,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const dataInicioIso = parseDateOnly(req.query.data_inicio) || todayIso();
   const dataFimIso = parseDateOnly(req.query.data_fim) || dataInicioIso;
-  const limit = Math.min(Math.max(Number(req.query.limit || 150), 1), 500);
-  const maxDetalhes = Math.min(Math.max(Number(req.query.max_detalhes ?? 30), 0), 100);
+  const limit = Math.min(Math.max(Number(req.query.limit || 500), 1), 500);
+  const maxDetalhes = Math.min(Math.max(Number(req.query.max_detalhes ?? 100), 0), 100);
 
   try {
     const resultado = await sincronizarLogisticaSnapshot({

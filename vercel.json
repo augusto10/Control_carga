@@ -11,7 +11,7 @@
   },
   "crons": [
     {
-      "path": "/api/dashboard/sincronizar-logistica?limit=500&max_detalhes=100",
+      "path": "/api/dashboard/sincronizar-logistica",
       "schedule": "*/5 * * * *"
     }
   ]
