@@ -8,11 +8,5 @@
     "pages/api/**/*.ts": {
       "maxDuration": 60
     }
-  },
-  "crons": [
-    {
-      "path": "/api/dashboard/sincronizar-logistica",
-      "schedule": "*/5 * * * *"
-    }
-  ]
+  }
 }
