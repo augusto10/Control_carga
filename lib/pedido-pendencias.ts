@@ -17,17 +17,22 @@ export const codigoAdmDoProduto = (item: Record<string, unknown>): string | null
 
 const temQuantidadeDevolvida = (value: Record<string, unknown>) =>
   ['DEVOLVIDOS', 'devolvidos', 'QUANTIDADE_DEVOLVIDA', 'quantidade_devolvida', 'QTD_DEVOLVIDA', 'qtd_devolvida']
-    .some((campo) => (numero(value[campo]) ?? 0) > 0);
+    .some((campo) => (numero(value[campo]) ?? 0) > 0) ||
+  Object.entries(value).some(([campo, dado]) => /devolu|devolvido/i.test(campo) && (numero(dado) ?? 0) > 0);
 
 const temStatusDevolucao = (value: Record<string, unknown>) =>
-  Object.entries(value).some(([campo, dado]) =>
-    /devolu|devolvido/i.test(campo) &&
-    (ehVerdadeiro(dado) ||
+  Object.entries(value).some(([campo, dado]) => {
+    const campoDevolucao = /devolu|devolvido/i.test(campo);
+    const statusDevolucao = ['STATUS', 'status', 'SITUACAO', 'situacao', 'STATUS_ENTREGA', 'status_entrega'].includes(campo) &&
+      typeof dado === 'string' && /devolu|devolvido/i.test(dado);
+    return statusDevolucao || (campoDevolucao && (
+      ehVerdadeiro(dado) ||
       (typeof dado === 'string' && /devolu|devolvido/i.test(dado)) ||
       (Array.isArray(dado) && dado.length > 0) ||
       (dado !== null && typeof dado === 'object' && Object.keys(dado as object).length > 0) ||
-      temQuantidadeDevolvida({ [campo]: dado }))
-  );
+      temQuantidadeDevolvida({ [campo]: dado })
+    ));
+  });
 
 /** Regra do painel: qualquer devolução tira o pedido do quadro de pendências. */
 export function pedidoTemDevolucao(

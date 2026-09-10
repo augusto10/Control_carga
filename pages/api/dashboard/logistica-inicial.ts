@@ -501,9 +501,9 @@ const isPedidoComPendencias = (
       (toNumber(item.QTD_EM_SEPARACAO_TRAN_ENT_PEN) || 0) > 0
     );
 
+  // O resumo do pedido pode permanecer gravado depois da devolução. A fonte
+  // válida para o quadro são os itens detalhados da entrega/comparativo.
   const possuiProdutosFaltando =
-    possuiProdutoFaltando(pedido) ||
-    possuiProdutoFaltando(logistica?.resumo_pendencias_logisticas || {}) ||
     itensComparativo.some(possuiProdutoFaltando) ||
     itensEntregasPendentes.some(possuiProdutoFaltando);
 

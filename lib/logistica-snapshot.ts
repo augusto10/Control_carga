@@ -837,9 +837,9 @@ export async function montarDashboardPorSnapshot(
       snapshot.possuiPendencia ||
       (snapshot.rawPedido as Record<string, unknown> | null)?.possui_produtos_faltando === true
     ), 2, async (snapshot) => {
-      if (!username || !password) { pendenciasNaoVerificadas = true; return; }
+      if (!username || !password) { pendenciasNaoVerificadas = true; snapshot.possuiPendencia = false; snapshot.rawLogistica = {}; return; }
       const atual = await buscarLogisticaAtual(snapshot.pedidoId, username, password);
-      if (!atual) { pendenciasNaoVerificadas = true; return; }
+      if (!atual) { pendenciasNaoVerificadas = true; snapshot.possuiPendencia = false; snapshot.rawLogistica = {}; return; }
       snapshot.rawLogistica = atual;
       const statusAtual = atual.status_logistico?.codigo;
       if (typeof statusAtual === 'string' && STATUS_ORDER.includes(statusAtual as StatusCode)) {
@@ -878,9 +878,7 @@ export async function montarDashboardPorSnapshot(
       ...(Array.isArray(snapshot.rawLogistica?.itens_entregas_pendentes)
         ? snapshot.rawLogistica.itens_entregas_pendentes : []),
     ];
-    const possuiProdutoFaltandoAtual =
-      resumoIndicaPendencia ||
-      itensPendenciaAtual.some((item: Record<string, any>) =>
+    const possuiProdutoFaltandoAtual = itensPendenciaAtual.some((item: Record<string, any>) =>
         ['S', 'SIM', 'TRUE', '1'].includes(String(item.POSSUI_PRODUTO_FALTANDO ?? item.possui_produto_faltando ?? item.PRODUTO_FALTANDO ?? item.produto_faltando ?? item.PRODUTO_NAO_ENCONTRADO ?? item.produto_nao_encontrado ?? item.NAO_ENCONTRADO ?? item.nao_encontrado ?? item.FALTA ?? item.falta ?? '').trim().toUpperCase()) ||
         (toNumber(item.QUANTIDADE_FALTANTE ?? item.quantidade_faltante ?? item.QTD_FALTANTE ?? item.qtd_faltante) || 0) > 0
       );
