@@ -162,6 +162,19 @@ export default function ControlePedidosPainel() {
   }, []);
 
   useEffect(() => {
+    try {
+      const queries = getDashboardQueries();
+      const cached = JSON.parse(window.localStorage.getItem(DASHBOARD_LOCAL_CACHE_KEY) || 'null') as DashboardResponse | null;
+      if (cached && cached.filtros?.dataInicio === queries.etapas.get('data_inicio') && cached.filtros?.dataFim === queries.etapas.get('data_fim') && Array.isArray(cached.indicadores)) {
+        setDashboard(cached);
+        setLoading(false);
+      }
+      const cachedAlertas = JSON.parse(window.localStorage.getItem(DASHBOARD_ALERTAS_LOCAL_CACHE_KEY) || 'null') as DashboardResponse | null;
+      if (cachedAlertas && cachedAlertas.filtros?.dataInicio === queries.alertas.get('data_inicio') && cachedAlertas.filtros?.dataFim === queries.alertas.get('data_fim') && Array.isArray(cachedAlertas.indicadores)) {
+        setDashboardAlertas(cachedAlertas);
+        setLoadingSecondary(false);
+      }
+    } catch { /* Cache corrompido é ignorado. */ }
     void loadDashboard();
 
     const intervalId = window.setInterval(loadDashboard, PAINEL_AUTO_REFRESH_INTERVAL_MS);

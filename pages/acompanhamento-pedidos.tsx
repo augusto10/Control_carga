@@ -558,6 +558,18 @@ function Home() {
 
   useEffect(() => {
     if (isAuthenticated) {
+      try {
+        const cached = JSON.parse(window.localStorage.getItem(DASHBOARD_LOCAL_CACHE_KEY) || 'null') as DashboardLogisticaData | null;
+        if (cached && cached.filtros?.dataInicio === periodoAplicado.dataInicio && cached.filtros?.dataFim === periodoAplicado.dataFim && Array.isArray(cached.indicadores)) {
+          setDashboard(cached);
+          setLoadingDashboard(false);
+        }
+        const cachedAlertas = JSON.parse(window.localStorage.getItem(DASHBOARD_ALERTAS_LOCAL_CACHE_KEY) || 'null') as DashboardLogisticaData | null;
+        const periodoAlertas = getAlertasPeriodo();
+        if (cachedAlertas && cachedAlertas.filtros?.dataInicio === periodoAlertas.dataInicio && cachedAlertas.filtros?.dataFim === periodoAlertas.dataFim && Array.isArray(cachedAlertas.indicadores)) {
+          setDashboardAlertas(cachedAlertas);
+        }
+      } catch { /* Cache corrompido é ignorado; a API atual será consultada. */ }
       const acaoFiltro = acaoFiltroPendenteRef.current;
       acaoFiltroPendenteRef.current = null;
       void loadDashboard(false, periodoAplicado, acaoFiltro);
