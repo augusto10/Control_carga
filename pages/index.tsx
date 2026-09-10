@@ -399,6 +399,7 @@ function Home() {
   const [loadingPedidoDetalhe, setLoadingPedidoDetalhe] = useState(false);
   const [pedidoDetalheErro, setPedidoDetalheErro] = useState<string | null>(null);
   const [listaPedidos, setListaPedidos] = useState<{
+    codigo?: string;
     titulo: string;
     descricao: string;
     pedidos: DashboardPedidoItem[];
@@ -706,6 +707,7 @@ function Home() {
 
   const abrirListaPedidos = (item: DashboardStatusItem) => {
     setListaPedidos({
+      codigo: item.codigo,
       titulo: item.titulo,
       descricao: item.descricao,
       pedidos: item.pedidos,
@@ -1923,7 +1925,9 @@ function Home() {
         >
           {listaPedidos && (
             <div className="space-y-4">
-              <ResumoStatusPedidos itens={resumirPedidosPorStatus(listaPedidos.pedidos)} />
+              <ResumoStatusPedidos itens={listaPedidos.codigo === 'PENDENCIAS'
+                ? [{ codigo: 'PENDENCIAS', titulo: 'Pedidos com produtos não encontrados', total: listaPedidos.pedidos.length }]
+                : resumirPedidosPorStatus(listaPedidos.pedidos)} />
               {listaPedidos.descricao && <p className="text-sm text-slate-500">{listaPedidos.descricao}</p>}
 
               {listaPedidos.pedidos.length > 0 && (
