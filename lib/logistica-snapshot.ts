@@ -971,7 +971,10 @@ export async function montarDashboardPorSnapshot(
   const totalPendencias = indicadores.find((item) => item.codigo === 'PENDENCIAS')?.total || 0;
 
   return {
-    generatedAt: new Date().toISOString(),
+    // Reading a stored snapshot must not give old data a new timestamp.
+    generatedAt: new Date(Math.max(...snapshots.map((snapshot) =>
+      new Date(snapshot.sincronizadoEm).getTime()
+    ))).toISOString(),
     filtros: {
       localProduto: 'Pedidos recebidos no caixa - Snapshot local',
       dataInicio: periodo.dataInicioIso || null,

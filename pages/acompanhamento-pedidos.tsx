@@ -1,3 +1,4 @@
+import { useCurrentDashboard } from '@/hooks/useCurrentDashboard';
 import { resumirPedidosPorStatus } from '@/lib/pedido-resumo-status';
 import { PedidoInformacoes } from '@/components/dashboard/PedidoInformacoes';
 import { ResumoStatusPedidos } from '@/components/dashboard/ResumoStatusPedidos';
@@ -262,8 +263,8 @@ const EMPTY_RESUMO_HOJE: ResumoHojeData = {
   pedidosHoje: 0,
   pedidosEntregaHoje: 0,
 };
-const DASHBOARD_LOCAL_CACHE_KEY = 'dashboard-logistica-cache-v10';
-const DASHBOARD_ALERTAS_LOCAL_CACHE_KEY = 'dashboard-logistica-alertas-cache-v3';
+const DASHBOARD_LOCAL_CACHE_KEY = 'dashboard-logistica-cache-v11';
+const DASHBOARD_ALERTAS_LOCAL_CACHE_KEY = 'dashboard-logistica-alertas-cache-v4';
 const DASHBOARD_AUTO_REFRESH_INTERVAL_MS = 3 * 60_000;
 const DASHBOARD_LEGACY_CACHE_KEYS = [
   'dashboard-logistica-cache-v3',
@@ -384,8 +385,8 @@ function Home() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
   const [periodoPadrao] = useState(getDefaultPeriodo);
-  const [dashboard, setDashboard] = useState<DashboardLogisticaData | null>(null);
-  const [dashboardAlertas, setDashboardAlertas] = useState<DashboardLogisticaData | null>(null);
+  const [dashboard, setDashboard] = useCurrentDashboard<DashboardLogisticaData | null>(null, DASHBOARD_LOCAL_CACHE_KEY);
+  const [dashboardAlertas, setDashboardAlertas] = useCurrentDashboard<DashboardLogisticaData | null>(null, DASHBOARD_ALERTAS_LOCAL_CACHE_KEY);
   const [resumoHoje, setResumoHoje] = useState<ResumoHojeData>(EMPTY_RESUMO_HOJE);
   const [loadingDashboard, setLoadingDashboard] = useState(true);
   const [refreshingDashboard, setRefreshingDashboard] = useState(false);
@@ -427,11 +428,15 @@ function Home() {
     return params;
   };
 
+  const dashboardRequestId = useRef(0);
+  useEffect(() => () => { dashboardRequestId.current += 1; }, []);
+
   const loadDashboard = useCallback(async (
     forceRefresh = false,
     periodo = periodoAplicado,
     acaoFiltro?: 'apply' | 'clear' | null
   ) => {
+    const requestId = ++dashboardRequestId.current;
     if (periodo.dataInicio && periodo.dataFim && periodo.dataInicio > periodo.dataFim) {
       setError('A data inicial nao pode ser maior que a data final.');
       return;
@@ -477,46 +482,42 @@ function Home() {
       }),
     ]);
 
+    if (requestId !== dashboardRequestId.current) return;
     let nextError: string | null = null;
 
     if (dashboardResult.status === 'fulfilled') {
       const response = dashboardResult.value;
       if (response.ok) {
         const data: DashboardLogisticaData = await response.json();
+        if (requestId !== dashboardRequestId.current) return;
         if (isDashboardFallbackVazio(data)) {
           nextError = data.warning || 'Nao foi possivel atualizar o painel logistico agora.';
         } else {
           setDashboard(data);
-          try {
-            window.localStorage.setItem(DASHBOARD_LOCAL_CACHE_KEY, JSON.stringify(data));
-          } catch {
-            // O cache local e apenas uma melhoria de carregamento.
-          }
         }
       } else {
         const data = await response.json().catch(() => null);
+        if (requestId !== dashboardRequestId.current) return;
         nextError = data?.error || `Falha ao carregar dashboard logistico (${response.status})`;
       }
     } else {
       nextError = 'Nao foi possivel carregar o painel logistico agora.';
     }
 
+    if (requestId !== dashboardRequestId.current) return;
     if (dashboardAlertasResult.status === 'fulfilled') {
       const response = dashboardAlertasResult.value;
       if (response.ok) {
         const data: DashboardLogisticaData = await response.json();
+        if (requestId !== dashboardRequestId.current) return;
         if (isDashboardFallbackVazio(data)) {
           if (!nextError) nextError = data.warning || 'Nao foi possivel atualizar alertas e pendencias agora.';
         } else {
           setDashboardAlertas(data);
-          try {
-            window.localStorage.setItem(DASHBOARD_ALERTAS_LOCAL_CACHE_KEY, JSON.stringify(data));
-          } catch {
-            // O cache local e apenas uma melhoria de carregamento.
-          }
         }
       } else if (!nextError) {
         const data = await response.json().catch(() => null);
+        if (requestId !== dashboardRequestId.current) return;
         nextError = data?.error || `Falha ao carregar alertas e pendencias (${response.status})`;
       }
     } else if (!nextError) {
@@ -527,6 +528,7 @@ function Home() {
       const response = resumoHojeResult.value;
       if (response.ok) {
         const data = await response.json();
+        if (requestId !== dashboardRequestId.current) return;
         setResumoHoje({
           notasHoje: data.notasHoje || 0,
           controlesHoje: data.controlesHoje || 0,
@@ -535,6 +537,7 @@ function Home() {
         });
       } else if (!nextError) {
         const data = await response.json().catch(() => null);
+        if (requestId !== dashboardRequestId.current) return;
         nextError = data?.message || `Falha ao carregar resumo do dia (${response.status})`;
       }
     } else if (!nextError) {
@@ -544,6 +547,7 @@ function Home() {
       }
     }
 
+    if (requestId !== dashboardRequestId.current) return;
     setError(isTransientDashboardError(nextError) ? null : nextError);
     setLoadingDashboard(false);
     setRefreshingDashboard(false);

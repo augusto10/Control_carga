@@ -790,6 +790,7 @@ export default async function handler(
 
   const username = process.env.API_EXTERNA_USERNAME;
   const password = process.env.API_EXTERNA_PASSWORD;
+  const requestStartedAt = new Date().toISOString();
   const forceRefresh = String(req.query.force || '').trim() === '1';
   const escopoPrincipal = String(req.query.escopo || '').trim() === 'principal';
 
@@ -1480,7 +1481,7 @@ export default async function handler(
 
     const payload: DashboardResponse = {
       warning: embarquesAtuais.verificacaoIncompleta ? 'Alguns vinculos de embarque nao puderam ser atualizados.' : undefined,
-      generatedAt: new Date().toISOString(),
+      generatedAt: requestStartedAt,
       filtros: {
         localProduto: 'Pedidos recebidos no caixa - Empresa 1',
         dataInicio: periodoFiltro.dataInicioIso,

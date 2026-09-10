@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCurrentDashboard } from '@/hooks/useCurrentDashboard';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { Loader2 } from 'lucide-react';
 import { ExpedicaoCards } from '@/components/dashboard/ExpedicaoCards';
 import {
@@ -88,16 +89,8 @@ const getDashboardQueries = () => {
 };
 
 const PAINEL_AUTO_REFRESH_INTERVAL_MS = 3 * 60_000;
-const DASHBOARD_LOCAL_CACHE_KEY = 'dashboard-logistica-cache-v8';
-const DASHBOARD_ALERTAS_LOCAL_CACHE_KEY = 'dashboard-logistica-alertas-cache-v1';
-
-const saveSnapshot = (key: string, data: DashboardResponse) => {
-  try {
-    window.localStorage.setItem(key, JSON.stringify(data));
-  } catch {
-    // O snapshot local e apenas uma melhoria de carregamento.
-  }
-};
+const DASHBOARD_LOCAL_CACHE_KEY = 'dashboard-logistica-cache-v11';
+const DASHBOARD_ALERTAS_LOCAL_CACHE_KEY = 'dashboard-logistica-alertas-cache-v4';
 
 const isDashboardFallbackVazio = (data: DashboardResponse) =>
   Boolean(data.warning) &&
@@ -105,13 +98,17 @@ const isDashboardFallbackVazio = (data: DashboardResponse) =>
   data.indicadores.every((item) => (item.total || 0) === 0);
 
 export default function ControlePedidosPainel() {
-  const [dashboard, setDashboard] = useState<DashboardResponse>(emptyDashboard);
-  const [dashboardAlertas, setDashboardAlertas] = useState<DashboardResponse>(emptyDashboard);
+  const [dashboard, setDashboard] = useCurrentDashboard<DashboardResponse>(emptyDashboard, DASHBOARD_LOCAL_CACHE_KEY);
+  const [dashboardAlertas, setDashboardAlertas] = useCurrentDashboard<DashboardResponse>(emptyDashboard, DASHBOARD_ALERTAS_LOCAL_CACHE_KEY);
   const [loading, setLoading] = useState(true);
   const [loadingSecondary, setLoadingSecondary] = useState(true);
   const [error, setError] = useState('');
 
+  const dashboardRequestId = useRef(0);
+  useEffect(() => () => { dashboardRequestId.current += 1; }, []);
+
   const loadDashboard = useCallback(async () => {
+    const requestId = ++dashboardRequestId.current;
     setError('');
     try {
       const queries = getDashboardQueries();
@@ -126,9 +123,10 @@ export default function ControlePedidosPainel() {
       if (!etapasResponse.ok) throw new Error('Falha ao carregar as etapas do painel');
 
       const etapasData = await etapasResponse.json();
+      if (requestId !== dashboardRequestId.current) return;
+      if (isDashboardFallbackVazio(etapasData)) throw new Error(etapasData.warning);
       setDashboard(etapasData);
       setLoading(false);
-      saveSnapshot(DASHBOARD_LOCAL_CACHE_KEY, etapasData);
 
       try {
         const alertasResponse = await fetch(
@@ -138,18 +136,19 @@ export default function ControlePedidosPainel() {
         if (!alertasResponse.ok) throw new Error('Falha ao carregar alertas do painel');
 
         const alertasData = await alertasResponse.json();
+        if (requestId !== dashboardRequestId.current) return;
         if (!isDashboardFallbackVazio(alertasData)) {
           setDashboardAlertas(alertasData);
-          saveSnapshot(DASHBOARD_ALERTAS_LOCAL_CACHE_KEY, alertasData);
         }
       } finally {
-        setLoadingSecondary(false);
+        if (requestId === dashboardRequestId.current) setLoadingSecondary(false);
       }
     } catch (loadError) {
+      if (requestId !== dashboardRequestId.current) return;
       setError(loadError instanceof Error ? loadError.message : 'Falha ao carregar o painel');
       setLoadingSecondary(false);
     } finally {
-      setLoading(false);
+      if (requestId === dashboardRequestId.current) setLoading(false);
     }
   }, []);
 
