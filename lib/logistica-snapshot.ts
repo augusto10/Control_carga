@@ -312,7 +312,7 @@ const agruparProdutosPendentes = (itens: Record<string, any>[]) => {
     if (quantidade <= 0) continue;
 
     const produtoId = toNumber(item.PRODUTO_ID);
-    const codigo = codigoAdmDoProduto(item) || toStringValue(item.CODIGO_ORIGINAL) || toStringValue(item.CODIGO_BARRAS);
+    const codigo = codigoAdmDoProduto(item);
     const nome = toStringValue(item.PRODUTO_NOME) || 'Produto nao informado';
     const chave = String(produtoId ?? codigo ?? nome);
     const atual = agrupados.get(chave);
