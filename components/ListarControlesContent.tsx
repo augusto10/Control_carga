@@ -268,9 +268,59 @@ const ListarControlesContent: React.FC = () => {
     });
   }, []);
 
+  // Mantém os dados completos do PDF em memória durante a sessão. A promessa
+  // em andamento também é compartilhada para evitar duas consultas ao abrir
+  // um PDF enquanto o pré-carregamento ainda está acontecendo.
+  const pdfDadosCacheRef = React.useRef(new Map<string, ControleComNotas>());
+  const pdfDadosInFlightRef = React.useRef(new Map<string, Promise<ControleComNotas>>());
+  const carregarDadosPdf = useCallback((controle: ControleComNotas) => {
+    const cached = pdfDadosCacheRef.current.get(controle.id);
+    if (cached) return Promise.resolve(cached);
+
+    const inFlight = pdfDadosInFlightRef.current.get(controle.id);
+    if (inFlight) return inFlight;
+
+    const request = api
+      .get(`/api/controles/${controle.id}/pdf-dados`)
+      .then((response) => response.data as ControleComNotas)
+      .catch(() => controle)
+      .then((dados) => {
+        pdfDadosCacheRef.current.set(controle.id, dados);
+        return dados;
+      })
+      .finally(() => {
+        pdfDadosInFlightRef.current.delete(controle.id);
+      });
+
+    pdfDadosInFlightRef.current.set(controle.id, request);
+    return request;
+  }, []);
+
   useEffect(() => {
     setControles(converterControles(controlesStore as any));
   }, [controlesStore, converterControles]);
+
+  useEffect(() => {
+    let cancelled = false;
+    let nextIndex = 0;
+    const queue = controles.filter((controle) => controle.notas?.length > 0).slice(0, 5);
+
+    const preloadNext = () => {
+      if (cancelled || nextIndex >= queue.length) return;
+      const controle = queue[nextIndex++];
+      void carregarDadosPdf(controle).finally(() => {
+        if (!cancelled) window.setTimeout(preloadNext, 150);
+      });
+    };
+
+    // Dá prioridade à renderização da lista e começa a preparar os PDFs logo
+    // depois, em sequência, para não sobrecarregar a API externa.
+    const timeoutId = window.setTimeout(preloadNext, 400);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, [controles, carregarDadosPdf]);
   const [editing, setEditing] = React.useState<ControleComNotas | null>(null);
   const [editData, setEditData] = React.useState<Partial<Omit<PrismaControleCarga, 'id' | 'dataCriacao' | 'notas'>>>({});
   const [pdfUrl, setPdfUrl] = React.useState<string | null>(null);
@@ -557,12 +607,8 @@ const ListarControlesContent: React.FC = () => {
     setLoadingButtons((atual) => ({ ...atual, [pdfLoadingKey]: true }));
 
     try {
-      const controlePdfPromise = api
-        .get(`/api/controles/${controle.id}/pdf-dados`)
-        .then((response) => response.data as ControleComNotas)
-        .catch(() => controle);
       const [controlePdf, existingBytes] = await Promise.all([
-        controlePdfPromise,
+        carregarDadosPdf(controle),
         modeloRomaneioPdfPromise,
       ]);
 
@@ -1369,7 +1415,7 @@ const ListarControlesContent: React.FC = () => {
       }
 
       const pdfBytes = await doc.save();
-      const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+      const blob = new Blob([pdfBytes.buffer as ArrayBuffer], { type: 'application/pdf' });
       const url = URL.createObjectURL(blob);
       setPdfUrl(url);
       setPdfOpen(true);
@@ -2266,6 +2312,7 @@ const ListarControlesContent: React.FC = () => {
                       <Tooltip title="Gerar PDF">
                         <IconButton 
                           onClick={() => gerarPdf(controle)}
+                          onMouseEnter={() => { void carregarDadosPdf(controle); }}
                           color="primary"
                           size="small"
                           disabled={loadingButtons[controle.id] || loadingButtons[`pdf_${controle.id}`]}
