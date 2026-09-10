@@ -22,7 +22,11 @@ const temQuantidadeDevolvida = (value: Record<string, unknown>) =>
 const temStatusDevolucao = (value: Record<string, unknown>) =>
   Object.entries(value).some(([campo, dado]) =>
     /devolu|devolvido/i.test(campo) &&
-    (ehVerdadeiro(dado) || (typeof dado === 'string' && /devolu|devolvido/i.test(dado)) || temQuantidadeDevolvida({ [campo]: dado }))
+    (ehVerdadeiro(dado) ||
+      (typeof dado === 'string' && /devolu|devolvido/i.test(dado)) ||
+      (Array.isArray(dado) && dado.length > 0) ||
+      (dado !== null && typeof dado === 'object' && Object.keys(dado as object).length > 0) ||
+      temQuantidadeDevolvida({ [campo]: dado }))
   );
 
 /** Regra do painel: qualquer devolução tira o pedido do quadro de pendências. */
@@ -30,7 +34,7 @@ export function pedidoTemDevolucao(
   pedido: Record<string, unknown> | null | undefined,
   logistica: Record<string, any> | null | undefined
 ): boolean {
-  const valores = [pedido, logistica, logistica?.pedido].filter(
+  const valores = [pedido, (pedido as any)?.logistica, logistica, logistica?.pedido, logistica?.status_logistico].filter(
     (item): item is Record<string, unknown> => Boolean(item && typeof item === 'object')
   );
   if (valores.some(temStatusDevolucao)) return true;

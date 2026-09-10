@@ -69,6 +69,15 @@ const formatDateInputValue = (date: Date) => {
   return `${year}-${month}-${day}`;
 };
 
+const formatAtualizacao = (value: string) => {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat('pt-BR', {
+    day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
+  }).format(date);
+};
+
 const getDashboardQueries = () => {
   const dataFim = new Date();
   const dataInicioAlertas = new Date(dataFim);
@@ -204,6 +213,10 @@ export default function ControlePedidosPainel() {
   ];
   const getTotalAlerta = (codigo: StatusCode) =>
     dashboardAlertas.indicadores.find((item) => item.codigo === codigo)?.total || 0;
+  const pedidosAlertas = dashboardAlertas.indicadores
+    .filter((item) => item.codigo.startsWith('ALERTAS_'))
+    .flatMap((item) => item.pedidos || []);
+  const totalPedidosAlertas = new Set(pedidosAlertas.map((pedido) => pedido.pedidoId)).size;
   const pendenciasAlertasItem = dashboardAlertas.indicadores.find(
     (item) => item.codigo === 'PENDENCIAS'
   );
@@ -226,12 +239,10 @@ export default function ControlePedidosPainel() {
               <h1 className="mb-5 text-center text-2xl font-black uppercase tracking-[0.12em] text-white md:text-3xl">
                 CONTROLE DE PEDIDOS - {dataHojeLabel}
               </h1>
-              {error && (
-                <p className="mb-4 text-center text-sm font-semibold text-amber-300">{error}</p>
-              )}
+              <p className="mb-4 text-center text-sm font-semibold text-slate-300">
+                Dados atualizados em {formatAtualizacao(dashboardAlertas.generatedAt || dashboard.generatedAt || '')}
+              </p>
               <ExpedicaoCards
-                atualizadoEtapasEm={dashboard.generatedAt}
-                atualizadoAlertasEm={dashboardAlertas.generatedAt}
                 wideLayout
                 loadingStages={false}
                 loadingSecondary={loadingSecondary}
@@ -250,7 +261,7 @@ export default function ControlePedidosPainel() {
                   naoSeparado: getTotalAlerta('ALERTAS_NAO_SEPARADOS'),
                   naoConferido: getTotalAlerta('ALERTAS_NAO_CONFERIDOS'),
                   naoEmbarcado: getTotalAlerta('ALERTAS_NAO_EMBARCADOS'),
-                  total: getTotalAlerta('ALERTAS_NAO_SEPARADOS') + getTotalAlerta('ALERTAS_NAO_CONFERIDOS') + getTotalAlerta('ALERTAS_NAO_EMBARCADOS'),
+                  total: totalPedidosAlertas,
                   onClick: () => undefined,
                 }}
                 pendencias={{
