@@ -4,6 +4,43 @@ const numero = (value: unknown): number | null => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
+const SIM = new Set(['S', 'SIM', 'TRUE', '1', 'Y', 'YES']);
+
+const ehVerdadeiro = (value: unknown) => SIM.has(String(value ?? '').trim().toUpperCase());
+
+const temQuantidadeDevolvida = (value: Record<string, unknown>) =>
+  ['DEVOLVIDOS', 'devolvidos', 'QUANTIDADE_DEVOLVIDA', 'quantidade_devolvida', 'QTD_DEVOLVIDA', 'qtd_devolvida']
+    .some((campo) => (numero(value[campo]) ?? 0) > 0);
+
+const temStatusDevolucao = (value: Record<string, unknown>) =>
+  Object.entries(value).some(([campo, dado]) =>
+    /devolu|devolvido/i.test(campo) &&
+    (ehVerdadeiro(dado) || (typeof dado === 'string' && /devolu|devolvido/i.test(dado)) || temQuantidadeDevolvida({ [campo]: dado }))
+  );
+
+/** Regra do painel: qualquer devolução tira o pedido do quadro de pendências. */
+export function pedidoTemDevolucao(
+  pedido: Record<string, unknown> | null | undefined,
+  logistica: Record<string, any> | null | undefined
+): boolean {
+  const valores = [pedido, logistica, logistica?.pedido].filter(
+    (item): item is Record<string, unknown> => Boolean(item && typeof item === 'object')
+  );
+  if (valores.some(temStatusDevolucao)) return true;
+
+  for (const raiz of valores) {
+    for (const campo of ['devolucoes', 'devolvidos', 'itens_devolucoes', 'entregas_devolvidas']) {
+      const itens = raiz[campo];
+      if (Array.isArray(itens) && itens.length > 0) return true;
+    }
+    for (const campo of ['entregas', 'itens_entregas_pendentes', 'comparativo_separacao_pendentes']) {
+      const itens = raiz[campo];
+      if (Array.isArray(itens) && itens.some((item) => item && typeof item === 'object' && (temStatusDevolucao(item) || temQuantidadeDevolvida(item)))) return true;
+    }
+  }
+  return false;
+}
+
 export function saldoPendente(item: Record<string, unknown>): number {
   const devolvidos = numero(item.DEVOLVIDOS ?? item.devolvidos ?? item.QUANTIDADE_DEVOLVIDA ?? item.quantidade_devolvida ?? item.QTD_DEVOLVIDA) ?? 0;
   const quantidade = numero(item.QUANTIDADE ?? item.quantidade ?? item.QTD ?? item.qtd);

@@ -1,7 +1,7 @@
 import { buscarEmbarquesAtuais } from '@/lib/pedido-embarques-atuais';
 import { buscarLogisticaAtual } from '@/lib/pedido-logistica-atual';
 import { dadosPedido } from '@/lib/pedido-apresentacao';
-import { saldoPendente, saldoDetalhadoPendente, itensComSaldoPendente } from '@/lib/pedido-pendencias';
+import { saldoPendente, saldoDetalhadoPendente, itensComSaldoPendente, pedidoTemDevolucao } from '@/lib/pedido-pendencias';
 import type { Prisma } from '@prisma/client';
 import prisma from '@/lib/prisma';
 import { apiExternaService } from '@/services/api-externa';
@@ -327,6 +327,7 @@ const getProdutosPendentes = (logistica: Record<string, any> | null) =>
   agruparProdutosPendentes(itensComSaldoPendente(logistica) || []);
 
 const isPedidoComPendencias = (pedido: Record<string, unknown>, logistica: Record<string, any> | null) => {
+  if (pedidoTemDevolucao(pedido, logistica)) return false;
   const statusLogisticoCodigo = toStringValue(
     (pedido.status_logistico as Record<string, unknown> | undefined)?.codigo
   )?.toUpperCase();
