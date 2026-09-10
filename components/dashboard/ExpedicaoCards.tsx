@@ -174,15 +174,11 @@ export function ExpedicaoCards({
                 <Siren className="h-6 w-6 text-white" />
               </motion.div>
               <div>
-                <h3 className="text-lg font-black uppercase leading-tight sm:text-xl">PEDIDOS ATRASADOS</h3>
+                <h3 className="text-lg font-black uppercase leading-tight sm:text-xl">PEDIDOS ATRASADOS <span className="text-2xl sm:text-3xl">{loadingSecondary ? '-' : alertas.total}</span></h3>
                 <div className="mt-2 h-px w-32 bg-white/28" />
               </div>
             </div>
 
-            <div className="mt-3 grid grid-cols-[1fr_auto] items-center gap-3 text-[11px] font-bold sm:text-xs">
-              <span className="uppercase">Total de pedidos com alerta:</span>
-              <strong className="text-2xl sm:text-3xl">{loadingSecondary ? '-' : alertas.total}</strong>
-            </div>
             <div className="mt-3 space-y-1 text-[11px] font-bold sm:text-xs">
               <div className="grid grid-cols-[1fr_auto] items-center gap-3">
                 <span className="uppercase">Pedidos não separados:</span>
@@ -236,7 +232,7 @@ export function ExpedicaoCards({
                 <ShieldAlert className="h-6 w-6 text-white" />
               </motion.div>
               <div>
-                <h3 className="text-lg font-black uppercase leading-tight sm:text-xl">PEDIDOS COM PRODUTOS NÃO ENCONTRADOS</h3>
+                <h3 className="text-lg font-black uppercase leading-tight sm:text-xl">PEDIDOS COM PRODUTOS NÃO ENCONTRADOS <span className="text-2xl sm:text-3xl">{loadingSecondary ? '-' : pendencias.total}</span></h3>
                 <div className="mt-2 h-px w-28 bg-white/28" />
               </div>
             </div>

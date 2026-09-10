@@ -988,7 +988,7 @@ function Home() {
                   CONTROLE DE PEDIDOS - {dataHojeLabel}
                 </h1>
 
-                <div className="flex items-center gap-3 [&>label]:hidden [&>button:nth-of-type(1)]:hidden [&>button:nth-of-type(2)]:hidden">
+                <div className="flex flex-col items-end gap-1 [&>label]:hidden [&>button:nth-of-type(1)]:hidden [&>button:nth-of-type(2)]:hidden">
                   <label className="space-y-1 text-sm">
                     <span className="block text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-100/80">
                       Data inicial
@@ -1052,14 +1052,13 @@ function Home() {
                     <RefreshCw className={cn('h-4 w-4', refreshingDashboard && 'animate-spin')} />
                     Atualizar
                   </button>
+                  <p className="text-right text-[11px] font-medium text-blue-100/75">
+                    Dados atualizados em {formatDateTime(ultimaAtualizacao)}
+                  </p>
                 </div>
               </div>
             </div>
           </Card>
-
-          <p className="text-center text-xs font-medium text-slate-500">
-            Dados atualizados em {formatDateTime(ultimaAtualizacao)}
-          </p>
 
           <ExpedicaoCards
             loadingStages={loadingDashboard && !dashboard}
