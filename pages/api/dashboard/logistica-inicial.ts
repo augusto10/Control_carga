@@ -1,7 +1,7 @@
 import { buscarEmbarquesAtuais } from '@/lib/pedido-embarques-atuais';
 import { buscarLogisticaAtual } from '@/lib/pedido-logistica-atual';
 import { dadosPedido } from '@/lib/pedido-apresentacao';
-import { saldoPendente, saldoDetalhadoPendente, itensComSaldoPendente, pedidoTemDevolucao, codigoAdmDoProduto } from '@/lib/pedido-pendencias';
+import { saldoPendente, saldoDetalhadoPendente, itensComSaldoPendente, pedidoTemDevolucao, pedidoTemEntregaGerada, codigoAdmDoProduto } from '@/lib/pedido-pendencias';
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiExternaService } from '@/services/api-externa';
 import { getPedidosDashboard } from '@/lib/dashboard-external-cache';
@@ -509,7 +509,7 @@ const isPedidoComPendencias = (
 
   // Saldo de separacao aberta, status e total historico nao bastam: o card
   // deve conter somente pedidos com produto faltando confirmado pelo ERP.
-  return possuiSeparacaoEfetivada && possuiProdutosFaltando;
+  return possuiSeparacaoEfetivada && possuiProdutosFaltando && pedidoTemEntregaGerada(pedido, logistica);
 };
 
 const hasStatusSeparacao = (pedido: Record<string, unknown>, status: string) => {

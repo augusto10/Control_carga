@@ -52,6 +52,21 @@ export function pedidoTemDevolucao(
   return false;
 }
 
+/** Pendencia só pode ser exibida depois que o ERP gerar a entrega do pedido. */
+export function pedidoTemEntregaGerada(
+  pedido: Record<string, unknown> | null | undefined,
+  logistica: Record<string, any> | null | undefined
+): boolean {
+  const valores = [pedido, (pedido as any)?.logistica, logistica, logistica?.pedido].filter(
+    (item): item is Record<string, unknown> => Boolean(item && typeof item === 'object')
+  );
+  return valores.some((raiz) =>
+    (['entregas', 'itens_entregas_pendentes'].some((campo) => Array.isArray(raiz[campo]) && (raiz[campo] as unknown[]).length > 0)) ||
+    ['ENTREGA_ID', 'entrega_id', 'ULTIMA_ENTREGA_ID', 'ultima_entrega_id', 'ENTREGA_GERADA', 'entrega_gerada']
+      .some((campo) => raiz[campo] !== null && raiz[campo] !== undefined && String(raiz[campo]).trim() !== '' && String(raiz[campo]).trim() !== '0')
+  );
+}
+
 export function saldoPendente(item: Record<string, unknown>): number {
   const devolvidos = numero(item.DEVOLVIDOS ?? item.devolvidos ?? item.QUANTIDADE_DEVOLVIDA ?? item.quantidade_devolvida ?? item.QTD_DEVOLVIDA) ?? 0;
   const quantidade = numero(item.QUANTIDADE ?? item.quantidade ?? item.QTD ?? item.qtd);

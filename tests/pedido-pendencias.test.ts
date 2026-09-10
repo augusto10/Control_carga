@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { saldoPendente, saldoDetalhadoPendente, itensComSaldoPendente, pedidoTemDevolucao } from '../lib/pedido-pendencias';
+import { saldoPendente, saldoDetalhadoPendente, itensComSaldoPendente, pedidoTemDevolucao, pedidoTemEntregaGerada } from '../lib/pedido-pendencias';
 
 // Uma devolucao encerrada nao pode ressuscitar a quantidade historica.
 assert.equal(saldoPendente({ SALDO_PENDENTE: 0, QUANTIDADE_PENDENTE_TOTAL: 5 }), 0);
@@ -28,4 +28,6 @@ assert.equal(itensComSaldoPendente({
 assert.equal(pedidoTemDevolucao({ status_separacoes: 'G' }, { pedido: { DEVOLVIDO: 'S' } }), true);
 assert.equal(pedidoTemDevolucao({ status_separacoes: 'G' }, { itens_entregas_pendentes: [{ SALDO: 2, DEVOLVIDOS: 1 }] }), true);
 assert.equal(pedidoTemDevolucao({ status_separacoes: 'G' }, { itens_entregas_pendentes: [{ SALDO: 2, DEVOLVIDOS: 0 }] }), false);
-console.log('Regras de pendencias: 16 verificacoes passaram.');
+assert.equal(pedidoTemEntregaGerada({}, { comparativo_separacao_pendentes: [{ POSSUI_PRODUTO_FALTANDO: 'S' }] }), false);
+assert.equal(pedidoTemEntregaGerada({}, { entregas: [{ ENTREGA_ID: 10 }] }), true);
+console.log('Regras de pendencias: 18 verificacoes passaram.');
