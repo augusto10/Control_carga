@@ -162,35 +162,6 @@ export default function ControlePedidosPainel() {
   }, []);
 
   useEffect(() => {
-    const queries = getDashboardQueries();
-    const dataInicio = queries.etapas.get('data_inicio');
-    const dataFim = queries.etapas.get('data_fim');
-    const dataInicioAlertas = queries.alertas.get('data_inicio');
-
-    const restoreSnapshot = (key: string, isAlertas: boolean) => {
-      try {
-        const raw = window.localStorage.getItem(key);
-        if (!raw) return;
-        const parsed = JSON.parse(raw) as DashboardResponse;
-        const periodoValido = isAlertas
-          ? parsed.filtros?.dataInicio === dataInicioAlertas && parsed.filtros?.dataFim === dataFim
-          : parsed.filtros?.dataInicio === dataInicio && parsed.filtros?.dataFim === dataFim;
-        if (!periodoValido || !Array.isArray(parsed.indicadores)) return;
-
-        if (isAlertas) {
-          setDashboardAlertas(parsed);
-          setLoadingSecondary(false);
-        } else {
-          setDashboard(parsed);
-          setLoading(false);
-        }
-      } catch {
-        // O painel segue com a consulta da API quando o snapshot local nao e valido.
-      }
-    };
-
-    restoreSnapshot(DASHBOARD_LOCAL_CACHE_KEY, false);
-    restoreSnapshot(DASHBOARD_ALERTAS_LOCAL_CACHE_KEY, true);
     void loadDashboard();
 
     const intervalId = window.setInterval(loadDashboard, PAINEL_AUTO_REFRESH_INTERVAL_MS);

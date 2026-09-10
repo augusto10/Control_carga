@@ -3,8 +3,6 @@ import prisma from '@/lib/prisma';
 import { apiExternaService } from '@/services/api-externa';
 
 const onlyDigits = (value: unknown) => String(value ?? '').replace(/\D/g, '');
-const normalizeNota = (value: unknown) => onlyDigits(value).replace(/^0+/, '') || '0';
-
 const pick = (...values: unknown[]) => {
   for (const value of values) {
     if (value !== null && value !== undefined && String(value).trim() !== '') return value;
@@ -33,56 +31,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(200).json(controle);
   }
 
-  const numerosProcurados = new Set(controle.notas.map((nota) => normalizeNota(nota.numeroNota)));
-  const completasPorNumero = new Map<string, Record<string, unknown>>();
-  const limit = 500;
-
-  for (let offset = 0; offset < 5000; offset += limit) {
-    const resultado = await apiExternaService.listarNotasFiscaisCompletas(
-      { limit, offset },
-      username,
-      password
-    );
-    const pagina = Array.isArray(resultado?.data) ? resultado.data : [];
-    if (pagina.length === 0) break;
-
-    for (const item of pagina) {
-      const notaFiscal =
-        (item.nota_fiscal as Record<string, unknown> | undefined) ||
-        (item.notaFiscal as Record<string, unknown> | undefined) ||
-        {};
-      const pedido =
-        (item.pedido as Record<string, unknown> | undefined) ||
-        (item.pedido_venda as Record<string, unknown> | undefined) ||
-        {};
-      const numero = normalizeNota(
-        pick(
-          notaFiscal.NUMERO_NOTA,
-          notaFiscal.NUMERO_NOTA_FISCAL,
-          notaFiscal.numero,
-          item.NUMERO_NOTA,
-          item.NUMERO_NOTA_FISCAL
-        )
-      );
-
-      if (numerosProcurados.has(numero)) {
-        completasPorNumero.set(numero, { ...item, ...pedido, ...notaFiscal });
-      }
-    }
-
-    if (completasPorNumero.size >= numerosProcurados.size) break;
-    if (pagina.length < limit) break;
-    if (typeof resultado?.total === 'number' && resultado.total > 0 && offset + pagina.length >= resultado.total) break;
-  }
-
   const notas = await Promise.all(
     controle.notas.map(async (nota) => {
       try {
         const chave = onlyDigits(nota.codigo);
-        const completa = completasPorNumero.get(normalizeNota(nota.numeroNota));
-        const externa = completa || (chave.length === 44
+        const externa = chave.length === 44
           ? await apiExternaService.buscarNotaFiscalPorChave(chave, username, password)
-          : await apiExternaService.buscarNotaFiscalPorNumeroSerie(nota.numeroNota, '1', username, password));
+          : await apiExternaService.buscarNotaFiscalPorNumeroSerie(nota.numeroNota, '1', username, password);
 
         const dados = (externa || {}) as Record<string, unknown>;
         return {

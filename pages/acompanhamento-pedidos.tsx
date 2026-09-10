@@ -558,40 +558,6 @@ function Home() {
 
   useEffect(() => {
     if (isAuthenticated) {
-      try {
-        DASHBOARD_LEGACY_CACHE_KEYS.forEach((key) => window.localStorage.removeItem(key));
-        const cachedDashboard = window.localStorage.getItem(DASHBOARD_LOCAL_CACHE_KEY);
-        if (cachedDashboard) {
-          const parsed = JSON.parse(cachedDashboard) as DashboardLogisticaData;
-          const cacheAtualizado =
-            Array.isArray(parsed.indicadores) &&
-            parsed.filtros?.dataInicio === periodoAplicado.dataInicio &&
-            parsed.filtros?.dataFim === periodoAplicado.dataFim &&
-            parsed.indicadores.every((indicador) =>
-              indicador.pedidos.every((pedido) => Object.prototype.hasOwnProperty.call(pedido, 'tipoEntrega'))
-            );
-          if (cacheAtualizado) {
-            setDashboard(parsed);
-            setLoadingDashboard(false);
-          }
-        }
-
-        const cachedAlertas = window.localStorage.getItem(DASHBOARD_ALERTAS_LOCAL_CACHE_KEY);
-        if (cachedAlertas) {
-          const parsedAlertas = JSON.parse(cachedAlertas) as DashboardLogisticaData;
-          const periodoAlertas = getAlertasPeriodo();
-          if (
-            Array.isArray(parsedAlertas.indicadores) &&
-            parsedAlertas.filtros?.dataInicio === periodoAlertas.dataInicio &&
-            parsedAlertas.filtros?.dataFim === periodoAlertas.dataFim
-          ) {
-            setDashboardAlertas(parsedAlertas);
-          }
-        }
-      } catch {
-        // Ignora cache local corrompido e consulta a API normalmente.
-      }
-
       const acaoFiltro = acaoFiltroPendenteRef.current;
       acaoFiltroPendenteRef.current = null;
       void loadDashboard(false, periodoAplicado, acaoFiltro);
