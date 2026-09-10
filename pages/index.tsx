@@ -943,12 +943,16 @@ function Home() {
     [alertasNaoConferidos.length, alertasNaoEmbarcados.length, alertasNaoSeparados.length]
   );
   const pedidosAlertasCombinados = useMemo(
-    () => [...alertasNaoSeparados, ...alertasNaoConferidos, ...alertasNaoEmbarcados],
+    () => Array.from(new Map(
+      [...alertasNaoSeparados, ...alertasNaoConferidos, ...alertasNaoEmbarcados]
+        .map((pedido) => [pedido.pedidoId, pedido] as const)
+    ).values()),
     [alertasNaoConferidos, alertasNaoEmbarcados, alertasNaoSeparados]
   );
   const dataHojeLabel = useMemo(() => new Intl.DateTimeFormat('pt-BR', {
     day: '2-digit', month: '2-digit', year: '2-digit',
   }).format(new Date()), []);
+  const ultimaAtualizacao = dashboardAlertas?.generatedAt || dashboard?.generatedAt || null;
 
   if (isLoading) {
     return (
@@ -1053,9 +1057,11 @@ function Home() {
             </div>
           </Card>
 
+          <p className="text-center text-xs font-medium text-slate-500">
+            Dados atualizados em {formatDateTime(ultimaAtualizacao)}
+          </p>
+
           <ExpedicaoCards
-            atualizadoEtapasEm={dashboard?.generatedAt}
-            atualizadoAlertasEm={dashboardAlertas?.generatedAt}
             loadingStages={loadingDashboard && !dashboard}
             loadingSecondary={!dashboardAlertas}
             stageCards={cardsHome.map((card) => {

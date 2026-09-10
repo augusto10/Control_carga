@@ -374,7 +374,7 @@ const isDashboardFallbackVazio = (dashboard: DashboardLogisticaData) =>
   Boolean(dashboard.warning) && (dashboard.resumo?.totalPedidos || 0) === 0;
 
 const isTransientDashboardError = (message: string | null) =>
-  Boolean(message) && (
+  message !== null && (
     message.includes('API externa indisponivel') ||
     message.includes('Nao foi possivel carregar o painel logistico agora') ||
     message.includes('Nao foi possivel carregar alertas e pendencias agora') ||
@@ -900,7 +900,10 @@ function Home() {
     [alertasNaoConferidos.length, alertasNaoEmbarcados.length, alertasNaoSeparados.length]
   );
   const pedidosAlertasCombinados = useMemo(
-    () => [...alertasNaoSeparados, ...alertasNaoConferidos, ...alertasNaoEmbarcados],
+    () => Array.from(new Map(
+      [...alertasNaoSeparados, ...alertasNaoConferidos, ...alertasNaoEmbarcados]
+        .map((pedido) => [pedido.pedidoId, pedido] as const)
+    ).values()),
     [alertasNaoConferidos, alertasNaoEmbarcados, alertasNaoSeparados]
   );
   const previewPendencias = useMemo(
@@ -1015,6 +1018,10 @@ function Home() {
             </div>
           </div>
         </Card>
+
+        <p className="text-center text-xs font-medium text-slate-500">
+          Dados atualizados em {formatDateTime(dashboardAlertas?.generatedAt || dashboard?.generatedAt || null)}
+        </p>
 
         {/* Resumo Operacional - Indicadores rápidos para tomada de decisão - OCULTADO TEMPORARIAMENTE
         <Card className="border-slate-200 shadow-sm overflow-hidden">

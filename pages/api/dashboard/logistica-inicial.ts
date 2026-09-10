@@ -1,7 +1,7 @@
 import { buscarEmbarquesAtuais } from '@/lib/pedido-embarques-atuais';
 import { buscarLogisticaAtual } from '@/lib/pedido-logistica-atual';
 import { dadosPedido } from '@/lib/pedido-apresentacao';
-import { saldoPendente, saldoDetalhadoPendente, itensComSaldoPendente, pedidoTemDevolucao } from '@/lib/pedido-pendencias';
+import { saldoPendente, saldoDetalhadoPendente, itensComSaldoPendente, pedidoTemDevolucao, codigoAdmDoProduto } from '@/lib/pedido-pendencias';
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiExternaService } from '@/services/api-externa';
 import { getPedidosDashboard } from '@/lib/dashboard-external-cache';
@@ -464,8 +464,9 @@ const isPedidoComPendencias = (
 
   const possuiProdutoFaltando = (item: Record<string, unknown>) =>
     ['S', 'SIM', 'TRUE', '1'].includes(
-      String(item.POSSUI_PRODUTO_FALTANDO ?? item.possui_produto_faltando ?? '').trim().toUpperCase()
-    );
+      String(item.POSSUI_PRODUTO_FALTANDO ?? item.possui_produto_faltando ?? item.PRODUTO_FALTANDO ?? item.produto_faltando ?? item.PRODUTO_NAO_ENCONTRADO ?? item.produto_nao_encontrado ?? item.NAO_ENCONTRADO ?? item.nao_encontrado ?? item.FALTA ?? item.falta ?? '').trim().toUpperCase()
+    ) ||
+    (toNumber(item.QUANTIDADE_FALTANTE ?? item.quantidade_faltante ?? item.QTD_FALTANTE ?? item.qtd_faltante) || 0) > 0;
   const itensComparativo = Array.isArray(logistica?.comparativo_separacao_pendentes)
     ? logistica.comparativo_separacao_pendentes
     : [];
@@ -506,17 +507,9 @@ const isPedidoComPendencias = (
     itensComparativo.some(possuiProdutoFaltando) ||
     itensEntregasPendentes.some(possuiProdutoFaltando);
 
-  const possuiIndicadorDePendencia =
-    possuiProdutosFaltando ||
-    totalItensPendentes > 0 ||
-    possuiSaldoPendente ||
-    statusLogisticoCodigo === 'PENDENCIAS' ||
-    ultimoStatusSeparacao === 'PENDENCIA' ||
-    statusSeparacoes.includes('PENDENCIA');
-
-  // Saldo de uma separacao ainda aberta nao e pendencia. So entra no card
-  // quando outra separacao do pedido ja foi efetivamente baixada.
-  return possuiSeparacaoEfetivada && (saldoDetalhadoPendente(logistica) ?? possuiIndicadorDePendencia);
+  // Saldo de separacao aberta, status e total historico nao bastam: o card
+  // deve conter somente pedidos com produto faltando confirmado pelo ERP.
+  return possuiSeparacaoEfetivada && possuiProdutosFaltando;
 };
 
 const hasStatusSeparacao = (pedido: Record<string, unknown>, status: string) => {
@@ -648,6 +641,7 @@ const agruparProdutosPendentes = (itens: Record<string, any>[]) => {
 
     const produtoId = toNumber(item.PRODUTO_ID ?? item.produto_id ?? item.ITEM_ID ?? item.item_id);
     const codigo =
+      codigoAdmDoProduto(item) ||
       toStringValue(item.CODIGO_ORIGINAL) ||
       toStringValue(item.codigo_original) ||
       toStringValue(item.CODIGO_BARRAS) ||

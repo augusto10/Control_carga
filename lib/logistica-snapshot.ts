@@ -1,7 +1,7 @@
 import { buscarEmbarquesAtuais } from '@/lib/pedido-embarques-atuais';
 import { buscarLogisticaAtual } from '@/lib/pedido-logistica-atual';
 import { dadosPedido } from '@/lib/pedido-apresentacao';
-import { saldoPendente, saldoDetalhadoPendente, itensComSaldoPendente, pedidoTemDevolucao } from '@/lib/pedido-pendencias';
+import { saldoPendente, saldoDetalhadoPendente, itensComSaldoPendente, pedidoTemDevolucao, codigoAdmDoProduto } from '@/lib/pedido-pendencias';
 import type { Prisma } from '@prisma/client';
 import prisma from '@/lib/prisma';
 import { apiExternaService } from '@/services/api-externa';
@@ -312,7 +312,7 @@ const agruparProdutosPendentes = (itens: Record<string, any>[]) => {
     if (quantidade <= 0) continue;
 
     const produtoId = toNumber(item.PRODUTO_ID);
-    const codigo = toStringValue(item.CODIGO_ORIGINAL) || toStringValue(item.CODIGO_BARRAS);
+    const codigo = codigoAdmDoProduto(item) || toStringValue(item.CODIGO_ORIGINAL) || toStringValue(item.CODIGO_BARRAS);
     const nome = toStringValue(item.PRODUTO_NOME) || 'Produto nao informado';
     const chave = String(produtoId ?? codigo ?? nome);
     const atual = agrupados.get(chave);
@@ -364,20 +364,16 @@ const isPedidoComPendencias = (pedido: Record<string, unknown>, logistica: Recor
     );
   const possuiProdutosFaltando =
     ['S', 'SIM', 'TRUE', '1'].includes(
-      String(pedido.possui_produtos_faltando ?? pedido.POSSUI_PRODUTO_FALTANDO ?? '').trim().toUpperCase()
+      String(pedido.possui_produtos_faltando ?? pedido.POSSUI_PRODUTO_FALTANDO ?? pedido.PRODUTO_FALTANDO ?? pedido.produto_faltando ?? pedido.PRODUTO_NAO_ENCONTRADO ?? pedido.produto_nao_encontrado ?? pedido.NAO_ENCONTRADO ?? pedido.nao_encontrado ?? pedido.FALTA ?? pedido.falta ?? '').trim().toUpperCase()
     ) ||
     ['S', 'SIM', 'TRUE', '1'].includes(
-      String(logistica?.resumo_pendencias_logisticas?.POSSUI_PRODUTO_FALTANDO ?? '').trim().toUpperCase()
+      String(logistica?.resumo_pendencias_logisticas?.POSSUI_PRODUTO_FALTANDO ?? logistica?.resumo_pendencias_logisticas?.PRODUTO_FALTANDO ?? '').trim().toUpperCase()
+    ) ||
+    [...itensComparativo, ...itensEntregasPendentes].some((item) =>
+      ['S', 'SIM', 'TRUE', '1'].includes(String(item.POSSUI_PRODUTO_FALTANDO ?? item.possui_produto_faltando ?? item.PRODUTO_FALTANDO ?? item.produto_faltando ?? item.PRODUTO_NAO_ENCONTRADO ?? item.produto_nao_encontrado ?? item.NAO_ENCONTRADO ?? item.nao_encontrado ?? item.FALTA ?? item.falta ?? '').trim().toUpperCase()) ||
+      (toNumber(item.QUANTIDADE_FALTANTE ?? item.quantidade_faltante ?? item.QTD_FALTANTE ?? item.qtd_faltante) || 0) > 0
     );
-  const possuiIndicador =
-    possuiProdutosFaltando ||
-    totalItensPendentes > 0 ||
-    possuiSaldoPendente ||
-    statusLogisticoCodigo === 'PENDENCIAS' ||
-    ultimoStatusSeparacao === 'PENDENCIA' ||
-    statusSeparacoes.includes('PENDENCIA');
-
-  return possuiSeparacaoEfetivada && (saldoDetalhadoPendente(logistica) ?? possuiIndicador);
+  return possuiSeparacaoEfetivada && possuiProdutosFaltando;
 };
 
 const isPedidoParaAlerta = (dataHoraRecebimento: Date | null) => {
@@ -872,11 +868,22 @@ export async function montarDashboardPorSnapshot(
     const controleAtual = embarques.porPedido.get(snapshot.pedidoId);
     const embarcadoNoControle = Boolean(controleAtual || snapshot.embarcadoNoControle);
     const numeroManifesto = controleAtual?.numeroManifesto || snapshot.numeroManifesto;
-    const saldoAtual = saldoDetalhadoPendente(snapshot.rawLogistica);
     const resumoIndicaPendencia =
-      (rawPedido.possui_produtos_faltando === true || rawPedido.POSSUI_PRODUTO_FALTANDO === true) &&
+      (['S', 'SIM', 'TRUE', '1'].includes(String(rawPedido.possui_produtos_faltando ?? rawPedido.POSSUI_PRODUTO_FALTANDO ?? '').trim().toUpperCase())) &&
       ['G', 'PENDENCIA'].includes(String(rawPedido.ultimo_status_separacao || '').toUpperCase());
-    const possuiPendencia = saldoAtual ?? (Boolean(snapshot.possuiPendencia) || resumoIndicaPendencia);
+    const itensPendenciaAtual = [
+      ...(Array.isArray(snapshot.rawLogistica?.comparativo_separacao_pendentes)
+        ? snapshot.rawLogistica.comparativo_separacao_pendentes : []),
+      ...(Array.isArray(snapshot.rawLogistica?.itens_entregas_pendentes)
+        ? snapshot.rawLogistica.itens_entregas_pendentes : []),
+    ];
+    const possuiProdutoFaltandoAtual =
+      resumoIndicaPendencia ||
+      itensPendenciaAtual.some((item: Record<string, any>) =>
+        ['S', 'SIM', 'TRUE', '1'].includes(String(item.POSSUI_PRODUTO_FALTANDO ?? item.possui_produto_faltando ?? item.PRODUTO_FALTANDO ?? item.produto_faltando ?? item.PRODUTO_NAO_ENCONTRADO ?? item.produto_nao_encontrado ?? item.NAO_ENCONTRADO ?? item.nao_encontrado ?? item.FALTA ?? item.falta ?? '').trim().toUpperCase()) ||
+        (toNumber(item.QUANTIDADE_FALTANTE ?? item.quantidade_faltante ?? item.QTD_FALTANTE ?? item.qtd_faltante) || 0) > 0
+      );
+    const possuiPendencia = possuiProdutoFaltandoAtual;
     const produtosPendentes = !possuiPendencia ? []
       : saldoDetalhadoPendente(snapshot.rawLogistica) !== null ? getProdutosPendentes(snapshot.rawLogistica)
       : Array.isArray(snapshot.produtosPendentes) ? snapshot.produtosPendentes : [];

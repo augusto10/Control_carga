@@ -44,8 +44,6 @@ interface ExpedicaoCardsProps {
   loadingStages?: boolean;
   loadingSecondary?: boolean;
   wideLayout?: boolean;
-  atualizadoEtapasEm?: string | null;
-  atualizadoAlertasEm?: string | null;
 }
 
 const formatAtualizacao = (value?: string | null) => {
@@ -62,12 +60,10 @@ const StageCard = ({
   item,
   index,
   loading,
-  atualizadoEm,
 }: {
   item: StageCardItem;
   index: number;
   loading: boolean;
-  atualizadoEm?: string | null;
 }) => {
   const Icon = item.icon;
 
@@ -114,9 +110,6 @@ const StageCard = ({
           )}
         </div>
 
-        <p className="text-[10px] font-semibold text-white/75">
-          Atualizado em {formatAtualizacao(atualizadoEm)}
-        </p>
       </div>
     </motion.button>
   );
@@ -129,8 +122,6 @@ export function ExpedicaoCards({
   loadingStages = false,
   loadingSecondary = false,
   wideLayout = false,
-  atualizadoEtapasEm,
-  atualizadoAlertasEm,
 }: ExpedicaoCardsProps) {
   const hasAlertas = alertas.total > 0;
   const hasPendencias = pendencias.total > 0;
@@ -142,7 +133,7 @@ export function ExpedicaoCards({
         wideLayout ? 'grid-cols-5' : 'md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5'
       )}>
         {stageCards.map((item, index) => (
-          <StageCard key={item.key} item={item} index={index} loading={loadingStages} atualizadoEm={atualizadoEtapasEm} />
+          <StageCard key={item.key} item={item} index={index} loading={loadingStages} />
         ))}
       </div>
 
@@ -188,6 +179,10 @@ export function ExpedicaoCards({
               </div>
             </div>
 
+            <div className="mt-3 grid grid-cols-[1fr_auto] items-center gap-3 text-[11px] font-bold sm:text-xs">
+              <span className="uppercase">Total de pedidos com alerta:</span>
+              <strong className="text-2xl sm:text-3xl">{loadingSecondary ? '-' : alertas.total}</strong>
+            </div>
             <div className="mt-3 space-y-1 text-[11px] font-bold sm:text-xs">
               <div className="grid grid-cols-[1fr_auto] items-center gap-3">
                 <span className="uppercase">Pedidos não separados:</span>
@@ -202,9 +197,6 @@ export function ExpedicaoCards({
                 <strong className="text-lg sm:text-xl">{loadingSecondary ? '-' : alertas.naoEmbarcado || ''}</strong>
               </div>
             </div>
-            <p className="mt-auto pt-2 text-[10px] font-semibold text-white/75">
-              Atualizado em {formatAtualizacao(atualizadoAlertasEm)}
-            </p>
           </div>
         </motion.button>
 
@@ -281,9 +273,6 @@ export function ExpedicaoCards({
                 </div>
               ) : null}
             </div>
-            <p className="mt-auto pt-2 text-[10px] font-semibold text-white/75">
-              Atualizado em {formatAtualizacao(atualizadoAlertasEm)}
-            </p>
           </div>
         </motion.button>
       </div>
