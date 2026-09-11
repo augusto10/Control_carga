@@ -1078,6 +1078,12 @@ export default async function handler(
       if (!notaExterna) {
         const numeroNotaLocal = normalizeNumeroNota(notaLocal.numeroNota);
         const pedidoIdLocal = toNumber(numeroNotaLocal);
+        if (pedidoIdLocal) {
+          pedidosLocaisParaValidarPendencias.set(pedidoIdLocal, {
+            pedido_id: pedidoIdLocal,
+            __forcarLogisticaDetalhada: true,
+          });
+        }
         if (pedidoIdLocal && !pedidosEmbarcadosLocais.has(pedidoIdLocal)) {
           const controleInfo =
             getControleInfoByReferencia({
@@ -1329,11 +1335,30 @@ export default async function handler(
     // Alguns pedidos já vinculados a um controle deixam de aparecer na lista
     // principal da API externa. Mesmo assim, eles precisam ser reavaliados no
     // endpoint de logística para que uma pendência atual não seja perdida.
-    const entradasPendenciasLocais: EnrichedDashboardEntry[] = (await enrichDashboardEntries(
+    const entradasLocaisValidadas: EnrichedDashboardEntry[] = (await enrichDashboardEntries(
       Array.from(pedidosLocaisParaValidarPendencias.values())
-    )).filter(
-      (entry): entry is EnrichedDashboardEntry => Boolean(entry?.possuiPendencia)
+    )).filter((entry): entry is EnrichedDashboardEntry => Boolean(entry));
+    const entradasPendenciasLocais = entradasLocaisValidadas.filter((entry) => entry.possuiPendencia);
+
+    // Se o ERP informar ATO/RLR/NDF ou outro tipo que não seja entrega, o
+    // pedido não deve permanecer no quadro só porque existe uma nota local.
+    const pedidosLocaisValidados = new Set(
+      entradasLocaisValidadas.map((entry) => entry.item.pedidoId)
     );
+    for (const pedidoId of pedidosLocaisParaValidarPendencias.keys()) {
+      if (!pedidosLocaisValidados.has(pedidoId)) {
+        pedidosEmbarcadosLocais.delete(pedidoId);
+      }
+    }
+    for (const entry of entradasLocaisValidadas) {
+      const local = pedidosEmbarcadosLocais.get(entry.item.pedidoId);
+      if (local) {
+        pedidosEmbarcadosLocais.set(entry.item.pedidoId, {
+          ...local,
+          tipoEntrega: entry.item.tipoEntrega,
+        });
+      }
+    }
 
     const embarquesAtuais = await buscarEmbarquesAtuais(entradasValidas.map(({ item }) => ({
       pedidoId: item.pedidoId,
