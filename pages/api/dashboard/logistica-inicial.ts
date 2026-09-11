@@ -5,7 +5,6 @@ import { saldoPendente, saldoDetalhadoPendente, itensComSaldoPendente, pedidoTem
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiExternaService } from '@/services/api-externa';
 import { getPedidosDashboard } from '@/lib/dashboard-external-cache';
-import { montarDashboardPorSnapshot } from '@/lib/logistica-snapshot';
 import prisma from '@/lib/prisma';
 
 const DASHBOARD_PREVISAO_FINAL = '2050-12-31';
@@ -811,25 +810,6 @@ export default async function handler(
   }
 
   res.setHeader('Cache-Control', 'private, no-store, max-age=0');
-  const cacheAtual = getCacheByPeriodo(periodoFiltro.cacheKey);
-
-  if (!forceRefresh) {
-    // A tabela local e a fonte preferencial; a API externa alimenta o snapshot.
-    const snapshotLocal = await montarDashboardPorSnapshot(periodoFiltro);
-    if (snapshotLocal) {
-      setCacheByPeriodo(periodoFiltro.cacheKey, snapshotLocal);
-      return res.status(200).json(snapshotLocal);
-    }
-
-    // Mesmo sem snapshot recente, aproveitamos o cache em memoria antes da API.
-    if (cacheAtual && cacheAtual.staleAt > Date.now()) {
-      return res.status(200).json({
-        ...cacheAtual.payload,
-        cached: true,
-        stale: cacheAtual.expiresAt <= Date.now(),
-      });
-    }
-  }
 
   try {
     const dataFimDashboard = periodoFiltro.dataFimIso || undefined;
@@ -1557,15 +1537,6 @@ export default async function handler(
 
     if (cacheStale && cacheStale.staleAt > Date.now()) {
       return res.status(200).json({ ...cacheStale.payload, stale: true });
-    }
-
-    const snapshotFallback = await montarDashboardPorSnapshot(periodoFiltro, {
-      warning: 'API externa indisponivel. Exibindo ultima base local sincronizada.',
-    });
-
-    if (snapshotFallback) {
-      setCacheByPeriodo(periodoFiltro.cacheKey, snapshotFallback);
-      return res.status(200).json(snapshotFallback);
     }
 
     return res.status(200).json(
