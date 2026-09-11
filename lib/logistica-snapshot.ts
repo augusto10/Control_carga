@@ -972,6 +972,11 @@ export async function montarDashboardPorSnapshot(
     }
   }
 
+  // Um snapshot pode existir, mas ficar sem registros depois dos filtros de
+  // tipo/devolução. Nesse caso ele não pode substituir a consulta atual do
+  // ERP por um painel inteiro zerado.
+  if (entries.length === 0) return null;
+
   const indicadores = STATUS_ORDER.map((statusCode) => {
     const pedidos = entries
       .filter((entry) => entry.statusCodigo === statusCode)
