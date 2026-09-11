@@ -1431,11 +1431,18 @@ export default async function handler(
     });
 
     const totalPedidos = indicadores.reduce((acc, item) => acc + item.total, 0);
-    const totalEmbarcados = indicadores.find((item) => item.codigo === 'PEDIDOS_EMBARCADOS')?.total || 0;
-    const notasLocaisUnicas = new Set(
-      notasEmControles.map((nota) => `${normalizeNumeroNota(nota.numeroNota)}:${onlyDigits(nota.codigo)}`)
-    );
-    const totalEmbarcadosComBaseLocal = Math.max(totalEmbarcados, notasLocaisUnicas.size);
+    // O indicador representa pedidos, não notas fiscais. Um mesmo pedido pode
+    // possuir várias notas no controle e não pode ser contado várias vezes.
+    const pedidosEmbarcadosUnicos = new Map<number, DashboardPedidoItem>();
+    for (const entry of embarcadosEntries) {
+      pedidosEmbarcadosUnicos.set(entry.item.pedidoId, entry.item);
+    }
+    for (const entry of embarcadosLocaisEntries) {
+      if (!pedidosEmbarcadosUnicos.has(entry.item.pedidoId)) {
+        pedidosEmbarcadosUnicos.set(entry.item.pedidoId, entry.item);
+      }
+    }
+    const totalEmbarcadosComBaseLocal = pedidosEmbarcadosUnicos.size;
     const embarcadosPorTransportadora: Record<string, number> = {
       ACCERT: 0,
       'EXPRESSO GOIAS': 0,
@@ -1443,9 +1450,9 @@ export default async function handler(
       DETAFRA: 0,
       TERCEIRIZADA: 0,
     };
-    const notasTransportadorasContadas = new Set<string>();
-    for (const nota of notasEmControles) {
-      const transportadora = String(nota.controle?.transportadora || '')
+    const pedidosTransportadorasContados = new Set<number>();
+    for (const pedido of pedidosEmbarcadosUnicos.values()) {
+      const transportadora = String(pedido.transportadoraNome || '')
         .normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '')
         .toUpperCase();
@@ -1460,9 +1467,8 @@ export default async function handler(
               : transportadora.includes('TERCEIRIZADA')
                 ? 'TERCEIRIZADA'
                 : null;
-      const chave = `${normalizeNumeroNota(nota.numeroNota)}:${onlyDigits(nota.codigo)}:${nome || 'OUTRA'}`;
-      if (nome && !notasTransportadorasContadas.has(chave)) {
-        notasTransportadorasContadas.add(chave);
+      if (nome && !pedidosTransportadorasContados.has(pedido.pedidoId)) {
+        pedidosTransportadorasContados.add(pedido.pedidoId);
         embarcadosPorTransportadora[nome] += 1;
       }
     }
