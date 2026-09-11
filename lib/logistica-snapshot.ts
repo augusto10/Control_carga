@@ -951,7 +951,13 @@ export async function montarDashboardPorSnapshot(
     }
 
     const alertaStatus = isPedidoParaAlerta(snapshot.dataHoraRecebimento)
-      ? deriveAlertaStatus(statusBase, possuiPendencia, embarcadoNoControle)
+      ? deriveAlertaStatus(
+          statusBase,
+          possuiPendencia,
+          embarcadoNoControle ||
+            (Array.isArray(snapshot.rawLogistica?.entregas) && snapshot.rawLogistica.entregas.length > 0) ||
+            String(snapshot.rawLogistica?.status_logistico?.origem || '').trim().toUpperCase() === 'ENTREGAS'
+        )
       : null;
     if (alertaStatus) {
       entries.push({

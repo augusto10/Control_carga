@@ -1276,6 +1276,11 @@ export default async function handler(
             pedidosEmbarcadosPorNota.has(pedidoId) || isNotaEmControle(referenciaNota);
           const controleInfo = getControleInfoByReferencia(referenciaNota);
           const produtosPendentes = possuiPendencia ? getProdutosPendentes(logistica, 'PENDENCIA') : [];
+          const entregaConfirmadaNoErp =
+            (Array.isArray(logistica?.entregas) && logistica.entregas.length > 0) ||
+            String((logistica?.status_logistico as Record<string, unknown> | undefined)?.origem || '')
+              .trim()
+              .toUpperCase() === 'ENTREGAS';
 
           const pedidoItem: DashboardPedidoItem = {
             statusOperacionalCodigo: embarcadoNoControle ? 'PEDIDOS_EMBARCADOS' : statusCodigo,
@@ -1309,7 +1314,7 @@ export default async function handler(
           };
 
           const alertaStatus = isPedidoParaAlerta(pedido)
-            ? deriveAlertaStatus(statusCodigo, possuiPendencia, embarcadoNoControle)
+            ? deriveAlertaStatus(statusCodigo, possuiPendencia, embarcadoNoControle || entregaConfirmadaNoErp)
             : null;
 
           return {
