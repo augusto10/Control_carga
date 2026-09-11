@@ -479,6 +479,10 @@ const isPedidoComPendencias = (
   const possuiSeparacaoEfetivada =
     ultimoStatusSeparacao === 'G' ||
     statusSeparacoes.includes('G') ||
+    ['PEDIDO_EMBARCADO', 'EMBARCADO'].includes(
+      String(logistica?.status_logistico?.codigo ?? '').trim().toUpperCase()
+    ) ||
+    String(logistica?.status_logistico?.status_separacao ?? '').trim().toUpperCase() === 'EMBARCADO' ||
     separacoes.some((separacao) => {
       const status = String(separacao.STATUS ?? '').trim().toUpperCase();
       return (
