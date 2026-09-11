@@ -1119,7 +1119,7 @@ export default async function handler(
           notaExterna.tipoEntrega,
           notaExterna.TIPO_ENTREGA_DESCRICAO,
           notaExterna.tipo_entrega_descricao
-        ) || null;
+        ) || 'EPG';
       if (
         !isPedidoPermitidoNoDashboard(
           {
