@@ -505,7 +505,8 @@ const isPedidoComPendencias = (
   // válida para o quadro são os itens detalhados da entrega/comparativo.
   const possuiProdutosFaltando =
     itensComparativo.some(possuiProdutoFaltando) ||
-    itensEntregasPendentes.some(possuiProdutoFaltando);
+    itensEntregasPendentes.some(possuiProdutoFaltando) ||
+    possuiSaldoPendente;
 
   // Saldo de separacao aberta, status e total historico nao bastam: o card
   // deve conter somente pedidos com produto faltando confirmado pelo ERP.
@@ -1200,6 +1201,7 @@ export default async function handler(
           let pedido = entry as Record<string, unknown>;
           const pedidoId = toNumber(pedido.pedido_id);
           const statusLogistico = (pedido.status_logistico || {}) as Record<string, unknown>;
+          const statusLogisticoCodigo = toStringValue(statusLogistico.codigo)?.toUpperCase();
           let logistica = (pedido.logistica || {}) as Record<string, any>;
           const tipoEntregaInicial = getTipoEntregaPrincipal(pedido, logistica);
           const tipoEntregaLista = pedidoId ? tipoEntregaPorPedido.get(pedidoId) : undefined;
@@ -1207,7 +1209,8 @@ export default async function handler(
           const precisaLogisticaDetalhada =
             forcarLogisticaDetalhada ||
             (!tipoEntregaInicial && !tipoEntregaLista) ||
-            hasResumoPendenciaNoPedido(pedido);
+            hasResumoPendenciaNoPedido(pedido) ||
+            statusLogisticoCodigo === 'PEDIDO_EMBARCADO';
 
           if (
             pedidoId &&
