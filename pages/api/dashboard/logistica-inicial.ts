@@ -1041,6 +1041,7 @@ export default async function handler(
 
     const pedidosEmbarcadosPorNota = new Set<number>();
     const pedidosEmbarcadosLocais = new Map<number, DashboardPedidoItem>();
+    const pedidosLocaisParaValidarPendencias = new Map<number, Record<string, any>>();
 
     for (const nota of notasCompletas?.data || []) {
       const referencia = getNotaDoPedido(nota);
@@ -1110,6 +1111,12 @@ export default async function handler(
 
       const pedidoId = getPedidoId(notaExterna);
       if (!pedidoId) continue;
+
+      pedidosLocaisParaValidarPendencias.set(pedidoId, {
+        ...notaExterna,
+        pedido_id: pedidoId,
+        __forcarLogisticaDetalhada: true,
+      });
 
       const tipoEntregaLocal =
         pickString(
@@ -1190,14 +1197,16 @@ export default async function handler(
           let logistica = (pedido.logistica || {}) as Record<string, any>;
           const tipoEntregaInicial = getTipoEntregaPrincipal(pedido, logistica);
           const tipoEntregaLista = pedidoId ? tipoEntregaPorPedido.get(pedidoId) : undefined;
+          const forcarLogisticaDetalhada = Boolean(pedido.__forcarLogisticaDetalhada);
           const precisaLogisticaDetalhada =
+            forcarLogisticaDetalhada ||
             (!tipoEntregaInicial && !tipoEntregaLista) ||
             hasResumoPendenciaNoPedido(pedido);
 
           if (
             pedidoId &&
             precisaLogisticaDetalhada &&
-            (hasResumoPendenciaNoPedido(pedido) || detailedLookupCount < MAX_LOGISTICA_LOOKUPS_PER_REQUEST)
+            (forcarLogisticaDetalhada || hasResumoPendenciaNoPedido(pedido) || detailedLookupCount < MAX_LOGISTICA_LOOKUPS_PER_REQUEST)
           ) {
             detailedLookupCount += 1;
             const logisticaDetalhada = await getPedidoLogisticaCached(pedidoId, username, password);
@@ -1317,6 +1326,15 @@ export default async function handler(
         } => Boolean(entry)
       );
 
+    // Alguns pedidos já vinculados a um controle deixam de aparecer na lista
+    // principal da API externa. Mesmo assim, eles precisam ser reavaliados no
+    // endpoint de logística para que uma pendência atual não seja perdida.
+    const entradasPendenciasLocais: EnrichedDashboardEntry[] = (await enrichDashboardEntries(
+      Array.from(pedidosLocaisParaValidarPendencias.values())
+    )).filter(
+      (entry): entry is EnrichedDashboardEntry => Boolean(entry?.possuiPendencia)
+    );
+
     const embarquesAtuais = await buscarEmbarquesAtuais(entradasValidas.map(({ item }) => ({
       pedidoId: item.pedidoId,
       numeroNota: notaPorPedido.get(item.pedidoId)?.numeroNota,
@@ -1333,7 +1351,7 @@ export default async function handler(
       entry.item.transportadoraNome = controle.transportadoraNome;
       entry.item.localNome = controle.numeroManifesto ? `Controle ${controle.numeroManifesto}` : entry.item.localNome;
     }
-    const entradasPendenciasGlobais = entradasValidas;
+    const entradasPendenciasGlobais = [...entradasValidas, ...entradasPendenciasLocais];
 
     // Agrupar pedidos para os quadros de alerta
     const alertaEntries: { statusCodigo: StatusCode; item: DashboardPedidoItem }[] = [];
