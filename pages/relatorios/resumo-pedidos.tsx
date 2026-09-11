@@ -84,9 +84,10 @@ const formatDateLabel = (value: string) => {
 const getPeriodoAtual = () => {
   const hoje = new Date();
   // Retorna os últimos 7 dias ao invés de apenas hoje
-  const seteDidasAtras = new Date(hoje.getTime() - 7 * 24 * 60 * 60 * 1000);
-  const dataInicio = formatDateInputValue(seteDidasAtras);
-  const dataFim = formatDateInputValue(hoje);
+  const ontem = new Date(hoje);
+  ontem.setDate(ontem.getDate() - 1);
+  const dataInicio = formatDateInputValue(ontem);
+  const dataFim = formatDateInputValue(ontem);
   return { dataInicio, dataFim };
 };
 
@@ -438,6 +439,7 @@ export default function ResumoPedidosPage() {
   }, [criarArquivoPdf]);
 
   const relatorioIndisponivel = Boolean(error);
+  const processandoRelatorio = loading || refreshing || aplicando;
 
   return (
     <ProtectedRoute>
@@ -498,6 +500,16 @@ export default function ResumoPedidosPage() {
               </div>
             </div>
           </Card>
+
+          {processandoRelatorio && (
+            <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/20 backdrop-blur-[1px]">
+              <div className="flex min-w-[220px] flex-col items-center gap-3 rounded-2xl bg-white px-8 py-7 text-center shadow-2xl">
+                <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                <p className="text-sm font-semibold text-slate-700">Gerando relatório...</p>
+                <p className="text-xs text-slate-500">Aguarde enquanto os dados são atualizados.</p>
+              </div>
+            </div>
+          )}
 
           {error && (
             <Card className="border-rose-200 bg-rose-50 text-rose-700">
