@@ -853,11 +853,16 @@ export async function montarDashboardPorSnapshot(
   let totalRetirados = 0;
 
   for (const snapshot of snapshots) {
-    const tipoEntrega = String(snapshot.tipoEntrega || '').trim().toUpperCase();
     const rawPedido = (snapshot.rawPedido || {}) as Record<string, unknown>;
+    const tipoEntrega = String(
+      getTipoEntregaPrincipal(rawPedido, snapshot.rawLogistica) || snapshot.tipoEntrega || ''
+    ).trim().toUpperCase();
     if (pedidoTemDevolucao(rawPedido, snapshot.rawLogistica)) continue;
     const ehRetirada = ['ATO', 'NDF', 'RDL', 'RLR'].includes(tipoEntrega) || isRetiradaConfirmada(rawPedido);
-    const ehEntrega = ['ENT', 'EPG'].includes(tipoEntrega) || (!tipoEntrega && !ehRetirada);
+    // O painel deve exibir somente entregas explicitamente classificadas pelo
+    // ERP. Tipo ausente não pode voltar como entrega por causa de snapshot
+    // antigo ou incompleto.
+    const ehEntrega = ['ENT', 'EPG'].includes(tipoEntrega);
     if (ehRetirada) totalRetirados += 1;
     if (!ehEntrega) continue;
 
