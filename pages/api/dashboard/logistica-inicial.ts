@@ -813,7 +813,10 @@ export default async function handler(
   res.setHeader('Cache-Control', 'private, no-store, max-age=0');
   const cacheAtual = getCacheByPeriodo(periodoFiltro.cacheKey);
 
-  if (!forceRefresh) {
+  // O snapshot permanece no fluxo rápido dos cards operacionais. Alertas e
+  // pendências precisam da situação atual do ERP para não reapresentar pedido
+  // resolvido nem deixar de descobrir uma pendência nova.
+  if (!forceRefresh && escopoPrincipal) {
     // A tabela local e a fonte preferencial; a API externa alimenta o snapshot.
     const snapshotLocal = await montarDashboardPorSnapshot(periodoFiltro);
     if (snapshotLocal) {
@@ -1555,8 +1558,18 @@ export default async function handler(
     console.error('[Dashboard Logistica Inicial] Erro:', error);
     const cacheStale = getCacheByPeriodo(periodoFiltro.cacheKey);
 
-    if (cacheStale && cacheStale.staleAt > Date.now()) {
+    // Alertas mudam conforme separações, entregas e devoluções. Para essa
+    // consulta, somente um resultado recente da própria API pode ser usado;
+    // o snapshot histórico não deve recolocar pedidos já resolvidos.
+    const limiteCache = escopoPrincipal ? cacheStale?.staleAt : cacheStale?.expiresAt;
+    if (cacheStale && limiteCache && limiteCache > Date.now()) {
       return res.status(200).json({ ...cacheStale.payload, stale: true });
+    }
+
+    if (!escopoPrincipal) {
+      return res.status(200).json(
+        getEmptyDashboardPayload('API externa indisponivel. Mantendo os ultimos alertas validos na tela.')
+      );
     }
 
     const snapshotFallback = await montarDashboardPorSnapshot(periodoFiltro, {
