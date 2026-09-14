@@ -470,6 +470,11 @@ const temProdutoPendenteConfirmado = (item: Record<string, unknown>) => {
   const possuiMarcacaoDeFalta = ['S', 'SIM', 'TRUE', '1'].includes(
     String(item.POSSUI_PRODUTO_FALTANDO ?? item.possui_produto_faltando ?? item.PRODUTO_FALTANDO ?? item.produto_faltando ?? item.PRODUTO_NAO_ENCONTRADO ?? item.produto_nao_encontrado ?? item.NAO_ENCONTRADO ?? item.nao_encontrado ?? item.FALTA ?? item.falta ?? '').trim().toUpperCase()
   );
+
+const hasPendenciaConfirmadaNoConsolidado = (pedido: Record<string, unknown>) =>
+  ['S', 'SIM', 'TRUE', '1'].includes(
+    String(pedido.possui_produtos_faltando ?? pedido.POSSUI_PRODUTO_FALTANDO ?? '').trim().toUpperCase()
+  ) && (toNumber(pedido.total_itens_pendentes ?? pedido.TOTAL_ITENS_PENDENTES) || 0) > 0;
   const quantidadeFaltante = (toNumber(
     item.QUANTIDADE_FALTANTE ?? item.quantidade_faltante ?? item.QTD_FALTANTE ?? item.qtd_faltante
   ) || 0) > 0;
@@ -800,7 +805,17 @@ const getTipoEntregaPrincipal = (pedido: Record<string, unknown>, logistica?: Re
 
 const isPedidoPermitidoNoDashboard = (pedido: Record<string, unknown>, logistica?: Record<string, unknown>) => {
   const tiposEntrega = getTiposEntrega(pedido, logistica);
-  if (tiposEntrega.length === 0) return false;
+  if (tiposEntrega.length === 0) {
+    // O consolidado do ERP nao traz o tipo em todas as linhas. Para alertas,
+    // ele ainda e valido quando a propria API confirma que nao foi retirada
+    // nem entrega no ato. O detalhamento e reservado para pendencias reais.
+    if (pedido.__origemDashboardLogistica === true) {
+      const retirada = pedido.retirada as Record<string, unknown> | undefined;
+      return !hasEntregaNoAto(pedido, logistica) &&
+        !['S', 'SIM', 'TRUE', '1'].includes(String(retirada?.foi_retirado ?? '').trim().toUpperCase());
+    }
+    return false;
+  }
   return isPedidoSomenteEntrega(pedido, logistica);
 };
 
@@ -950,16 +965,13 @@ export default async function handler(
         : Promise.resolve(null)),
       timed(
         'notas_externas',
-        // Sempre buscar notas externas para poder vincular com controles locais
-        // mesmo em escopo principal, mas com limite menor
-        apiExternaService.listarNotasFiscaisCompletas(
-          { limit: escopoPrincipal ? 100 : 500, offset: 0 },
-          username,
-          password,
-          escopoPrincipal ? 4_000 : 6_000
-        ).catch(() => null) // Se falhar em escopo principal, continua sem notas
+        escopoPrincipal
+          ? apiExternaService.listarNotasFiscaisCompletas(
+              { limit: 100, offset: 0 }, username, password, 4_000
+            ).catch(() => null)
+          : Promise.resolve(null)
       ),
-      timed('notas_locais', prisma.notaFiscal.findMany({
+      timed('notas_locais', escopoPrincipal ? prisma.notaFiscal.findMany({
         where: {
           controleId: { not: null },
           ...(periodoFiltro.dataInicio || periodoFiltro.dataFim
@@ -999,7 +1011,7 @@ export default async function handler(
         },
         orderBy: { dataCriacao: 'desc' },
         take: MAX_NOTAS_EM_CONTROLE_DETALHE,
-      })),
+      }) : Promise.resolve([])),
     ]);
     res.setHeader(
       'Server-Timing',
@@ -1019,7 +1031,7 @@ export default async function handler(
         (pedido.status_logistico || {}) as Record<string, unknown>,
         (pedido.logistica || {}) as Record<string, any>
       );
-      return hasResumoPendenciaNoPedido(pedido) || (
+      return hasPendenciaConfirmadaNoConsolidado(pedido) || (
         Boolean(status && ['PEDIDO_NOVO', 'PEDIDO_EM_SEPARACAO', 'PEDIDO_SEPARADO', 'PEDIDO_EMBARCADO'].includes(status)) &&
         isPedidoParaAlerta(pedido)
       );
@@ -1031,7 +1043,13 @@ export default async function handler(
       ? [...entradasConsolidadas, ...pedidosComTipo.map(normalizarEntradaDashboard)]
       : entradasConsolidadas
           .filter(ehCandidatoDeAlerta)
-          .map((pedido) => ({ ...pedido, __forcarLogisticaDetalhada: true }))
+          .map((pedido) => ({
+            ...pedido,
+            // Somente pendencia confirmada precisa do detalhamento para
+            // montar a lista de produtos. Atrasados usam o status ja
+            // calculado pelo consolidado e nao podem atrasar toda a tela.
+            __forcarLogisticaDetalhada: hasPendenciaConfirmadaNoConsolidado(pedido),
+          }))
     ).filter((item, index, entries) => {
       const pedidoId = getPedidoId(item);
       return !pedidoId || entries.findIndex((candidate) => getPedidoId(candidate) === pedidoId) === index;
@@ -1513,14 +1531,7 @@ export default async function handler(
       if (
         !entry.possuiPendencia ||
         entry.item.produtosPendentes.length === 0 ||
-        entry.item.totalItensPendentes <= 0 ||
-        !isPedidoPermitidoNoDashboard(
-          {
-            tipo_entrega: entry.item.tipoEntrega,
-            TIPO_ENTREGA: entry.item.tipoEntrega,
-          },
-          undefined
-        )
+        entry.item.totalItensPendentes <= 0
       ) {
         continue;
       }
@@ -1566,15 +1577,7 @@ export default async function handler(
       ...embarcadosEntries,
       ...embarcadosLocaisEntries,
       ...alertaEntries,
-    ].filter((entry) =>
-      isPedidoPermitidoNoDashboard(
-        {
-          tipo_entrega: entry.item.tipoEntrega,
-          TIPO_ENTREGA: entry.item.tipoEntrega,
-        },
-        undefined
-      )
-    );
+    ];
 
     const indicadores: DashboardStatusItem[] = STATUS_ORDER.map((statusCode) => {
       const pedidosStatus = allEntries
