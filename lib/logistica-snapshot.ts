@@ -18,8 +18,6 @@ const STATUS_ORDER = [
   'ALERTAS_NAO_EMBARCADOS',
 ] as const;
 
-const SNAPSHOT_ATIVO_META = '__snapshotAtivoNoErp';
-
 type StatusCode = (typeof STATUS_ORDER)[number];
 
 type PeriodoSnapshot = {
@@ -239,6 +237,8 @@ const isPedidoPermitidoNoDashboard = (
   if (hasEntregaNoAto(pedido, logistica)) return false;
   if (isRetiradaConfirmada(pedido)) return permitirTipoAusente;
   const tipos = getTiposEntrega(pedido, logistica);
+  const tipoCodigo = tipos.find((tipo) => ['ENT', 'EPG', 'ATO', 'RLR', 'NDF', 'RDL'].includes(tipo));
+  if (tipoCodigo && !['ENT', 'EPG'].includes(tipoCodigo)) return false;
   return tipos.some((tipo) => ['ENT', 'EPG'].includes(tipo)) || (permitirTipoAusente && tipos.length === 0);
 };
 
@@ -273,6 +273,31 @@ const deriveDashboardStatus = (
   const statusLogistica = toStringValue(logisticaPedido.status_codigo)?.toUpperCase();
   const candidate = statusApi || statusLogistica;
   return candidate && STATUS_ORDER.includes(candidate as StatusCode) ? (candidate as StatusCode) : null;
+};
+
+const hasResumoPendenciaNoPedido = (pedido: Record<string, unknown>) =>
+  (toNumber(pedido.total_itens_pendentes) || 0) > 0 ||
+  (toNumber(pedido.itens_em_separacao) || 0) > 0 ||
+  (toNumber(pedido.quantidade_em_separacao_total) || 0) > 0 ||
+  ['S', 'SIM', 'TRUE', '1'].includes(
+    String(pedido.possui_produtos_faltando ?? pedido.POSSUI_PRODUTO_FALTANDO ?? '').trim().toUpperCase()
+  );
+
+const isPedidoSomenteComSeparacaoAberta = (pedido: Record<string, unknown>) => {
+  const ultimoStatus = toStringValue(pedido.ultimo_status_separacao)?.trim().toUpperCase() || null;
+  const statusSeparacoes = getStatusSeparacoes(pedido);
+  const statusLogistico = toStringValue(
+    (pedido.status_logistico as Record<string, unknown> | undefined)?.codigo
+  )?.trim().toUpperCase();
+  const possuiStatusConcluido =
+    ['E', 'G'].includes(ultimoStatus || '') ||
+    statusSeparacoes.some((status) => ['E', 'G'].includes(status));
+  const possuiStatusAberto =
+    ['A', 'S'].includes(ultimoStatus || '') ||
+    statusSeparacoes.some((status) => ['A', 'S'].includes(status)) ||
+    ['PEDIDO_NOVO', 'PEDIDO_EM_SEPARACAO'].includes(statusLogistico || '');
+
+  return possuiStatusAberto && !possuiStatusConcluido;
 };
 
 const hasStatusSeparacao = (pedido: Record<string, unknown>, status: string) => {
@@ -327,25 +352,7 @@ const isPedidoComPendencias = (pedido: Record<string, unknown>, logistica: Recor
       return status === 'G' || Boolean(separacao.DATA_HORA_BAIXA ?? separacao.DATA_BAIXA);
     }) ||
     itensSeparacoes.some((item) => (toNumber(item.QUANTIDADE_BAIXADA) || 0) > 0);
-  const possuiSaldoPendente =
-    itensComparativo.some((item) =>
-      (toNumber(item.SALDO_PENDENTE) || 0) > 0 ||
-      (toNumber(item.QUANTIDADE_PENDENTE_TOTAL) || 0) > 0 ||
-      (toNumber(item.EM_SEPARACAO_PENDENTE) || 0) > 0 ||
-      (toNumber(item.SALDO_NA_SEPARACAO) || 0) > 0
-    ) ||
-    itensEntregasPendentes.some((item) =>
-      (toNumber(item.SALDO) || 0) > 0 ||
-      (toNumber(item.QUANTIDADE_EM_SEPARACAO) || 0) > 0 ||
-      (toNumber(item.QTD_EM_SEPARACAO_TRAN_ENT_PEN) || 0) > 0
-    );
   const possuiProdutosFaltando =
-    ['S', 'SIM', 'TRUE', '1'].includes(
-      String(pedido.possui_produtos_faltando ?? pedido.POSSUI_PRODUTO_FALTANDO ?? pedido.PRODUTO_FALTANDO ?? pedido.produto_faltando ?? pedido.PRODUTO_NAO_ENCONTRADO ?? pedido.produto_nao_encontrado ?? pedido.NAO_ENCONTRADO ?? pedido.nao_encontrado ?? pedido.FALTA ?? pedido.falta ?? '').trim().toUpperCase()
-    ) ||
-    ['S', 'SIM', 'TRUE', '1'].includes(
-      String(logistica?.resumo_pendencias_logisticas?.POSSUI_PRODUTO_FALTANDO ?? logistica?.resumo_pendencias_logisticas?.PRODUTO_FALTANDO ?? '').trim().toUpperCase()
-    ) ||
     [...itensComparativo, ...itensEntregasPendentes].some((item) =>
       ['S', 'SIM', 'TRUE', '1'].includes(String(item.POSSUI_PRODUTO_FALTANDO ?? item.possui_produto_faltando ?? item.PRODUTO_FALTANDO ?? item.produto_faltando ?? item.PRODUTO_NAO_ENCONTRADO ?? item.produto_nao_encontrado ?? item.NAO_ENCONTRADO ?? item.nao_encontrado ?? item.FALTA ?? item.falta ?? '').trim().toUpperCase()) ||
       (toNumber(item.QUANTIDADE_FALTANTE ?? item.quantidade_faltante ?? item.QTD_FALTANTE ?? item.qtd_faltante) || 0) > 0
@@ -505,7 +512,7 @@ export async function sincronizarLogisticaSnapshot(options: {
     dataInicioIso: options.dataInicioIso || null,
     dataFimIso: options.dataFimIso || null,
   };
-  const maxDetalhes = Math.min(Math.max(options.maxDetalhes ?? 500, 0), 500);
+  const maxDetalhes = Math.min(Math.max(options.maxDetalhes ?? 30, 0), 100);
   // A API Santri pode levar mais de 10s para montar as consultas consolidadas.
   // Mantemos um limite finito para a funcao serverless, mas evitamos falsos
   // indisponiveis antes que a API consiga responder.
@@ -515,7 +522,7 @@ export async function sincronizarLogisticaSnapshot(options: {
   let totalComErro = 0;
 
   try {
-    const [dashboardExterno, pedidosComTipoResult, controles, notasCompletas] = await Promise.all([
+    const [dashboardExterno, controles, notasCompletas] = await Promise.all([
       apiExternaService.listarDashboardLogistica(
         {
           empresa_id: 1,
@@ -526,49 +533,28 @@ export async function sincronizarLogisticaSnapshot(options: {
         options.password,
         timeoutMs
       ),
-      apiExternaService.listarPedidos(
-        {
-          data_inicio: options.dataInicioIso || undefined,
-          data_fim: options.dataFimIso || undefined,
-          limit: Math.min(Math.max(options.limit ?? 500, 1), 500),
-          offset: 0,
-        },
-        options.username,
-        options.password,
-        10_000
-      ).catch(() => null),
       getControleInfoPorNotasLocais(),
       apiExternaService
-        .listarNotasFiscaisCompletas({ limit: 500, offset: 0 }, options.username, options.password, 8_000)
+        .listarNotasFiscaisCompletas({ limit: 100, offset: 0 }, options.username, options.password, 6_000)
         .catch(() => null),
     ]);
 
-    const pedidosComTipo = (pedidosComTipoResult?.data || []) as Record<string, unknown>[];
-    const itensDashboard = (dashboardExterno?.data || []) as Record<string, unknown>[];
-    const entradasPorId = new Map<number, Record<string, unknown>>();
-    if (itensDashboard.length > 0 || dashboardExterno) {
-      for (const item of itensDashboard) {
-        const pedidoId = getPedidoId(item);
-        if (!pedidoId) continue;
-        entradasPorId.set(pedidoId, { ...item, __origemDashboardLogistica: true });
-      }
-      // A listagem de pedidos serve para completar o dashboard, mas nao pode
-      // acrescentar pedidos de outro periodo caso a API ignore o filtro de
-      // data nesse endpoint.
-      for (const item of pedidosComTipo) {
-        const pedidoId = getPedidoId(item);
-        if (!pedidoId || !entradasPorId.has(pedidoId)) continue;
-        entradasPorId.set(pedidoId, { ...item, ...entradasPorId.get(pedidoId) });
-      }
-    } else {
-      for (const item of pedidosComTipo) {
-        const pedidoId = getPedidoId(item);
-        if (pedidoId) entradasPorId.set(pedidoId, { ...item });
-      }
-    }
-    const entradas = Array.from(entradasPorId.values());
+    // A rota consolidada ja traz os pedidos operacionais. A rota /pedidos
+    // rejeita filtros de data na API atual e nao deve bloquear o cron.
+    const pedidosComTipo: Record<string, unknown>[] = [];
 
-    if (!dashboardExterno && !pedidosComTipoResult) {
+    const entradas: Record<string, unknown>[] = [
+      ...((dashboardExterno?.data || []) as Record<string, unknown>[]).map((item) => ({
+        ...item,
+        __origemDashboardLogistica: true,
+      })),
+      ...((pedidosComTipo || []) as Record<string, unknown>[]),
+    ].filter((item, index, entries) => {
+      const pedidoId = getPedidoId(item);
+      return Boolean(pedidoId) && entries.findIndex((candidate) => getPedidoId(candidate) === pedidoId) === index;
+    });
+
+    if (!dashboardExterno && pedidosComTipo.length === 0) {
       throw new Error('API externa retornou indisponibilidade nas consultas de dashboard e pedidos');
     }
 
@@ -586,7 +572,6 @@ export async function sincronizarLogisticaSnapshot(options: {
     }
 
     let detalhesUsados = 0;
-    let detalhesComErro = 0;
     const snapshots = await mapWithConcurrency(entradas, 10, async (entry) => {
       const pedidoId = getPedidoId(entry);
       if (!pedidoId) return null;
@@ -594,48 +579,48 @@ export async function sincronizarLogisticaSnapshot(options: {
       let pedido = entry;
       let logistica = ((pedido.logistica as Record<string, any> | undefined) || {}) as Record<string, any>;
       const tipoEntregaLista = tipoEntregaPorPedido.get(pedidoId);
-      // Os cards dependem da situacao atual de entrega, devolucao e
-      // pendencia. A listagem consolidada nao traz todos esses campos, por
-      // isso cada pedido do lote precisa de uma consulta detalhada.
-      const precisaDetalhe = true;
+      const statusLogisticoInicial = ((pedido.status_logistico || {}) as Record<string, unknown>) || {};
+      const statusInicial = deriveDashboardStatus(pedido, statusLogisticoInicial, logistica);
+      const referenciaInicialDireta = getNotaReferencia(pedido, logistica);
+      const referenciaInicial =
+        referenciaInicialDireta.numeroNota || referenciaInicialDireta.chave.length === 44
+          ? referenciaInicialDireta
+          : notaPorPedido.get(pedidoId) || referenciaInicialDireta;
+      const precisaDetalhe =
+        (!getTipoEntregaPrincipal(pedido, logistica) && !tipoEntregaLista) ||
+        (hasResumoPendenciaNoPedido(pedido) && !isPedidoSomenteComSeparacaoAberta(pedido)) ||
+        (
+          statusInicial === 'PEDIDO_EMBARCADO' &&
+          !referenciaInicial.numeroNota &&
+          referenciaInicial.chave.length !== 44
+        );
 
       if (precisaDetalhe && detalhesUsados < maxDetalhes) {
         detalhesUsados += 1;
         const detalhe = await apiExternaService.buscarPedidoLogistica(pedidoId, options.username, options.password, 4_000);
         if (detalhe) logistica = { ...logistica, ...detalhe };
-        else {
-          totalComErro += 1;
-          detalhesComErro += 1;
-          return null;
-        }
-      } else if (precisaDetalhe) {
-        totalComErro += 1;
-        detalhesComErro += 1;
-        return null;
+        else totalComErro += 1;
       }
 
       if (tipoEntregaLista) {
         pedido = { ...pedido, tipo_entrega: tipoEntregaLista, TIPO_ENTREGA: tipoEntregaLista };
       }
 
-      if (!isPedidoPermitidoNoDashboard(pedido, logistica, false)) return null;
+      if (!isPedidoPermitidoNoDashboard(pedido, logistica, pedido.__origemDashboardLogistica === true)) return null;
 
       const statusLogistico = ((pedido.status_logistico || {}) as Record<string, unknown>) || {};
       const statusCodigoBase = deriveDashboardStatus(pedido, statusLogistico, logistica);
       if (!statusCodigoBase) return null;
 
-      const possuiPendenciaDetectada = isPedidoComPendencias(pedido, logistica);
+      const possuiPendencia = isPedidoComPendencias(pedido, logistica);
       const statusCodigo =
         statusCodigoBase === 'PEDIDO_SEPARADO' &&
-        possuiPendenciaDetectada &&
+        possuiPendencia &&
         hasStatusSeparacao(pedido, 'G') &&
         hasStatusSeparacao(pedido, 'E')
           ? 'PEDIDO_EMBARCADO'
           : statusCodigoBase;
-      const produtosPendentes = possuiPendenciaDetectada ? getProdutosPendentes(logistica) : [];
-      // Nunca persistir uma pendencia sem produto identificável. Isso evita
-      // que apenas um sinal antigo do ERP mantenha o pedido no card.
-      const possuiPendencia = possuiPendenciaDetectada && produtosPendentes.length > 0;
+      const produtosPendentes = possuiPendencia ? getProdutosPendentes(logistica) : [];
       const referenciaDireta = getNotaReferencia(pedido, logistica);
       const referenciaNota =
         referenciaDireta.numeroNota || referenciaDireta.chave.length === 44
@@ -699,7 +684,7 @@ export async function sincronizarLogisticaSnapshot(options: {
         totalItensPendentes,
         produtosPendentes,
         assinatura,
-        rawPedido: { ...pedido, [SNAPSHOT_ATIVO_META]: true },
+        rawPedido: pedido,
         rawLogistica: logistica,
       };
     });
@@ -707,16 +692,12 @@ export async function sincronizarLogisticaSnapshot(options: {
     const validos = snapshots.filter((snapshot): snapshot is NonNullable<typeof snapshot> => Boolean(snapshot));
     const existentes = await (prisma as any).pedidoLogisticaSnapshot.findMany({
       where: { pedidoId: { in: validos.map((snapshot) => snapshot.pedidoId) } },
-      select: { pedidoId: true, assinatura: true, rawPedido: true },
+      select: { pedidoId: true, assinatura: true },
     });
-    const assinaturaExistente = new Map<number, { assinatura: string; rawPedido: Record<string, unknown> | null }>(
-      existentes.map((item: { pedidoId: number; assinatura: string; rawPedido: Record<string, unknown> | null }) => [item.pedidoId, item])
+    const assinaturaExistente = new Map<number, string>(
+      existentes.map((item: { pedidoId: number; assinatura: string }) => [item.pedidoId, item.assinatura])
     );
-    const alterados = validos.filter((snapshot) => {
-      const existente = assinaturaExistente.get(snapshot.pedidoId);
-      const ativoNoErp = existente?.rawPedido?.[SNAPSHOT_ATIVO_META] !== false;
-      return !existente || existente.assinatura !== snapshot.assinatura || !ativoNoErp;
-    });
+    const alterados = validos.filter((snapshot) => assinaturaExistente.get(snapshot.pedidoId) !== snapshot.assinatura);
 
     for (const snapshot of alterados) {
       await (prisma as any).pedidoLogisticaSnapshot.upsert({
@@ -736,52 +717,6 @@ export async function sincronizarLogisticaSnapshot(options: {
       });
     }
 
-    const dashboardCompleto = Boolean(
-      dashboardExterno &&
-      (dashboardExterno.total <= (dashboardExterno.data || []).length || dashboardExterno.total === 0)
-    );
-    const pedidosComTipoCompleto = Boolean(
-      pedidosComTipoResult &&
-      (pedidosComTipoResult.total <= (pedidosComTipoResult.data || []).length || pedidosComTipoResult.total === 0)
-    );
-    const consultaCompleta = (dashboardCompleto || pedidosComTipoCompleto) &&
-      detalhesComErro === 0 &&
-      detalhesUsados >= entradas.length;
-    if (consultaCompleta) {
-      const idsValidos = validos.map((snapshot) => snapshot.pedidoId);
-      const dataFimLimite = dataFim
-        ? new Date(dataFim.getFullYear(), dataFim.getMonth(), dataFim.getDate(), 23, 59, 59, 999)
-        : null;
-      const candidatosInativos = await (prisma as any).pedidoLogisticaSnapshot.findMany({
-        where: {
-          ...(dataInicio || dataFimLimite ? {
-            dataRecebimentoDia: {
-              ...(dataInicio ? { gte: dataInicio } : {}),
-              ...(dataFimLimite ? { lte: dataFimLimite } : {}),
-            },
-          } : {}),
-          ...(idsValidos.length > 0 ? { pedidoId: { notIn: idsValidos } } : {}),
-        },
-        select: { id: true, rawPedido: true },
-      });
-      for (const snapshot of candidatosInativos) {
-        const rawPedido = (snapshot.rawPedido || {}) as Record<string, unknown>;
-        await (prisma as any).pedidoLogisticaSnapshot.update({
-          where: { id: snapshot.id },
-          data: {
-            possuiPendencia: false,
-            totalItensPendentes: 0,
-            produtosPendentes: [],
-            rawPedido: toJsonInput({ ...rawPedido, [SNAPSHOT_ATIVO_META]: false }),
-          },
-        });
-      }
-    }
-
-    const erroParcial = totalComErro > 0
-      ? `${totalComErro} consulta(s) de detalhe da API nao responderam; snapshot mantido sem invalidacao.`
-      : null;
-
     await (prisma as any).sincronizacaoLogistica.upsert({
       where: { chave: syncKey },
       create: {
@@ -791,7 +726,7 @@ export async function sincronizarLogisticaSnapshot(options: {
         totalLidos: entradas.length,
         totalAtualizados: alterados.length,
         totalComErro,
-        ultimoErro: erroParcial,
+        ultimoErro: null,
       },
       update: {
         dataInicio,
@@ -799,19 +734,18 @@ export async function sincronizarLogisticaSnapshot(options: {
         totalLidos: entradas.length,
         totalAtualizados: alterados.length,
         totalComErro,
-        ultimoErro: erroParcial,
+        ultimoErro: null,
       },
     });
 
     return {
-      ok: !erroParcial,
+      ok: true,
       chave: syncKey,
       totalLidos: entradas.length,
       totalValidos: validos.length,
       totalAtualizados: alterados.length,
       totalComErro,
       detalhesUsados,
-      erro: erroParcial,
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Erro desconhecido';
@@ -845,11 +779,6 @@ export async function montarDashboardPorSnapshot(
   try {
     const sync = await (prisma as any).sincronizacaoLogistica.findUnique({ where: { chave: syncKey } });
 
-    // Uma tentativa com erro nao pode transformar um snapshot antigo em uma
-    // sincronizacao aparentemente atual. A tela deve consultar a API ou
-    // informar indisponibilidade ate existir uma sincronizacao bem-sucedida.
-    if (sync?.ultimoErro) return null;
-
     if (options.exigirSincronizacaoRecenteMs && sync?.ultimaSincronizacao) {
       const idade = Date.now() - new Date(sync.ultimaSincronizacao).getTime();
       if (idade > options.exigirSincronizacaoRecenteMs) return null;
@@ -881,11 +810,6 @@ export async function montarDashboardPorSnapshot(
     throw error;
   }
 
-  snapshots = snapshots.filter((snapshot) => {
-    const rawPedido = (snapshot.rawPedido || {}) as Record<string, unknown>;
-    return rawPedido[SNAPSHOT_ATIVO_META] !== false;
-  });
-
   if (!snapshots.length) return null;
 
   const username = process.env.API_EXTERNA_USERNAME;
@@ -913,16 +837,11 @@ export async function montarDashboardPorSnapshot(
   let totalRetirados = 0;
 
   for (const snapshot of snapshots) {
+    const tipoEntrega = String(snapshot.tipoEntrega || '').trim().toUpperCase();
     const rawPedido = (snapshot.rawPedido || {}) as Record<string, unknown>;
-    const tipoEntrega = String(
-      getTipoEntregaPrincipal(rawPedido, snapshot.rawLogistica) || snapshot.tipoEntrega || ''
-    ).trim().toUpperCase();
     if (pedidoTemDevolucao(rawPedido, snapshot.rawLogistica)) continue;
     const ehRetirada = ['ATO', 'NDF', 'RDL', 'RLR'].includes(tipoEntrega) || isRetiradaConfirmada(rawPedido);
-    // O painel deve exibir somente entregas explicitamente classificadas pelo
-    // ERP. Tipo ausente não pode voltar como entrega por causa de snapshot
-    // antigo ou incompleto.
-    const ehEntrega = ['ENT', 'EPG'].includes(tipoEntrega);
+    const ehEntrega = ['ENT', 'EPG'].includes(tipoEntrega) || (!tipoEntrega && !ehRetirada);
     if (ehRetirada) totalRetirados += 1;
     if (!ehEntrega) continue;
 
@@ -945,8 +864,7 @@ export async function montarDashboardPorSnapshot(
     ];
     const possuiProdutoFaltandoAtual = itensPendenciaAtual.some((item: Record<string, any>) =>
         ['S', 'SIM', 'TRUE', '1'].includes(String(item.POSSUI_PRODUTO_FALTANDO ?? item.possui_produto_faltando ?? item.PRODUTO_FALTANDO ?? item.produto_faltando ?? item.PRODUTO_NAO_ENCONTRADO ?? item.produto_nao_encontrado ?? item.NAO_ENCONTRADO ?? item.nao_encontrado ?? item.FALTA ?? item.falta ?? '').trim().toUpperCase()) ||
-        (toNumber(item.QUANTIDADE_FALTANTE ?? item.quantidade_faltante ?? item.QTD_FALTANTE ?? item.qtd_faltante) || 0) > 0 ||
-        saldoPendente(item) > 0
+        (toNumber(item.QUANTIDADE_FALTANTE ?? item.quantidade_faltante ?? item.QTD_FALTANTE ?? item.qtd_faltante) || 0) > 0
       );
     const possuiPendencia = possuiProdutoFaltandoAtual && pedidoTemEntregaGerada(rawPedido, snapshot.rawLogistica);
     const produtosPendentes = !possuiPendencia ? []
@@ -1011,13 +929,7 @@ export async function montarDashboardPorSnapshot(
     }
 
     const alertaStatus = isPedidoParaAlerta(snapshot.dataHoraRecebimento)
-      ? deriveAlertaStatus(
-          statusBase,
-          possuiPendencia,
-          embarcadoNoControle ||
-            (Array.isArray(snapshot.rawLogistica?.entregas) && snapshot.rawLogistica.entregas.length > 0) ||
-            String(snapshot.rawLogistica?.status_logistico?.origem || '').trim().toUpperCase() === 'ENTREGAS'
-        )
+      ? deriveAlertaStatus(statusBase, possuiPendencia, embarcadoNoControle)
       : null;
     if (alertaStatus) {
       entries.push({
@@ -1031,11 +943,6 @@ export async function montarDashboardPorSnapshot(
       });
     }
   }
-
-  // Um snapshot pode existir, mas ficar sem registros depois dos filtros de
-  // tipo/devolução. Nesse caso ele não pode substituir a consulta atual do
-  // ERP por um painel inteiro zerado.
-  if (entries.length === 0) return null;
 
   const indicadores = STATUS_ORDER.map((statusCode) => {
     const pedidos = entries

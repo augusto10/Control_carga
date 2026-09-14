@@ -43,7 +43,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const dataInicioIso = parseDateOnly(req.query.data_inicio) || todayIso();
   const dataFimIso = parseDateOnly(req.query.data_fim) || dataInicioIso;
   const limit = Math.min(Math.max(Number(req.query.limit || 500), 1), 500);
-  const maxDetalhes = Math.min(Math.max(Number(req.query.max_detalhes ?? 500), 0), 500);
+  const maxDetalhes = Math.min(Math.max(Number(req.query.max_detalhes ?? 100), 0), 100);
 
   try {
     const resultado = await sincronizarLogisticaSnapshot({
@@ -55,7 +55,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       maxDetalhes,
     });
 
-    return res.status(resultado.ok ? 200 : 503).json(resultado);
+    return res.status(200).json(resultado);
   } catch (error) {
     console.error('[Sincronizacao Logistica] Erro:', error);
     return res.status(503).json({

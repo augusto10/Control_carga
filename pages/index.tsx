@@ -263,9 +263,8 @@ const EMPTY_RESUMO_HOJE: ResumoHojeData = {
   pedidosEntregaHoje: 0,
 };
 const DASHBOARD_LOCAL_CACHE_KEY = 'dashboard-logistica-cache-v11';
-const DASHBOARD_ALERTAS_LOCAL_CACHE_KEY = 'dashboard-logistica-alertas-cache-v5';
+const DASHBOARD_ALERTAS_LOCAL_CACHE_KEY = 'dashboard-logistica-alertas-cache-v4';
 const DASHBOARD_AUTO_REFRESH_INTERVAL_MS = 3 * 60_000;
-const DASHBOARD_ALERTAS_LOADING_TIMEOUT_MS = 20_000;
 const DASHBOARD_LEGACY_CACHE_KEYS = [
   'dashboard-logistica-cache-v3',
   'dashboard-logistica-cache-v4',
@@ -389,7 +388,6 @@ function Home() {
   const [dashboardAlertas, setDashboardAlertas] = useCurrentDashboard<DashboardLogisticaData | null>(null, DASHBOARD_ALERTAS_LOCAL_CACHE_KEY);
   const [resumoHoje, setResumoHoje] = useState<ResumoHojeData>(EMPTY_RESUMO_HOJE);
   const [loadingDashboard, setLoadingDashboard] = useState(true);
-  const [loadingAlertas, setLoadingAlertas] = useState(true);
   const [refreshingDashboard, setRefreshingDashboard] = useState(false);
   const [acaoFiltroAtiva, setAcaoFiltroAtiva] = useState<'apply' | 'clear' | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -502,12 +500,6 @@ function Home() {
     setLoadingDashboard(false);
 
     // Alertas e resumo sao secundarios e nao bloqueiam a primeira pintura.
-    const alertasLoadingTimeoutId = window.setTimeout(() => {
-      if (requestId === dashboardRequestId.current) {
-        setLoadingAlertas(false);
-      }
-    }, DASHBOARD_ALERTAS_LOADING_TIMEOUT_MS);
-
     const [dashboardAlertasResult, resumoHojeResult] = await Promise.allSettled([
       fetch(`/api/dashboard/logistica-inicial${alertasQuerySuffix}`, {
         credentials: 'include',
@@ -518,34 +510,25 @@ function Home() {
         cache: 'no-store',
       }),
     ]);
-    window.clearTimeout(alertasLoadingTimeoutId);
 
     if (requestId !== dashboardRequestId.current) return;
-    try {
-      if (dashboardAlertasResult.status === 'fulfilled') {
-        const response = dashboardAlertasResult.value;
-        if (response.ok) {
-          const data: DashboardLogisticaData = await response.json();
-          if (requestId !== dashboardRequestId.current) return;
-          if (isDashboardFallbackVazio(data)) {
-            if (!nextError) nextError = data.warning || 'Nao foi possivel atualizar alertas e pendencias agora.';
-          } else {
-            setDashboardAlertas(data);
-          }
-        } else if (!nextError) {
-          const data = await response.json().catch(() => null);
-          if (requestId !== dashboardRequestId.current) return;
-          nextError = data?.error || `Falha ao carregar alertas e pendencias (${response.status})`;
+    if (dashboardAlertasResult.status === 'fulfilled') {
+      const response = dashboardAlertasResult.value;
+      if (response.ok) {
+        const data: DashboardLogisticaData = await response.json();
+        if (requestId !== dashboardRequestId.current) return;
+        if (isDashboardFallbackVazio(data)) {
+          if (!nextError) nextError = data.warning || 'Nao foi possivel atualizar alertas e pendencias agora.';
+        } else {
+          setDashboardAlertas(data);
         }
       } else if (!nextError) {
-        nextError = 'Nao foi possivel carregar alertas e pendencias agora.';
+        const data = await response.json().catch(() => null);
+        if (requestId !== dashboardRequestId.current) return;
+        nextError = data?.error || `Falha ao carregar alertas e pendencias (${response.status})`;
       }
-    } catch {
-      if (!nextError) nextError = 'Nao foi possivel interpretar alertas e pendencias agora.';
-    } finally {
-      if (requestId === dashboardRequestId.current) {
-        setLoadingAlertas(false);
-      }
+    } else if (!nextError) {
+      nextError = 'Nao foi possivel carregar alertas e pendencias agora.';
     }
 
     if (resumoHojeResult.status === 'fulfilled') {
@@ -591,7 +574,6 @@ function Home() {
         const periodoAlertas = getAlertasPeriodo();
         if (cachedAlertas && cachedAlertas.filtros?.dataInicio === periodoAlertas.dataInicio && cachedAlertas.filtros?.dataFim === periodoAlertas.dataFim && Array.isArray(cachedAlertas.indicadores)) {
           setDashboardAlertas(cachedAlertas);
-          setLoadingAlertas(false);
         }
       } catch { /* Cache corrompido é ignorado; a API atual será consultada. */ }
       const acaoFiltro = acaoFiltroPendenteRef.current;
@@ -1058,7 +1040,7 @@ function Home() {
 
           <ExpedicaoCards
             loadingStages={loadingDashboard && !dashboard}
-            loadingSecondary={loadingAlertas}
+            loadingSecondary={!dashboardAlertas}
             stageCards={cardsHome.map((card) => {
               const item = indicadoresOrdenados.find((indicador) => indicador.codigo === card.codigo);
               const visual = STATUS_VISUAL[card.codigo];

@@ -479,10 +479,6 @@ const isPedidoComPendencias = (
   const possuiSeparacaoEfetivada =
     ultimoStatusSeparacao === 'G' ||
     statusSeparacoes.includes('G') ||
-    ['PEDIDO_EMBARCADO', 'EMBARCADO'].includes(
-      String(logistica?.status_logistico?.codigo ?? '').trim().toUpperCase()
-    ) ||
-    String(logistica?.status_logistico?.status_separacao ?? '').trim().toUpperCase() === 'EMBARCADO' ||
     separacoes.some((separacao) => {
       const status = String(separacao.STATUS ?? '').trim().toUpperCase();
       return (
@@ -509,8 +505,7 @@ const isPedidoComPendencias = (
   // válida para o quadro são os itens detalhados da entrega/comparativo.
   const possuiProdutosFaltando =
     itensComparativo.some(possuiProdutoFaltando) ||
-    itensEntregasPendentes.some(possuiProdutoFaltando) ||
-    possuiSaldoPendente;
+    itensEntregasPendentes.some(possuiProdutoFaltando);
 
   // Saldo de separacao aberta, status e total historico nao bastam: o card
   // deve conter somente pedidos com produto faltando confirmado pelo ERP.
@@ -723,6 +718,11 @@ const hasEntregaNoAto = (pedido: Record<string, unknown>, logistica?: Record<str
 const isPedidoSomenteEntrega = (pedido: Record<string, unknown>, logistica?: Record<string, unknown>) => {
   const tiposEntrega = getTiposEntrega(pedido, logistica);
   if (hasEntregaNoAto(pedido, logistica)) return false;
+  // O ERP pode repetir o tipo em campos diferentes. Se o primeiro codigo
+  // informado for retirada (ATO/RLR/NDF/RDL), um EPG secundario nao deve
+  // transformar esse pedido em entrega para os cards.
+  const tipoCodigo = tiposEntrega.find((tipo) => ['ENT', 'EPG', 'ATO', 'RLR', 'NDF', 'RDL'].includes(tipo));
+  if (tipoCodigo && !['ENT', 'EPG'].includes(tipoCodigo)) return false;
   return tiposEntrega.some((tipo) => ['ENT', 'EPG'].includes(tipo));
 };
 
@@ -813,10 +813,7 @@ export default async function handler(
   res.setHeader('Cache-Control', 'private, no-store, max-age=0');
   const cacheAtual = getCacheByPeriodo(periodoFiltro.cacheKey);
 
-  // O snapshot permanece no fluxo rápido dos cards operacionais. Alertas e
-  // pendências precisam da situação atual do ERP para não reapresentar pedido
-  // resolvido nem deixar de descobrir uma pendência nova.
-  if (!forceRefresh && escopoPrincipal) {
+  if (!forceRefresh) {
     // A tabela local e a fonte preferencial; a API externa alimenta o snapshot.
     const snapshotLocal = await montarDashboardPorSnapshot(periodoFiltro);
     if (snapshotLocal) {
@@ -1208,7 +1205,6 @@ export default async function handler(
           let pedido = entry as Record<string, unknown>;
           const pedidoId = toNumber(pedido.pedido_id);
           const statusLogistico = (pedido.status_logistico || {}) as Record<string, unknown>;
-          const statusLogisticoCodigo = toStringValue(statusLogistico.codigo)?.toUpperCase();
           let logistica = (pedido.logistica || {}) as Record<string, any>;
           const tipoEntregaInicial = getTipoEntregaPrincipal(pedido, logistica);
           const tipoEntregaLista = pedidoId ? tipoEntregaPorPedido.get(pedidoId) : undefined;
@@ -1216,8 +1212,7 @@ export default async function handler(
           const precisaLogisticaDetalhada =
             forcarLogisticaDetalhada ||
             (!tipoEntregaInicial && !tipoEntregaLista) ||
-            hasResumoPendenciaNoPedido(pedido) ||
-            statusLogisticoCodigo === 'PEDIDO_EMBARCADO';
+            hasResumoPendenciaNoPedido(pedido);
 
           if (
             pedidoId &&
@@ -1283,11 +1278,6 @@ export default async function handler(
             pedidosEmbarcadosPorNota.has(pedidoId) || isNotaEmControle(referenciaNota);
           const controleInfo = getControleInfoByReferencia(referenciaNota);
           const produtosPendentes = possuiPendencia ? getProdutosPendentes(logistica, 'PENDENCIA') : [];
-          const entregaConfirmadaNoErp =
-            (Array.isArray(logistica?.entregas) && logistica.entregas.length > 0) ||
-            String((logistica?.status_logistico as Record<string, unknown> | undefined)?.origem || '')
-              .trim()
-              .toUpperCase() === 'ENTREGAS';
 
           const pedidoItem: DashboardPedidoItem = {
             statusOperacionalCodigo: embarcadoNoControle ? 'PEDIDOS_EMBARCADOS' : statusCodigo,
@@ -1321,7 +1311,7 @@ export default async function handler(
           };
 
           const alertaStatus = isPedidoParaAlerta(pedido)
-            ? deriveAlertaStatus(statusCodigo, possuiPendencia, embarcadoNoControle || entregaConfirmadaNoErp)
+            ? deriveAlertaStatus(statusCodigo, possuiPendencia, embarcadoNoControle)
             : null;
 
           return {
@@ -1558,18 +1548,8 @@ export default async function handler(
     console.error('[Dashboard Logistica Inicial] Erro:', error);
     const cacheStale = getCacheByPeriodo(periodoFiltro.cacheKey);
 
-    // Alertas mudam conforme separações, entregas e devoluções. Para essa
-    // consulta, somente um resultado recente da própria API pode ser usado;
-    // o snapshot histórico não deve recolocar pedidos já resolvidos.
-    const limiteCache = escopoPrincipal ? cacheStale?.staleAt : cacheStale?.expiresAt;
-    if (cacheStale && limiteCache && limiteCache > Date.now()) {
+    if (cacheStale && cacheStale.staleAt > Date.now()) {
       return res.status(200).json({ ...cacheStale.payload, stale: true });
-    }
-
-    if (!escopoPrincipal) {
-      return res.status(200).json(
-        getEmptyDashboardPayload('API externa indisponivel. Mantendo os ultimos alertas validos na tela.')
-      );
     }
 
     const snapshotFallback = await montarDashboardPorSnapshot(periodoFiltro, {
