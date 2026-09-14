@@ -521,9 +521,11 @@ const isPedidoComPendencias = (
 
   // O resumo do pedido pode permanecer gravado depois da devolução. A fonte
   // válida para o quadro são os itens detalhados da entrega/comparativo.
-  const possuiProdutosFaltando =
-    itensComparativo.some(possuiProdutoFaltando) ||
-    itensEntregasPendentes.some(possuiProdutoFaltando);
+  // O resumo/status pode permanecer gravado depois que a pendencia foi
+  // resolvida. A fonte valida sao os produtos com saldo positivo, somando
+  // comparativo e itens de todas as separacoes.
+  const itensPendentesAtuais = itensComSaldoPendente(logistica) || [];
+  const possuiProdutosFaltando = itensPendentesAtuais.some((item) => saldoPendente(item) > 0);
 
   // Saldo de separacao aberta, status e total historico nao bastam: o card
   // deve conter somente pedidos com produto faltando confirmado pelo ERP.

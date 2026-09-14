@@ -882,7 +882,10 @@ export async function montarDashboardPorSnapshot(
         ['S', 'SIM', 'TRUE', '1'].includes(String(item.POSSUI_PRODUTO_FALTANDO ?? item.possui_produto_faltando ?? item.PRODUTO_FALTANDO ?? item.produto_faltando ?? item.PRODUTO_NAO_ENCONTRADO ?? item.produto_nao_encontrado ?? item.NAO_ENCONTRADO ?? item.nao_encontrado ?? item.FALTA ?? item.falta ?? '').trim().toUpperCase()) ||
         (toNumber(item.QUANTIDADE_FALTANTE ?? item.quantidade_faltante ?? item.QTD_FALTANTE ?? item.qtd_faltante) || 0) > 0
       );
-    const possuiPendencia = possuiProdutoFaltandoAtual && pedidoTemEntregaGerada(rawPedido, snapshot.rawLogistica);
+    const produtosPendentesAtuais = saldoDetalhadoPendente(snapshot.rawLogistica) === true
+      ? getProdutosPendentes(snapshot.rawLogistica)
+      : [];
+    const possuiPendencia = produtosPendentesAtuais.length > 0 && pedidoTemEntregaGerada(rawPedido, snapshot.rawLogistica);
     const produtosPendentes = !possuiPendencia ? []
       : saldoDetalhadoPendente(snapshot.rawLogistica) !== null ? getProdutosPendentes(snapshot.rawLogistica)
       : Array.isArray(snapshot.produtosPendentes) ? snapshot.produtosPendentes : [];
