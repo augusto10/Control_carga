@@ -466,6 +466,25 @@ const deriveDashboardStatus = (
     : null;
 };
 
+const temProdutoPendenteConfirmado = (item: Record<string, unknown>) => {
+  const possuiMarcacaoDeFalta = ['S', 'SIM', 'TRUE', '1'].includes(
+    String(item.POSSUI_PRODUTO_FALTANDO ?? item.possui_produto_faltando ?? item.PRODUTO_FALTANDO ?? item.produto_faltando ?? item.PRODUTO_NAO_ENCONTRADO ?? item.produto_nao_encontrado ?? item.NAO_ENCONTRADO ?? item.nao_encontrado ?? item.FALTA ?? item.falta ?? '').trim().toUpperCase()
+  );
+  const quantidadeFaltante = (toNumber(
+    item.QUANTIDADE_FALTANTE ?? item.quantidade_faltante ?? item.QTD_FALTANTE ?? item.qtd_faltante
+  ) || 0) > 0;
+  const saldoPendenteInformado = [
+    'SALDO_PENDENTE', 'QUANTIDADE_PENDENTE_TOTAL', 'QUANTIDADE_PENDENTE',
+    'EM_SEPARACAO_PENDENTE', 'SALDO_NA_SEPARACAO', 'SALDO',
+    'QUANTIDADE_EM_SEPARACAO', 'QTD_EM_SEPARACAO_TRAN_ENT_PEN',
+  ].some((campo) => (toNumber(item[campo] ?? item[campo.toLowerCase()]) || 0) > 0);
+
+  // Quantidade comum menos quantidade baixada tambem descreve uma separacao
+  // aberta. O alerta exige falta declarada ou flag de falta com saldo que o
+  // ERP classificou explicitamente como pendente.
+  return quantidadeFaltante || (possuiMarcacaoDeFalta && saldoPendenteInformado);
+};
+
 const isPedidoComPendencias = (
   pedido: Record<string, unknown>,
   logistica: Record<string, any> | null
@@ -480,11 +499,6 @@ const isPedidoComPendencias = (
     .map((item) => item.trim().toUpperCase())
     .filter(Boolean);
 
-  const possuiProdutoFaltando = (item: Record<string, unknown>) =>
-    ['S', 'SIM', 'TRUE', '1'].includes(
-      String(item.POSSUI_PRODUTO_FALTANDO ?? item.possui_produto_faltando ?? item.PRODUTO_FALTANDO ?? item.produto_faltando ?? item.PRODUTO_NAO_ENCONTRADO ?? item.produto_nao_encontrado ?? item.NAO_ENCONTRADO ?? item.nao_encontrado ?? item.FALTA ?? item.falta ?? '').trim().toUpperCase()
-    ) ||
-    (toNumber(item.QUANTIDADE_FALTANTE ?? item.quantidade_faltante ?? item.QTD_FALTANTE ?? item.qtd_faltante) || 0) > 0;
   const itensComparativo = Array.isArray(logistica?.comparativo_separacao_pendentes)
     ? logistica.comparativo_separacao_pendentes
     : [];
@@ -524,8 +538,8 @@ const isPedidoComPendencias = (
   // O resumo/status pode permanecer gravado depois que a pendencia foi
   // resolvida. A fonte valida sao os produtos com saldo positivo, somando
   // comparativo e itens de todas as separacoes.
-  const itensPendentesAtuais = itensComSaldoPendente(logistica) || [];
-  const possuiProdutosFaltando = itensPendentesAtuais.some((item) => saldoPendente(item) > 0);
+  const possuiProdutosFaltando = [...itensComparativo, ...itensEntregasPendentes]
+    .some((item) => temProdutoPendenteConfirmado(item));
 
   // Saldo de separacao aberta, status e total historico nao bastam: o card
   // deve conter somente pedidos com produto faltando confirmado pelo ERP.
@@ -631,7 +645,9 @@ const getProdutosPendentes = (logistica: Record<string, any> | null, statusSepar
     ? logistica.itens_entregas_pendentes
     : [];
   if (status === 'PENDENCIA') {
-    return agruparProdutosPendentes(itensComSaldoPendente(logistica) || []);
+    return agruparProdutosPendentes(
+      (itensComSaldoPendente(logistica) || []).filter((item) => temProdutoPendenteConfirmado(item))
+    );
   }
 
   const separacoesAtivas = Array.isArray(logistica?.separacoes)
@@ -738,6 +754,17 @@ const hasEntregaNoAto = (pedido: Record<string, unknown>, logistica?: Record<str
 const isPedidoSomenteEntrega = (pedido: Record<string, unknown>, logistica?: Record<string, unknown>) => {
   const tiposEntrega = getTiposEntrega(pedido, logistica);
   if (hasEntregaNoAto(pedido, logistica)) return false;
+  const contemTipoRetirada = (value: unknown): boolean => {
+    if (typeof value === 'string') {
+      return /(^|[^A-Z])(ATO|RLR|NDF|RDL)([^A-Z]|$)/.test(value.trim().toUpperCase());
+    }
+    if (Array.isArray(value)) return value.some(contemTipoRetirada);
+    if (value && typeof value === 'object') return Object.values(value as Record<string, unknown>).some(contemTipoRetirada);
+    return false;
+  };
+  // Alguns retornos trazem o tipo apenas dentro do objeto original aninhado.
+  // Varremos o pedido e a logistica antes de qualquer campo ser sobrescrito.
+  if (contemTipoRetirada(pedido) || contemTipoRetirada(logistica)) return false;
   const retirada = [
     pedido.retirada,
     (pedido.logistica as Record<string, any> | undefined)?.retirada,
