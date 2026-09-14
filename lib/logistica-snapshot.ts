@@ -841,7 +841,7 @@ export async function montarDashboardPorSnapshot(
     const rawPedido = (snapshot.rawPedido || {}) as Record<string, unknown>;
     if (pedidoTemDevolucao(rawPedido, snapshot.rawLogistica)) continue;
     const ehRetirada = ['ATO', 'NDF', 'RDL', 'RLR'].includes(tipoEntrega) || isRetiradaConfirmada(rawPedido);
-    const ehEntrega = ['ENT', 'EPG'].includes(tipoEntrega) || (!tipoEntrega && !ehRetirada);
+    const ehEntrega = ['ENT', 'EPG'].includes(tipoEntrega);
     if (ehRetirada) totalRetirados += 1;
     if (!ehEntrega) continue;
 

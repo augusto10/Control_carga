@@ -404,7 +404,25 @@ const deriveDashboardStatus = (
   statusLogistico: Record<string, unknown>,
   logistica: Record<string, any> | null
 ): StatusCode | null => {
-  const statusApi = toStringValue(statusLogistico.codigo);
+  const statusApi = toStringValue(statusLogistico.codigo)?.toUpperCase();
+  const statusDetalhado = toStringValue(
+    (logistica?.status_logistico as Record<string, unknown> | undefined)?.codigo
+  )?.toUpperCase() || toStringValue(
+    (logistica?.pedido as Record<string, unknown> | undefined)?.status_codigo
+  )?.toUpperCase();
+  const statusAtual = statusDetalhado || statusApi;
+  if (statusAtual && statusAtual !== 'PENDENCIAS' && STATUS_ORDER.includes(statusAtual as StatusCode)) {
+    return statusAtual as StatusCode;
+  }
+
+  const separacoesDetalhadas = Array.isArray(logistica?.separacoes) ? logistica.separacoes : [];
+  if (separacoesDetalhadas.some((separacao) => String(separacao?.STATUS ?? '').trim().toUpperCase() === 'G')) {
+    return 'PEDIDO_EMBARCADO';
+  }
+  if (separacoesDetalhadas.some((separacao) => String(separacao?.STATUS ?? '').trim().toUpperCase() === 'E')) {
+    return 'PEDIDO_SEPARADO';
+  }
+
   const ultimoStatusSeparacao = toStringValue(pedido.ultimo_status_separacao)?.toUpperCase() || null;
   const ultimaEntregaId = toNumber(pedido.ultima_entrega_id);
   const statusSeparacoesRaw = toStringValue(pedido.status_separacoes);
@@ -439,12 +457,12 @@ const deriveDashboardStatus = (
     return 'PEDIDO_SEPARADO';
   }
 
-  if (statusApi === 'SEM_LOGISTICA') {
+  if (statusAtual === 'SEM_LOGISTICA') {
     return 'PEDIDO_NOVO';
   }
 
-  return statusApi && statusApi !== 'PENDENCIAS' && STATUS_ORDER.includes(statusApi as StatusCode)
-    ? (statusApi as StatusCode)
+  return statusAtual && statusAtual !== 'PENDENCIAS' && STATUS_ORDER.includes(statusAtual as StatusCode)
+    ? (statusAtual as StatusCode)
     : null;
 };
 
@@ -718,6 +736,8 @@ const hasEntregaNoAto = (pedido: Record<string, unknown>, logistica?: Record<str
 const isPedidoSomenteEntrega = (pedido: Record<string, unknown>, logistica?: Record<string, unknown>) => {
   const tiposEntrega = getTiposEntrega(pedido, logistica);
   if (hasEntregaNoAto(pedido, logistica)) return false;
+  const retirada = pedido.retirada as Record<string, unknown> | undefined;
+  if (['S', 'SIM', 'TRUE', '1'].includes(String(retirada?.foi_retirado ?? '').trim().toUpperCase())) return false;
   // O ERP pode repetir o tipo em campos diferentes. Se o primeiro codigo
   // informado for retirada (ATO/RLR/NDF/RDL), um EPG secundario nao deve
   // transformar esse pedido em entrega para os cards.
@@ -746,6 +766,19 @@ const getPedidoId = (pedido: Record<string, unknown>) =>
       pedido.ID ??
       pedido.id
   );
+
+const normalizarEntradaDashboard = (entrada: Record<string, unknown>): Record<string, unknown> => {
+  const pedidoAninhado = (entrada.pedido as Record<string, unknown> | undefined) || {};
+  const pedidoId = getPedidoId(pedidoAninhado) || getPedidoId(entrada);
+  return {
+    ...entrada,
+    ...pedidoAninhado,
+    ...(pedidoId ? { pedido_id: pedidoId } : {}),
+    status_logistico: pedidoAninhado.status_logistico || entrada.status_logistico,
+    retirada: pedidoAninhado.retirada ?? entrada.retirada,
+    logistica: entrada.logistica || pedidoAninhado.logistica,
+  };
+};
 
 const getNotaDoPedido = (nota: Record<string, unknown>) => {
   const notaFiscal =
@@ -813,7 +846,7 @@ export default async function handler(
   res.setHeader('Cache-Control', 'private, no-store, max-age=0');
   const cacheAtual = getCacheByPeriodo(periodoFiltro.cacheKey);
 
-  if (!forceRefresh) {
+  if (!forceRefresh && escopoPrincipal) {
     // A tabela local e a fonte preferencial; a API externa alimenta o snapshot.
     const snapshotLocal = await montarDashboardPorSnapshot(periodoFiltro);
     if (snapshotLocal) {
@@ -928,15 +961,15 @@ export default async function handler(
 
     const pedidosComTipo = pedidosComTipoResult || [];
     const dashboardEntries = [
-      ...(dashboardExterno.data as Record<string, unknown>[]),
-      ...pedidosComTipo,
+      ...(dashboardExterno.data as Record<string, unknown>[]).map(normalizarEntradaDashboard),
+      ...pedidosComTipo.map(normalizarEntradaDashboard),
     ].filter((item, index, entries) => {
       const pedidoId = getPedidoId(item);
       return !pedidoId || entries.findIndex((candidate) => getPedidoId(candidate) === pedidoId) === index;
     });
     const notasCompletas = notasCompletasResult || null;
     const dashboardPedidoIds = new Set(
-      (dashboardExterno.data as Record<string, unknown>[])
+      (dashboardExterno.data as Record<string, unknown>[]).map(normalizarEntradaDashboard)
         .map((item) => getPedidoId(item))
         .filter((pedidoId): pedidoId is number => Boolean(pedidoId))
     );
@@ -972,7 +1005,7 @@ export default async function handler(
     }
 
     const notaPorPedido = new Map<number, { numeroNota: string | null; chave: string }>();
-    for (const dashboardItem of dashboardExterno.data as Record<string, any>[]) {
+    for (const dashboardItem of (dashboardExterno.data as Record<string, any>[]).map(normalizarEntradaDashboard)) {
       const pedidoId = getPedidoId(dashboardItem);
       const logistica = (dashboardItem.logistica || {}) as Record<string, any>;
       const nota = Array.isArray(logistica.notas_fiscais) ? logistica.notas_fiscais[0] || {} : {};
