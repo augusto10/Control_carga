@@ -237,8 +237,6 @@ const isPedidoPermitidoNoDashboard = (
   if (hasEntregaNoAto(pedido, logistica)) return false;
   if (isRetiradaConfirmada(pedido)) return permitirTipoAusente;
   const tipos = getTiposEntrega(pedido, logistica);
-  const tipoCodigo = tipos.find((tipo) => ['ENT', 'EPG', 'ATO', 'RLR', 'NDF', 'RDL'].includes(tipo));
-  if (tipoCodigo && !['ENT', 'EPG'].includes(tipoCodigo)) return false;
   return tipos.some((tipo) => ['ENT', 'EPG'].includes(tipo)) || (permitirTipoAusente && tipos.length === 0);
 };
 
@@ -352,7 +350,25 @@ const isPedidoComPendencias = (pedido: Record<string, unknown>, logistica: Recor
       return status === 'G' || Boolean(separacao.DATA_HORA_BAIXA ?? separacao.DATA_BAIXA);
     }) ||
     itensSeparacoes.some((item) => (toNumber(item.QUANTIDADE_BAIXADA) || 0) > 0);
+  const possuiSaldoPendente =
+    itensComparativo.some((item) =>
+      (toNumber(item.SALDO_PENDENTE) || 0) > 0 ||
+      (toNumber(item.QUANTIDADE_PENDENTE_TOTAL) || 0) > 0 ||
+      (toNumber(item.EM_SEPARACAO_PENDENTE) || 0) > 0 ||
+      (toNumber(item.SALDO_NA_SEPARACAO) || 0) > 0
+    ) ||
+    itensEntregasPendentes.some((item) =>
+      (toNumber(item.SALDO) || 0) > 0 ||
+      (toNumber(item.QUANTIDADE_EM_SEPARACAO) || 0) > 0 ||
+      (toNumber(item.QTD_EM_SEPARACAO_TRAN_ENT_PEN) || 0) > 0
+    );
   const possuiProdutosFaltando =
+    ['S', 'SIM', 'TRUE', '1'].includes(
+      String(pedido.possui_produtos_faltando ?? pedido.POSSUI_PRODUTO_FALTANDO ?? pedido.PRODUTO_FALTANDO ?? pedido.produto_faltando ?? pedido.PRODUTO_NAO_ENCONTRADO ?? pedido.produto_nao_encontrado ?? pedido.NAO_ENCONTRADO ?? pedido.nao_encontrado ?? pedido.FALTA ?? pedido.falta ?? '').trim().toUpperCase()
+    ) ||
+    ['S', 'SIM', 'TRUE', '1'].includes(
+      String(logistica?.resumo_pendencias_logisticas?.POSSUI_PRODUTO_FALTANDO ?? logistica?.resumo_pendencias_logisticas?.PRODUTO_FALTANDO ?? '').trim().toUpperCase()
+    ) ||
     [...itensComparativo, ...itensEntregasPendentes].some((item) =>
       ['S', 'SIM', 'TRUE', '1'].includes(String(item.POSSUI_PRODUTO_FALTANDO ?? item.possui_produto_faltando ?? item.PRODUTO_FALTANDO ?? item.produto_faltando ?? item.PRODUTO_NAO_ENCONTRADO ?? item.produto_nao_encontrado ?? item.NAO_ENCONTRADO ?? item.nao_encontrado ?? item.FALTA ?? item.falta ?? '').trim().toUpperCase()) ||
       (toNumber(item.QUANTIDADE_FALTANTE ?? item.quantidade_faltante ?? item.QTD_FALTANTE ?? item.qtd_faltante) || 0) > 0
@@ -841,7 +857,7 @@ export async function montarDashboardPorSnapshot(
     const rawPedido = (snapshot.rawPedido || {}) as Record<string, unknown>;
     if (pedidoTemDevolucao(rawPedido, snapshot.rawLogistica)) continue;
     const ehRetirada = ['ATO', 'NDF', 'RDL', 'RLR'].includes(tipoEntrega) || isRetiradaConfirmada(rawPedido);
-    const ehEntrega = ['ENT', 'EPG'].includes(tipoEntrega);
+    const ehEntrega = ['ENT', 'EPG'].includes(tipoEntrega) || (!tipoEntrega && !ehRetirada);
     if (ehRetirada) totalRetirados += 1;
     if (!ehEntrega) continue;
 
