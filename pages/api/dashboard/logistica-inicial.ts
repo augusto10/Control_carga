@@ -922,16 +922,18 @@ export default async function handler(
         password,
         escopoPrincipal ? 10_000 : 8_000
       )),
-      timed('pedidos_tipo', getPedidosDashboard(
-        username,
-        password,
-        escopoPrincipal ? 100 : 500,
-        8_000,
-        {
-          data_inicio: periodoFiltro.dataInicioIso || undefined,
-          data_fim: dataFimDashboard,
-        }
-      )),
+      timed('pedidos_tipo', escopoPrincipal
+        ? getPedidosDashboard(
+            username,
+            password,
+            100,
+            8_000,
+            {
+              data_inicio: periodoFiltro.dataInicioIso || undefined,
+              data_fim: dataFimDashboard,
+            }
+          )
+        : Promise.resolve(null)),
       timed(
         'notas_externas',
         // Sempre buscar notas externas para poder vincular com controles locais
@@ -995,16 +997,34 @@ export default async function handler(
     }
 
     const pedidosComTipo = pedidosComTipoResult || [];
-    const dashboardEntries = [
-      ...(dashboardExterno.data as Record<string, unknown>[]).map(normalizarEntradaDashboard),
-      ...pedidosComTipo.map(normalizarEntradaDashboard),
-    ].filter((item, index, entries) => {
+    const entradasConsolidadas = (dashboardExterno.data as Record<string, unknown>[])
+      .map(normalizarEntradaDashboard);
+    const ehCandidatoDeAlerta = (pedido: Record<string, unknown>) => {
+      const status = deriveDashboardStatus(
+        pedido,
+        (pedido.status_logistico || {}) as Record<string, unknown>,
+        (pedido.logistica || {}) as Record<string, any>
+      );
+      return hasResumoPendenciaNoPedido(pedido) || (
+        Boolean(status && ['PEDIDO_NOVO', 'PEDIDO_EM_SEPARACAO', 'PEDIDO_SEPARADO', 'PEDIDO_EMBARCADO'].includes(status)) &&
+        isPedidoParaAlerta(pedido)
+      );
+    };
+    // Os alertas usam exclusivamente o consolidado do ERP. A lista geral de
+    // pedidos nao possui filtro de periodo documentado e podia misturar tipos
+    // de entrega de registros fora do recorte atual.
+    const dashboardEntries = (escopoPrincipal
+      ? [...entradasConsolidadas, ...pedidosComTipo.map(normalizarEntradaDashboard)]
+      : entradasConsolidadas
+          .filter(ehCandidatoDeAlerta)
+          .map((pedido) => ({ ...pedido, __forcarLogisticaDetalhada: true }))
+    ).filter((item, index, entries) => {
       const pedidoId = getPedidoId(item);
       return !pedidoId || entries.findIndex((candidate) => getPedidoId(candidate) === pedidoId) === index;
     });
     const notasCompletas = notasCompletasResult || null;
     const dashboardPedidoIds = new Set(
-      (dashboardExterno.data as Record<string, unknown>[]).map(normalizarEntradaDashboard)
+      entradasConsolidadas
         .map((item) => getPedidoId(item))
         .filter((pedidoId): pedidoId is number => Boolean(pedidoId))
     );
@@ -1291,6 +1311,11 @@ export default async function handler(
             const logisticaDetalhada = await getPedidoLogisticaCached(pedidoId, username, password);
             if (logisticaDetalhada) {
               logistica = { ...logistica, ...logisticaDetalhada };
+            } else if (forcarLogisticaDetalhada) {
+              // Sem a consulta atual nao e seguro classificar entrega,
+              // retirada ou produto faltando. Preferimos nao exibir o pedido
+              // a deixa-lo entrar indevidamente em um alerta.
+              return null;
             }
           }
           const statusCodigoBase = deriveDashboardStatus(pedido, statusLogistico, logistica);
