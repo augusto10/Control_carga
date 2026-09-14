@@ -949,7 +949,10 @@ export default async function handler(
         },
         username,
         password,
-        escopoPrincipal ? 10_000 : 8_000
+        // O consolidado do ERP pode levar mais de 8s quando o periodo de
+        // alertas cobre 30 dias. Com 8s a rota caia no fallback e a interface
+        // mantinha o ultimo quadro, mesmo em navegacao privada.
+        escopoPrincipal ? 10_000 : 45_000
       )),
       timed('pedidos_tipo', escopoPrincipal
         ? getPedidosDashboard(
@@ -1668,6 +1671,7 @@ export default async function handler(
 
     const snapshotFallback = await montarDashboardPorSnapshot(periodoFiltro, {
       warning: 'API externa indisponivel. Exibindo ultima base local sincronizada.',
+      alertasOnly: !escopoPrincipal,
     });
 
     if (snapshotFallback) {

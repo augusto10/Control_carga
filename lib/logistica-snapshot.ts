@@ -379,14 +379,18 @@ const isPedidoComPendencias = (pedido: Record<string, unknown>, logistica: Recor
 const isPedidoParaAlerta = (dataHoraRecebimento: Date | null) => {
   if (!dataHoraRecebimento) return true;
 
-  const agora = new Date();
-  const hoje = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate());
-  const corte = new Date(hoje);
-  corte.setHours(16, 1, 0, 0);
-
-  if (dataHoraRecebimento < hoje) return true;
-  if (agora < corte) return false;
-  return dataHoraRecebimento < corte;
+  const partes = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+  }).formatToParts(new Date()).reduce<Record<string, string>>((resultado, parte) => {
+    resultado[parte.type] = parte.value;
+    return resultado;
+  }, {});
+  const hojeSaoPaulo = `${partes.year}-${partes.month}-${partes.day}`;
+  const dataPedido = dataHoraRecebimento.toISOString().slice(0, 10);
+  if (dataPedido < hojeSaoPaulo) return true;
+  if (dataPedido > hojeSaoPaulo) return false;
+  return Number(partes.hour || 0) * 60 + Number(partes.minute || 0) >= 16 * 60 + 1;
 };
 
 const deriveAlertaStatus = (
@@ -787,7 +791,7 @@ export async function sincronizarLogisticaSnapshot(options: {
 
 export async function montarDashboardPorSnapshot(
   periodo: PeriodoSnapshot,
-  options: { exigirSincronizacaoRecenteMs?: number; warning?: string } = {}
+  options: { exigirSincronizacaoRecenteMs?: number; warning?: string; alertasOnly?: boolean } = {}
 ) {
   const syncKey = getSnapshotSyncKey(periodo);
   let snapshots: any[] = [];
@@ -857,7 +861,9 @@ export async function montarDashboardPorSnapshot(
     const rawPedido = (snapshot.rawPedido || {}) as Record<string, unknown>;
     if (pedidoTemDevolucao(rawPedido, snapshot.rawLogistica)) continue;
     const ehRetirada = ['ATO', 'NDF', 'RDL', 'RLR'].includes(tipoEntrega) || isRetiradaConfirmada(rawPedido);
-    const ehEntrega = ['ENT', 'EPG'].includes(tipoEntrega) || (!tipoEntrega && !ehRetirada);
+    const ehEntrega = options.alertasOnly
+      ? ['ENT', 'EPG'].includes(tipoEntrega)
+      : ['ENT', 'EPG'].includes(tipoEntrega) || (!tipoEntrega && !ehRetirada);
     if (ehRetirada) totalRetirados += 1;
     if (!ehEntrega) continue;
 
@@ -869,9 +875,11 @@ export async function montarDashboardPorSnapshot(
     const controleAtual = embarques.porPedido.get(snapshot.pedidoId);
     const embarcadoNoControle = Boolean(controleAtual || snapshot.embarcadoNoControle);
     const numeroManifesto = controleAtual?.numeroManifesto || snapshot.numeroManifesto;
+    // O consolidado sincronizado do ERP e a fonte de verdade. Itens em
+    // separacao nao sao falta de produto: exigimos flag e quantidade atual.
     const resumoIndicaPendencia =
-      (['S', 'SIM', 'TRUE', '1'].includes(String(rawPedido.possui_produtos_faltando ?? rawPedido.POSSUI_PRODUTO_FALTANDO ?? '').trim().toUpperCase())) &&
-      ['G', 'PENDENCIA'].includes(String(rawPedido.ultimo_status_separacao || '').toUpperCase());
+      ['S', 'SIM', 'TRUE', '1'].includes(String(rawPedido.possui_produtos_faltando ?? rawPedido.POSSUI_PRODUTO_FALTANDO ?? '').trim().toUpperCase()) &&
+      (toNumber(rawPedido.total_itens_pendentes ?? rawPedido.TOTAL_ITENS_PENDENTES) || 0) > 0;
     const itensPendenciaAtual = [
       ...(Array.isArray(snapshot.rawLogistica?.comparativo_separacao_pendentes)
         ? snapshot.rawLogistica.comparativo_separacao_pendentes : []),
@@ -885,7 +893,10 @@ export async function montarDashboardPorSnapshot(
     const produtosPendentesAtuais = saldoDetalhadoPendente(snapshot.rawLogistica) === true
       ? getProdutosPendentes(snapshot.rawLogistica)
       : [];
-    const possuiPendencia = produtosPendentesAtuais.length > 0 && pedidoTemEntregaGerada(rawPedido, snapshot.rawLogistica);
+    const possuiPendencia =
+      resumoIndicaPendencia &&
+      produtosPendentesAtuais.length > 0 &&
+      pedidoTemEntregaGerada(rawPedido, snapshot.rawLogistica);
     const produtosPendentes = !possuiPendencia ? []
       : saldoDetalhadoPendente(snapshot.rawLogistica) !== null ? getProdutosPendentes(snapshot.rawLogistica)
       : Array.isArray(snapshot.produtosPendentes) ? snapshot.produtosPendentes : [];
