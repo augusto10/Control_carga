@@ -736,13 +736,19 @@ const hasEntregaNoAto = (pedido: Record<string, unknown>, logistica?: Record<str
 const isPedidoSomenteEntrega = (pedido: Record<string, unknown>, logistica?: Record<string, unknown>) => {
   const tiposEntrega = getTiposEntrega(pedido, logistica);
   if (hasEntregaNoAto(pedido, logistica)) return false;
-  const retirada = pedido.retirada as Record<string, unknown> | undefined;
+  const retirada = [
+    pedido.retirada,
+    (pedido.logistica as Record<string, any> | undefined)?.retirada,
+    logistica?.retirada,
+  ].find((value) => value && typeof value === 'object') as Record<string, unknown> | undefined;
   if (['S', 'SIM', 'TRUE', '1'].includes(String(retirada?.foi_retirado ?? '').trim().toUpperCase())) return false;
-  // O ERP pode repetir o tipo em campos diferentes. Se o primeiro codigo
-  // informado for retirada (ATO/RLR/NDF/RDL), um EPG secundario nao deve
-  // transformar esse pedido em entrega para os cards.
-  const tipoCodigo = tiposEntrega.find((tipo) => ['ENT', 'EPG', 'ATO', 'RLR', 'NDF', 'RDL'].includes(tipo));
-  if (tipoCodigo && !['ENT', 'EPG'].includes(tipoCodigo)) return false;
+  // O ERP pode repetir o tipo em campos diferentes. Qualquer ocorrência de
+  // ATO/RLR/NDF/RDL invalida o pedido para estes quadros, mesmo que outro
+  // campo (ou a lista auxiliar) informe EPG.
+  const tiposRetirada = ['ATO', 'RLR', 'NDF', 'RDL'];
+  if (tiposEntrega.some((tipo) => tiposRetirada.some((codigo) =>
+    tipo === codigo || tipo.startsWith(`${codigo} `) || tipo.startsWith(`${codigo}-`) || tipo.startsWith(`${codigo}/`)
+  ))) return false;
   return tiposEntrega.some((tipo) => ['ENT', 'EPG'].includes(tipo));
 };
 
