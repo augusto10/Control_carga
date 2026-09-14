@@ -1512,6 +1512,8 @@ export default async function handler(
     for (const entry of entradasPendenciasGlobais) {
       if (
         !entry.possuiPendencia ||
+        entry.item.produtosPendentes.length === 0 ||
+        entry.item.totalItensPendentes <= 0 ||
         !isPedidoPermitidoNoDashboard(
           {
             tipo_entrega: entry.item.tipoEntrega,
