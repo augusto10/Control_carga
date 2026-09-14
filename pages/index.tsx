@@ -264,7 +264,7 @@ const EMPTY_RESUMO_HOJE: ResumoHojeData = {
 };
 const DASHBOARD_LOCAL_CACHE_KEY = 'dashboard-logistica-cache-v11';
 // Descarta alertas gravados antes da validacao atual no ERP.
-const DASHBOARD_ALERTAS_LOCAL_CACHE_KEY = 'dashboard-logistica-alertas-cache-v7';
+const DASHBOARD_ALERTAS_LOCAL_CACHE_KEY = 'dashboard-logistica-alertas-cache-v8';
 const DASHBOARD_AUTO_REFRESH_INTERVAL_MS = 3 * 60_000;
 const DASHBOARD_LEGACY_CACHE_KEYS = [
   'dashboard-logistica-cache-v3',
@@ -725,6 +725,10 @@ function Home() {
   }, []);
 
   useEffect(() => {
+    // A classificacao de pendencia ja foi confirmada no ERP pelo endpoint.
+    // Nao reinterpretar SALDO de itens em separacao no navegador.
+    return;
+
     const pedidosSemProdutos = (pendencias?.pedidos || []).filter(
       (pedido) => pedido.produtosPendentes.length === 0
     );
