@@ -495,11 +495,11 @@ const isPedidoComPendencias = (
   // registros antigos de comparativo ou de controles locais.
   if (pedido.__origemDashboardLogistica === true) {
     const flagResumo = pedido.possui_produtos_faltando ?? pedido.POSSUI_PRODUTO_FALTANDO;
-    const flagResumoFalso = ['N', 'NAO', 'FALSE', '0', ''].includes(
+    const flagResumoVerdadeiro = ['S', 'SIM', 'TRUE', '1'].includes(
       String(flagResumo ?? '').trim().toUpperCase()
     );
     const totalResumo = toNumber(pedido.total_itens_pendentes ?? pedido.TOTAL_ITENS_PENDENTES) || 0;
-    if (flagResumoFalso && totalResumo === 0) return false;
+    if (!flagResumoVerdadeiro || totalResumo <= 0) return false;
   }
   const statusLogisticoCodigo = toStringValue(
     (pedido.status_logistico as Record<string, unknown> | undefined)?.codigo
@@ -582,20 +582,23 @@ const isPedidoParaAlerta = (pedido: Record<string, unknown>): boolean => {
   const dataHoraRecebimento = getPedidoDataHoraRecebimento(pedido);
   if (!dataHoraRecebimento) return true; // Se não tem data, considera para alerta
 
-  const agora = new Date();
-  const hoje = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate());
-  const corte16h01 = new Date(hoje);
-  corte16h01.setHours(16, 1, 0, 0);
+  const dataPedido = toStringValue(
+    pedido.DATA_HORA_RECEBIMENTO ?? pedido.data_hora_recebimento ?? pedido.DATA_RECEBIMENTO ?? pedido.data_recebimento
+  )?.slice(0, 10);
+  if (!dataPedido) return true;
 
-  if (dataHoraRecebimento < hoje) {
-    return true;
-  }
-
-  if (agora < corte16h01) {
-    return false;
-  }
-
-  return dataHoraRecebimento < corte16h01;
+  // O Vercel executa em UTC; o corte e operacional e sempre Sao Paulo.
+  const partes = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+  }).formatToParts(new Date()).reduce<Record<string, string>>((resultado, parte) => {
+    resultado[parte.type] = parte.value;
+    return resultado;
+  }, {});
+  const hojeSaoPaulo = `${partes.year}-${partes.month}-${partes.day}`;
+  if (dataPedido < hojeSaoPaulo) return true;
+  if (dataPedido > hojeSaoPaulo) return false;
+  return Number(partes.hour || 0) * 60 + Number(partes.minute || 0) >= 16 * 60 + 1;
 };
 
 // Helper: deriva o status de alerta baseado no status de separação
