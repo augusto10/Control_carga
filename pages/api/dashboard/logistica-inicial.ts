@@ -936,7 +936,17 @@ export default async function handler(
       exigirSincronizacaoRecenteMs: 6 * 60 * 60 * 1000,
       alertasOnly: true,
     });
-    if (snapshotAlertas) {
+    const totalAtrasadosNoSnapshot = (snapshotAlertas?.indicadores || [])
+      .filter((item) => item.codigo.startsWith('ALERTAS_'))
+      .reduce((total, item) => total + item.total, 0);
+    const totalPendenciasNoSnapshot = snapshotAlertas?.indicadores
+      .find((item) => item.codigo === 'PENDENCIAS')?.total || 0;
+
+    // Um snapshot sem nenhum alerta pode ser uma sincronizacao incompleta do
+    // ambiente (por exemplo, antes de os tipos ENT/EPG terem sido gravados).
+    // Nao devolvemos zero como se fosse um dado definitivo: buscamos o ERP e
+    // preservamos o snapshot somente se ele tambem estiver indisponivel.
+    if (snapshotAlertas && (totalAtrasadosNoSnapshot > 0 || totalPendenciasNoSnapshot > 0)) {
       setCacheByPeriodo(periodoFiltro.cacheKey, snapshotAlertas);
       return res.status(200).json(snapshotAlertas);
     }
@@ -1090,7 +1100,10 @@ export default async function handler(
     const totalTiposCorrespondentes = Array.from(dashboardPedidoIds).filter((pedidoId) =>
       tipoEntregaPorPedido.has(pedidoId)
     ).length;
-    if (dashboardPedidoIds.size > 0 && totalTiposCorrespondentes === 0) {
+    // A consulta auxiliar de tipos e usada apenas pelo painel principal.
+    // Alertas usam o consolidado e podem seguir sem essa lista, que a API
+    // externa frequentemente devolve vazia para periodos por data.
+    if (escopoPrincipal && dashboardPedidoIds.size > 0 && totalTiposCorrespondentes === 0) {
       throw new Error('tipos_pedidos_indisponiveis');
     }
 
