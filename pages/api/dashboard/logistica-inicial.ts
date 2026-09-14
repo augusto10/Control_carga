@@ -490,6 +490,17 @@ const isPedidoComPendencias = (
   logistica: Record<string, any> | null
 ) => {
   if (pedidoTemDevolucao(pedido, logistica)) return false;
+  // Para entradas do consolidado, o ERP ja informa se ha pendencia atual.
+  // Um "false" com total zero e definitivo e nao pode ser ressuscitado por
+  // registros antigos de comparativo ou de controles locais.
+  if (pedido.__origemDashboardLogistica === true) {
+    const flagResumo = pedido.possui_produtos_faltando ?? pedido.POSSUI_PRODUTO_FALTANDO;
+    const flagResumoFalso = ['N', 'NAO', 'FALSE', '0', ''].includes(
+      String(flagResumo ?? '').trim().toUpperCase()
+    );
+    const totalResumo = toNumber(pedido.total_itens_pendentes ?? pedido.TOTAL_ITENS_PENDENTES) || 0;
+    if (flagResumoFalso && totalResumo === 0) return false;
+  }
   const statusLogisticoCodigo = toStringValue(
     (pedido.status_logistico as Record<string, unknown> | undefined)?.codigo
   )?.toUpperCase();
@@ -998,7 +1009,7 @@ export default async function handler(
 
     const pedidosComTipo = pedidosComTipoResult || [];
     const entradasConsolidadas = (dashboardExterno.data as Record<string, unknown>[])
-      .map(normalizarEntradaDashboard);
+      .map((pedido) => normalizarEntradaDashboard({ ...pedido, __origemDashboardLogistica: true }));
     const ehCandidatoDeAlerta = (pedido: Record<string, unknown>) => {
       const status = deriveDashboardStatus(
         pedido,
@@ -1436,7 +1447,6 @@ export default async function handler(
     const entradasLocaisValidadas: EnrichedDashboardEntry[] = (await enrichDashboardEntries(
       Array.from(pedidosLocaisParaValidarPendencias.values())
     )).filter((entry): entry is EnrichedDashboardEntry => Boolean(entry));
-    const entradasPendenciasLocais = entradasLocaisValidadas.filter((entry) => entry.possuiPendencia);
 
     // Se o ERP informar ATO/RLR/NDF ou outro tipo que não seja entrega, o
     // pedido não deve permanecer no quadro só porque existe uma nota local.
@@ -1474,7 +1484,10 @@ export default async function handler(
       entry.item.transportadoraNome = controle.transportadoraNome;
       entry.item.localNome = controle.numeroManifesto ? `Controle ${controle.numeroManifesto}` : entry.item.localNome;
     }
-    const entradasPendenciasGlobais = [...entradasValidas, ...entradasPendenciasLocais];
+    // Pendencias sao exclusivamente as confirmadas no consolidado atual do
+    // ERP. Notas e controles locais continuam servindo para embarques, mas
+    // nao podem criar uma pendencia que o ERP ja encerrou.
+    const entradasPendenciasGlobais = entradasValidas;
 
     // Agrupar pedidos para os quadros de alerta
     const alertaEntries: { statusCodigo: StatusCode; item: DashboardPedidoItem }[] = [];
@@ -1493,7 +1506,7 @@ export default async function handler(
     }
 
     const pendenciaPorPedido = new Map<number, DashboardPedidoItem>();
-    for (const entry of [...entradasPendenciasGlobais, ...entradasValidas]) {
+    for (const entry of entradasPendenciasGlobais) {
       if (
         !entry.possuiPendencia ||
         !isPedidoPermitidoNoDashboard(
