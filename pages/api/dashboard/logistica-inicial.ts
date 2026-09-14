@@ -466,15 +466,15 @@ const deriveDashboardStatus = (
     : null;
 };
 
-const temProdutoPendenteConfirmado = (item: Record<string, unknown>) => {
-  const possuiMarcacaoDeFalta = ['S', 'SIM', 'TRUE', '1'].includes(
-    String(item.POSSUI_PRODUTO_FALTANDO ?? item.possui_produto_faltando ?? item.PRODUTO_FALTANDO ?? item.produto_faltando ?? item.PRODUTO_NAO_ENCONTRADO ?? item.produto_nao_encontrado ?? item.NAO_ENCONTRADO ?? item.nao_encontrado ?? item.FALTA ?? item.falta ?? '').trim().toUpperCase()
-  );
-
 const hasPendenciaConfirmadaNoConsolidado = (pedido: Record<string, unknown>) =>
   ['S', 'SIM', 'TRUE', '1'].includes(
     String(pedido.possui_produtos_faltando ?? pedido.POSSUI_PRODUTO_FALTANDO ?? '').trim().toUpperCase()
   ) && (toNumber(pedido.total_itens_pendentes ?? pedido.TOTAL_ITENS_PENDENTES) || 0) > 0;
+
+const temProdutoPendenteConfirmado = (item: Record<string, unknown>) => {
+  const possuiMarcacaoDeFalta = ['S', 'SIM', 'TRUE', '1'].includes(
+    String(item.POSSUI_PRODUTO_FALTANDO ?? item.possui_produto_faltando ?? item.PRODUTO_FALTANDO ?? item.produto_faltando ?? item.PRODUTO_NAO_ENCONTRADO ?? item.produto_nao_encontrado ?? item.NAO_ENCONTRADO ?? item.nao_encontrado ?? item.FALTA ?? item.falta ?? '').trim().toUpperCase()
+  );
   const quantidadeFaltante = (toNumber(
     item.QUANTIDADE_FALTANTE ?? item.quantidade_faltante ?? item.QTD_FALTANTE ?? item.qtd_faltante
   ) || 0) > 0;
@@ -919,12 +919,26 @@ export default async function handler(
     }
 
     // Mesmo sem snapshot recente, aproveitamos o cache em memoria antes da API.
-    if (cacheAtual && cacheAtual.staleAt > Date.now()) {
+    if (!forceRefresh && cacheAtual && cacheAtual.staleAt > Date.now()) {
       return res.status(200).json({
         ...cacheAtual.payload,
         cached: true,
         stale: cacheAtual.expiresAt <= Date.now(),
       });
+    }
+  }
+
+  if (!escopoPrincipal) {
+    // Os dois cards de alerta usam a janela sincronizada pelo cron. Isso evita
+    // que cada abertura consulte o ERP, oscile os numeros e misture pedidos
+    // em separacao com produtos realmente faltando.
+    const snapshotAlertas = await montarDashboardPorSnapshot(periodoFiltro, {
+      exigirSincronizacaoRecenteMs: 6 * 60 * 60 * 1000,
+      alertasOnly: true,
+    });
+    if (snapshotAlertas) {
+      setCacheByPeriodo(periodoFiltro.cacheKey, snapshotAlertas);
+      return res.status(200).json(snapshotAlertas);
     }
   }
 
@@ -949,10 +963,7 @@ export default async function handler(
         },
         username,
         password,
-        // O consolidado do ERP pode levar mais de 8s quando o periodo de
-        // alertas cobre 30 dias. Com 8s a rota caia no fallback e a interface
-        // mantinha o ultimo quadro, mesmo em navegacao privada.
-        escopoPrincipal ? 10_000 : 45_000
+        escopoPrincipal ? 10_000 : 30_000
       )),
       timed('pedidos_tipo', escopoPrincipal
         ? getPedidosDashboard(
@@ -1052,7 +1063,7 @@ export default async function handler(
             // montar a lista de produtos. Atrasados usam o status ja
             // calculado pelo consolidado e nao podem atrasar toda a tela.
             __forcarLogisticaDetalhada: hasPendenciaConfirmadaNoConsolidado(pedido),
-          }))
+          }) as Record<string, unknown>)
     ).filter((item, index, entries) => {
       const pedidoId = getPedidoId(item);
       return !pedidoId || entries.findIndex((candidate) => getPedidoId(candidate) === pedidoId) === index;

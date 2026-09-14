@@ -1,7 +1,6 @@
 import { buscarEmbarquesAtuais } from '@/lib/pedido-embarques-atuais';
-import { buscarLogisticaAtual } from '@/lib/pedido-logistica-atual';
 import { dadosPedido } from '@/lib/pedido-apresentacao';
-import { saldoPendente, saldoDetalhadoPendente, itensComSaldoPendente, pedidoTemDevolucao, pedidoTemEntregaGerada, codigoAdmDoProduto } from '@/lib/pedido-pendencias';
+import { saldoPendente, itensComSaldoPendente, pedidoTemDevolucao, pedidoTemEntregaGerada, codigoAdmDoProduto } from '@/lib/pedido-pendencias';
 import type { Prisma } from '@prisma/client';
 import prisma from '@/lib/prisma';
 import { apiExternaService } from '@/services/api-externa';
@@ -182,11 +181,38 @@ const getPedidoId = (pedido: Record<string, unknown>) =>
       pedido.id
   );
 
+// O endpoint consolidado pode devolver os dados do pedido dentro de `pedido`.
+// Normalizamos antes de salvar para nunca perder o tipo de entrega no filtro.
+const normalizarPedidoConsolidado = (entrada: Record<string, unknown>) => {
+  const pedidoInterno = entrada.pedido && typeof entrada.pedido === 'object'
+    ? (entrada.pedido as Record<string, unknown>)
+    : {};
+
+  return {
+    ...pedidoInterno,
+    ...entrada,
+    pedido_id: entrada.pedido_id ?? pedidoInterno.pedido_id ?? pedidoInterno.ORCAMENTO_ID ?? pedidoInterno.id,
+    tipo_entrega: entrada.tipo_entrega ?? pedidoInterno.tipo_entrega ?? pedidoInterno.TIPO_ENTREGA,
+    TIPO_ENTREGA: entrada.TIPO_ENTREGA ?? pedidoInterno.TIPO_ENTREGA ?? pedidoInterno.tipo_entrega,
+    retirada: entrada.retirada ?? pedidoInterno.retirada,
+    status_logistico: entrada.status_logistico ?? pedidoInterno.status_logistico,
+    status_separacoes: entrada.status_separacoes ?? pedidoInterno.status_separacoes,
+    ultimo_status_separacao: entrada.ultimo_status_separacao ?? pedidoInterno.ultimo_status_separacao,
+    entrega_confirmada: entrada.entrega_confirmada ?? pedidoInterno.entrega_confirmada,
+    ultima_entrega_id: entrada.ultima_entrega_id ?? pedidoInterno.ultima_entrega_id,
+    possui_produtos_faltando: entrada.possui_produtos_faltando ?? pedidoInterno.possui_produtos_faltando,
+    total_itens_pendentes: entrada.total_itens_pendentes ?? pedidoInterno.total_itens_pendentes,
+    __origemDashboardLogistica: true,
+  } as Record<string, unknown>;
+};
+
 const getTiposEntrega = (pedido: Record<string, unknown>, logistica?: Record<string, any> | null) =>
   [
     pedido.tipo_entrega,
     pedido.TIPO_ENTREGA,
     pedido.tipoEntrega,
+    pedido.DESCRICAO_TIPO_ENTREGA,
+    pedido.descricao_tipo_entrega,
     pedido.TIPO_ENTREGA_DESCRICAO,
     pedido.tipo_entrega_descricao,
     (pedido.logistica as Record<string, any> | undefined)?.pedido?.TIPO_ENTREGA,
@@ -197,6 +223,7 @@ const getTiposEntrega = (pedido: Record<string, unknown>, logistica?: Record<str
     (logistica?.pedido as Record<string, any> | undefined)?.TIPO_ENTREGA,
     (logistica?.pedido as Record<string, any> | undefined)?.tipo_entrega,
     (logistica?.pedido as Record<string, any> | undefined)?.TIPO_ENTREGA_DESCRICAO,
+    (logistica?.pedido as Record<string, any> | undefined)?.DESCRICAO_TIPO_ENTREGA,
   ]
     .map(toStringValue)
     .filter((value): value is string => Boolean(value))
@@ -229,13 +256,28 @@ const isRetiradaConfirmada = (pedido: Record<string, unknown>) => {
   );
 };
 
+const contemTipoRetirada = (valor: unknown, visitados = new Set<unknown>()): boolean => {
+  if (!valor || typeof valor !== 'object' || visitados.has(valor)) return false;
+  visitados.add(valor);
+  if (Array.isArray(valor)) return valor.some((item) => contemTipoRetirada(item, visitados));
+
+  const registro = valor as Record<string, unknown>;
+  for (const [chave, item] of Object.entries(registro)) {
+    const nomeCampo = chave.toUpperCase();
+    if (!nomeCampo.includes('TIPO') && !nomeCampo.includes('RETIR')) continue;
+    const texto = String(item ?? '').trim().toUpperCase();
+    if (['ATO', 'NDF', 'RDL', 'RLR'].includes(texto) || texto.includes('RETIRADA')) return true;
+  }
+  return Object.values(registro).some((item) => contemTipoRetirada(item, visitados));
+};
+
 const isPedidoPermitidoNoDashboard = (
   pedido: Record<string, unknown>,
   logistica?: Record<string, any> | null,
   permitirTipoAusente = false
 ) => {
   if (hasEntregaNoAto(pedido, logistica)) return false;
-  if (isRetiradaConfirmada(pedido)) return permitirTipoAusente;
+  if (isRetiradaConfirmada(pedido) || contemTipoRetirada(pedido) || contemTipoRetirada(logistica)) return false;
   const tipos = getTiposEntrega(pedido, logistica);
   return tipos.some((tipo) => ['ENT', 'EPG'].includes(tipo)) || (permitirTipoAusente && tipos.length === 0);
 };
@@ -273,31 +315,6 @@ const deriveDashboardStatus = (
   return candidate && STATUS_ORDER.includes(candidate as StatusCode) ? (candidate as StatusCode) : null;
 };
 
-const hasResumoPendenciaNoPedido = (pedido: Record<string, unknown>) =>
-  (toNumber(pedido.total_itens_pendentes) || 0) > 0 ||
-  (toNumber(pedido.itens_em_separacao) || 0) > 0 ||
-  (toNumber(pedido.quantidade_em_separacao_total) || 0) > 0 ||
-  ['S', 'SIM', 'TRUE', '1'].includes(
-    String(pedido.possui_produtos_faltando ?? pedido.POSSUI_PRODUTO_FALTANDO ?? '').trim().toUpperCase()
-  );
-
-const isPedidoSomenteComSeparacaoAberta = (pedido: Record<string, unknown>) => {
-  const ultimoStatus = toStringValue(pedido.ultimo_status_separacao)?.trim().toUpperCase() || null;
-  const statusSeparacoes = getStatusSeparacoes(pedido);
-  const statusLogistico = toStringValue(
-    (pedido.status_logistico as Record<string, unknown> | undefined)?.codigo
-  )?.trim().toUpperCase();
-  const possuiStatusConcluido =
-    ['E', 'G'].includes(ultimoStatus || '') ||
-    statusSeparacoes.some((status) => ['E', 'G'].includes(status));
-  const possuiStatusAberto =
-    ['A', 'S'].includes(ultimoStatus || '') ||
-    statusSeparacoes.some((status) => ['A', 'S'].includes(status)) ||
-    ['PEDIDO_NOVO', 'PEDIDO_EM_SEPARACAO'].includes(statusLogistico || '');
-
-  return possuiStatusAberto && !possuiStatusConcluido;
-};
-
 const hasStatusSeparacao = (pedido: Record<string, unknown>, status: string) => {
   const statusNormalizado = status.trim().toUpperCase();
   const ultimoStatusSeparacao = toStringValue(pedido.ultimo_status_separacao)?.toUpperCase() || null;
@@ -328,6 +345,14 @@ const getProdutosPendentes = (logistica: Record<string, any> | null) =>
 
 const isPedidoComPendencias = (pedido: Record<string, unknown>, logistica: Record<string, any> | null) => {
   if (pedidoTemDevolucao(pedido, logistica)) return false;
+  // No consolidado, a flag do ERP e obrigatoria. Itens em separacao nunca
+  // devem, por si so, classificar um pedido como produto faltando.
+  if (pedido.__origemDashboardLogistica === true) {
+    const confirmadoPeloErp = ['S', 'SIM', 'TRUE', '1'].includes(
+      String(pedido.possui_produtos_faltando ?? pedido.POSSUI_PRODUTO_FALTANDO ?? '').trim().toUpperCase()
+    );
+    if (!confirmadoPeloErp || (toNumber(pedido.total_itens_pendentes) || 0) <= 0) return false;
+  }
   const statusLogisticoCodigo = toStringValue(
     (pedido.status_logistico as Record<string, unknown> | undefined)?.codigo
   )?.toUpperCase();
@@ -532,7 +557,7 @@ export async function sincronizarLogisticaSnapshot(options: {
     dataInicioIso: options.dataInicioIso || null,
     dataFimIso: options.dataFimIso || null,
   };
-  const maxDetalhes = Math.min(Math.max(options.maxDetalhes ?? 30, 0), 100);
+  const maxDetalhes = Math.min(Math.max(options.maxDetalhes ?? 20, 0), 100);
   // A API Santri pode levar mais de 10s para montar as consultas consolidadas.
   // Mantemos um limite finito para a funcao serverless, mas evitamos falsos
   // indisponiveis antes que a API consiga responder.
@@ -542,7 +567,7 @@ export async function sincronizarLogisticaSnapshot(options: {
   let totalComErro = 0;
 
   try {
-    const [dashboardExterno, controles, notasCompletas] = await Promise.all([
+    const [dashboardExterno, controles, notasCompletas, pedidosComTipoResultado] = await Promise.all([
       apiExternaService.listarDashboardLogistica(
         {
           empresa_id: 1,
@@ -557,17 +582,22 @@ export async function sincronizarLogisticaSnapshot(options: {
       apiExternaService
         .listarNotasFiscaisCompletas({ limit: 100, offset: 0 }, options.username, options.password, 6_000)
         .catch(() => null),
+      apiExternaService
+        .listarPedidos(
+          { data_inicio: options.dataInicioIso || undefined, data_fim: options.dataFimIso || undefined, limit: options.limit || 500, offset: 0 },
+          options.username,
+          options.password,
+          8_000
+        )
+        .catch(() => null),
     ]);
 
     // A rota consolidada ja traz os pedidos operacionais. A rota /pedidos
     // rejeita filtros de data na API atual e nao deve bloquear o cron.
-    const pedidosComTipo: Record<string, unknown>[] = [];
+    const pedidosComTipo = ((pedidosComTipoResultado?.data || []) as Record<string, unknown>[]);
 
     const entradas: Record<string, unknown>[] = [
-      ...((dashboardExterno?.data || []) as Record<string, unknown>[]).map((item) => ({
-        ...item,
-        __origemDashboardLogistica: true,
-      })),
+      ...((dashboardExterno?.data || []) as Record<string, unknown>[]).map(normalizarPedidoConsolidado),
       ...((pedidosComTipo || []) as Record<string, unknown>[]),
     ].filter((item, index, entries) => {
       const pedidoId = getPedidoId(item);
@@ -577,6 +607,17 @@ export async function sincronizarLogisticaSnapshot(options: {
     if (!dashboardExterno && pedidosComTipo.length === 0) {
       throw new Error('API externa retornou indisponibilidade nas consultas de dashboard e pedidos');
     }
+
+    // O dashboard consolidado nem sempre inclui tipo de entrega. Preservamos
+    // o ultimo tipo conhecido enquanto a lista geral do ERP estiver lenta,
+    // em vez de sobrescrever ENT/EPG com vazio e perder o pedido no alerta.
+    const existentes = await (prisma as any).pedidoLogisticaSnapshot.findMany({
+      where: { pedidoId: { in: entradas.map((entrada) => getPedidoId(entrada)).filter(Boolean) as number[] } },
+      select: { pedidoId: true, tipoEntrega: true, assinatura: true },
+    });
+    const existentePorPedido = new Map<number, { tipoEntrega: string | null; assinatura: string }>(
+      existentes.map((item: { pedidoId: number; tipoEntrega: string | null; assinatura: string }) => [item.pedidoId, item])
+    );
 
     const notaPorPedido = new Map<number, { numeroNota: string | null; chave: string }>();
     for (const nota of notasCompletas?.data || []) {
@@ -599,16 +640,26 @@ export async function sincronizarLogisticaSnapshot(options: {
       let pedido = entry;
       let logistica = ((pedido.logistica as Record<string, any> | undefined) || {}) as Record<string, any>;
       const tipoEntregaLista = tipoEntregaPorPedido.get(pedidoId);
+      const tipoEntregaAnterior = existentePorPedido.get(pedidoId)?.tipoEntrega || null;
+      if (!getTipoEntregaPrincipal(pedido, logistica) && (tipoEntregaLista || tipoEntregaAnterior)) {
+        const tipoEntrega = tipoEntregaLista || tipoEntregaAnterior;
+        pedido = { ...pedido, tipo_entrega: tipoEntrega, TIPO_ENTREGA: tipoEntrega };
+      }
       const statusLogisticoInicial = ((pedido.status_logistico || {}) as Record<string, unknown>) || {};
       const statusInicial = deriveDashboardStatus(pedido, statusLogisticoInicial, logistica);
+      const pendenciaConfirmadaNoConsolidado =
+        pedido.__origemDashboardLogistica === true &&
+        ['S', 'SIM', 'TRUE', '1'].includes(
+          String(pedido.possui_produtos_faltando ?? pedido.POSSUI_PRODUTO_FALTANDO ?? '').trim().toUpperCase()
+        ) &&
+        (toNumber(pedido.total_itens_pendentes) || 0) > 0;
       const referenciaInicialDireta = getNotaReferencia(pedido, logistica);
       const referenciaInicial =
         referenciaInicialDireta.numeroNota || referenciaInicialDireta.chave.length === 44
           ? referenciaInicialDireta
           : notaPorPedido.get(pedidoId) || referenciaInicialDireta;
       const precisaDetalhe =
-        (!getTipoEntregaPrincipal(pedido, logistica) && !tipoEntregaLista) ||
-        (hasResumoPendenciaNoPedido(pedido) && !isPedidoSomenteComSeparacaoAberta(pedido)) ||
+        pendenciaConfirmadaNoConsolidado ||
         (
           statusInicial === 'PEDIDO_EMBARCADO' &&
           !referenciaInicial.numeroNota &&
@@ -710,10 +761,6 @@ export async function sincronizarLogisticaSnapshot(options: {
     });
 
     const validos = snapshots.filter((snapshot): snapshot is NonNullable<typeof snapshot> => Boolean(snapshot));
-    const existentes = await (prisma as any).pedidoLogisticaSnapshot.findMany({
-      where: { pedidoId: { in: validos.map((snapshot) => snapshot.pedidoId) } },
-      select: { pedidoId: true, assinatura: true },
-    });
     const assinaturaExistente = new Map<number, string>(
       existentes.map((item: { pedidoId: number; assinatura: string }) => [item.pedidoId, item.assinatura])
     );
@@ -832,26 +879,12 @@ export async function montarDashboardPorSnapshot(
 
   if (!snapshots.length) return null;
 
-  const username = process.env.API_EXTERNA_USERNAME;
-  const password = process.env.API_EXTERNA_PASSWORD;
-  let pendenciasNaoVerificadas = false;
-  const [embarques] = await Promise.all([
-    buscarEmbarquesAtuais(snapshots, username, password),
-    mapWithConcurrency(snapshots.filter((snapshot) =>
-      snapshot.possuiPendencia ||
-      (snapshot.rawPedido as Record<string, unknown> | null)?.possui_produtos_faltando === true
-    ), 2, async (snapshot) => {
-      if (!username || !password) { pendenciasNaoVerificadas = true; snapshot.possuiPendencia = false; snapshot.rawLogistica = {}; return; }
-      const atual = await buscarLogisticaAtual(snapshot.pedidoId, username, password);
-      if (!atual) { pendenciasNaoVerificadas = true; snapshot.possuiPendencia = false; snapshot.rawLogistica = {}; return; }
-      snapshot.rawLogistica = atual;
-      const statusAtual = atual.status_logistico?.codigo;
-      if (typeof statusAtual === 'string' && STATUS_ORDER.includes(statusAtual as StatusCode)) {
-        snapshot.statusCodigo = statusAtual;
-        snapshot.situacaoAtual = STATUS_META[statusAtual as StatusCode].titulo;
-      }
-    }),
-  ]);
+  // Alertas leem somente a copia sincronizada. Consultar detalhes do ERP ao
+  // abrir a tela fazia o card oscilar e reclassificava "em separacao" como
+  // pendencia. A atualizacao e responsabilidade exclusiva do sincronizador.
+  const embarques = options.alertasOnly
+    ? { porPedido: new Map<number, { numeroManifesto: string | null; transportadoraNome: string | null; dataHoraControle: Date | null }>(), verificacaoIncompleta: false }
+    : await buscarEmbarquesAtuais(snapshots, process.env.API_EXTERNA_USERNAME, process.env.API_EXTERNA_PASSWORD);
 
   const entries: { statusCodigo: StatusCode; item: DashboardPedidoItem }[] = [];
   let totalRetirados = 0;
@@ -860,7 +893,7 @@ export async function montarDashboardPorSnapshot(
     const tipoEntrega = String(snapshot.tipoEntrega || '').trim().toUpperCase();
     const rawPedido = (snapshot.rawPedido || {}) as Record<string, unknown>;
     if (pedidoTemDevolucao(rawPedido, snapshot.rawLogistica)) continue;
-    const ehRetirada = ['ATO', 'NDF', 'RDL', 'RLR'].includes(tipoEntrega) || isRetiradaConfirmada(rawPedido);
+    const ehRetirada = ['ATO', 'NDF', 'RDL', 'RLR'].includes(tipoEntrega) || isRetiradaConfirmada(rawPedido) || contemTipoRetirada(rawPedido);
     const ehEntrega = options.alertasOnly
       ? ['ENT', 'EPG'].includes(tipoEntrega)
       : ['ENT', 'EPG'].includes(tipoEntrega) || (!tipoEntrega && !ehRetirada);
@@ -875,31 +908,17 @@ export async function montarDashboardPorSnapshot(
     const controleAtual = embarques.porPedido.get(snapshot.pedidoId);
     const embarcadoNoControle = Boolean(controleAtual || snapshot.embarcadoNoControle);
     const numeroManifesto = controleAtual?.numeroManifesto || snapshot.numeroManifesto;
-    // O consolidado sincronizado do ERP e a fonte de verdade. Itens em
-    // separacao nao sao falta de produto: exigimos flag e quantidade atual.
+    // O registro sincronizado ja foi validado contra a flag do ERP e os itens
+    // detalhados. Nao reinterpretamos saldos durante a leitura do card.
     const resumoIndicaPendencia =
       ['S', 'SIM', 'TRUE', '1'].includes(String(rawPedido.possui_produtos_faltando ?? rawPedido.POSSUI_PRODUTO_FALTANDO ?? '').trim().toUpperCase()) &&
       (toNumber(rawPedido.total_itens_pendentes ?? rawPedido.TOTAL_ITENS_PENDENTES) || 0) > 0;
-    const itensPendenciaAtual = [
-      ...(Array.isArray(snapshot.rawLogistica?.comparativo_separacao_pendentes)
-        ? snapshot.rawLogistica.comparativo_separacao_pendentes : []),
-      ...(Array.isArray(snapshot.rawLogistica?.itens_entregas_pendentes)
-        ? snapshot.rawLogistica.itens_entregas_pendentes : []),
-    ];
-    const possuiProdutoFaltandoAtual = itensPendenciaAtual.some((item: Record<string, any>) =>
-        ['S', 'SIM', 'TRUE', '1'].includes(String(item.POSSUI_PRODUTO_FALTANDO ?? item.possui_produto_faltando ?? item.PRODUTO_FALTANDO ?? item.produto_faltando ?? item.PRODUTO_NAO_ENCONTRADO ?? item.produto_nao_encontrado ?? item.NAO_ENCONTRADO ?? item.nao_encontrado ?? item.FALTA ?? item.falta ?? '').trim().toUpperCase()) ||
-        (toNumber(item.QUANTIDADE_FALTANTE ?? item.quantidade_faltante ?? item.QTD_FALTANTE ?? item.qtd_faltante) || 0) > 0
-      );
-    const produtosPendentesAtuais = saldoDetalhadoPendente(snapshot.rawLogistica) === true
-      ? getProdutosPendentes(snapshot.rawLogistica)
-      : [];
     const possuiPendencia =
       resumoIndicaPendencia &&
-      produtosPendentesAtuais.length > 0 &&
-      pedidoTemEntregaGerada(rawPedido, snapshot.rawLogistica);
-    const produtosPendentes = !possuiPendencia ? []
-      : saldoDetalhadoPendente(snapshot.rawLogistica) !== null ? getProdutosPendentes(snapshot.rawLogistica)
-      : Array.isArray(snapshot.produtosPendentes) ? snapshot.produtosPendentes : [];
+      snapshot.possuiPendencia === true &&
+      Array.isArray(snapshot.produtosPendentes) &&
+      snapshot.produtosPendentes.length > 0;
+    const produtosPendentes = possuiPendencia ? snapshot.produtosPendentes : [];
     const itemBase: DashboardPedidoItem = {
       ...dadosPedido(rawPedido, snapshot.rawLogistica),
       pedidoId: snapshot.pedidoId,
@@ -1011,6 +1030,6 @@ export async function montarDashboardPorSnapshot(
     indicadores,
     cached: true,
     stale: Boolean(options.warning),
-    warning: [options.warning, embarques.verificacaoIncompleta ? 'Alguns vinculos de embarque nao puderam ser atualizados.' : null, pendenciasNaoVerificadas ? 'Algumas pendencias nao puderam ser verificadas no ERP.' : null].filter(Boolean).join(' ') || undefined,
+    warning: [options.warning, embarques.verificacaoIncompleta ? 'Alguns vinculos de embarque nao puderam ser atualizados.' : null].filter(Boolean).join(' ') || undefined,
   };
 }
