@@ -263,7 +263,8 @@ const EMPTY_RESUMO_HOJE: ResumoHojeData = {
   pedidosEntregaHoje: 0,
 };
 const DASHBOARD_LOCAL_CACHE_KEY = 'dashboard-logistica-cache-v11';
-const DASHBOARD_ALERTAS_LOCAL_CACHE_KEY = 'dashboard-logistica-alertas-cache-v6';
+// Descarta alertas gravados antes da validacao atual no ERP.
+const DASHBOARD_ALERTAS_LOCAL_CACHE_KEY = 'dashboard-logistica-alertas-cache-v7';
 const DASHBOARD_AUTO_REFRESH_INTERVAL_MS = 3 * 60_000;
 const DASHBOARD_LEGACY_CACHE_KEYS = [
   'dashboard-logistica-cache-v3',
