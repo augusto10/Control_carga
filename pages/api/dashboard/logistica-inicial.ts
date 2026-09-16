@@ -365,7 +365,7 @@ const isPedidoEmpresa1Recebido = (pedido: Record<string, unknown>) => {
 };
 
 const hasResumoPendenciaNoPedido = (pedido: Record<string, unknown>) =>
-  (toNumber(pedido.total_itens_pendentes) || 0) > 0 ||
+  (toNumber(pedido.total_itens_pendentes ?? pedido.TOTAL_ITENS_PENDENTES) || 0) > 0 ||
   (toNumber(pedido.itens_em_separacao) || 0) > 0 ||
   (toNumber(pedido.quantidade_em_separacao_total) || 0) > 0 ||
   ['S', 'SIM', 'TRUE', '1'].includes(
@@ -445,6 +445,19 @@ const isPedidoComPendencias = (
   pedido: Record<string, unknown>,
   logistica: Record<string, any> | null
 ) => {
+  // Gate do ERP consolidado: se o campo existe e diz explicitamente que NAO
+  // ha produtos faltando (e total_itens_pendentes e zero), nao classificar
+  // como pendencia. Isso evita falso-positivos de status logistico stale
+  // (ex: pedidos 198714, 198712, 198685).
+  const campoErpFaltando = pedido.possui_produtos_faltando ?? pedido.POSSUI_PRODUTO_FALTANDO;
+  if (campoErpFaltando !== undefined && campoErpFaltando !== null && campoErpFaltando !== '') {
+    const erpConfirmaFalta = ['S', 'SIM', 'TRUE', '1'].includes(
+      String(campoErpFaltando).trim().toUpperCase()
+    );
+    const erpTotalItens = toNumber(pedido.total_itens_pendentes ?? pedido.TOTAL_ITENS_PENDENTES) || 0;
+    if (!erpConfirmaFalta && erpTotalItens <= 0) return false;
+  }
+
   const statusLogisticoCodigo = toStringValue(
     (pedido.status_logistico as Record<string, unknown> | undefined)?.codigo
   )?.toUpperCase();
@@ -733,12 +746,40 @@ const getTipoEntregaPrincipal = (pedido: Record<string, unknown>, logistica?: Re
 const isTipoEntregaRetiraNoAto = (tipo: string) =>
   ['ATO', 'NDF', 'RDL', 'RLR', 'RETIRA'].includes(tipo.trim().toUpperCase());
 
+// Verifica recursivamente se qualquer campo com "TIPO" ou "RETIR" no nome
+// contem um valor de retirada (ATO, NDF, RDL, RLR, ou texto com RETIRADA).
+const contemTipoRetirada = (valor: unknown, visitados = new Set<unknown>()): boolean => {
+  if (!valor || typeof valor !== 'object' || visitados.has(valor)) return false;
+  visitados.add(valor);
+  if (Array.isArray(valor)) return valor.some((item) => contemTipoRetirada(item, visitados));
+
+  const registro = valor as Record<string, unknown>;
+  for (const [chave, item] of Object.entries(registro)) {
+    const nomeCampo = chave.toUpperCase();
+    if (!nomeCampo.includes('TIPO') && !nomeCampo.includes('RETIR')) continue;
+    const texto = String(item ?? '').trim().toUpperCase();
+    if (['ATO', 'NDF', 'RDL', 'RLR'].includes(texto) || texto.includes('RETIRADA') || texto.includes('NO ATO')) return true;
+  }
+  return Object.values(registro).some((item) => contemTipoRetirada(item, visitados));
+};
+
+const isRetiradaConfirmada = (pedido: Record<string, unknown>) => {
+  const retirada = pedido.retirada as Record<string, unknown> | undefined;
+  return ['S', 'SIM', 'TRUE', '1'].includes(
+    String(retirada?.foi_retirado ?? '').trim().toUpperCase()
+  );
+};
+
 const isPedidoPermitidoNoDashboard = (pedido: Record<string, unknown>, logistica?: Record<string, unknown>) => {
+  // Pedidos "retira no ato" nunca aparecem nos cards.
+  if (hasEntregaNoAto(pedido, logistica)) return false;
+  if (isRetiradaConfirmada(pedido)) return false;
+  if (contemTipoRetirada(pedido) || contemTipoRetirada(logistica)) return false;
+
   const tiposEntrega = getTiposEntrega(pedido, logistica);
   if (tiposEntrega.length === 0) return false;
-  // Pedidos do tipo "retira no ato" (RLR, ATO, NDF, RDL) nunca aparecem nos cards.
   if (tiposEntrega.some(isTipoEntregaRetiraNoAto)) return false;
-  return isPedidoSomenteEntrega(pedido, logistica);
+  return tiposEntrega.some((tipo) => ['ENT', 'EPG'].includes(tipo));
 };
 
 const getPedidoId = (pedido: Record<string, unknown>) =>
@@ -1282,7 +1323,7 @@ export default async function handler(
               isPedidoComPendencias(pedido, logistica),
             totalItensPendentes: produtosPendentes.length > 0
               ? produtosPendentes.reduce((acc, p) => acc + p.quantidade, 0)
-              : toNumber(pedido.total_itens_pendentes) || 0,
+              : toNumber(pedido.total_itens_pendentes ?? pedido.TOTAL_ITENS_PENDENTES) || 0,
             produtosPendentes,
           };
 
@@ -1335,10 +1376,6 @@ export default async function handler(
     for (const entry of [...entradasPendenciasGlobais, ...entradasValidas]) {
       if (
         !entry.possuiPendencia ||
-        // So inclui no card pedidos que tenham produtos faltando de fato.
-        // Pedidos sinalizados como pendencia mas sem itens pendentes listados
-        // sao falso-positivos do ERP (ex: 198714, 198712, 198685).
-        (entry.item.produtosPendentes.length === 0 && entry.item.totalItensPendentes <= 0) ||
         !isPedidoPermitidoNoDashboard(
           {
             tipo_entrega: entry.item.tipoEntrega,
