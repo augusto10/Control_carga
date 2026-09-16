@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import ProtectedRoute from '../../components/ProtectedRoute';
 import { Card } from '@/components/ui/Card';
@@ -46,11 +46,6 @@ type DashboardLogisticaData = {
     dataFim: string;
   };
   indicadores: DashboardStatusItem[];
-  resumo?: {
-    pedidosRetirados?: number;
-    totalEmbarcados?: number;
-    transportadoras?: Record<string, number>;
-  };
   error?: string;
   warning?: string;
 };
@@ -84,10 +79,9 @@ const formatDateLabel = (value: string) => {
 const getPeriodoAtual = () => {
   const hoje = new Date();
   // Retorna os últimos 7 dias ao invés de apenas hoje
-  const ontem = new Date(hoje);
-  ontem.setDate(ontem.getDate() - 1);
-  const dataInicio = formatDateInputValue(ontem);
-  const dataFim = formatDateInputValue(ontem);
+  const seteDidasAtras = new Date(hoje.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const dataInicio = formatDateInputValue(seteDidasAtras);
+  const dataFim = formatDateInputValue(hoje);
   return { dataInicio, dataFim };
 };
 
@@ -105,9 +99,8 @@ const normalizeTransportadora = (value: string | null | undefined) => {
 
   if (normalized.includes('ACCERT')) return 'ACCERT';
   if (normalized.includes('EXPRESSO') || normalized.includes('GOIAS')) return 'EXPRESSO GOIAS';
-  if (normalized.includes('ZANUELLO') || normalized.includes('ZANUELO') || normalized.includes('ZANEULO')) return 'ZANUELLO';
+  if (normalized.includes('ZANUELLO') || normalized.includes('ZANEULO')) return 'ZANUELLO';
   if (normalized.includes('DETAFRA')) return 'DETAFRA';
-  if (normalized.includes('TERCEIRIZADA')) return 'TERCEIRIZADA';
   return null;
 };
 
@@ -123,7 +116,6 @@ export default function ResumoPedidosPage() {
   const [gerandoPdf, setGerandoPdf] = useState(false);
   const [compartilhandoPdf, setCompartilhandoPdf] = useState(false);
   const [pdfPreview, setPdfPreview] = useState<{ url: string; arquivo: File } | null>(null);
-  const forcarProximaConsultaRef = useRef(false);
 
   const carregar = useCallback(async (forceRefresh = false, alvo = aplicado) => {
     if (alvo.dataInicio > alvo.dataFim) {
@@ -177,17 +169,14 @@ export default function ResumoPedidosPage() {
   const aplicarPeriodo = useCallback(() => {
     setAplicando(true);
     if (periodo.dataInicio === aplicado.dataInicio && periodo.dataFim === aplicado.dataFim) {
-      void carregar(true, periodo);
+      void carregar(false, periodo);
       return;
     }
-    forcarProximaConsultaRef.current = true;
     setAplicado(periodo);
   }, [aplicado.dataFim, aplicado.dataInicio, carregar, periodo]);
 
   useEffect(() => {
-    const forceRefresh = forcarProximaConsultaRef.current;
-    forcarProximaConsultaRef.current = false;
-    void carregar(forceRefresh, aplicado);
+    void carregar(false, aplicado);
   }, [aplicado, carregar]);
 
   const pedidosRetiradosPorId = useMemo(() => {
@@ -210,16 +199,16 @@ export default function ResumoPedidosPage() {
     return retirados;
   }, [dashboardEtapas]);
 
-  const pedidosRetirados = dashboardEtapas?.resumo?.pedidosRetirados ?? pedidosRetiradosPorId.size;
+  const pedidosRetirados = pedidosRetiradosPorId.size;
 
   const pedidosEmbarcados = getIndicador(dashboardEtapas, 'PEDIDOS_EMBARCADOS');
   const pedidosEmbarcadosAjustados = useMemo(() => {
-    const pedidos = pedidosEmbarcados?.pedidos || [];
+    const pedidos = (pedidosEmbarcados?.pedidos || []).filter((pedido) => !pedidosRetiradosPorId.has(pedido.pedidoId));
     return {
-      total: dashboardEtapas?.resumo?.totalEmbarcados ?? pedidos.length,
+      total: pedidos.length,
       pedidos,
     };
-  }, [dashboardEtapas?.resumo?.totalEmbarcados, pedidosEmbarcados]);
+  }, [pedidosEmbarcados, pedidosRetiradosPorId]);
 
   const transportadoras = useMemo(() => {
     const totais = {
@@ -227,19 +216,7 @@ export default function ResumoPedidosPage() {
       expressoGoias: 0,
       zanuello: 0,
       detafra: 0,
-      terceirizada: 0,
     };
-
-    const transportadorasDoResumo = dashboardEtapas?.resumo?.transportadoras;
-    if (transportadorasDoResumo) {
-      return {
-        accert: transportadorasDoResumo.ACCERT || 0,
-        expressoGoias: transportadorasDoResumo['EXPRESSO GOIAS'] || 0,
-        zanuello: transportadorasDoResumo.ZANUELLO || 0,
-        detafra: transportadorasDoResumo.DETAFRA || 0,
-        terceirizada: transportadorasDoResumo.TERCEIRIZADA || 0,
-      };
-    }
 
     for (const pedido of pedidosEmbarcadosAjustados.pedidos) {
       const transportadora = normalizeTransportadora(pedido.transportadoraNome);
@@ -247,11 +224,10 @@ export default function ResumoPedidosPage() {
       if (transportadora === 'EXPRESSO GOIAS') totais.expressoGoias += 1;
       if (transportadora === 'ZANUELLO') totais.zanuello += 1;
       if (transportadora === 'DETAFRA') totais.detafra += 1;
-      if (transportadora === 'TERCEIRIZADA') totais.terceirizada += 1;
     }
 
     return totais;
-  }, [dashboardEtapas?.resumo?.transportadoras, pedidosEmbarcadosAjustados]);
+  }, [pedidosEmbarcadosAjustados]);
 
   const pendencias = getIndicador(dashboardAlertas, 'PENDENCIAS');
   const itensPendentes = useMemo(
@@ -281,12 +257,13 @@ export default function ResumoPedidosPage() {
       `RESUMO DE PEDIDOS ${dataTitulo}`,
       '',
       'ENTREGUES',
+      `- PEDIDOS SEPARADOS: ${getIndicador(dashboardEtapas, 'PEDIDO_SEPARADO')?.total || 0}`,
+      `- PEDIDOS CONFERIDOS: ${getIndicador(dashboardEtapas, 'PEDIDO_EMBARCADO')?.total || 0}`,
       `- PEDIDOS EMBARCADOS: ${pedidosEmbarcadosAjustados.total}`,
       `  -> ACCERT: ${transportadoras.accert}`,
       `  -> EXPRESSO GOIAS: ${transportadoras.expressoGoias}`,
       `  -> ZANUELLO: ${transportadoras.zanuello}`,
       `  -> DETAFRA: ${transportadoras.detafra}`,
-      `  -> TERCEIRIZADA: ${transportadoras.terceirizada}`,
       '',
       'RETIRADOS',
       `- PEDIDOS RETIRADOS: ${pedidosRetirados}`,
@@ -299,7 +276,7 @@ export default function ResumoPedidosPage() {
       'PENDÊNCIAS',
       ...(itensPendentes.length > 0 ? itensPendentes.map((item) => `- ${item.texto}`) : ['- Nenhuma pendência encontrada']),
     ].join('\n');
-  }, [aplicado, dashboardAlertas, dashboardEtapas, itensPendentes, pedidosEmbarcadosAjustados.total, pedidosRetirados, transportadoras.accert, transportadoras.detafra, transportadoras.expressoGoias, transportadoras.terceirizada, transportadoras.zanuello]);
+  }, [aplicado, dashboardAlertas, dashboardEtapas, itensPendentes, pedidosEmbarcados?.total, pedidosRetirados, transportadoras.accert, transportadoras.detafra, transportadoras.expressoGoias, transportadoras.zanuello]);
 
   const criarArquivoPdf = useCallback(async () => {
     const { PDFDocument, StandardFonts, rgb } = await import('pdf-lib');
@@ -311,7 +288,6 @@ export default function ResumoPedidosPage() {
     const templateBytes = await templateResponse.arrayBuffer();
     const template = await PDFDocument.load(templateBytes);
     const documento = await PDFDocument.create();
-    documento.setTitle('Resumo de Pedidos');
     const fonte = await documento.embedFont(StandardFonts.Helvetica);
     const fonteNegrito = await documento.embedFont(StandardFonts.HelveticaBold);
     const margem = 46;
@@ -327,10 +303,10 @@ export default function ResumoPedidosPage() {
       // A área do texto fica no centro do cabeçalho e precisa cobrir um pouco mais para
       // garantir que o texto desapareça mesmo com variações de renderização do template.
       paginaAtual.drawRectangle({
-        x: 0,
-        y: 700,
-        width: largura,
-        height: 48,
+        x: 110,
+        y: 86,
+        width: 380,
+        height: 36,
         color: rgb(1, 1, 1),
       });
     };
@@ -366,50 +342,24 @@ export default function ResumoPedidosPage() {
     return new File([blob], nome, { type: 'application/pdf' });
   }, [aplicado.dataFim, aplicado.dataInicio, textoRelatorio]);
 
-  const gerarPdfParaVisualizacao = useCallback(async () => {
+  const baixarPdf = useCallback(async () => {
     setGerandoPdf(true);
     try {
       const arquivo = await criarArquivoPdf();
-      setPdfPreview((atual) => {
-        if (atual) URL.revokeObjectURL(atual.url);
-        return { url: URL.createObjectURL(arquivo), arquivo };
-      });
+      const url = URL.createObjectURL(arquivo);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = arquivo.name;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
     } catch {
       setError('Nao foi possivel gerar o PDF do relatorio.');
     } finally {
       setGerandoPdf(false);
     }
   }, [criarArquivoPdf]);
-
-  const fecharPdfPreview = useCallback(() => {
-    setPdfPreview((atual) => {
-      if (atual) URL.revokeObjectURL(atual.url);
-      return null;
-    });
-  }, []);
-
-  const baixarPdfPreview = useCallback(() => {
-    if (!pdfPreview) return;
-    const link = document.createElement('a');
-    link.href = pdfPreview.url;
-    link.download = pdfPreview.arquivo.name;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  }, [pdfPreview]);
-
-  const compartilharPdfPreview = useCallback(async () => {
-    if (!pdfPreview || !navigator.share) return;
-    const podeCompartilharArquivo =
-      typeof navigator.canShare !== 'function' || navigator.canShare({ files: [pdfPreview.arquivo] });
-
-    if (!podeCompartilharArquivo) return;
-    try {
-      await navigator.share({ title: 'Resumo de Pedidos', files: [pdfPreview.arquivo] });
-    } catch {
-      // O usuario pode fechar a janela nativa de compartilhamento sem concluir.
-    }
-  }, [pdfPreview]);
 
   const compartilharPdf = useCallback(async () => {
     setCompartilhandoPdf(true);
@@ -439,7 +389,6 @@ export default function ResumoPedidosPage() {
   }, [criarArquivoPdf]);
 
   const relatorioIndisponivel = Boolean(error);
-  const processandoRelatorio = loading || refreshing || aplicando;
 
   return (
     <ProtectedRoute>
@@ -454,6 +403,13 @@ export default function ResumoPedidosPage() {
         <div className="space-y-6">
           <Card className="border-slate-200 shadow-sm">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <h2 className="text-xl font-bold text-slate-900">Resumo de Pedidos</h2>
+                <p className="text-sm text-slate-500">
+                  As etapas, alertas e pendências usam o período selecionado no filtro.
+                </p>
+              </div>
+
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_auto_auto]">
                 <label className="space-y-1 text-sm">
                   <span className="block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
@@ -479,12 +435,11 @@ export default function ResumoPedidosPage() {
                 </label>
                 <button
                   type="button"
-                  onClick={aplicarPeriodo}
-                  disabled={aplicando}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-wait disabled:opacity-70"
+                  onClick={() => setAplicado(periodo)}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90"
                 >
-                  {aplicando ? <Loader2 className="h-4 w-4 animate-spin" /> : <CalendarRange className="h-4 w-4" />}
-                  {aplicando ? 'Atualizando relatório...' : 'Aplicar'}
+                  <CalendarRange className="h-4 w-4" />
+                  Aplicar
                 </button>
                 <button
                   type="button"
@@ -501,23 +456,21 @@ export default function ResumoPedidosPage() {
             </div>
           </Card>
 
-          {processandoRelatorio && (
-            <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/20 backdrop-blur-[1px]">
-              <div className="flex min-w-[220px] flex-col items-center gap-3 rounded-2xl bg-white px-8 py-7 text-center shadow-2xl">
-                <Loader2 className="h-10 w-10 animate-spin text-primary" />
-                <p className="text-sm font-semibold text-slate-700">Gerando relatório...</p>
-                <p className="text-xs text-slate-500">Aguarde enquanto os dados são atualizados.</p>
-              </div>
-            </div>
-          )}
-
           {error && (
             <Card className="border-rose-200 bg-rose-50 text-rose-700">
               <p className="text-sm font-medium">{error}</p>
             </Card>
           )}
 
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <Card className="border-slate-200 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Pedidos separados</p>
+              <p className="mt-2 text-3xl font-black text-slate-900">{relatorioIndisponivel ? '-' : getIndicador(dashboardEtapas, 'PEDIDO_SEPARADO')?.total || 0}</p>
+            </Card>
+            <Card className="border-slate-200 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Pedidos conferidos</p>
+              <p className="mt-2 text-3xl font-black text-slate-900">{relatorioIndisponivel ? '-' : getIndicador(dashboardEtapas, 'PEDIDO_EMBARCADO')?.total || 0}</p>
+            </Card>
             <Card className="border-slate-200 shadow-sm">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Pedidos embarcados</p>
               <p className="mt-2 text-3xl font-black text-slate-900">{relatorioIndisponivel ? '-' : pedidosEmbarcadosAjustados.total}</p>
@@ -543,7 +496,7 @@ export default function ResumoPedidosPage() {
               <div className="flex flex-wrap justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => void gerarPdfParaVisualizacao()}
+                  onClick={() => void baixarPdf()}
                   disabled={loading || relatorioIndisponivel || gerandoPdf}
                   className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
                 >
@@ -575,59 +528,6 @@ export default function ResumoPedidosPage() {
             </div>
           </Card>
         </div>
-
-        {pdfPreview && (
-          <div className="fixed inset-0 z-50 flex flex-col bg-slate-950/80 p-3 sm:p-6">
-            <div className="mx-auto flex h-full w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
-              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3 sm:px-6">
-                <div>
-                  <h2 className="text-base font-bold text-slate-900">Visualizar resumo de pedidos</h2>
-                  <p className="text-xs text-slate-500">Confira o relatório e escolha uma opção.</p>
-                </div>
-                <div className="flex flex-wrap items-center justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => window.open(pdfPreview.url, '_blank', 'noopener,noreferrer')}
-                    className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-white hover:opacity-90"
-                  >
-                    <Printer className="h-4 w-4" />
-                    Imprimir
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void compartilharPdfPreview()}
-                    disabled={typeof navigator === 'undefined' || !navigator.share}
-                    className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <Share2 className="h-4 w-4" />
-                    Compartilhar
-                  </button>
-                  <button
-                    type="button"
-                    onClick={baixarPdfPreview}
-                    className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                  >
-                    <Download className="h-4 w-4" />
-                    Baixar
-                  </button>
-                  <button
-                    type="button"
-                    onClick={fecharPdfPreview}
-                    className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
-                    aria-label="Fechar visualizacao do PDF"
-                  >
-                    <X className="h-5 w-5" />
-                  </button>
-                </div>
-              </div>
-              <iframe
-                src={pdfPreview.url}
-                title="Visualizacao do resumo de pedidos"
-                className="min-h-0 flex-1 bg-slate-100"
-              />
-            </div>
-          </div>
-        )}
       </AppLayout>
     </ProtectedRoute>
   );
