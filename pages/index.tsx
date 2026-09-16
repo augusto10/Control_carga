@@ -235,7 +235,7 @@ const STATUS_DEFAULTS: Record<
     statusSeparacao: 'EMBARCADO NO CONTROLE',
   },
   PENDENCIAS: {
-    titulo: 'PEDIDOS COM PRODUTOS NÃO ENCONTRADOS',
+    titulo: 'PEDIDOS FALTANDO PRODUTOS',
     descricao: 'Pedidos com pendencias, independentemente do periodo informado',
     statusSeparacao: 'PENDENCIA',
   },
@@ -949,8 +949,8 @@ function Home() {
 
   return (
     <AppLayout
-      title={`CONTROLE DE PEDIDOS - ${dataHojeLabel}`}
-      subtitle={`CONTROLE DE PEDIDOS - ${dataHojeLabel}`}
+      title={`CONTROLE DE ENTREGAS - ${dataHojeLabel}`}
+      subtitle={`CONTROLE DE ENTREGAS - ${dataHojeLabel}`}
       showHeader={false}
     >
       <div className="space-y-6 max-w-[1600px] mx-auto">
@@ -968,7 +968,7 @@ function Home() {
                   </p>
                 </div>
                 <h1 className="text-base font-black tracking-[0.08em] text-white sm:text-lg">
-                  CONTROLE DE PEDIDOS - {dataHojeLabel}
+                  CONTROLE DE ENTREGAS - {dataHojeLabel}
                 </h1>
 
                 <div className="flex flex-col items-end gap-1 [&>label]:hidden [&>button:nth-of-type(1)]:hidden [&>button:nth-of-type(2)]:hidden">
@@ -1036,7 +1036,7 @@ function Home() {
                     Atualizar
                   </button>
                   <p className="text-right text-[11px] font-medium text-blue-100/75">
-                    Dados atualizados em {formatDateTime(ultimaAtualizacao)}
+                    Última atualização: {formatDateTime(ultimaAtualizacao)}
                   </p>
                 </div>
               </div>
@@ -1082,7 +1082,7 @@ function Home() {
                 pendencias &&
                 abrirListaPedidos({
                   ...pendencias,
-                  titulo: 'PEDIDOS COM PRODUTOS NÃO ENCONTRADOS',
+                  titulo: 'PEDIDOS FALTANDO PRODUTOS',
                   descricao: 'Pedidos com itens pendentes nos últimos 30 dias.',
                 }),
             }}

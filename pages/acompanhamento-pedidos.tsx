@@ -998,7 +998,7 @@ function Home() {
         </Card>
 
         <p className="text-center text-xs font-medium text-slate-500">
-          Dados atualizados em {formatDateTime(dashboardAlertas?.generatedAt || dashboard?.generatedAt || null)}
+          Última atualização: {formatDateTime(dashboardAlertas?.generatedAt || dashboard?.generatedAt || null)}
         </p>
 
         {/* Resumo Operacional - Indicadores rápidos para tomada de decisão - OCULTADO TEMPORARIAMENTE

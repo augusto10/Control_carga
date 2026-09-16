@@ -222,10 +222,10 @@ export default function ControlePedidosPainel() {
           ) : (
             <>
               <h1 className="mb-5 text-center text-2xl font-black uppercase tracking-[0.12em] text-white md:text-3xl">
-                CONTROLE DE PEDIDOS - {dataHojeLabel}
+                CONTROLE DE ENTREGAS - {dataHojeLabel}
               </h1>
               <p className="mb-4 text-center text-sm font-semibold text-slate-300">
-                Dados atualizados em {formatAtualizacao(dashboardAlertas.generatedAt || dashboard.generatedAt || '')}
+                Última atualização: {formatAtualizacao(dashboardAlertas.generatedAt || dashboard.generatedAt || '')}
               </p>
               <ExpedicaoCards
                 wideLayout

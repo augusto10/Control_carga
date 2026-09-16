@@ -88,7 +88,7 @@ const STATUS_META: Record<StatusCode, { codigo: StatusCode; titulo: string; desc
   },
   PENDENCIAS: {
     codigo: 'PENDENCIAS',
-    titulo: 'PEDIDOS COM PRODUTOS NÃO ENCONTRADOS',
+    titulo: 'PEDIDOS FALTANDO PRODUTOS',
     descricao: 'Pedidos com pendencias',
     statusSeparacao: 'PENDENCIA',
   },
