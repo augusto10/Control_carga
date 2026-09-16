@@ -386,6 +386,7 @@ function Home() {
   const router = useRouter();
   const [periodoPadrao] = useState(getDefaultPeriodo);
   const [dashboard, setDashboard] = useCurrentDashboard<DashboardLogisticaData | null>(null, DASHBOARD_LOCAL_CACHE_KEY);
+  const [dashboardDiaAtual, setDashboardDiaAtual] = useCurrentDashboard<DashboardLogisticaData | null>(null, DASHBOARD_LOCAL_CACHE_KEY + '-dia-atual');
   const [dashboardAlertas, setDashboardAlertas] = useCurrentDashboard<DashboardLogisticaData | null>(null, DASHBOARD_ALERTAS_LOCAL_CACHE_KEY);
   const [resumoHoje, setResumoHoje] = useState<ResumoHojeData>(EMPTY_RESUMO_HOJE);
   const [loadingDashboard, setLoadingDashboard] = useState(true);
@@ -459,14 +460,22 @@ function Home() {
     params.set('escopo', 'principal');
     const alertasPeriodo = getAlertasPeriodo();
     const alertasParams = buildPeriodoQuery(alertasPeriodo.dataInicio, alertasPeriodo.dataFim);
+    
+    // Para os cards principais, sempre usar o dia atual (igual ao painel)
+    const hojeParams = buildPeriodoQuery(periodoPadrao.dataInicio, periodoPadrao.dataFim);
+    hojeParams.set('escopo', 'principal');
+    
     if (forceRefresh) {
       params.set('force', '1');
       params.set('t', String(Date.now()));
       alertasParams.set('force', '1');
       alertasParams.set('t', String(Date.now()));
+      hojeParams.set('force', '1');
+      hojeParams.set('t', String(Date.now()));
     }
     const querySuffix = params.toString() ? `?${params.toString()}` : '';
     const alertasQuerySuffix = alertasParams.toString() ? `?${alertasParams.toString()}` : '';
+    const hojeQuerySuffix = hojeParams.toString() ? `?${hojeParams.toString()}` : '';
 
     let nextError: string | null = null;
 
@@ -476,9 +485,15 @@ function Home() {
         credentials: 'include',
         cache: 'no-store',
       }),
+      fetch(`/api/dashboard/logistica-inicial${hojeQuerySuffix}`, {
+        credentials: 'include',
+        cache: 'no-store',
+      }),
     ]);
     if (requestId !== dashboardRequestId.current) return;
     const dashboardResponse = dashboardResult[0];
+    const dashboardDiaAtualResponse = dashboardResult[1];
+    
     if (dashboardResponse.status === 'fulfilled') {
       const response = dashboardResponse.value;
       if (response.ok) {
@@ -496,6 +511,18 @@ function Home() {
       }
     } else {
       nextError = 'Nao foi possivel carregar o painel logistico agora.';
+    }
+    
+    // Processar o dashboard do dia atual para os cards principais
+    if (dashboardDiaAtualResponse.status === 'fulfilled') {
+      const response = dashboardDiaAtualResponse.value;
+      if (response.ok) {
+        const data: DashboardLogisticaData = await response.json();
+        if (requestId !== dashboardRequestId.current) return;
+        if (!isDashboardFallbackVazio(data)) {
+          setDashboardDiaAtual(data);
+        }
+      }
     }
 
     setLoadingDashboard(false);
@@ -571,6 +598,10 @@ function Home() {
           setDashboard(cached);
           setLoadingDashboard(false);
         }
+        const cachedDiaAtual = JSON.parse(window.localStorage.getItem(DASHBOARD_LOCAL_CACHE_KEY + '-dia-atual') || 'null') as DashboardLogisticaData | null;
+        if (cachedDiaAtual && cachedDiaAtual.filtros?.dataInicio === periodoPadrao.dataInicio && cachedDiaAtual.filtros?.dataFim === periodoPadrao.dataFim && Array.isArray(cachedDiaAtual.indicadores)) {
+          setDashboardDiaAtual(cachedDiaAtual);
+        }
         const cachedAlertas = JSON.parse(window.localStorage.getItem(DASHBOARD_ALERTAS_LOCAL_CACHE_KEY) || 'null') as DashboardLogisticaData | null;
         const periodoAlertas = getAlertasPeriodo();
         if (cachedAlertas && cachedAlertas.filtros?.dataInicio === periodoAlertas.dataInicio && cachedAlertas.filtros?.dataFim === periodoAlertas.dataFim && Array.isArray(cachedAlertas.indicadores)) {
@@ -581,7 +612,7 @@ function Home() {
       acaoFiltroPendenteRef.current = null;
       void loadDashboard(false, periodoAplicado, acaoFiltro);
     }
-  }, [isAuthenticated, loadDashboard, periodoAplicado]);
+  }, [isAuthenticated, loadDashboard, periodoAplicado, periodoPadrao]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -612,7 +643,7 @@ function Home() {
     return 'Boa noite';
   };
 
-  const indicadoresOrdenados = useMemo(() => buildIndicadoresOrdenados(dashboard), [dashboard]);
+  const indicadoresOrdenados = useMemo(() => buildIndicadoresOrdenados(dashboardDiaAtual), [dashboardDiaAtual]);
   const indicadoresAlertasOrdenados = useMemo(
     () => buildIndicadoresOrdenados(dashboardAlertas),
     [dashboardAlertas]
