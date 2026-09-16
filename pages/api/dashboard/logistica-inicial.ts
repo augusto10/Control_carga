@@ -441,7 +441,7 @@ const deriveDashboardStatus = (
     : null;
 };
 
-const isPedidoComPendencias = (
+export const isPedidoComPendencias = (
   pedido: Record<string, unknown>,
   logistica: Record<string, any> | null
 ) => {
@@ -449,7 +449,10 @@ const isPedidoComPendencias = (
   // ha produtos faltando (e total_itens_pendentes e zero), nao classificar
   // como pendencia. Isso evita falso-positivos de status logistico stale
   // (ex: pedidos 198714, 198712, 198685).
-  const campoErpFaltando = pedido.possui_produtos_faltando ?? pedido.POSSUI_PRODUTO_FALTANDO;
+  const campoErpFaltando =
+    pedido.possui_produtos_faltando ??
+    pedido.POSSUI_PRODUTOS_FALTANDO ??
+    pedido.POSSUI_PRODUTO_FALTANDO;
   if (campoErpFaltando !== undefined && campoErpFaltando !== null && campoErpFaltando !== '') {
     const erpConfirmaFalta = ['S', 'SIM', 'TRUE', '1'].includes(
       String(campoErpFaltando).trim().toUpperCase()
@@ -469,7 +472,13 @@ const isPedidoComPendencias = (
 
   const possuiProdutoFaltando = (item: Record<string, unknown>) =>
     ['S', 'SIM', 'TRUE', '1'].includes(
-      String(item.POSSUI_PRODUTO_FALTANDO ?? item.possui_produto_faltando ?? '').trim().toUpperCase()
+      String(
+        item.POSSUI_PRODUTOS_FALTANDO ??
+          item.possui_produtos_faltando ??
+          item.POSSUI_PRODUTO_FALTANDO ??
+          item.possui_produto_faltando ??
+          ''
+      ).trim().toUpperCase()
     );
   const itensComparativo = Array.isArray(logistica?.comparativo_separacao_pendentes)
     ? logistica.comparativo_separacao_pendentes
@@ -513,15 +522,14 @@ const isPedidoComPendencias = (
 
   const possuiIndicadorDePendencia =
     possuiProdutosFaltando ||
-    totalItensPendentes > 0 ||
-    possuiSaldoPendente ||
     statusLogisticoCodigo === 'PENDENCIAS' ||
     ultimoStatusSeparacao === 'PENDENCIA' ||
     statusSeparacoes.includes('PENDENCIA');
 
-  // Saldo de uma separacao ainda aberta nao e pendencia. So entra no card
-  // quando outra separacao do pedido ja foi efetivamente baixada.
-  return possuiSeparacaoEfetivada && possuiIndicadorDePendencia;
+  // A regra do card deve exigir que a resposta realmente indique produto faltando.
+  // Quando o ERP/endpoint não sinaliza explicitamente a falha, não contar como
+  // pedido faltando apenas por quantidade pendente isolada.
+  return possuiIndicadorDePendencia && (possuiSeparacaoEfetivada || possuiProdutosFaltando);
 };
 
 const hasStatusSeparacao = (pedido: Record<string, unknown>, status: string) => {

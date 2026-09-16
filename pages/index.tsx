@@ -594,23 +594,48 @@ function Home() {
     if (isAuthenticated) {
       try {
         const cached = JSON.parse(window.localStorage.getItem(DASHBOARD_LOCAL_CACHE_KEY) || 'null') as DashboardLogisticaData | null;
-        if (cached && cached.filtros?.dataInicio === periodoAplicado.dataInicio && cached.filtros?.dataFim === periodoAplicado.dataFim && Array.isArray(cached.indicadores)) {
-          setDashboard(cached);
-          setLoadingDashboard(false);
+        const cacheIsFresh =
+          cached &&
+          cached.generatedAt &&
+          Date.now() - Date.parse(cached.generatedAt) < 2 * 60 * 1000 &&
+          cached.filtros?.dataInicio === periodoAplicado.dataInicio &&
+          cached.filtros?.dataFim === periodoAplicado.dataFim &&
+          Array.isArray(cached.indicadores);
+
+        if (!cacheIsFresh && cached) {
+          window.localStorage.removeItem(DASHBOARD_LOCAL_CACHE_KEY);
         }
+
         const cachedDiaAtual = JSON.parse(window.localStorage.getItem(DASHBOARD_LOCAL_CACHE_KEY + '-dia-atual') || 'null') as DashboardLogisticaData | null;
-        if (cachedDiaAtual && cachedDiaAtual.filtros?.dataInicio === periodoPadrao.dataInicio && cachedDiaAtual.filtros?.dataFim === periodoPadrao.dataFim && Array.isArray(cachedDiaAtual.indicadores)) {
-          setDashboardDiaAtual(cachedDiaAtual);
+        const cacheDiaAtualIsFresh =
+          cachedDiaAtual &&
+          cachedDiaAtual.generatedAt &&
+          Date.now() - Date.parse(cachedDiaAtual.generatedAt) < 2 * 60 * 1000 &&
+          cachedDiaAtual.filtros?.dataInicio === periodoPadrao.dataInicio &&
+          cachedDiaAtual.filtros?.dataFim === periodoPadrao.dataFim &&
+          Array.isArray(cachedDiaAtual.indicadores);
+
+        if (!cacheDiaAtualIsFresh && cachedDiaAtual) {
+          window.localStorage.removeItem(DASHBOARD_LOCAL_CACHE_KEY + '-dia-atual');
         }
+
         const cachedAlertas = JSON.parse(window.localStorage.getItem(DASHBOARD_ALERTAS_LOCAL_CACHE_KEY) || 'null') as DashboardLogisticaData | null;
         const periodoAlertas = getAlertasPeriodo();
-        if (cachedAlertas && cachedAlertas.filtros?.dataInicio === periodoAlertas.dataInicio && cachedAlertas.filtros?.dataFim === periodoAlertas.dataFim && Array.isArray(cachedAlertas.indicadores)) {
-          setDashboardAlertas(cachedAlertas);
+        const cacheAlertasIsFresh =
+          cachedAlertas &&
+          cachedAlertas.generatedAt &&
+          Date.now() - Date.parse(cachedAlertas.generatedAt) < 2 * 60 * 1000 &&
+          cachedAlertas.filtros?.dataInicio === periodoAlertas.dataInicio &&
+          cachedAlertas.filtros?.dataFim === periodoAlertas.dataFim &&
+          Array.isArray(cachedAlertas.indicadores);
+
+        if (!cacheAlertasIsFresh && cachedAlertas) {
+          window.localStorage.removeItem(DASHBOARD_ALERTAS_LOCAL_CACHE_KEY);
         }
       } catch { /* Cache corrompido é ignorado; a API atual será consultada. */ }
       const acaoFiltro = acaoFiltroPendenteRef.current;
       acaoFiltroPendenteRef.current = null;
-      void loadDashboard(false, periodoAplicado, acaoFiltro);
+      void loadDashboard(true, periodoAplicado, acaoFiltro);
     }
   }, [isAuthenticated, loadDashboard, periodoAplicado, periodoPadrao]);
 
@@ -618,13 +643,13 @@ function Home() {
     if (!isAuthenticated) return;
 
     const refreshInBackground = () => {
-      void loadDashboard(false, periodoAplicado);
+      void loadDashboard(true, periodoAplicado);
     };
 
     const handleVisibilityChange = () => {
       if (document.visibilityState !== 'visible') return;
       if (Date.now() - lastDashboardSyncRef.current < DASHBOARD_AUTO_REFRESH_INTERVAL_MS) return;
-      void loadDashboard(false, periodoAplicado);
+      void loadDashboard(true, periodoAplicado);
     };
 
     const intervalId = window.setInterval(refreshInBackground, DASHBOARD_AUTO_REFRESH_INTERVAL_MS);

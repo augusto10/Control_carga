@@ -3,6 +3,25 @@ export type DatedDashboard = {
   filtros?: { dataInicio?: string | null; dataFim?: string | null };
 };
 
+export function shouldPreferStoredDashboard(
+  current: DatedDashboard | null,
+  incoming: DatedDashboard,
+  stored: DatedDashboard
+): boolean {
+  const storedTime = Date.parse(stored.generatedAt);
+  const incomingTime = Date.parse(incoming.generatedAt);
+  if (!Number.isFinite(storedTime) || !Number.isFinite(incomingTime)) return false;
+
+  const samePeriod = (stored.filtros?.dataInicio || '') === (incoming.filtros?.dataInicio || '') &&
+    (stored.filtros?.dataFim || '') === (incoming.filtros?.dataFim || '');
+  if (!samePeriod) return false;
+
+  const currentTime = current ? Date.parse(current.generatedAt) : NaN;
+  if (Number.isFinite(currentTime) && currentTime > storedTime) return false;
+
+  return storedTime > incomingTime;
+}
+
 export function canReplaceDashboard(current: DatedDashboard | null, incoming: DatedDashboard): boolean {
   const nextTime = Date.parse(incoming.generatedAt);
   if (!Number.isFinite(nextTime)) return false;

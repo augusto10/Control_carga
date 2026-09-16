@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState, type SetStateAction } from 'react';
-import { canReplaceDashboard, type DatedDashboard } from '@/lib/dashboard-freshness';
+import { canReplaceDashboard, shouldPreferStoredDashboard, type DatedDashboard } from '@/lib/dashboard-freshness';
 
 // A ref is updated immediately so consecutive responses cannot compare against stale React state.
 export function useCurrentDashboard<T extends DatedDashboard | null>(initial: T, cacheKey: string) {
@@ -13,9 +13,7 @@ export function useCurrentDashboard<T extends DatedDashboard | null>(initial: T,
     // Another screen in this browser may already have saved a more recent response.
     try {
       const saved = JSON.parse(window.localStorage.getItem(cacheKey) || 'null') as T;
-      if (saved && canReplaceDashboard(next, saved) &&
-          (saved.filtros?.dataInicio || '') === (next.filtros?.dataInicio || '') &&
-          (saved.filtros?.dataFim || '') === (next.filtros?.dataFim || '')) {
+      if (saved && shouldPreferStoredDashboard(current.current, next, saved)) {
         if (canReplaceDashboard(current.current, saved)) {
           current.current = saved;
           setValue(saved);
