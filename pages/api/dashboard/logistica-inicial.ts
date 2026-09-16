@@ -481,6 +481,8 @@ const isPedidoComPendencias = (
   const separacoes = Array.isArray(logistica?.separacoes) ? logistica.separacoes : [];
   const itensSeparacoes = Array.isArray(logistica?.itens_separacoes) ? logistica.itens_separacoes : [];
   const possuiSeparacaoEfetivada =
+    ultimoStatusSeparacao === 'G' ||
+    statusSeparacoes.includes('G') ||
     separacoes.some((separacao) => {
       const status = String(separacao.STATUS ?? '').trim().toUpperCase();
       return (
@@ -770,15 +772,15 @@ const isRetiradaConfirmada = (pedido: Record<string, unknown>) => {
   );
 };
 
-const isPedidoPermitidoNoDashboard = (pedido: Record<string, unknown>, logistica?: Record<string, unknown>) => {
+const isPedidoPermitidoNoDashboard = (pedido: Record<string, unknown>, logistica?: Record<string, unknown>, permitirTipoAusente = false) => {
   // Pedidos "retira no ato" nunca aparecem nos cards.
   if (hasEntregaNoAto(pedido, logistica)) return false;
   if (isRetiradaConfirmada(pedido)) return false;
   if (contemTipoRetirada(pedido) || contemTipoRetirada(logistica)) return false;
 
   const tiposEntrega = getTiposEntrega(pedido, logistica);
-  if (tiposEntrega.length === 0) return false;
   if (tiposEntrega.some(isTipoEntregaRetiraNoAto)) return false;
+  if (tiposEntrega.length === 0) return permitirTipoAusente;
   return tiposEntrega.some((tipo) => ['ENT', 'EPG'].includes(tipo));
 };
 
@@ -1262,7 +1264,7 @@ export default async function handler(
             return null;
           }
 
-          if (!isPedidoPermitidoNoDashboard(pedido, logistica)) {
+          if (!isPedidoPermitidoNoDashboard(pedido, logistica, !tipoEntregaLista && !tipoEntregaInicial)) {
             return null;
           }
 
