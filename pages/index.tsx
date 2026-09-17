@@ -264,7 +264,7 @@ const EMPTY_RESUMO_HOJE: ResumoHojeData = {
 };
 const DASHBOARD_LOCAL_CACHE_KEY = 'dashboard-logistica-cache-v11';
 // Descarta alertas gravados antes da validacao atual no ERP.
-const DASHBOARD_ALERTAS_LOCAL_CACHE_KEY = 'dashboard-logistica-alertas-cache-v10';
+const DASHBOARD_ALERTAS_LOCAL_CACHE_KEY = 'dashboard-logistica-alertas-cache-v11';
 const DASHBOARD_AUTO_REFRESH_INTERVAL_MS = 3 * 60_000;
 const DASHBOARD_LEGACY_CACHE_KEYS = [
   'dashboard-logistica-cache-v3',
@@ -351,6 +351,14 @@ const getAlertasPeriodo = () => {
     dataFim: formatDateInputValue(dataFim),
   };
 };
+
+const deduplicarPedidosEntrega = (pedidos: DashboardPedidoItem[]) => Array.from(
+  new Map(
+    pedidos
+      .filter((pedido) => ['ENT', 'EPG'].includes(String(pedido.tipoEntrega || '').trim().toUpperCase()))
+      .map((pedido) => [pedido.pedidoId, pedido] as const)
+  ).values()
+);
 
 const buildIndicadoresOrdenados = (dashboard: DashboardLogisticaData | null) => {
   const source = dashboard?.indicadores || [];
@@ -915,15 +923,15 @@ function Home() {
     ? pedidoDetalhe.logistica?.notas_fiscais || []
     : [];
   const alertasNaoSeparados = useMemo(
-    () => indicadoresAlertasOrdenados.find((item) => item.codigo === 'ALERTAS_NAO_SEPARADOS')?.pedidos || [],
+    () => deduplicarPedidosEntrega(indicadoresAlertasOrdenados.find((item) => item.codigo === 'ALERTAS_NAO_SEPARADOS')?.pedidos || []),
     [indicadoresAlertasOrdenados]
   );
   const alertasNaoConferidos = useMemo(
-    () => indicadoresAlertasOrdenados.find((item) => item.codigo === 'ALERTAS_NAO_CONFERIDOS')?.pedidos || [],
+    () => deduplicarPedidosEntrega(indicadoresAlertasOrdenados.find((item) => item.codigo === 'ALERTAS_NAO_CONFERIDOS')?.pedidos || []),
     [indicadoresAlertasOrdenados]
   );
   const alertasNaoEmbarcados = useMemo(
-    () => indicadoresAlertasOrdenados.find((item) => item.codigo === 'ALERTAS_NAO_EMBARCADOS')?.pedidos || [],
+    () => deduplicarPedidosEntrega(indicadoresAlertasOrdenados.find((item) => item.codigo === 'ALERTAS_NAO_EMBARCADOS')?.pedidos || []),
     [indicadoresAlertasOrdenados]
   );
   const cardsHome = useMemo(() => ([

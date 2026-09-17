@@ -25,8 +25,10 @@ type DashboardItem = {
   codigo: StatusCode;
   titulo: string;
   total: number;
+  tipoEntrega?: string | null;
   pedidos?: Array<{
     pedidoId: number;
+    tipoEntrega?: string | null;
     totalItensPendentes: number;
     produtosPendentes?: Array<{ nome: string; quantidade: number }>;
   }>;
@@ -100,12 +102,20 @@ const getDashboardQueries = () => {
 const PAINEL_AUTO_REFRESH_INTERVAL_MS = 3 * 60_000;
 const DASHBOARD_LOCAL_CACHE_KEY = 'dashboard-logistica-cache-v11';
 // Os alertas precisam iniciar sem a lista salva antes da validacao direta no ERP.
-const DASHBOARD_ALERTAS_LOCAL_CACHE_KEY = 'dashboard-logistica-alertas-cache-v10';
+const DASHBOARD_ALERTAS_LOCAL_CACHE_KEY = 'dashboard-logistica-alertas-cache-v11';
 
 const isDashboardFallbackVazio = (data: DashboardResponse) =>
   Boolean(data.warning) &&
   ((data.resumo?.totalPedidos || 0) === 0) &&
   data.indicadores.every((item) => (item.total || 0) === 0);
+
+const getPedidosEntrega = (item?: DashboardItem) => Array.from(
+  new Map(
+    (item?.pedidos || [])
+      .filter((pedido) => ['ENT', 'EPG'].includes(String(pedido.tipoEntrega || '').trim().toUpperCase()))
+      .map((pedido) => [pedido.pedidoId, pedido] as const)
+  ).values()
+);
 
 export default function ControlePedidosPainel() {
   const [dashboard, setDashboard] = useCurrentDashboard<DashboardResponse>(emptyDashboard, DASHBOARD_LOCAL_CACHE_KEY);
@@ -197,10 +207,10 @@ export default function ControlePedidosPainel() {
     { codigo: 'PEDIDOS_EMBARCADOS' as StatusCode, titulo: 'PEDIDOS EMBARCADOS', icon: PackageCheck },
   ];
   const getTotalAlerta = (codigo: StatusCode) =>
-    dashboardAlertas.indicadores.find((item) => item.codigo === codigo)?.total || 0;
+    getPedidosEntrega(dashboardAlertas.indicadores.find((item) => item.codigo === codigo)).length;
   const pedidosAlertas = dashboardAlertas.indicadores
     .filter((item) => item.codigo.startsWith('ALERTAS_'))
-    .flatMap((item) => item.pedidos || []);
+    .flatMap((item) => getPedidosEntrega(item));
   const totalPedidosAlertas = new Set(pedidosAlertas.map((pedido) => pedido.pedidoId)).size;
   const pendenciasAlertasItem = dashboardAlertas.indicadores.find(
     (item) => item.codigo === 'PENDENCIAS'

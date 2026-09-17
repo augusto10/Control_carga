@@ -144,8 +144,8 @@ const isPedidoRecebido = (pedido: Record<string, unknown>) => {
   return recebidoFlag && Boolean(getPedidoDataHoraRecebimento(pedido));
 };
 
-const isRetiraNoAto = (pedido: Record<string, unknown>) =>
-  ['ATO', 'NDF', 'RDL', 'RLR'].includes(
+const isPedidoEntrega = (pedido: Record<string, unknown>) =>
+  ['ENT', 'EPG'].includes(
     String(pedido.TIPO_ENTREGA ?? pedido.tipo_entrega ?? '').toUpperCase()
   );
 
@@ -180,8 +180,8 @@ const getPedidosPeriodoDetalhados = async (dataInicio: Date, dataFim: Date) => {
     );
   });
 
-  const pedidosEntregaHoje = pedidosValidos.filter((pedido) => !isRetiraNoAto(pedido)).length;
-  const pedidosRetiraAtoHoje = pedidosValidos.filter((pedido) => isRetiraNoAto(pedido)).length;
+  const pedidosEntregaHoje = pedidosValidos.filter(isPedidoEntrega).length;
+  const pedidosRetiraAtoHoje = pedidosValidos.filter((pedido) => !isPedidoEntrega(pedido)).length;
 
   return {
     pedidosHoje: pedidosValidos.length,

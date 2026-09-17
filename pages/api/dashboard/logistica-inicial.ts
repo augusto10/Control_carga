@@ -780,7 +780,7 @@ const isRetiradaConfirmada = (pedido: Record<string, unknown>) => {
   );
 };
 
-const isPedidoPermitidoNoDashboard = (pedido: Record<string, unknown>, logistica?: Record<string, unknown>, permitirTipoAusente = false) => {
+const isPedidoPermitidoNoDashboard = (pedido: Record<string, unknown>, logistica?: Record<string, unknown>) => {
   // Pedidos "retira no ato" nunca aparecem nos cards.
   if (hasEntregaNoAto(pedido, logistica)) return false;
   if (isRetiradaConfirmada(pedido)) return false;
@@ -788,7 +788,6 @@ const isPedidoPermitidoNoDashboard = (pedido: Record<string, unknown>, logistica
 
   const tiposEntrega = getTiposEntrega(pedido, logistica);
   if (tiposEntrega.some(isTipoEntregaRetiraNoAto)) return false;
-  if (tiposEntrega.length === 0) return permitirTipoAusente;
   return tiposEntrega.some((tipo) => ['ENT', 'EPG'].includes(tipo));
 };
 
@@ -1124,39 +1123,7 @@ export default async function handler(
       const notaExterna =
         notaCompletaPorChave.get(onlyDigits(notaLocal.codigo)) ||
         notaCompletaPorNumero.get(normalizeNumeroNota(notaLocal.numeroNota));
-      if (!notaExterna) {
-        const numeroNotaLocal = normalizeNumeroNota(notaLocal.numeroNota);
-        const pedidoIdLocal = toNumber(numeroNotaLocal);
-        if (pedidoIdLocal && !pedidosEmbarcadosLocais.has(pedidoIdLocal)) {
-          const controleInfo =
-            getControleInfoByReferencia({
-              numeroNota: notaLocal.numeroNota,
-              chave: onlyDigits(notaLocal.codigo),
-            }) || null;
-          pedidosEmbarcadosLocais.set(pedidoIdLocal, {
-            pedidoId: pedidoIdLocal,
-            tipoEntrega: 'EPG',
-            clienteNome: `Nota fiscal ${notaLocal.numeroNota}`,
-            nomeFantasia: null,
-            valorPedido: null,
-            dataHoraRecebimento: notaLocal.dataCriacao?.toISOString?.() || null,
-            previsaoEntrega: null,
-            localNome: getControleLocalNome(controleInfo),
-            statusCodigo: 'PEDIDOS_EMBARCADOS',
-            statusDescricao: STATUS_META.PEDIDOS_EMBARCADOS.titulo,
-            statusSeparacao: STATUS_META.PEDIDOS_EMBARCADOS.statusSeparacao,
-            situacaoAtual: STATUS_META.PEDIDOS_EMBARCADOS.titulo,
-            usuarioConfirmacaoNome: null,
-            dataHoraConfirmacao: null,
-            dataHoraControle: controleInfo?.dataHoraControle || null,
-            transportadoraNome: controleInfo?.transportadoraNome || null,
-            possuiProdutosFaltando: false,
-            totalItensPendentes: 0,
-            produtosPendentes: [],
-          });
-        }
-        continue;
-      }
+      if (!notaExterna) continue;
 
       const pedidoId = getPedidoId(notaExterna);
       if (!pedidoId) continue;
@@ -1171,13 +1138,10 @@ export default async function handler(
           notaExterna.tipo_entrega_descricao
         ) || null;
       if (
-        !isPedidoPermitidoNoDashboard(
-          {
-            tipo_entrega: tipoEntregaLocal,
-            TIPO_ENTREGA: tipoEntregaLocal,
-          },
-          undefined
-        )
+        !isPedidoPermitidoNoDashboard({
+          tipo_entrega: tipoEntregaLocal,
+          TIPO_ENTREGA: tipoEntregaLocal,
+        })
       ) {
         continue;
       }
@@ -1272,7 +1236,7 @@ export default async function handler(
             return null;
           }
 
-          if (!isPedidoPermitidoNoDashboard(pedido, logistica, !tipoEntregaLista && !tipoEntregaInicial)) {
+          if (!isPedidoPermitidoNoDashboard(pedido, logistica)) {
             return null;
           }
 
@@ -1386,13 +1350,10 @@ export default async function handler(
     for (const entry of [...entradasPendenciasGlobais, ...entradasValidas]) {
       if (
         !entry.possuiPendencia ||
-        !isPedidoPermitidoNoDashboard(
-          {
-            tipo_entrega: entry.item.tipoEntrega,
-            TIPO_ENTREGA: entry.item.tipoEntrega,
-          },
-          undefined
-        )
+        !isPedidoPermitidoNoDashboard({
+          tipo_entrega: entry.item.tipoEntrega,
+          TIPO_ENTREGA: entry.item.tipoEntrega,
+        })
       ) {
         continue;
       }
@@ -1449,9 +1410,11 @@ export default async function handler(
     );
 
     const indicadores: DashboardStatusItem[] = STATUS_ORDER.map((statusCode) => {
-      const pedidosStatus = allEntries
-        .filter((entry) => entry.statusCodigo === statusCode)
-        .map((entry) => entry.item)
+      const pedidosStatus = Array.from(new Map(
+        allEntries
+          .filter((entry) => entry.statusCodigo === statusCode)
+          .map((entry) => [entry.item.pedidoId, entry.item] as const)
+      ).values())
         .sort((a, b) => b.pedidoId - a.pedidoId);
 
       return {
