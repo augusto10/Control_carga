@@ -663,12 +663,14 @@ export async function sincronizarLogisticaSnapshot(options: {
       }
       const statusLogisticoInicial = ((pedido.status_logistico || {}) as Record<string, unknown>) || {};
       const statusInicial = deriveDashboardStatus(pedido, statusLogisticoInicial, logistica);
+      const totalPendenteInformado = toNumber(
+        pedido.total_itens_pendentes ?? pedido.TOTAL_ITENS_PENDENTES
+      ) || 0;
       const pendenciaConfirmadaNoConsolidado =
         pedido.__origemDashboardLogistica === true &&
-        ['S', 'SIM', 'TRUE', '1'].includes(
+        (['S', 'SIM', 'TRUE', '1'].includes(
           String(pedido.possui_produtos_faltando ?? pedido.POSSUI_PRODUTO_FALTANDO ?? '').trim().toUpperCase()
-        ) &&
-        (toNumber(pedido.total_itens_pendentes) || 0) > 0;
+        ) || totalPendenteInformado > 0);
       const referenciaInicialDireta = getNotaReferencia(pedido, logistica);
       const referenciaInicial =
         referenciaInicialDireta.numeroNota || referenciaInicialDireta.chave.length === 44

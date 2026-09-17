@@ -52,7 +52,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const limit = Math.min(Math.max(Number(req.query.limit || 1500), 1), 1500);
   // Detalhes individuais servem apenas para listar produtos de pendencias
   // confirmadas. Um limite moderado impede que o cron estoure a execucao.
-  const maxDetalhes = Math.min(Math.max(Number(req.query.max_detalhes ?? 20), 0), 100);
+  const maxDetalhes = Math.min(Math.max(Number(req.query.max_detalhes ?? 100), 0), 150);
 
   try {
     const resultado = await sincronizarLogisticaSnapshot({
