@@ -4,6 +4,7 @@ import { saldoPendente, itensComSaldoPendente, pedidoTemDevolucao, pedidoTemEntr
 import type { Prisma } from '@prisma/client';
 import prisma from '@/lib/prisma';
 import { apiExternaService } from '@/services/api-externa';
+import { getPedidosDashboard } from '@/lib/dashboard-external-cache';
 
 const STATUS_ORDER = [
   'PEDIDO_NOVO',
@@ -582,19 +583,18 @@ export async function sincronizarLogisticaSnapshot(options: {
       apiExternaService
         .listarNotasFiscaisCompletas({ limit: 100, offset: 0 }, options.username, options.password, 6_000)
         .catch(() => null),
-      apiExternaService
-        .listarPedidos(
-          { data_inicio: options.dataInicioIso || undefined, data_fim: options.dataFimIso || undefined, limit: options.limit || 500, offset: 0 },
-          options.username,
-          options.password,
-          8_000
-        )
-        .catch(() => null),
+      getPedidosDashboard(
+        options.username,
+        options.password,
+        options.limit || 1500,
+        12_000,
+        { data_inicio: options.dataInicioIso || undefined, data_fim: options.dataFimIso || undefined }
+      ),
     ]);
 
     // A rota consolidada ja traz os pedidos operacionais. A rota /pedidos
     // rejeita filtros de data na API atual e nao deve bloquear o cron.
-    const pedidosComTipo = ((pedidosComTipoResultado?.data || []) as Record<string, unknown>[]);
+    const pedidosComTipo = (pedidosComTipoResultado || []) as Record<string, unknown>[];
 
     const entradasPorPedido = new Map<number, Record<string, unknown>>();
     for (const item of (dashboardExterno?.data || []) as Record<string, unknown>[]) {

@@ -910,8 +910,8 @@ export default async function handler(
       timed('pedidos_tipo', getPedidosDashboard(
         username,
         password,
-        escopoPrincipal ? 100 : 500,
-        8_000,
+        1500,
+        12_000,
         {
           data_inicio: periodoFiltro.dataInicioIso || undefined,
           data_fim: dataFimDashboard,

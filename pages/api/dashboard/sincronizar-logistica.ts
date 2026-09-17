@@ -49,7 +49,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // renovar exatamente a mesma janela de 30 dias usada pelos alertas.
   const dataFimIso = parseDateOnly(req.query.data_fim) || todayIso();
   const dataInicioIso = parseDateOnly(req.query.data_inicio) || diasAntesIso(29);
-  const limit = Math.min(Math.max(Number(req.query.limit || 500), 1), 500);
+  const limit = Math.min(Math.max(Number(req.query.limit || 1500), 1), 1500);
   // Detalhes individuais servem apenas para listar produtos de pendencias
   // confirmadas. Um limite moderado impede que o cron estoure a execucao.
   const maxDetalhes = Math.min(Math.max(Number(req.query.max_detalhes ?? 20), 0), 100);
