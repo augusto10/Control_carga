@@ -4,7 +4,6 @@ import { saldoPendente, itensComSaldoPendente, pedidoTemDevolucao, pedidoTemEntr
 import type { Prisma } from '@prisma/client';
 import prisma from '@/lib/prisma';
 import { apiExternaService } from '@/services/api-externa';
-import { getPedidosDashboard } from '@/lib/dashboard-external-cache';
 
 const STATUS_ORDER = [
   'PEDIDO_NOVO',
@@ -568,33 +567,20 @@ export async function sincronizarLogisticaSnapshot(options: {
   let totalComErro = 0;
 
   try {
-    const [dashboardExterno, controles, notasCompletas, pedidosComTipoResultado] = await Promise.all([
-      apiExternaService.listarDashboardLogistica(
-        {
-          empresa_id: 1,
-          data_inicio: options.dataInicioIso || undefined,
-          data_fim: options.dataFimIso || undefined,
-        },
-        options.username,
-        options.password,
-        timeoutMs
-      ),
-      getControleInfoPorNotasLocais(),
-      apiExternaService
-        .listarNotasFiscaisCompletas({ limit: 100, offset: 0 }, options.username, options.password, 6_000)
-        .catch(() => null),
-      getPedidosDashboard(
-        options.username,
-        options.password,
-        options.limit || 1500,
-        12_000,
-        { data_inicio: options.dataInicioIso || undefined, data_fim: options.dataFimIso || undefined }
-      ),
-    ]);
-
-    // A rota consolidada ja traz os pedidos operacionais. A rota /pedidos
-    // rejeita filtros de data na API atual e nao deve bloquear o cron.
-    const pedidosComTipo = (pedidosComTipoResultado || []) as Record<string, unknown>[];
+    const controles = await getControleInfoPorNotasLocais();
+    const dashboardExterno = await apiExternaService.listarDashboardLogistica(
+      {
+        empresa_id: 1,
+        data_inicio: options.dataInicioIso || undefined,
+        data_fim: options.dataFimIso || undefined,
+      },
+      options.username,
+      options.password,
+      timeoutMs
+    );
+    const notasCompletas = await apiExternaService
+      .listarNotasFiscaisCompletas({ limit: 100, offset: 0 }, options.username, options.password, 6_000)
+      .catch(() => null);
 
     const entradasPorPedido = new Map<number, Record<string, unknown>>();
     for (const item of (dashboardExterno?.data || []) as Record<string, unknown>[]) {
@@ -602,26 +588,10 @@ export async function sincronizarLogisticaSnapshot(options: {
       const pedidoId = getPedidoId(normalizado);
       if (pedidoId) entradasPorPedido.set(pedidoId, normalizado);
     }
-    for (const item of pedidosComTipo) {
-      const pedidoId = getPedidoId(item);
-      if (!pedidoId) continue;
-      const atual = entradasPorPedido.get(pedidoId);
-      // O consolidado traz o status operacional; a lista de pedidos costuma
-      // trazer o TIPO_ENTREGA. Mesclar evita descartar o tipo ao deduplicar.
-      entradasPorPedido.set(pedidoId, {
-        ...(atual || {}),
-        ...(item.tipo_entrega || item.TIPO_ENTREGA || item.tipoEntrega
-          ? {
-              tipo_entrega: item.tipo_entrega ?? item.TIPO_ENTREGA ?? item.tipoEntrega,
-              TIPO_ENTREGA: item.TIPO_ENTREGA ?? item.tipo_entrega ?? item.tipoEntrega,
-            }
-          : {}),
-      });
-    }
     const entradas = Array.from(entradasPorPedido.values());
 
-    if (!dashboardExterno && pedidosComTipo.length === 0) {
-      throw new Error('API externa retornou indisponibilidade nas consultas de dashboard e pedidos');
+    if (!dashboardExterno) {
+      throw new Error('API externa retornou indisponibilidade no dashboard logistico');
     }
 
     // O dashboard consolidado nem sempre inclui tipo de entrega. Preservamos
@@ -641,13 +611,6 @@ export async function sincronizarLogisticaSnapshot(options: {
       if (referencia.pedidoId) notaPorPedido.set(referencia.pedidoId, referencia);
     }
 
-    const tipoEntregaPorPedido = new Map<number, string>();
-    for (const pedido of pedidosComTipo || []) {
-      const pedidoId = getPedidoId(pedido);
-      const tipoEntrega = getTipoEntregaPrincipal(pedido, null);
-      if (pedidoId && tipoEntrega) tipoEntregaPorPedido.set(pedidoId, tipoEntrega);
-    }
-
     let detalhesUsados = 0;
     const snapshots = await mapWithConcurrency(entradas, 10, async (entry) => {
       const pedidoId = getPedidoId(entry);
@@ -655,10 +618,9 @@ export async function sincronizarLogisticaSnapshot(options: {
 
       let pedido = entry;
       let logistica = ((pedido.logistica as Record<string, any> | undefined) || {}) as Record<string, any>;
-      const tipoEntregaLista = tipoEntregaPorPedido.get(pedidoId);
       const tipoEntregaAnterior = existentePorPedido.get(pedidoId)?.tipoEntrega || null;
-      if (!getTipoEntregaPrincipal(pedido, logistica) && (tipoEntregaLista || tipoEntregaAnterior)) {
-        const tipoEntrega = tipoEntregaLista || tipoEntregaAnterior;
+      if (!getTipoEntregaPrincipal(pedido, logistica) && tipoEntregaAnterior) {
+        const tipoEntrega = tipoEntregaAnterior;
         pedido = { ...pedido, tipo_entrega: tipoEntrega, TIPO_ENTREGA: tipoEntrega };
       }
       const statusLogisticoInicial = ((pedido.status_logistico || {}) as Record<string, unknown>) || {};
@@ -689,10 +651,6 @@ export async function sincronizarLogisticaSnapshot(options: {
         const detalhe = await apiExternaService.buscarPedidoLogistica(pedidoId, options.username, options.password, 4_000);
         if (detalhe) logistica = { ...logistica, ...detalhe };
         else totalComErro += 1;
-      }
-
-      if (tipoEntregaLista) {
-        pedido = { ...pedido, tipo_entrega: tipoEntregaLista, TIPO_ENTREGA: tipoEntregaLista };
       }
 
       if (!isPedidoPermitidoNoDashboard(pedido, logistica, pedido.__origemDashboardLogistica === true)) return null;

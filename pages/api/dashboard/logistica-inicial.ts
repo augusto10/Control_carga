@@ -1,6 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiExternaService } from '@/services/api-externa';
-import { getPedidosDashboard } from '@/lib/dashboard-external-cache';
 import { montarDashboardPorSnapshot } from '@/lib/logistica-snapshot';
 import prisma from '@/lib/prisma';
 
@@ -803,6 +802,28 @@ const getPedidoId = (pedido: Record<string, unknown>) =>
       pedido.id
   );
 
+const normalizarPedidoDashboard = (entrada: Record<string, unknown>) => {
+  const pedidoInterno = entrada.pedido && typeof entrada.pedido === 'object'
+    ? (entrada.pedido as Record<string, unknown>)
+    : {};
+
+  return {
+    ...pedidoInterno,
+    ...entrada,
+    pedido_id: entrada.pedido_id ?? pedidoInterno.pedido_id ?? pedidoInterno.ORCAMENTO_ID ?? pedidoInterno.id,
+    tipo_entrega: entrada.tipo_entrega ?? pedidoInterno.tipo_entrega ?? pedidoInterno.TIPO_ENTREGA,
+    TIPO_ENTREGA: entrada.TIPO_ENTREGA ?? pedidoInterno.TIPO_ENTREGA ?? pedidoInterno.tipo_entrega,
+    retirada: entrada.retirada ?? pedidoInterno.retirada,
+    status_logistico: entrada.status_logistico ?? pedidoInterno.status_logistico,
+    status_separacoes: entrada.status_separacoes ?? pedidoInterno.status_separacoes,
+    ultimo_status_separacao: entrada.ultimo_status_separacao ?? pedidoInterno.ultimo_status_separacao,
+    entrega_confirmada: entrada.entrega_confirmada ?? pedidoInterno.entrega_confirmada,
+    ultima_entrega_id: entrada.ultima_entrega_id ?? pedidoInterno.ultima_entrega_id,
+    possui_produtos_faltando: entrada.possui_produtos_faltando ?? pedidoInterno.possui_produtos_faltando,
+    total_itens_pendentes: entrada.total_itens_pendentes ?? pedidoInterno.total_itens_pendentes,
+  } as Record<string, unknown>;
+};
+
 const getNotaDoPedido = (nota: Record<string, unknown>) => {
   const notaFiscal =
     (nota.nota_fiscal as Record<string, unknown> | undefined) ||
@@ -895,7 +916,7 @@ export default async function handler(
         timings[name] = Date.now() - startedAt;
       }
     };
-    const [dashboardExterno, pedidosComTipoResult, notasCompletasResult, notasEmControles] =
+    const [dashboardExterno, notasCompletasResult, notasEmControles] =
       await Promise.all([
       timed('dashboard_externo', listarDashboardComRetry(
         {
@@ -906,16 +927,6 @@ export default async function handler(
         username,
         password,
         escopoPrincipal ? 10_000 : 8_000
-      )),
-      timed('pedidos_tipo', getPedidosDashboard(
-        username,
-        password,
-        1500,
-        12_000,
-        {
-          data_inicio: periodoFiltro.dataInicioIso || undefined,
-          data_fim: dataFimDashboard,
-        }
       )),
       timed(
         'notas_externas',
@@ -979,39 +990,9 @@ export default async function handler(
       throw new Error('api_externa_dashboard_periodo_indisponivel');
     }
 
-    const pedidosComTipo = pedidosComTipoResult || [];
-    const dashboardEntries = [
-      ...(dashboardExterno.data as Record<string, unknown>[]),
-      ...pedidosComTipo,
-    ].filter((item, index, entries) => {
-      const pedidoId = getPedidoId(item);
-      return !pedidoId || entries.findIndex((candidate) => getPedidoId(candidate) === pedidoId) === index;
-    });
+    const dashboardEntries = (dashboardExterno.data as Record<string, unknown>[])
+      .map(normalizarPedidoDashboard);
     const notasCompletas = notasCompletasResult || null;
-    const dashboardPedidoIds = new Set(
-      (dashboardExterno.data as Record<string, unknown>[])
-        .map((item) => getPedidoId(item))
-        .filter((pedidoId): pedidoId is number => Boolean(pedidoId))
-    );
-    const tipoEntregaPorPedido = new Map<number, string>();
-    for (const pedidoTipo of pedidosComTipo || []) {
-      const pedidoId = getPedidoId(pedidoTipo);
-      const tipoEntrega = pickString(
-        pedidoTipo.TIPO_ENTREGA,
-        pedidoTipo.tipo_entrega,
-        pedidoTipo.tipoEntrega,
-        pedidoTipo.TIPO_ENTREGA_DESCRICAO,
-        pedidoTipo.tipo_entrega_descricao
-      );
-      if (pedidoId && tipoEntrega) tipoEntregaPorPedido.set(pedidoId, tipoEntrega);
-    }
-
-    const totalTiposCorrespondentes = Array.from(dashboardPedidoIds).filter((pedidoId) =>
-      tipoEntregaPorPedido.has(pedidoId)
-    ).length;
-    if (dashboardPedidoIds.size > 0 && totalTiposCorrespondentes === 0) {
-      throw new Error('tipos_pedidos_indisponiveis');
-    }
 
     const notaPorPedido = new Map<number, { numeroNota: string | null; chave: string }>();
     for (const dashboardItem of dashboardExterno.data as Record<string, any>[]) {
@@ -1128,7 +1109,6 @@ export default async function handler(
 
       const tipoEntregaLocal =
         pickString(
-          tipoEntregaPorPedido.get(pedidoId),
           notaExterna.TIPO_ENTREGA,
           notaExterna.tipo_entrega,
           notaExterna.tipoEntrega,
@@ -1142,10 +1122,6 @@ export default async function handler(
         })
       ) {
         continue;
-      }
-
-      if (dashboardPedidoIds.has(pedidoId)) {
-        pedidosEmbarcadosPorNota.add(pedidoId);
       }
 
       if (!pedidosEmbarcadosLocais.has(pedidoId)) {
@@ -1200,9 +1176,8 @@ export default async function handler(
           const statusLogistico = (pedido.status_logistico || {}) as Record<string, unknown>;
           let logistica = (pedido.logistica || {}) as Record<string, any>;
           const tipoEntregaInicial = getTipoEntregaPrincipal(pedido, logistica);
-          const tipoEntregaLista = pedidoId ? tipoEntregaPorPedido.get(pedidoId) : undefined;
           const precisaLogisticaDetalhada =
-            (!tipoEntregaInicial && !tipoEntregaLista) ||
+            !tipoEntregaInicial ||
             (hasResumoPendenciaNoPedido(pedido) && !isPedidoSomenteComSeparacaoAberta(pedido));
 
           if (
@@ -1219,14 +1194,6 @@ export default async function handler(
           const statusCodigoBase = deriveDashboardStatus(pedido, statusLogistico, logistica);
           if (!pedidoId || !statusCodigoBase) {
             return null;
-          }
-
-          if (tipoEntregaLista) {
-            pedido = {
-              ...pedido,
-              tipo_entrega: tipoEntregaLista,
-              TIPO_ENTREGA: tipoEntregaLista,
-            };
           }
 
           const previsaoEntrega = toStringValue(pedido.previsao_entrega);

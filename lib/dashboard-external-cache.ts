@@ -36,29 +36,29 @@ export async function getPedidosDashboard(
         { length: Math.ceil(limit / pageSize) },
         (_, index) => index * pageSize
       );
-      let responses = await Promise.all(
-        offsets.map((offset) =>
-          apiExternaService.listarPedidos(
+      // O ERP limita chamadas simultaneas e pode expirar o login quando as
+      // paginas sao abertas em paralelo. A sequencia preserva o mesmo token.
+      let responses: Awaited<ReturnType<typeof apiExternaService.listarPedidos>>[] = [];
+      for (const offset of offsets) {
+        responses.push(await apiExternaService.listarPedidos(
+          { ...filtros, limit: Math.min(pageSize, limit - offset), offset },
+          username,
+          password,
+          timeoutMs
+        ));
+      }
+
+      const failedOffsets = offsets.filter((_, index) => !responses[index]);
+      if (failedOffsets.length > 0) {
+        const retries: Awaited<ReturnType<typeof apiExternaService.listarPedidos>>[] = [];
+        for (const offset of failedOffsets) {
+          retries.push(await apiExternaService.listarPedidos(
             { ...filtros, limit: Math.min(pageSize, limit - offset), offset },
             username,
             password,
             timeoutMs
-          )
-        )
-      );
-
-      const failedOffsets = offsets.filter((_, index) => !responses[index]);
-      if (failedOffsets.length > 0) {
-        const retries = await Promise.all(
-          failedOffsets.map((offset) =>
-            apiExternaService.listarPedidos(
-              { ...filtros, limit: Math.min(pageSize, limit - offset), offset },
-              username,
-              password,
-              timeoutMs
-            )
-          )
-        );
+          ));
+        }
         responses = responses.map((response, index) => {
           if (response) return response;
           const retryIndex = failedOffsets.indexOf(offsets[index]);
