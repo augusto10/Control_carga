@@ -4,6 +4,7 @@ import { saldoPendente, itensComSaldoPendente, pedidoTemDevolucao, pedidoTemEntr
 import type { Prisma } from '@prisma/client';
 import prisma from '@/lib/prisma';
 import { apiExternaService } from '@/services/api-externa';
+import { getPedidosDashboard } from '@/lib/dashboard-external-cache';
 
 const STATUS_ORDER = [
   'PEDIDO_NOVO',
@@ -578,6 +579,13 @@ export async function sincronizarLogisticaSnapshot(options: {
       options.password,
       timeoutMs
     );
+    const pedidosComTipoResultado = await getPedidosDashboard(
+      options.username,
+      options.password,
+      options.limit || 1500,
+      12_000,
+      { data_inicio: options.dataInicioIso || undefined, data_fim: options.dataFimIso || undefined }
+    );
     const notasCompletas = await apiExternaService
       .listarNotasFiscaisCompletas({ limit: 100, offset: 0 }, options.username, options.password, 6_000)
       .catch(() => null);
@@ -590,6 +598,21 @@ export async function sincronizarLogisticaSnapshot(options: {
     }
     const entradas = Array.from(entradasPorPedido.values());
 
+    for (const item of (pedidosComTipoResultado || []) as Record<string, unknown>[]) {
+      const pedidoId = getPedidoId(item);
+      const tipoEntrega = getTipoEntregaPrincipal(item, null);
+      const atual = pedidoId ? entradasPorPedido.get(pedidoId) : null;
+      if (pedidoId && atual && tipoEntrega) {
+        entradasPorPedido.set(pedidoId, {
+          ...atual,
+          tipo_entrega: tipoEntrega,
+          TIPO_ENTREGA: tipoEntrega,
+        });
+      }
+    }
+
+    const entradasComTipo = Array.from(entradasPorPedido.values());
+
     if (!dashboardExterno) {
       throw new Error('API externa retornou indisponibilidade no dashboard logistico');
     }
@@ -598,7 +621,7 @@ export async function sincronizarLogisticaSnapshot(options: {
     // o ultimo tipo conhecido enquanto a lista geral do ERP estiver lenta,
     // em vez de sobrescrever ENT/EPG com vazio e perder o pedido no alerta.
     const existentes = await (prisma as any).pedidoLogisticaSnapshot.findMany({
-      where: { pedidoId: { in: entradas.map((entrada) => getPedidoId(entrada)).filter(Boolean) as number[] } },
+      where: { pedidoId: { in: entradasComTipo.map((entrada) => getPedidoId(entrada)).filter(Boolean) as number[] } },
       select: { pedidoId: true, tipoEntrega: true, assinatura: true },
     });
     const existentePorPedido = new Map<number, { tipoEntrega: string | null; assinatura: string }>(
@@ -612,7 +635,7 @@ export async function sincronizarLogisticaSnapshot(options: {
     }
 
     let detalhesUsados = 0;
-    const snapshots = await mapWithConcurrency(entradas, 10, async (entry) => {
+    const snapshots = await mapWithConcurrency(entradasComTipo, 10, async (entry) => {
       const pedidoId = getPedidoId(entry);
       if (!pedidoId) return null;
 
@@ -766,7 +789,7 @@ export async function sincronizarLogisticaSnapshot(options: {
         chave: syncKey,
         dataInicio,
         dataFim,
-        totalLidos: entradas.length,
+        totalLidos: entradasComTipo.length,
         totalAtualizados: alterados.length,
         totalComErro,
         ultimoErro: null,
@@ -774,7 +797,7 @@ export async function sincronizarLogisticaSnapshot(options: {
       update: {
         dataInicio,
         dataFim,
-        totalLidos: entradas.length,
+        totalLidos: entradasComTipo.length,
         totalAtualizados: alterados.length,
         totalComErro,
         ultimoErro: null,

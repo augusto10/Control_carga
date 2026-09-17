@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiExternaService } from '@/services/api-externa';
+import { getPedidosDashboard } from '@/lib/dashboard-external-cache';
 import { montarDashboardPorSnapshot } from '@/lib/logistica-snapshot';
 import prisma from '@/lib/prisma';
 
@@ -916,28 +917,35 @@ export default async function handler(
         timings[name] = Date.now() - startedAt;
       }
     };
-    const [dashboardExterno, notasCompletasResult, notasEmControles] =
-      await Promise.all([
-      timed('dashboard_externo', listarDashboardComRetry(
-        {
-          empresa_id: 1,
-          data_inicio: periodoFiltro.dataInicioIso || undefined,
-          data_fim: dataFimDashboard,
-        },
-        username,
-        password,
-        escopoPrincipal ? 10_000 : 8_000
-      )),
+    const dashboardExterno = await timed('dashboard_externo', listarDashboardComRetry(
+      {
+        empresa_id: 1,
+        data_inicio: periodoFiltro.dataInicioIso || undefined,
+        data_fim: dataFimDashboard,
+      },
+      username,
+      password,
+      escopoPrincipal ? 10_000 : 8_000
+    ));
+    const pedidosComTipoResult = await timed('pedidos_tipo', getPedidosDashboard(
+      username,
+      password,
+      1500,
+      12_000,
+      {
+        data_inicio: periodoFiltro.dataInicioIso || undefined,
+        data_fim: dataFimDashboard,
+      }
+    ));
+    const [notasCompletasResult, notasEmControles] = await Promise.all([
       timed(
         'notas_externas',
-        // Sempre buscar notas externas para poder vincular com controles locais
-        // mesmo em escopo principal, mas com limite menor
         apiExternaService.listarNotasFiscaisCompletas(
           { limit: escopoPrincipal ? 100 : 500, offset: 0 },
           username,
           password,
           escopoPrincipal ? 4_000 : 6_000
-        ).catch(() => null) // Se falhar em escopo principal, continua sem notas
+        ).catch(() => null)
       ),
       timed('notas_locais', prisma.notaFiscal.findMany({
         where: {
@@ -992,6 +1000,19 @@ export default async function handler(
 
     const dashboardEntries = (dashboardExterno.data as Record<string, unknown>[])
       .map(normalizarPedidoDashboard);
+    const pedidosComTipo = pedidosComTipoResult || [];
+    const tipoEntregaPorPedido = new Map<number, string>();
+    for (const pedidoTipo of pedidosComTipo) {
+      const pedidoId = getPedidoId(pedidoTipo);
+      const tipoEntrega = pickString(
+        pedidoTipo.TIPO_ENTREGA,
+        pedidoTipo.tipo_entrega,
+        pedidoTipo.tipoEntrega,
+        pedidoTipo.TIPO_ENTREGA_DESCRICAO,
+        pedidoTipo.tipo_entrega_descricao
+      );
+      if (pedidoId && tipoEntrega) tipoEntregaPorPedido.set(pedidoId, tipoEntrega);
+    }
     const notasCompletas = notasCompletasResult || null;
 
     const notaPorPedido = new Map<number, { numeroNota: string | null; chave: string }>();
@@ -1173,6 +1194,10 @@ export default async function handler(
         async (entry): Promise<EnrichedDashboardEntry | null> => {
           let pedido = entry as Record<string, unknown>;
           const pedidoId = toNumber(pedido.pedido_id);
+          const tipoEntregaLista = pedidoId ? tipoEntregaPorPedido.get(pedidoId) : undefined;
+          if (tipoEntregaLista) {
+            pedido = { ...pedido, tipo_entrega: tipoEntregaLista, TIPO_ENTREGA: tipoEntregaLista };
+          }
           const statusLogistico = (pedido.status_logistico || {}) as Record<string, unknown>;
           let logistica = (pedido.logistica || {}) as Record<string, any>;
           const tipoEntregaInicial = getTipoEntregaPrincipal(pedido, logistica);
