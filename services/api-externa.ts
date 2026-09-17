@@ -692,6 +692,30 @@ class APIExternaService {
     }
   }
 
+  async listarTodasNotasFiscaisCompletas(
+    username: string,
+    password: string,
+    timeoutMs = API_EXTERNA_TIMEOUT_MS,
+    maxRegistros = 15000
+  ): Promise<Record<string, any>[]> {
+    const notas: Record<string, any>[] = [];
+    const limite = 500;
+
+    for (let offset = 0; offset < maxRegistros; offset += limite) {
+      const resposta = await this.listarNotasFiscaisCompletas(
+        { limit: limite, offset },
+        username,
+        password,
+        timeoutMs
+      );
+      if (!resposta) break;
+      notas.push(...resposta.data);
+      if (resposta.data.length === 0 || offset + resposta.data.length >= resposta.total) break;
+    }
+
+    return notas;
+  }
+
   async listarPedidos(
     filtros: {
       data_inicio?: string;

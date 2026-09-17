@@ -1,0 +1,2 @@
+ALTER TABLE "PedidoLogisticaSnapshot"
+ADD COLUMN IF NOT EXISTS "numerosNotas" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[];

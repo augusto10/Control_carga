@@ -591,8 +591,8 @@ export async function sincronizarLogisticaSnapshot(options: {
       { data_inicio: options.dataInicioIso || undefined, data_fim: options.dataFimIso || undefined }
     );
     const notasCompletas = await apiExternaService
-      .listarNotasFiscaisCompletas({ limit: 100, offset: 0 }, options.username, options.password, 6_000)
-      .catch(() => null);
+      .listarTodasNotasFiscaisCompletas(options.username, options.password, 12_000)
+      .catch(() => []);
 
     const entradasPorPedido = new Map<number, Record<string, unknown>>();
     for (const item of (dashboardExterno?.data || []) as Record<string, unknown>[]) {
@@ -632,10 +632,21 @@ export async function sincronizarLogisticaSnapshot(options: {
       existentes.map((item: { pedidoId: number; tipoEntrega: string | null; assinatura: string }) => [item.pedidoId, item])
     );
 
-    const notaPorPedido = new Map<number, { numeroNota: string | null; chave: string }>();
-    for (const nota of notasCompletas?.data || []) {
+    const notaPorPedido = new Map<number, { numeroNota: string | null; chave: string; numerosNotas: string[] }>();
+    for (const nota of notasCompletas) {
       const referencia = getNotaDoPedido(nota);
-      if (referencia.pedidoId) notaPorPedido.set(referencia.pedidoId, referencia);
+      if (!referencia.pedidoId) continue;
+      const atual = notaPorPedido.get(referencia.pedidoId) || {
+        numeroNota: null,
+        chave: '',
+        numerosNotas: [],
+      };
+      if (referencia.numeroNota && !atual.numerosNotas.includes(referencia.numeroNota)) {
+        atual.numerosNotas.push(referencia.numeroNota);
+      }
+      if (!atual.numeroNota) atual.numeroNota = referencia.numeroNota;
+      if (!atual.chave) atual.chave = referencia.chave;
+      notaPorPedido.set(referencia.pedidoId, atual);
     }
 
     let detalhesUsados = 0;
@@ -700,9 +711,14 @@ export async function sincronizarLogisticaSnapshot(options: {
         referenciaDireta.numeroNota || referenciaDireta.chave.length === 44
           ? referenciaDireta
           : notaPorPedido.get(pedidoId) || referenciaDireta;
+      const numerosNotas = notaPorPedido.get(pedidoId)?.numerosNotas ||
+        (referenciaNota.numeroNota ? [referenciaNota.numeroNota] : []);
+      const controlePorNumero = numerosNotas
+        .map((numero) => controles.porNumero.get(normalizeNumeroNota(numero)))
+        .find(Boolean) || null;
       const controleInfo =
         (referenciaNota.chave.length === 44 ? controles.porChave.get(referenciaNota.chave) : null) ||
-        (referenciaNota.numeroNota ? controles.porNumero.get(normalizeNumeroNota(referenciaNota.numeroNota)) : null) ||
+        controlePorNumero ||
         null;
       const dataHoraRecebimento = parsePedidoDate(
         pedido.data_hora_recebimento ?? pedido.DATA_HORA_RECEBIMENTO ?? pedido.DATA_RECEBIMENTO
@@ -726,6 +742,7 @@ export async function sincronizarLogisticaSnapshot(options: {
         totalItensPendentes,
         produtosPendentes,
         numeroNota: referenciaNota.numeroNota,
+        numerosNotas,
         chave: referenciaNota.chave,
         controleInfo,
       });
@@ -749,6 +766,7 @@ export async function sincronizarLogisticaSnapshot(options: {
         usuarioConfirmacaoNome: toStringValue(statusLogistico.usuario_confirmacao_nome),
         dataHoraConfirmacao,
         numeroNota: referenciaNota.numeroNota,
+        numerosNotas,
         chaveNfe: referenciaNota.chave || null,
         embarcadoNoControle: Boolean(controleInfo),
         numeroManifesto: controleInfo?.numeroManifesto || null,

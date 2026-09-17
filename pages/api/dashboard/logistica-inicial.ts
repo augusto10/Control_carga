@@ -941,12 +941,9 @@ export default async function handler(
     const [notasCompletasResult, notasEmControles] = await Promise.all([
       timed(
         'notas_externas',
-        apiExternaService.listarNotasFiscaisCompletas(
-          { limit: escopoPrincipal ? 100 : 500, offset: 0 },
-          username,
-          password,
-          escopoPrincipal ? 4_000 : 6_000
-        ).catch(() => null)
+        apiExternaService
+          .listarTodasNotasFiscaisCompletas(username, password, escopoPrincipal ? 8_000 : 12_000)
+          .catch(() => [])
       ),
       timed('notas_locais', prisma.notaFiscal.findMany({
         where: {
@@ -1014,7 +1011,7 @@ export default async function handler(
       );
       if (pedidoId && tipoEntrega) tipoEntregaPorPedido.set(pedidoId, tipoEntrega);
     }
-    const notasCompletas = notasCompletasResult || null;
+    const notasCompletas = notasCompletasResult || [];
 
     const notaPorPedido = new Map<number, { numeroNota: string | null; chave: string }>();
     for (const dashboardItem of dashboardExterno.data as Record<string, any>[]) {
@@ -1042,7 +1039,7 @@ export default async function handler(
         notaPorPedido.set(pedidoId, { numeroNota, chave });
       }
     }
-    for (const nota of notasCompletas?.data || []) {
+    for (const nota of notasCompletas) {
       const referencia = getNotaDoPedido(nota);
       if (referencia.pedidoId && !notaPorPedido.has(referencia.pedidoId)) {
         notaPorPedido.set(referencia.pedidoId, referencia);
@@ -1092,7 +1089,7 @@ export default async function handler(
     const pedidosEmbarcadosPorNota = new Set<number>();
     const pedidosEmbarcadosLocais = new Map<number, DashboardPedidoItem>();
 
-    for (const nota of notasCompletas?.data || []) {
+    for (const nota of notasCompletas) {
       const referencia = getNotaDoPedido(nota);
       if (referencia.pedidoId && isNotaEmControle(referencia)) {
         pedidosEmbarcadosPorNota.add(referencia.pedidoId);
@@ -1101,7 +1098,7 @@ export default async function handler(
 
     const notaCompletaPorChave = new Map<string, Record<string, any>>();
     const notaCompletaPorNumero = new Map<string, Record<string, any>>();
-    for (const nota of notasCompletas?.data || []) {
+    for (const nota of notasCompletas) {
       const referencia = getNotaDoPedido(nota);
       if (referencia.chave) notaCompletaPorChave.set(referencia.chave, nota);
       if (referencia.numeroNota) notaCompletaPorNumero.set(normalizeNumeroNota(referencia.numeroNota), nota);

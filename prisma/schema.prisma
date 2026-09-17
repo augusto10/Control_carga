@@ -142,6 +142,7 @@ model PedidoLogisticaSnapshot {
   usuarioConfirmacaoNome  String?
   dataHoraConfirmacao     DateTime?
   numeroNota              String?
+  numerosNotas            String[] @default([])
   chaveNfe                String?
   embarcadoNoControle     Boolean  @default(false)
   numeroManifesto         String?
