@@ -596,13 +596,29 @@ export async function sincronizarLogisticaSnapshot(options: {
     // rejeita filtros de data na API atual e nao deve bloquear o cron.
     const pedidosComTipo = ((pedidosComTipoResultado?.data || []) as Record<string, unknown>[]);
 
-    const entradas: Record<string, unknown>[] = [
-      ...((dashboardExterno?.data || []) as Record<string, unknown>[]).map(normalizarPedidoConsolidado),
-      ...((pedidosComTipo || []) as Record<string, unknown>[]),
-    ].filter((item, index, entries) => {
+    const entradasPorPedido = new Map<number, Record<string, unknown>>();
+    for (const item of (dashboardExterno?.data || []) as Record<string, unknown>[]) {
+      const normalizado = normalizarPedidoConsolidado(item);
+      const pedidoId = getPedidoId(normalizado);
+      if (pedidoId) entradasPorPedido.set(pedidoId, normalizado);
+    }
+    for (const item of pedidosComTipo) {
       const pedidoId = getPedidoId(item);
-      return Boolean(pedidoId) && entries.findIndex((candidate) => getPedidoId(candidate) === pedidoId) === index;
-    });
+      if (!pedidoId) continue;
+      const atual = entradasPorPedido.get(pedidoId);
+      // O consolidado traz o status operacional; a lista de pedidos costuma
+      // trazer o TIPO_ENTREGA. Mesclar evita descartar o tipo ao deduplicar.
+      entradasPorPedido.set(pedidoId, {
+        ...(atual || {}),
+        ...(item.tipo_entrega || item.TIPO_ENTREGA || item.tipoEntrega
+          ? {
+              tipo_entrega: item.tipo_entrega ?? item.TIPO_ENTREGA ?? item.tipoEntrega,
+              TIPO_ENTREGA: item.TIPO_ENTREGA ?? item.tipo_entrega ?? item.tipoEntrega,
+            }
+          : {}),
+      });
+    }
+    const entradas = Array.from(entradasPorPedido.values());
 
     if (!dashboardExterno && pedidosComTipo.length === 0) {
       throw new Error('API externa retornou indisponibilidade nas consultas de dashboard e pedidos');
