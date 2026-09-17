@@ -459,6 +459,7 @@ export const isPedidoComPendencias = (
     );
     const erpTotalItens = toNumber(pedido.total_itens_pendentes ?? pedido.TOTAL_ITENS_PENDENTES) || 0;
     if (!erpConfirmaFalta && erpTotalItens <= 0) return false;
+    if (erpTotalItens > 0 && pedido.__origemDashboardLogistica === true) return true;
   }
 
   const statusLogisticoCodigo = toStringValue(

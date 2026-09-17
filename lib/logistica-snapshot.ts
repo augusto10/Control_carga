@@ -349,10 +349,14 @@ const isPedidoComPendencias = (pedido: Record<string, unknown>, logistica: Recor
   // No consolidado, a flag do ERP e obrigatoria. Itens em separacao nunca
   // devem, por si so, classificar um pedido como produto faltando.
   if (pedido.__origemDashboardLogistica === true) {
+    const totalPendenteErp = toNumber(
+      pedido.total_itens_pendentes ?? pedido.TOTAL_ITENS_PENDENTES
+    ) || 0;
     const confirmadoPeloErp = ['S', 'SIM', 'TRUE', '1'].includes(
       String(pedido.possui_produtos_faltando ?? pedido.POSSUI_PRODUTO_FALTANDO ?? '').trim().toUpperCase()
     );
-    if (!confirmadoPeloErp || (toNumber(pedido.total_itens_pendentes) || 0) <= 0) return false;
+    if (totalPendenteErp > 0) return true;
+    if (!confirmadoPeloErp) return false;
   }
   const statusLogisticoCodigo = toStringValue(
     (pedido.status_logistico as Record<string, unknown> | undefined)?.codigo
@@ -671,7 +675,7 @@ export async function sincronizarLogisticaSnapshot(options: {
 
       if (precisaDetalhe && detalhesUsados < maxDetalhes) {
         detalhesUsados += 1;
-        const detalhe = await apiExternaService.buscarPedidoLogistica(pedidoId, options.username, options.password, 4_000);
+        const detalhe = await apiExternaService.buscarPedidoLogistica(pedidoId, options.username, options.password, 15_000);
         if (detalhe) logistica = { ...logistica, ...detalhe };
         else totalComErro += 1;
       }
@@ -908,7 +912,7 @@ export async function montarDashboardPorSnapshot(
     // O registro sincronizado ja foi validado contra a flag do ERP e os itens
     // detalhados. Nao reinterpretamos saldos durante a leitura do card.
     const resumoIndicaPendencia =
-      ['S', 'SIM', 'TRUE', '1'].includes(String(rawPedido.possui_produtos_faltando ?? rawPedido.POSSUI_PRODUTO_FALTANDO ?? '').trim().toUpperCase()) &&
+      ['S', 'SIM', 'TRUE', '1'].includes(String(rawPedido.possui_produtos_faltando ?? rawPedido.POSSUI_PRODUTO_FALTANDO ?? '').trim().toUpperCase()) ||
       (toNumber(rawPedido.total_itens_pendentes ?? rawPedido.TOTAL_ITENS_PENDENTES) || 0) > 0;
     const possuiPendencia =
       resumoIndicaPendencia &&
