@@ -274,22 +274,22 @@ export function printProductLabelsInBrowser(
 
           .sheet {
             display: grid;
-            grid-template-columns: ${isA4Product ? '180mm' : isA4ProductLandscape ? '287mm' : isA4ProductVertical ? '150mm' : isA4ProductVerticalDouble ? 'repeat(3, 80mm)' : isClosedBox ? 'repeat(2, 100mm)' : 'repeat(3, 66mm)'};
-            grid-template-rows: ${isA4Product ? 'repeat(2, 110mm)' : isA4ProductLandscape ? '200mm' : isA4ProductVertical ? '210mm' : isA4ProductVerticalDouble ? '140mm' : 'none'};
+            grid-template-columns: ${isA4Product ? '180mm' : isA4ProductLandscape ? '287mm' : isA4ProductVertical ? '200mm' : isA4ProductVerticalDouble ? 'repeat(3, 80mm)' : isClosedBox ? 'repeat(2, 100mm)' : 'repeat(3, 66mm)'};
+            grid-template-rows: ${isA4Product ? 'repeat(2, 110mm)' : isA4ProductLandscape ? '200mm' : isA4ProductVertical ? '287mm' : isA4ProductVerticalDouble ? '140mm' : 'none'};
             gap: ${isA4Product ? '40mm 0' : isA4ProductLandscape || isA4ProductVertical ? '0' : isA4ProductVerticalDouble ? '12mm' : '4mm'};
             justify-content: center;
             align-content: ${isA4ProductVertical || isA4ProductVerticalDouble ? 'center' : 'start'};
             width: ${isLandscapeA4 ? '297mm' : isBrowserA4Product ? '210mm' : 'auto'};
             min-height: ${isLandscapeA4 ? '210mm' : isBrowserA4Product ? '297mm' : 'auto'};
-            padding: ${isA4Product ? '18.5mm 15mm' : isA4ProductLandscape ? '5mm' : isA4ProductVertical ? '43.5mm 30mm' : isA4ProductVerticalDouble ? '35mm 16.5mm' : '10mm'};
+            padding: ${isA4Product ? '18.5mm 15mm' : isA4ProductLandscape ? '5mm' : isA4ProductVertical ? '5mm' : isA4ProductVerticalDouble ? '35mm 16.5mm' : '10mm'};
             border-radius: 18px;
             background: #ffffff;
             box-shadow: 0 24px 60px rgba(15, 23, 42, 0.12);
           }
 
           .label {
-            width: ${isA4Product ? '180mm' : isA4ProductLandscape ? '287mm' : isA4ProductVertical ? '150mm' : isA4ProductVerticalDouble ? '80mm' : isClosedBox ? '100mm' : '66mm'};
-            height: ${isA4Product ? '110mm' : isA4ProductLandscape ? '200mm' : isA4ProductVertical ? '210mm' : isA4ProductVerticalDouble ? '140mm' : isClosedBox ? '60mm' : '44mm'};
+            width: ${isA4Product ? '180mm' : isA4ProductLandscape ? '287mm' : isA4ProductVertical ? '200mm' : isA4ProductVerticalDouble ? '80mm' : isClosedBox ? '100mm' : '66mm'};
+            height: ${isA4Product ? '110mm' : isA4ProductLandscape ? '200mm' : isA4ProductVertical ? '287mm' : isA4ProductVerticalDouble ? '140mm' : isClosedBox ? '60mm' : '44mm'};
             border: 1px solid #94a3b8;
             padding: ${isBrowserA4Product ? '0' : '3mm'};
             display: flex;
@@ -341,7 +341,7 @@ export function printProductLabelsInBrowser(
             border-radius: 3mm;
             overflow: hidden;
             display: grid;
-            grid-template-rows: 74mm 36mm;
+            grid-template-rows: 74fr 36fr;
             font-family: "Arial Narrow", "Roboto Condensed", Arial, sans-serif;
           }
 
@@ -350,7 +350,7 @@ export function printProductLabelsInBrowser(
             border-radius: 3mm;
             overflow: hidden;
             display: grid;
-            grid-template-rows: 135mm 65mm;
+            grid-template-rows: 135fr 65fr;
             font-family: "Arial Narrow", "Roboto Condensed", Arial, sans-serif;
           }
 
@@ -359,7 +359,7 @@ export function printProductLabelsInBrowser(
           }
 
           .label-a4-landscape .product-copy {
-            grid-template-rows: 36mm 48mm 51mm;
+            grid-template-rows: 36fr 48fr 51fr;
           }
 
           .label-a4-landscape .adm-large {
@@ -416,7 +416,7 @@ export function printProductLabelsInBrowser(
 
           .product-copy {
             display: grid;
-            grid-template-rows: 19mm 25mm 30mm;
+            grid-template-rows: 19fr 25fr 30fr;
             min-width: 0;
           }
 
@@ -487,11 +487,11 @@ export function printProductLabelsInBrowser(
           }
 
           .label-a4-vertical {
-            grid-template-rows: 100mm 75mm 35mm;
+            grid-template-rows: 140fr 100fr 45fr;
           }
 
           .label-a4-vertical-double {
-            grid-template-rows: 66mm 52mm 22mm;
+            grid-template-rows: 66fr 52fr 22fr;
           }
 
           .product-image-vertical,
@@ -538,11 +538,11 @@ export function printProductLabelsInBrowser(
           }
 
           .product-copy-vertical {
-            grid-template-rows: 18mm 24mm 1fr;
+            grid-template-rows: 18fr 24fr 1fr;
           }
 
           .product-copy-vertical-double {
-            grid-template-rows: 12mm 16mm 1fr;
+            grid-template-rows: 12fr 16fr 1fr;
           }
 
           .adm-large-vertical,
@@ -574,7 +574,7 @@ export function printProductLabelsInBrowser(
           }
 
           .adm-large-vertical {
-            font-size: 24pt;
+            font-size: 32pt;
           }
 
           .adm-large-vertical-double {
@@ -590,7 +590,7 @@ export function printProductLabelsInBrowser(
           }
 
           .meta-line-vertical {
-            font-size: 16pt;
+            font-size: 21pt;
             line-height: 1.08;
             white-space: nowrap;
             overflow: hidden;
@@ -606,7 +606,7 @@ export function printProductLabelsInBrowser(
           }
 
           .description-vertical {
-            font-size: 18pt;
+            font-size: 24pt;
             line-height: 1.12;
             padding-top: 2mm;
           }
@@ -626,8 +626,12 @@ export function printProductLabelsInBrowser(
           }
 
           .barcode-large-vertical svg {
-            max-width: 112mm;
-            max-height: 16mm;
+            max-width: 150mm;
+            max-height: 26mm;
+          }
+
+          .barcode-large-vertical .barcode-number {
+            font-size: 26pt;
           }
 
           .barcode-large-vertical-double svg {
@@ -671,8 +675,12 @@ export function printProductLabelsInBrowser(
               display: none;
             }
 
+            .summary {
+              display: none;
+            }
+
             .sheet {
-              padding: ${isA4Product ? '18.5mm 15mm' : isA4ProductLandscape ? '5mm' : isA4ProductVertical ? '43.5mm 30mm' : isA4ProductVerticalDouble ? '35mm 16.5mm' : '0'};
+              padding: ${isA4Product ? '18.5mm 15mm' : isA4ProductLandscape ? '5mm' : isA4ProductVertical ? '5mm' : isA4ProductVerticalDouble ? '35mm 16.5mm' : '0'};
               border-radius: 0;
               box-shadow: none;
             }
@@ -1026,6 +1034,10 @@ export function printTransportLabelsInBrowser(
             }
 
             .toolbar {
+              display: none;
+            }
+
+            .summary {
               display: none;
             }
 

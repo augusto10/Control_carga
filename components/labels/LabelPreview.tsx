@@ -22,16 +22,16 @@ function ProductVerticalPreview({
     <Box
       sx={{
         width: '100%',
-        maxWidth: compact ? 420 : 560,
+        maxWidth: compact ? 420 : 720,
         mx: 'auto',
-        aspectRatio: compact ? '80 / 140' : '150 / 210',
+        aspectRatio: compact ? '80 / 140' : '200 / 287',
         border: '2px solid #172033',
         borderRadius: 2,
         overflow: 'hidden',
         bgcolor: '#fff',
         color: '#111',
         display: 'grid',
-        gridTemplateRows: compact ? '45% 40% 15%' : '48% 36% 16%',
+        gridTemplateRows: compact ? '45% 40% 15%' : '38% 24% 1fr 14%',
       }}
     >
       <Box
@@ -62,19 +62,19 @@ function ProductVerticalPreview({
         )}
       </Box>
 
-      <Box sx={{ display: 'grid', gridTemplateRows: compact ? '16% 23% 1fr' : '18% 22% 1fr', minWidth: 0 }}>
-        <Box sx={{ borderBottom: '2px solid #172033', minWidth: 0 }}>
-          <Box sx={{ px: compact ? 1.3 : 2, py: compact ? 0.15 : 0.25, width: '100%', minWidth: 0 }}>
-            <Typography sx={{ color: '#07559b', fontWeight: 950, fontSize: compact ? 15 : 'clamp(18px, 3vw, 30px)', lineHeight: 1 }}>
+      <Box sx={{ display: 'grid', gridTemplateRows: compact ? '16% 23% 1fr' : '30% 30% 1fr', minWidth: 0 }}>
+        <Box sx={{ borderBottom: '2px solid #172033', minWidth: 0, display: 'grid', placeItems: 'center' }}>
+          <Box sx={{ px: compact ? 1.3 : 2.5, width: '100%', minWidth: 0 }}>
+            <Typography noWrap sx={{ color: '#07559b', fontWeight: 950, fontSize: compact ? 15 : 'clamp(20px, 3.2vw, 34px)', lineHeight: 1 }}>
               CODIGO ADM: {formatProductAdm(produto.codigoAdm)}
             </Typography>
           </Box>
         </Box>
 
-        <Box sx={{ borderBottom: '2px solid #172033', minWidth: 0 }}>
+        <Box sx={{ borderBottom: '2px solid #172033', minWidth: 0, display: 'grid', placeItems: 'center' }}>
           <Box
             sx={{
-              px: compact ? 1.3 : 2,
+              px: compact ? 1.3 : 2.5,
               py: compact ? 0.45 : 0.7,
               width: '100%',
               minWidth: 0,
@@ -84,28 +84,28 @@ function ProductVerticalPreview({
               gap: compact ? 0.2 : 0.35,
             }}
           >
-            <Typography noWrap sx={{ fontSize: compact ? 10.5 : 'clamp(15px, 2.2vw, 22px)', lineHeight: 1.06 }}>
+            <Typography noWrap sx={{ fontSize: compact ? 10.5 : 'clamp(16px, 2.4vw, 26px)', lineHeight: 1.06 }}>
               <strong>MARCA:</strong> {produto.marca || 'SEM MARCA'}
             </Typography>
-            <Typography noWrap sx={{ fontSize: compact ? 10.5 : 'clamp(15px, 2.2vw, 22px)', lineHeight: 1.06 }}>
+            <Typography noWrap sx={{ fontSize: compact ? 10.5 : 'clamp(16px, 2.4vw, 26px)', lineHeight: 1.06 }}>
               <strong>CODIGO ORIGINAL:</strong> {produto.codigoOriginal || '-'}
             </Typography>
           </Box>
         </Box>
 
         <Box sx={{ minWidth: 0, overflow: 'hidden' }}>
-          <Box sx={{ px: compact ? 1.3 : 2, py: compact ? 0.6 : 1, width: '100%', minWidth: 0 }}>
-            <Typography sx={{ fontSize: compact ? 10.5 : 'clamp(15px, 2.2vw, 22px)', lineHeight: 1.12 }}>
+          <Box sx={{ px: compact ? 1.3 : 2.5, py: compact ? 0.6 : 1.2, width: '100%', minWidth: 0 }}>
+            <Typography sx={{ fontSize: compact ? 10.5 : 'clamp(16px, 2.4vw, 26px)', lineHeight: 1.15 }}>
               <strong>DESCRICAO:</strong> {produto.nome}
             </Typography>
           </Box>
         </Box>
       </Box>
 
-      <Box sx={{ borderTop: '2px solid #172033', display: 'grid', placeItems: 'center', px: compact ? '8%' : '10%', py: compact ? 0.45 : 0.75 }}>
+      <Box sx={{ borderTop: '2px solid #172033', display: 'grid', placeItems: 'center', px: compact ? '8%' : '10%', py: compact ? 0.45 : 1 }}>
         <Box sx={{ width: '100%' }}>
-          <Box sx={{ height: compact ? 34 : 44, backgroundImage: 'repeating-linear-gradient(90deg, #000 0 3px, transparent 3px 6px, #000 6px 8px, transparent 8px 11px)' }} />
-          <Typography textAlign="center" fontWeight={800} letterSpacing={0} fontSize={compact ? 14 : 20} sx={{ fontFamily: 'Arial, sans-serif' }}>
+          <Box sx={{ height: compact ? 34 : 56, backgroundImage: 'repeating-linear-gradient(90deg, #000 0 3px, transparent 3px 6px, #000 6px 9px, transparent 9px 13px)' }} />
+          <Typography textAlign="center" fontWeight={800} letterSpacing={0} fontSize={compact ? 14 : 24} sx={{ fontFamily: 'Arial, sans-serif' }}>
             {selectedBarcode || 'Sem codigo'}
           </Typography>
         </Box>
@@ -131,16 +131,18 @@ export function LabelPreview({ produto, quantidade, labelType = 'UNITARIA' }: La
         Previa aproximada de {total} etiqueta{total > 1 ? 's' : ''} ({barcode.type})
         {isA4Product
           ? ' - 2 por folha A4'
-          : isA4ProductVertical
-            ? ' - 1 por folha A4'
-            : isA4ProductVerticalDouble
-              ? ' - 3 por folha A4 paisagem'
-              : ''}
+          : isA4ProductLandscape
+            ? ' - 1 por folha A4 paisagem'
+            : isA4ProductVertical
+              ? ' - 1 por folha A4'
+              : isA4ProductVerticalDouble
+                ? ' - 3 por folha A4 paisagem'
+                : ''}
       </Typography>
       <Box
         sx={{
           display: 'grid',
-          gridTemplateColumns: isA4Product || isA4ProductVertical || isA4ProductVerticalDouble
+          gridTemplateColumns: isA4Product || isA4ProductLandscape || isA4ProductVertical || isA4ProductVerticalDouble
             ? '1fr'
             : isClosedBox
               ? { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' }

@@ -357,7 +357,7 @@ export default function CriarEtiquetasPage() {
                     <MenuItem value="CAIXA_FECHADA">Caixa fechada 100 x 60 mm</MenuItem>
                     <MenuItem value="A4_PRODUTO">Produto 18 x 11 cm (2 por A4)</MenuItem>
                     <MenuItem value="A4_PRODUTO_LANDSCAPE">Produto grande A4 paisagem (1 por A4)</MenuItem>
-                    <MenuItem value="A4_PRODUTO_VERTICAL">Produto 15 x 21 cm vertical (1 por A4)</MenuItem>
+                    <MenuItem value="A4_PRODUTO_VERTICAL">Produto vertical 20 x 28,7 cm (1 por A4)</MenuItem>
                     <MenuItem value="A4_PRODUTO_VERTICAL_DUPLA">Produto vertical 8 x 14 cm A4 paisagem (3 por A4)</MenuItem>
                   </TextField>
                 </Grid>
@@ -447,7 +447,7 @@ export default function CriarEtiquetasPage() {
                             ? labelType === 'A4_PRODUTO'
                               ? 'Impressao e PDF usam o mesmo arquivo, com duas etiquetas 18 x 11 cm e espacamento de 4 cm. Use Tamanho real ou escala 100%.'
                               : labelType === 'A4_PRODUTO_VERTICAL'
-                                ? 'Impressao e PDF usam o mesmo arquivo, com uma etiqueta vertical 15 x 21 cm, foto em cima e informacoes embaixo. Use Tamanho real ou escala 100%.'
+                                ? 'Impressao e PDF usam o mesmo arquivo, com uma etiqueta vertical 20 x 28,7 cm ocupando praticamente toda a folha A4, foto em cima e informacoes embaixo. Use Tamanho real ou escala 100%.'
                                 : 'Impressao e PDF usam o mesmo arquivo, com tres etiquetas verticais 8 x 14 cm em A4 paisagem. Use Tamanho real ou escala 100%.'
                             : 'Esta impressora vai abrir uma previa visual no navegador. Para Zebra/ZDesigner, a impressao continua direta pelo QZ Tray.'}
                         </Alert>
