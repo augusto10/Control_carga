@@ -44,12 +44,12 @@ function buildProductLabelMarkup(
   produto: ProdutoEtiqueta,
   barcodeSvg: string,
   barcodeValue: string,
-  variant: 'a4-horizontal' | 'a4-vertical' | 'a4-vertical-double' | 'small',
+  variant: 'a4-horizontal' | 'a4-landscape' | 'a4-vertical' | 'a4-vertical-double' | 'small',
   isClosedBox: boolean,
 ) {
-  if (variant === 'a4-horizontal') {
+  if (variant === 'a4-horizontal' || variant === 'a4-landscape') {
     return `
-      <article class="label label-a4">
+      <article class="label ${variant === 'a4-landscape' ? 'label-a4-landscape' : 'label-a4'}">
         <section class="product-details">
           <div class="product-image">
             <span class="image-placeholder">SEM FOTO</span>
@@ -122,10 +122,11 @@ export function printProductLabelsInBrowser(
 
   const isClosedBox = labelType === 'CAIXA_FECHADA';
   const isA4Product = labelType === 'A4_PRODUTO';
+  const isA4ProductLandscape = labelType === 'A4_PRODUTO_LANDSCAPE';
   const isA4ProductVertical = labelType === 'A4_PRODUTO_VERTICAL';
   const isA4ProductVerticalDouble = labelType === 'A4_PRODUTO_VERTICAL_DUPLA';
-  const isBrowserA4Product = isA4Product || isA4ProductVertical || isA4ProductVerticalDouble;
-  const isLandscapeA4 = isA4ProductVerticalDouble;
+  const isBrowserA4Product = isA4Product || isA4ProductLandscape || isA4ProductVertical || isA4ProductVerticalDouble;
+  const isLandscapeA4 = isA4ProductLandscape || isA4ProductVerticalDouble;
   const targetPrinter = printerName.trim() || 'desejada';
   const copiesPerProduct = Math.max(1, Math.floor(options?.copiesPerProduct || 1));
   const previewTitle = options?.previewTitle?.trim() || (outputMode === 'pdf' ? 'Gerar PDF das etiquetas' : 'Previa de etiquetas');
@@ -155,6 +156,8 @@ export function printProductLabelsInBrowser(
 
     const variant = isA4Product
       ? 'a4-horizontal'
+      : isA4ProductLandscape
+        ? 'a4-landscape'
       : isA4ProductVertical
         ? 'a4-vertical'
         : isA4ProductVerticalDouble
@@ -174,7 +177,7 @@ export function printProductLabelsInBrowser(
 
   const total = labelItems.length;
   const labelsHtml = labelItems.join('');
-  const labelsPerSheet = isA4Product ? 2 : isA4ProductVertical ? 1 : isA4ProductVerticalDouble ? 3 : labelItems.length;
+  const labelsPerSheet = isA4Product ? 2 : isA4ProductVertical || isA4ProductLandscape ? 1 : isA4ProductVerticalDouble ? 3 : labelItems.length;
   const totalSheets = isBrowserA4Product ? Math.ceil(labelItems.length / labelsPerSheet) : 1;
   const sheetsHtml = isBrowserA4Product
     ? Array.from({ length: totalSheets }, (_, pageIndex) => {
@@ -271,22 +274,22 @@ export function printProductLabelsInBrowser(
 
           .sheet {
             display: grid;
-            grid-template-columns: ${isA4Product ? '180mm' : isA4ProductVertical ? '150mm' : isA4ProductVerticalDouble ? 'repeat(3, 80mm)' : isClosedBox ? 'repeat(2, 100mm)' : 'repeat(3, 66mm)'};
-            grid-template-rows: ${isA4Product ? 'repeat(2, 110mm)' : isA4ProductVertical ? '210mm' : isA4ProductVerticalDouble ? '140mm' : 'none'};
-            gap: ${isA4Product ? '40mm 0' : isA4ProductVertical ? '0' : isA4ProductVerticalDouble ? '12mm' : '4mm'};
+            grid-template-columns: ${isA4Product ? '180mm' : isA4ProductLandscape ? '287mm' : isA4ProductVertical ? '150mm' : isA4ProductVerticalDouble ? 'repeat(3, 80mm)' : isClosedBox ? 'repeat(2, 100mm)' : 'repeat(3, 66mm)'};
+            grid-template-rows: ${isA4Product ? 'repeat(2, 110mm)' : isA4ProductLandscape ? '200mm' : isA4ProductVertical ? '210mm' : isA4ProductVerticalDouble ? '140mm' : 'none'};
+            gap: ${isA4Product ? '40mm 0' : isA4ProductLandscape || isA4ProductVertical ? '0' : isA4ProductVerticalDouble ? '12mm' : '4mm'};
             justify-content: center;
             align-content: ${isA4ProductVertical || isA4ProductVerticalDouble ? 'center' : 'start'};
             width: ${isLandscapeA4 ? '297mm' : isBrowserA4Product ? '210mm' : 'auto'};
             min-height: ${isLandscapeA4 ? '210mm' : isBrowserA4Product ? '297mm' : 'auto'};
-            padding: ${isA4Product ? '18.5mm 15mm' : isA4ProductVertical ? '43.5mm 30mm' : isA4ProductVerticalDouble ? '35mm 16.5mm' : '10mm'};
+            padding: ${isA4Product ? '18.5mm 15mm' : isA4ProductLandscape ? '5mm' : isA4ProductVertical ? '43.5mm 30mm' : isA4ProductVerticalDouble ? '35mm 16.5mm' : '10mm'};
             border-radius: 18px;
             background: #ffffff;
             box-shadow: 0 24px 60px rgba(15, 23, 42, 0.12);
           }
 
           .label {
-            width: ${isA4Product ? '180mm' : isA4ProductVertical ? '150mm' : isA4ProductVerticalDouble ? '80mm' : isClosedBox ? '100mm' : '66mm'};
-            height: ${isA4Product ? '110mm' : isA4ProductVertical ? '210mm' : isA4ProductVerticalDouble ? '140mm' : isClosedBox ? '60mm' : '44mm'};
+            width: ${isA4Product ? '180mm' : isA4ProductLandscape ? '287mm' : isA4ProductVertical ? '150mm' : isA4ProductVerticalDouble ? '80mm' : isClosedBox ? '100mm' : '66mm'};
+            height: ${isA4Product ? '110mm' : isA4ProductLandscape ? '200mm' : isA4ProductVertical ? '210mm' : isA4ProductVerticalDouble ? '140mm' : isClosedBox ? '60mm' : '44mm'};
             border: 1px solid #94a3b8;
             padding: ${isBrowserA4Product ? '0' : '3mm'};
             display: flex;
@@ -340,6 +343,45 @@ export function printProductLabelsInBrowser(
             display: grid;
             grid-template-rows: 74mm 36mm;
             font-family: "Arial Narrow", "Roboto Condensed", Arial, sans-serif;
+          }
+
+          .label-a4-landscape {
+            border: 0.6mm solid #172033;
+            border-radius: 3mm;
+            overflow: hidden;
+            display: grid;
+            grid-template-rows: 135mm 65mm;
+            font-family: "Arial Narrow", "Roboto Condensed", Arial, sans-serif;
+          }
+
+          .label-a4-landscape .product-details {
+            grid-template-columns: 88mm 1fr;
+          }
+
+          .label-a4-landscape .product-copy {
+            grid-template-rows: 36mm 48mm 51mm;
+          }
+
+          .label-a4-landscape .adm-large {
+            font-size: 42pt;
+          }
+
+          .label-a4-landscape .meta-line,
+          .label-a4-landscape .description {
+            font-size: 26pt;
+          }
+
+          .label-a4-landscape .barcode-large {
+            padding: 2mm 55mm 1mm;
+          }
+
+          .label-a4-landscape .barcode-large svg {
+            max-width: 160mm;
+            max-height: 28mm;
+          }
+
+          .label-a4-landscape .barcode-number {
+            font-size: 30pt;
           }
 
           .product-details {
@@ -630,7 +672,7 @@ export function printProductLabelsInBrowser(
             }
 
             .sheet {
-              padding: ${isA4Product ? '18.5mm 15mm' : isA4ProductVertical ? '43.5mm 30mm' : isA4ProductVerticalDouble ? '35mm 16.5mm' : '0'};
+              padding: ${isA4Product ? '18.5mm 15mm' : isA4ProductLandscape ? '5mm' : isA4ProductVertical ? '43.5mm 30mm' : isA4ProductVerticalDouble ? '35mm 16.5mm' : '0'};
               border-radius: 0;
               box-shadow: none;
             }

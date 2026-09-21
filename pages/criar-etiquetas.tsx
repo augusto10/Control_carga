@@ -89,6 +89,7 @@ export default function CriarEtiquetasPage() {
   const printerIsCompatible = useMemo(() => (printer ? isZplCompatiblePrinter(printer) : false), [printer]);
   const usesBrowserA4Layout =
     labelType === 'A4_PRODUTO'
+    || labelType === 'A4_PRODUTO_LANDSCAPE'
     || labelType === 'A4_PRODUTO_VERTICAL'
     || labelType === 'A4_PRODUTO_VERTICAL_DUPLA';
   const printsDirectlyInZebra = printerIsCompatible && !usesBrowserA4Layout;
@@ -355,6 +356,7 @@ export default function CriarEtiquetasPage() {
                     <MenuItem value="UNITARIA">Produto (3 por linha)</MenuItem>
                     <MenuItem value="CAIXA_FECHADA">Caixa fechada 100 x 60 mm</MenuItem>
                     <MenuItem value="A4_PRODUTO">Produto 18 x 11 cm (2 por A4)</MenuItem>
+                    <MenuItem value="A4_PRODUTO_LANDSCAPE">Produto grande A4 paisagem (1 por A4)</MenuItem>
                     <MenuItem value="A4_PRODUTO_VERTICAL">Produto 15 x 21 cm vertical (1 por A4)</MenuItem>
                     <MenuItem value="A4_PRODUTO_VERTICAL_DUPLA">Produto vertical 8 x 14 cm A4 paisagem (3 por A4)</MenuItem>
                   </TextField>

@@ -36,6 +36,7 @@ import { USER_TYPES } from '@/types/auth-types';
 
 const LABEL_OPTIONS: Array<{ value: LabelType; label: string }> = [
   { value: 'A4_PRODUTO', label: 'Produto 18 x 11 cm (2 por A4)' },
+  { value: 'A4_PRODUTO_LANDSCAPE', label: 'Produto grande A4 paisagem (1 por A4)' },
   { value: 'A4_PRODUTO_VERTICAL', label: 'Produto 15 x 21 cm vertical (1 por A4)' },
   { value: 'A4_PRODUTO_VERTICAL_DUPLA', label: 'Produto vertical 8 x 14 cm A4 paisagem (3 por A4)' },
   { value: 'UNITARIA', label: 'Produto (3 por linha)' },

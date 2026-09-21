@@ -118,6 +118,7 @@ export function LabelPreview({ produto, quantidade, labelType = 'UNITARIA' }: La
   const theme = useTheme();
   const isClosedBox = labelType === 'CAIXA_FECHADA';
   const isA4Product = labelType === 'A4_PRODUTO';
+  const isA4ProductLandscape = labelType === 'A4_PRODUTO_LANDSCAPE';
   const isA4ProductVertical = labelType === 'A4_PRODUTO_VERTICAL';
   const isA4ProductVerticalDouble = labelType === 'A4_PRODUTO_VERTICAL_DUPLA';
   const selectedBarcode = isClosedBox ? produto.codigoBarrasCaixaFechada : produto.codigoBarras;
@@ -148,24 +149,24 @@ export function LabelPreview({ produto, quantidade, labelType = 'UNITARIA' }: La
         }}
       >
         {Array.from({ length: total }).map((_, index) => (
-          isA4Product ? (
+          isA4Product || isA4ProductLandscape ? (
             <Box
               key={index}
               sx={{
                 width: '100%',
-                maxWidth: 720,
+                maxWidth: isA4ProductLandscape ? 1280 : 720,
                 mx: 'auto',
-                aspectRatio: '180 / 110',
+                aspectRatio: isA4ProductLandscape ? '287 / 200' : '180 / 110',
                 border: '2px solid #172033',
                 borderRadius: 2,
                 overflow: 'hidden',
                 bgcolor: '#fff',
                 color: '#111',
                 display: 'grid',
-                gridTemplateRows: '74fr 36fr',
+                gridTemplateRows: isA4ProductLandscape ? '135fr 65fr' : '74fr 36fr',
               }}
             >
-              <Box sx={{ display: 'grid', gridTemplateColumns: '31% 69%', minHeight: 0 }}>
+              <Box sx={{ display: 'grid', gridTemplateColumns: isA4ProductLandscape ? '31% 69%' : '31% 69%', minHeight: 0 }}>
                 <Box
                   sx={{
                     borderRight: '2px solid #172033',
@@ -186,31 +187,31 @@ export function LabelPreview({ produto, quantidade, labelType = 'UNITARIA' }: La
                     />
                   )}
                 </Box>
-                <Box sx={{ display: 'grid', gridTemplateRows: '19fr 25fr 30fr', minWidth: 0 }}>
+                <Box sx={{ display: 'grid', gridTemplateRows: isA4ProductLandscape ? '36fr 48fr 51fr' : '19fr 25fr 30fr', minWidth: 0 }}>
                   <Box sx={{ px: 1.4, display: 'flex', alignItems: 'center', borderBottom: '2px solid #172033' }}>
-                    <Typography sx={{ color: '#07559b', fontWeight: 950, fontSize: 'clamp(17px, 3.2vw, 28px)', lineHeight: 1 }}>
+                    <Typography sx={{ color: '#07559b', fontWeight: 950, fontSize: isA4ProductLandscape ? 'clamp(24px, 4vw, 42px)' : 'clamp(17px, 3.2vw, 28px)', lineHeight: 1 }}>
                       CODIGO ADM: {formatProductAdm(produto.codigoAdm)}
                     </Typography>
                   </Box>
                   <Box sx={{ px: 1.4, py: 0.25, display: 'flex', flexDirection: 'column', justifyContent: 'center', borderBottom: '2px solid #172033', minWidth: 0, gap: 0.15 }}>
-                    <Typography noWrap sx={{ fontSize: 'clamp(14px, 2.3vw, 22px)', lineHeight: 1.05 }}>
+                      <Typography noWrap sx={{ fontSize: isA4ProductLandscape ? 'clamp(18px, 3vw, 30px)' : 'clamp(14px, 2.3vw, 22px)', lineHeight: 1.05 }}>
                       <strong>MARCA:</strong> {produto.marca || 'SEM MARCA'}
                     </Typography>
-                    <Typography noWrap sx={{ fontSize: 'clamp(14px, 2.3vw, 22px)', lineHeight: 1.05 }}>
+                      <Typography noWrap sx={{ fontSize: isA4ProductLandscape ? 'clamp(18px, 3vw, 30px)' : 'clamp(14px, 2.3vw, 22px)', lineHeight: 1.05 }}>
                       <strong>CODIGO ORIGINAL:</strong> {produto.codigoOriginal || '-'}
                     </Typography>
                   </Box>
                   <Box sx={{ px: 1.4, py: 0.25, overflow: 'hidden' }}>
-                    <Typography sx={{ fontSize: 'clamp(14px, 2.3vw, 22px)', lineHeight: 1.1 }}>
+                    <Typography sx={{ fontSize: isA4ProductLandscape ? 'clamp(18px, 3vw, 30px)' : 'clamp(14px, 2.3vw, 22px)', lineHeight: 1.1 }}>
                       <strong>DESCRICAO:</strong> {produto.nome}
                     </Typography>
                   </Box>
                 </Box>
               </Box>
-              <Box sx={{ borderTop: '2px solid #172033', display: 'grid', placeItems: 'center', px: '12%', py: 0.35 }}>
+              <Box sx={{ borderTop: '2px solid #172033', display: 'grid', placeItems: 'center', px: isA4ProductLandscape ? '19%' : '12%', py: 0.35 }}>
                 <Box sx={{ width: '100%' }}>
-                  <Box sx={{ height: 44, backgroundImage: 'repeating-linear-gradient(90deg, #000 0 3px, transparent 3px 6px, #000 6px 8px, transparent 8px 11px)' }} />
-                  <Typography textAlign="center" fontWeight={800} letterSpacing={0} fontSize={20} sx={{ fontFamily: 'Arial, sans-serif' }}>
+                  <Box sx={{ height: isA4ProductLandscape ? 64 : 44, backgroundImage: 'repeating-linear-gradient(90deg, #000 0 3px, transparent 3px 6px, #000 6px 8px, transparent 8px 11px)' }} />
+                  <Typography textAlign="center" fontWeight={800} letterSpacing={0} fontSize={isA4ProductLandscape ? 30 : 20} sx={{ fontFamily: 'Arial, sans-serif' }}>
                     {selectedBarcode || 'Sem codigo'}
                   </Typography>
                 </Box>
