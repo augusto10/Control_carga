@@ -459,7 +459,6 @@ export const isPedidoComPendencias = (
     );
     const erpTotalItens = toNumber(pedido.total_itens_pendentes ?? pedido.TOTAL_ITENS_PENDENTES) || 0;
     if (!erpConfirmaFalta && erpTotalItens <= 0) return false;
-    if (erpTotalItens > 0 && pedido.__origemDashboardLogistica === true) return true;
   }
 
   const statusLogisticoCodigo = toStringValue(
@@ -781,7 +780,7 @@ const isRetiradaConfirmada = (pedido: Record<string, unknown>) => {
   );
 };
 
-const isPedidoPermitidoNoDashboard = (pedido: Record<string, unknown>, logistica?: Record<string, unknown>) => {
+const isPedidoPermitidoNoDashboard = (pedido: Record<string, unknown>, logistica?: Record<string, unknown>, permitirTipoAusente = false) => {
   // Pedidos "retira no ato" nunca aparecem nos cards.
   if (hasEntregaNoAto(pedido, logistica)) return false;
   if (isRetiradaConfirmada(pedido)) return false;
@@ -789,6 +788,7 @@ const isPedidoPermitidoNoDashboard = (pedido: Record<string, unknown>, logistica
 
   const tiposEntrega = getTiposEntrega(pedido, logistica);
   if (tiposEntrega.some(isTipoEntregaRetiraNoAto)) return false;
+  if (tiposEntrega.length === 0) return permitirTipoAusente;
   return tiposEntrega.some((tipo) => ['ENT', 'EPG'].includes(tipo));
 };
 
@@ -803,28 +803,6 @@ const getPedidoId = (pedido: Record<string, unknown>) =>
       pedido.ID ??
       pedido.id
   );
-
-const normalizarPedidoDashboard = (entrada: Record<string, unknown>) => {
-  const pedidoInterno = entrada.pedido && typeof entrada.pedido === 'object'
-    ? (entrada.pedido as Record<string, unknown>)
-    : {};
-
-  return {
-    ...pedidoInterno,
-    ...entrada,
-    pedido_id: entrada.pedido_id ?? pedidoInterno.pedido_id ?? pedidoInterno.ORCAMENTO_ID ?? pedidoInterno.id,
-    tipo_entrega: entrada.tipo_entrega ?? pedidoInterno.tipo_entrega ?? pedidoInterno.TIPO_ENTREGA,
-    TIPO_ENTREGA: entrada.TIPO_ENTREGA ?? pedidoInterno.TIPO_ENTREGA ?? pedidoInterno.tipo_entrega,
-    retirada: entrada.retirada ?? pedidoInterno.retirada,
-    status_logistico: entrada.status_logistico ?? pedidoInterno.status_logistico,
-    status_separacoes: entrada.status_separacoes ?? pedidoInterno.status_separacoes,
-    ultimo_status_separacao: entrada.ultimo_status_separacao ?? pedidoInterno.ultimo_status_separacao,
-    entrega_confirmada: entrada.entrega_confirmada ?? pedidoInterno.entrega_confirmada,
-    ultima_entrega_id: entrada.ultima_entrega_id ?? pedidoInterno.ultima_entrega_id,
-    possui_produtos_faltando: entrada.possui_produtos_faltando ?? pedidoInterno.possui_produtos_faltando,
-    total_itens_pendentes: entrada.total_itens_pendentes ?? pedidoInterno.total_itens_pendentes,
-  } as Record<string, unknown>;
-};
 
 const getNotaDoPedido = (nota: Record<string, unknown>) => {
   const notaFiscal =
@@ -892,12 +870,14 @@ export default async function handler(
   const cacheAtual = getCacheByPeriodo(periodoFiltro.cacheKey);
 
   if (!forceRefresh) {
+    // A tabela local e a fonte preferencial; a API externa alimenta o snapshot.
     const snapshotLocal = await montarDashboardPorSnapshot(periodoFiltro);
     if (snapshotLocal) {
       setCacheByPeriodo(periodoFiltro.cacheKey, snapshotLocal);
       return res.status(200).json(snapshotLocal);
     }
 
+    // Mesmo sem snapshot recente, aproveitamos o cache em memoria antes da API.
     if (cacheAtual && cacheAtual.staleAt > Date.now()) {
       return res.status(200).json({
         ...cacheAtual.payload,
@@ -918,32 +898,38 @@ export default async function handler(
         timings[name] = Date.now() - startedAt;
       }
     };
-    const dashboardExterno = await timed('dashboard_externo', listarDashboardComRetry(
-      {
-        empresa_id: 1,
-        data_inicio: periodoFiltro.dataInicioIso || undefined,
-        data_fim: dataFimDashboard,
-      },
-      username,
-      password,
-      escopoPrincipal ? 10_000 : 8_000
-    ));
-    const pedidosComTipoResult = await timed('pedidos_tipo', getPedidosDashboard(
-      username,
-      password,
-      1500,
-      12_000,
-      {
-        data_inicio: periodoFiltro.dataInicioIso || undefined,
-        data_fim: dataFimDashboard,
-      }
-    ));
-    const [notasCompletasResult, notasEmControles] = await Promise.all([
+    const [dashboardExterno, pedidosComTipoResult, notasCompletasResult, notasEmControles] =
+      await Promise.all([
+      timed('dashboard_externo', listarDashboardComRetry(
+        {
+          empresa_id: 1,
+          data_inicio: periodoFiltro.dataInicioIso || undefined,
+          data_fim: dataFimDashboard,
+        },
+        username,
+        password,
+        escopoPrincipal ? 10_000 : 8_000
+      )),
+      timed('pedidos_tipo', getPedidosDashboard(
+        username,
+        password,
+        escopoPrincipal ? 100 : 500,
+        8_000,
+        {
+          data_inicio: periodoFiltro.dataInicioIso || undefined,
+          data_fim: dataFimDashboard,
+        }
+      )),
       timed(
         'notas_externas',
-        apiExternaService
-          .listarTodasNotasFiscaisCompletas(username, password, escopoPrincipal ? 8_000 : 12_000)
-          .catch(() => [])
+        // Sempre buscar notas externas para poder vincular com controles locais
+        // mesmo em escopo principal, mas com limite menor
+        apiExternaService.listarNotasFiscaisCompletas(
+          { limit: escopoPrincipal ? 100 : 500, offset: 0 },
+          username,
+          password,
+          escopoPrincipal ? 4_000 : 6_000
+        ).catch(() => null) // Se falhar em escopo principal, continua sem notas
       ),
       timed('notas_locais', prisma.notaFiscal.findMany({
         where: {
@@ -996,11 +982,22 @@ export default async function handler(
       throw new Error('api_externa_dashboard_periodo_indisponivel');
     }
 
-    const dashboardEntries = (dashboardExterno.data as Record<string, unknown>[])
-      .map(normalizarPedidoDashboard);
     const pedidosComTipo = pedidosComTipoResult || [];
+    const dashboardEntries = [
+      ...(dashboardExterno.data as Record<string, unknown>[]),
+      ...pedidosComTipo,
+    ].filter((item, index, entries) => {
+      const pedidoId = getPedidoId(item);
+      return !pedidoId || entries.findIndex((candidate) => getPedidoId(candidate) === pedidoId) === index;
+    });
+    const notasCompletas = notasCompletasResult || null;
+    const dashboardPedidoIds = new Set(
+      (dashboardExterno.data as Record<string, unknown>[])
+        .map((item) => getPedidoId(item))
+        .filter((pedidoId): pedidoId is number => Boolean(pedidoId))
+    );
     const tipoEntregaPorPedido = new Map<number, string>();
-    for (const pedidoTipo of pedidosComTipo) {
+    for (const pedidoTipo of pedidosComTipo || []) {
       const pedidoId = getPedidoId(pedidoTipo);
       const tipoEntrega = pickString(
         pedidoTipo.TIPO_ENTREGA,
@@ -1011,7 +1008,13 @@ export default async function handler(
       );
       if (pedidoId && tipoEntrega) tipoEntregaPorPedido.set(pedidoId, tipoEntrega);
     }
-    const notasCompletas = notasCompletasResult || [];
+
+    const totalTiposCorrespondentes = Array.from(dashboardPedidoIds).filter((pedidoId) =>
+      tipoEntregaPorPedido.has(pedidoId)
+    ).length;
+    if (dashboardPedidoIds.size > 0 && totalTiposCorrespondentes === 0) {
+      throw new Error('tipos_pedidos_indisponiveis');
+    }
 
     const notaPorPedido = new Map<number, { numeroNota: string | null; chave: string }>();
     for (const dashboardItem of dashboardExterno.data as Record<string, any>[]) {
@@ -1039,7 +1042,7 @@ export default async function handler(
         notaPorPedido.set(pedidoId, { numeroNota, chave });
       }
     }
-    for (const nota of notasCompletas) {
+    for (const nota of notasCompletas?.data || []) {
       const referencia = getNotaDoPedido(nota);
       if (referencia.pedidoId && !notaPorPedido.has(referencia.pedidoId)) {
         notaPorPedido.set(referencia.pedidoId, referencia);
@@ -1089,7 +1092,7 @@ export default async function handler(
     const pedidosEmbarcadosPorNota = new Set<number>();
     const pedidosEmbarcadosLocais = new Map<number, DashboardPedidoItem>();
 
-    for (const nota of notasCompletas) {
+    for (const nota of notasCompletas?.data || []) {
       const referencia = getNotaDoPedido(nota);
       if (referencia.pedidoId && isNotaEmControle(referencia)) {
         pedidosEmbarcadosPorNota.add(referencia.pedidoId);
@@ -1098,7 +1101,7 @@ export default async function handler(
 
     const notaCompletaPorChave = new Map<string, Record<string, any>>();
     const notaCompletaPorNumero = new Map<string, Record<string, any>>();
-    for (const nota of notasCompletas) {
+    for (const nota of notasCompletas?.data || []) {
       const referencia = getNotaDoPedido(nota);
       if (referencia.chave) notaCompletaPorChave.set(referencia.chave, nota);
       if (referencia.numeroNota) notaCompletaPorNumero.set(normalizeNumeroNota(referencia.numeroNota), nota);
@@ -1121,13 +1124,46 @@ export default async function handler(
       const notaExterna =
         notaCompletaPorChave.get(onlyDigits(notaLocal.codigo)) ||
         notaCompletaPorNumero.get(normalizeNumeroNota(notaLocal.numeroNota));
-      if (!notaExterna) continue;
+      if (!notaExterna) {
+        const numeroNotaLocal = normalizeNumeroNota(notaLocal.numeroNota);
+        const pedidoIdLocal = toNumber(numeroNotaLocal);
+        if (pedidoIdLocal && !pedidosEmbarcadosLocais.has(pedidoIdLocal)) {
+          const controleInfo =
+            getControleInfoByReferencia({
+              numeroNota: notaLocal.numeroNota,
+              chave: onlyDigits(notaLocal.codigo),
+            }) || null;
+          pedidosEmbarcadosLocais.set(pedidoIdLocal, {
+            pedidoId: pedidoIdLocal,
+            tipoEntrega: 'EPG',
+            clienteNome: `Nota fiscal ${notaLocal.numeroNota}`,
+            nomeFantasia: null,
+            valorPedido: null,
+            dataHoraRecebimento: notaLocal.dataCriacao?.toISOString?.() || null,
+            previsaoEntrega: null,
+            localNome: getControleLocalNome(controleInfo),
+            statusCodigo: 'PEDIDOS_EMBARCADOS',
+            statusDescricao: STATUS_META.PEDIDOS_EMBARCADOS.titulo,
+            statusSeparacao: STATUS_META.PEDIDOS_EMBARCADOS.statusSeparacao,
+            situacaoAtual: STATUS_META.PEDIDOS_EMBARCADOS.titulo,
+            usuarioConfirmacaoNome: null,
+            dataHoraConfirmacao: null,
+            dataHoraControle: controleInfo?.dataHoraControle || null,
+            transportadoraNome: controleInfo?.transportadoraNome || null,
+            possuiProdutosFaltando: false,
+            totalItensPendentes: 0,
+            produtosPendentes: [],
+          });
+        }
+        continue;
+      }
 
       const pedidoId = getPedidoId(notaExterna);
       if (!pedidoId) continue;
 
       const tipoEntregaLocal =
         pickString(
+          tipoEntregaPorPedido.get(pedidoId),
           notaExterna.TIPO_ENTREGA,
           notaExterna.tipo_entrega,
           notaExterna.tipoEntrega,
@@ -1135,12 +1171,19 @@ export default async function handler(
           notaExterna.tipo_entrega_descricao
         ) || null;
       if (
-        !isPedidoPermitidoNoDashboard({
-          tipo_entrega: tipoEntregaLocal,
-          TIPO_ENTREGA: tipoEntregaLocal,
-        })
+        !isPedidoPermitidoNoDashboard(
+          {
+            tipo_entrega: tipoEntregaLocal,
+            TIPO_ENTREGA: tipoEntregaLocal,
+          },
+          undefined
+        )
       ) {
         continue;
+      }
+
+      if (dashboardPedidoIds.has(pedidoId)) {
+        pedidosEmbarcadosPorNota.add(pedidoId);
       }
 
       if (!pedidosEmbarcadosLocais.has(pedidoId)) {
@@ -1192,15 +1235,12 @@ export default async function handler(
         async (entry): Promise<EnrichedDashboardEntry | null> => {
           let pedido = entry as Record<string, unknown>;
           const pedidoId = toNumber(pedido.pedido_id);
-          const tipoEntregaLista = pedidoId ? tipoEntregaPorPedido.get(pedidoId) : undefined;
-          if (tipoEntregaLista) {
-            pedido = { ...pedido, tipo_entrega: tipoEntregaLista, TIPO_ENTREGA: tipoEntregaLista };
-          }
           const statusLogistico = (pedido.status_logistico || {}) as Record<string, unknown>;
           let logistica = (pedido.logistica || {}) as Record<string, any>;
           const tipoEntregaInicial = getTipoEntregaPrincipal(pedido, logistica);
+          const tipoEntregaLista = pedidoId ? tipoEntregaPorPedido.get(pedidoId) : undefined;
           const precisaLogisticaDetalhada =
-            !tipoEntregaInicial ||
+            (!tipoEntregaInicial && !tipoEntregaLista) ||
             (hasResumoPendenciaNoPedido(pedido) && !isPedidoSomenteComSeparacaoAberta(pedido));
 
           if (
@@ -1219,12 +1259,20 @@ export default async function handler(
             return null;
           }
 
+          if (tipoEntregaLista) {
+            pedido = {
+              ...pedido,
+              tipo_entrega: tipoEntregaLista,
+              TIPO_ENTREGA: tipoEntregaLista,
+            };
+          }
+
           const previsaoEntrega = toStringValue(pedido.previsao_entrega);
           if (previsaoEntrega && previsaoEntrega.slice(0, 10) > DASHBOARD_PREVISAO_FINAL) {
             return null;
           }
 
-          if (!isPedidoPermitidoNoDashboard(pedido, logistica)) {
+          if (!isPedidoPermitidoNoDashboard(pedido, logistica, !tipoEntregaLista && !tipoEntregaInicial)) {
             return null;
           }
 
@@ -1338,10 +1386,13 @@ export default async function handler(
     for (const entry of [...entradasPendenciasGlobais, ...entradasValidas]) {
       if (
         !entry.possuiPendencia ||
-        !isPedidoPermitidoNoDashboard({
-          tipo_entrega: entry.item.tipoEntrega,
-          TIPO_ENTREGA: entry.item.tipoEntrega,
-        })
+        !isPedidoPermitidoNoDashboard(
+          {
+            tipo_entrega: entry.item.tipoEntrega,
+            TIPO_ENTREGA: entry.item.tipoEntrega,
+          },
+          undefined
+        )
       ) {
         continue;
       }
@@ -1398,11 +1449,9 @@ export default async function handler(
     );
 
     const indicadores: DashboardStatusItem[] = STATUS_ORDER.map((statusCode) => {
-      const pedidosStatus = Array.from(new Map(
-        allEntries
-          .filter((entry) => entry.statusCodigo === statusCode)
-          .map((entry) => [entry.item.pedidoId, entry.item] as const)
-      ).values())
+      const pedidosStatus = allEntries
+        .filter((entry) => entry.statusCodigo === statusCode)
+        .map((entry) => entry.item)
         .sort((a, b) => b.pedidoId - a.pedidoId);
 
       return {
@@ -1446,11 +1495,14 @@ export default async function handler(
     const snapshotFallback = await montarDashboardPorSnapshot(periodoFiltro, {
       warning: 'API externa indisponivel. Exibindo ultima base local sincronizada.',
     });
+
     if (snapshotFallback) {
       setCacheByPeriodo(periodoFiltro.cacheKey, snapshotFallback);
       return res.status(200).json(snapshotFallback);
     }
 
-    return res.status(200).json(getEmptyDashboardPayload('API externa indisponivel. O dashboard sera atualizado quando o servico retornar.'));
+    return res.status(200).json(
+      getEmptyDashboardPayload('API externa indisponivel. O dashboard sera atualizado quando o servico retornar.')
+    );
   }
 }

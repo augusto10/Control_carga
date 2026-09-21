@@ -2,7 +2,7 @@ import { useCurrentDashboard } from '@/hooks/useCurrentDashboard';
 import { resumirPedidosPorStatus } from '@/lib/pedido-resumo-status';
 import { PedidoInformacoes } from '@/components/dashboard/PedidoInformacoes';
 import { ResumoStatusPedidos } from '@/components/dashboard/ResumoStatusPedidos';
-import { saldoPendente, itensComSaldoPendente, codigoAdmDoProduto } from '@/lib/pedido-pendencias';
+import { saldoPendente, itensComSaldoPendente } from '@/lib/pedido-pendencias';
 import { dadosPedido } from '@/lib/pedido-apresentacao';
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useRouter } from 'next/router';
@@ -264,7 +264,7 @@ const EMPTY_RESUMO_HOJE: ResumoHojeData = {
 };
 const DASHBOARD_LOCAL_CACHE_KEY = 'dashboard-logistica-cache-v11';
 // Descarta alertas gravados antes da validacao atual no ERP.
-const DASHBOARD_ALERTAS_LOCAL_CACHE_KEY = 'dashboard-logistica-alertas-cache-v11';
+const DASHBOARD_ALERTAS_LOCAL_CACHE_KEY = 'dashboard-logistica-alertas-cache-v10';
 const DASHBOARD_AUTO_REFRESH_INTERVAL_MS = 3 * 60_000;
 const DASHBOARD_LEGACY_CACHE_KEYS = [
   'dashboard-logistica-cache-v3',
@@ -351,14 +351,6 @@ const getAlertasPeriodo = () => {
     dataFim: formatDateInputValue(dataFim),
   };
 };
-
-const deduplicarPedidosEntrega = (pedidos: DashboardPedidoItem[]) => Array.from(
-  new Map(
-    pedidos
-      .filter((pedido) => ['ENT', 'EPG'].includes(String(pedido.tipoEntrega || '').trim().toUpperCase()))
-      .map((pedido) => [pedido.pedidoId, pedido] as const)
-  ).values()
-);
 
 const buildIndicadoresOrdenados = (dashboard: DashboardLogisticaData | null) => {
   const source = dashboard?.indicadores || [];
@@ -810,7 +802,7 @@ function Home() {
           const quantidade = saldoPendente(item);
           if (quantidade <= 0) return;
           const produtoId = Number(item.PRODUTO_ID ?? item.produto_id);
-          const codigo = codigoAdmDoProduto(item);
+          const codigo = formatText(item.CODIGO_ORIGINAL, formatText(item.CODIGO_BARRAS, '')) || null;
           const nome = formatText(item.PRODUTO_NOME, 'Produto não informado');
           const chave = String(Number.isFinite(produtoId) ? produtoId : codigo || nome);
           const existente = produtos.get(chave);
@@ -909,7 +901,7 @@ function Home() {
 
         return {
           produtoId: typeof item.PRODUTO_ID === 'number' ? item.PRODUTO_ID : null,
-          codigo: codigoAdmDoProduto(item) || '',
+          codigo: formatText(item.CODIGO_ORIGINAL, formatText(item.CODIGO_BARRAS, '')),
           nome: formatText(item.PRODUTO_NOME, 'Produto nao informado'),
           quantidade: saldo,
         };
@@ -923,15 +915,15 @@ function Home() {
     ? pedidoDetalhe.logistica?.notas_fiscais || []
     : [];
   const alertasNaoSeparados = useMemo(
-    () => deduplicarPedidosEntrega(indicadoresAlertasOrdenados.find((item) => item.codigo === 'ALERTAS_NAO_SEPARADOS')?.pedidos || []),
+    () => indicadoresAlertasOrdenados.find((item) => item.codigo === 'ALERTAS_NAO_SEPARADOS')?.pedidos || [],
     [indicadoresAlertasOrdenados]
   );
   const alertasNaoConferidos = useMemo(
-    () => deduplicarPedidosEntrega(indicadoresAlertasOrdenados.find((item) => item.codigo === 'ALERTAS_NAO_CONFERIDOS')?.pedidos || []),
+    () => indicadoresAlertasOrdenados.find((item) => item.codigo === 'ALERTAS_NAO_CONFERIDOS')?.pedidos || [],
     [indicadoresAlertasOrdenados]
   );
   const alertasNaoEmbarcados = useMemo(
-    () => deduplicarPedidosEntrega(indicadoresAlertasOrdenados.find((item) => item.codigo === 'ALERTAS_NAO_EMBARCADOS')?.pedidos || []),
+    () => indicadoresAlertasOrdenados.find((item) => item.codigo === 'ALERTAS_NAO_EMBARCADOS')?.pedidos || [],
     [indicadoresAlertasOrdenados]
   );
   const cardsHome = useMemo(() => ([
@@ -1890,7 +1882,7 @@ function Home() {
                                 {formatText(item.PRODUTO_NOME, 'Produto nao informado')}
                               </p>
                               <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
-                                <span>Cod. ADM: {codigoAdmDoProduto(item) || '-'}</span>
+                                <span>Cod.: {formatText(item.CODIGO_ORIGINAL, formatText(item.CODIGO_BARRAS))}</span>
                                 <span>Qtd.: {formatQuantity(item.QUANTIDADE)}</span>
                                 <span>Baixada: {formatQuantity(item.QUANTIDADE_BAIXADA)}</span>
                                 <span>Saldo: {formatQuantity(item.SALDO)}</span>

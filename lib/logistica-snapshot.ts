@@ -348,14 +348,10 @@ const isPedidoComPendencias = (pedido: Record<string, unknown>, logistica: Recor
   // No consolidado, a flag do ERP e obrigatoria. Itens em separacao nunca
   // devem, por si so, classificar um pedido como produto faltando.
   if (pedido.__origemDashboardLogistica === true) {
-    const totalPendenteErp = toNumber(
-      pedido.total_itens_pendentes ?? pedido.TOTAL_ITENS_PENDENTES
-    ) || 0;
     const confirmadoPeloErp = ['S', 'SIM', 'TRUE', '1'].includes(
       String(pedido.possui_produtos_faltando ?? pedido.POSSUI_PRODUTO_FALTANDO ?? '').trim().toUpperCase()
     );
-    if (totalPendenteErp > 0) return true;
-    if (!confirmadoPeloErp) return false;
+    if (!confirmadoPeloErp || (toNumber(pedido.total_itens_pendentes) || 0) <= 0) return false;
   }
   const statusLogisticoCodigo = toStringValue(
     (pedido.status_logistico as Record<string, unknown> | undefined)?.codigo
@@ -571,38 +567,38 @@ export async function sincronizarLogisticaSnapshot(options: {
   let totalComErro = 0;
 
   try {
-    const controles = await getControleInfoPorNotasLocais();
-    const dashboardExterno = await apiExternaService.listarDashboardLogistica(
-      {
-        empresa_id: 1,
-        data_inicio: options.dataInicioIso || undefined,
-        data_fim: options.dataFimIso || undefined,
-      },
-      options.username,
-      options.password,
-      timeoutMs
-    );
-    const pedidosComTipoResultado = await apiExternaService
-      .listarPedidos(
+    const [dashboardExterno, controles, notasCompletas, pedidosComTipoResultado] = await Promise.all([
+      apiExternaService.listarDashboardLogistica(
         {
+          empresa_id: 1,
           data_inicio: options.dataInicioIso || undefined,
           data_fim: options.dataFimIso || undefined,
-          limit: options.limit || 500,
-          offset: 0,
         },
         options.username,
         options.password,
-        8_000
-      )
-      .catch(() => null);
-    const notasCompletas = await apiExternaService
-      .listarTodasNotasFiscaisCompletas(options.username, options.password, 12_000)
-      .catch(() => []);
+        timeoutMs
+      ),
+      getControleInfoPorNotasLocais(),
+      apiExternaService
+        .listarNotasFiscaisCompletas({ limit: 100, offset: 0 }, options.username, options.password, 6_000)
+        .catch(() => null),
+      apiExternaService
+        .listarPedidos(
+          { data_inicio: options.dataInicioIso || undefined, data_fim: options.dataFimIso || undefined, limit: options.limit || 500, offset: 0 },
+          options.username,
+          options.password,
+          8_000
+        )
+        .catch(() => null),
+    ]);
 
+    // A rota consolidada ja traz os pedidos operacionais. A rota /pedidos
+    // rejeita filtros de data na API atual e nao deve bloquear o cron.
     const pedidosComTipo = ((pedidosComTipoResultado?.data || []) as Record<string, unknown>[]);
+
     const entradas: Record<string, unknown>[] = [
       ...((dashboardExterno?.data || []) as Record<string, unknown>[]).map(normalizarPedidoConsolidado),
-      ...pedidosComTipo,
+      ...((pedidosComTipo || []) as Record<string, unknown>[]),
     ].filter((item, index, entries) => {
       const pedidoId = getPedidoId(item);
       return Boolean(pedidoId) && entries.findIndex((candidate) => getPedidoId(candidate) === pedidoId) === index;
@@ -622,28 +618,18 @@ export async function sincronizarLogisticaSnapshot(options: {
     const existentePorPedido = new Map<number, { tipoEntrega: string | null; assinatura: string }>(
       existentes.map((item: { pedidoId: number; tipoEntrega: string | null; assinatura: string }) => [item.pedidoId, item])
     );
+
+    const notaPorPedido = new Map<number, { numeroNota: string | null; chave: string }>();
+    for (const nota of notasCompletas?.data || []) {
+      const referencia = getNotaDoPedido(nota);
+      if (referencia.pedidoId) notaPorPedido.set(referencia.pedidoId, referencia);
+    }
+
     const tipoEntregaPorPedido = new Map<number, string>();
-    for (const pedido of pedidosComTipo) {
+    for (const pedido of pedidosComTipo || []) {
       const pedidoId = getPedidoId(pedido);
       const tipoEntrega = getTipoEntregaPrincipal(pedido, null);
       if (pedidoId && tipoEntrega) tipoEntregaPorPedido.set(pedidoId, tipoEntrega);
-    }
-
-    const notaPorPedido = new Map<number, { numeroNota: string | null; chave: string; numerosNotas: string[] }>();
-    for (const nota of notasCompletas) {
-      const referencia = getNotaDoPedido(nota);
-      if (!referencia.pedidoId) continue;
-      const atual = notaPorPedido.get(referencia.pedidoId) || {
-        numeroNota: null,
-        chave: '',
-        numerosNotas: [],
-      };
-      if (referencia.numeroNota && !atual.numerosNotas.includes(referencia.numeroNota)) {
-        atual.numerosNotas.push(referencia.numeroNota);
-      }
-      if (!atual.numeroNota) atual.numeroNota = referencia.numeroNota;
-      if (!atual.chave) atual.chave = referencia.chave;
-      notaPorPedido.set(referencia.pedidoId, atual);
     }
 
     let detalhesUsados = 0;
@@ -661,14 +647,12 @@ export async function sincronizarLogisticaSnapshot(options: {
       }
       const statusLogisticoInicial = ((pedido.status_logistico || {}) as Record<string, unknown>) || {};
       const statusInicial = deriveDashboardStatus(pedido, statusLogisticoInicial, logistica);
-      const totalPendenteInformado = toNumber(
-        pedido.total_itens_pendentes ?? pedido.TOTAL_ITENS_PENDENTES
-      ) || 0;
       const pendenciaConfirmadaNoConsolidado =
         pedido.__origemDashboardLogistica === true &&
-        (['S', 'SIM', 'TRUE', '1'].includes(
+        ['S', 'SIM', 'TRUE', '1'].includes(
           String(pedido.possui_produtos_faltando ?? pedido.POSSUI_PRODUTO_FALTANDO ?? '').trim().toUpperCase()
-        ) && totalPendenteInformado > 0);
+        ) &&
+        (toNumber(pedido.total_itens_pendentes) || 0) > 0;
       const referenciaInicialDireta = getNotaReferencia(pedido, logistica);
       const referenciaInicial =
         referenciaInicialDireta.numeroNota || referenciaInicialDireta.chave.length === 44
@@ -684,9 +668,13 @@ export async function sincronizarLogisticaSnapshot(options: {
 
       if (precisaDetalhe && detalhesUsados < maxDetalhes) {
         detalhesUsados += 1;
-        const detalhe = await apiExternaService.buscarPedidoLogistica(pedidoId, options.username, options.password, 15_000);
+        const detalhe = await apiExternaService.buscarPedidoLogistica(pedidoId, options.username, options.password, 4_000);
         if (detalhe) logistica = { ...logistica, ...detalhe };
         else totalComErro += 1;
+      }
+
+      if (tipoEntregaLista) {
+        pedido = { ...pedido, tipo_entrega: tipoEntregaLista, TIPO_ENTREGA: tipoEntregaLista };
       }
 
       if (!isPedidoPermitidoNoDashboard(pedido, logistica, pedido.__origemDashboardLogistica === true)) return null;
@@ -709,14 +697,9 @@ export async function sincronizarLogisticaSnapshot(options: {
         referenciaDireta.numeroNota || referenciaDireta.chave.length === 44
           ? referenciaDireta
           : notaPorPedido.get(pedidoId) || referenciaDireta;
-      const numerosNotas = notaPorPedido.get(pedidoId)?.numerosNotas ||
-        (referenciaNota.numeroNota ? [referenciaNota.numeroNota] : []);
-      const controlePorNumero = numerosNotas
-        .map((numero) => controles.porNumero.get(normalizeNumeroNota(numero)))
-        .find(Boolean) || null;
       const controleInfo =
         (referenciaNota.chave.length === 44 ? controles.porChave.get(referenciaNota.chave) : null) ||
-        controlePorNumero ||
+        (referenciaNota.numeroNota ? controles.porNumero.get(normalizeNumeroNota(referenciaNota.numeroNota)) : null) ||
         null;
       const dataHoraRecebimento = parsePedidoDate(
         pedido.data_hora_recebimento ?? pedido.DATA_HORA_RECEBIMENTO ?? pedido.DATA_RECEBIMENTO
@@ -740,7 +723,6 @@ export async function sincronizarLogisticaSnapshot(options: {
         totalItensPendentes,
         produtosPendentes,
         numeroNota: referenciaNota.numeroNota,
-        numerosNotas,
         chave: referenciaNota.chave,
         controleInfo,
       });
@@ -764,7 +746,6 @@ export async function sincronizarLogisticaSnapshot(options: {
         usuarioConfirmacaoNome: toStringValue(statusLogistico.usuario_confirmacao_nome),
         dataHoraConfirmacao,
         numeroNota: referenciaNota.numeroNota,
-        numerosNotas,
         chaveNfe: referenciaNota.chave || null,
         embarcadoNoControle: Boolean(controleInfo),
         numeroManifesto: controleInfo?.numeroManifesto || null,
@@ -928,7 +909,7 @@ export async function montarDashboardPorSnapshot(
     // O registro sincronizado ja foi validado contra a flag do ERP e os itens
     // detalhados. Nao reinterpretamos saldos durante a leitura do card.
     const resumoIndicaPendencia =
-      ['S', 'SIM', 'TRUE', '1'].includes(String(rawPedido.possui_produtos_faltando ?? rawPedido.POSSUI_PRODUTO_FALTANDO ?? '').trim().toUpperCase()) ||
+      ['S', 'SIM', 'TRUE', '1'].includes(String(rawPedido.possui_produtos_faltando ?? rawPedido.POSSUI_PRODUTO_FALTANDO ?? '').trim().toUpperCase()) &&
       (toNumber(rawPedido.total_itens_pendentes ?? rawPedido.TOTAL_ITENS_PENDENTES) || 0) > 0;
     const possuiPendencia =
       resumoIndicaPendencia &&
