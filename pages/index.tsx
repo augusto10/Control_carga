@@ -2,7 +2,7 @@ import { useCurrentDashboard } from '@/hooks/useCurrentDashboard';
 import { resumirPedidosPorStatus } from '@/lib/pedido-resumo-status';
 import { PedidoInformacoes } from '@/components/dashboard/PedidoInformacoes';
 import { ResumoStatusPedidos } from '@/components/dashboard/ResumoStatusPedidos';
-import { saldoPendente, itensComSaldoPendente } from '@/lib/pedido-pendencias';
+import { saldoPendente, itensComSaldoPendente, codigoAdmDoProduto } from '@/lib/pedido-pendencias';
 import { dadosPedido } from '@/lib/pedido-apresentacao';
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useRouter } from 'next/router';
@@ -810,7 +810,7 @@ function Home() {
           const quantidade = saldoPendente(item);
           if (quantidade <= 0) return;
           const produtoId = Number(item.PRODUTO_ID ?? item.produto_id);
-          const codigo = formatText(item.CODIGO_ORIGINAL, formatText(item.CODIGO_BARRAS, '')) || null;
+          const codigo = codigoAdmDoProduto(item);
           const nome = formatText(item.PRODUTO_NOME, 'Produto não informado');
           const chave = String(Number.isFinite(produtoId) ? produtoId : codigo || nome);
           const existente = produtos.get(chave);
@@ -909,7 +909,7 @@ function Home() {
 
         return {
           produtoId: typeof item.PRODUTO_ID === 'number' ? item.PRODUTO_ID : null,
-          codigo: formatText(item.CODIGO_ORIGINAL, formatText(item.CODIGO_BARRAS, '')),
+          codigo: codigoAdmDoProduto(item) || '',
           nome: formatText(item.PRODUTO_NOME, 'Produto nao informado'),
           quantidade: saldo,
         };
@@ -1890,7 +1890,7 @@ function Home() {
                                 {formatText(item.PRODUTO_NOME, 'Produto nao informado')}
                               </p>
                               <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
-                                <span>Cod.: {formatText(item.CODIGO_ORIGINAL, formatText(item.CODIGO_BARRAS))}</span>
+                                <span>Cod. ADM: {codigoAdmDoProduto(item) || '-'}</span>
                                 <span>Qtd.: {formatQuantity(item.QUANTIDADE)}</span>
                                 <span>Baixada: {formatQuantity(item.QUANTIDADE_BAIXADA)}</span>
                                 <span>Saldo: {formatQuantity(item.SALDO)}</span>

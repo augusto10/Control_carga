@@ -4,7 +4,6 @@ import { saldoPendente, itensComSaldoPendente, pedidoTemDevolucao, pedidoTemEntr
 import type { Prisma } from '@prisma/client';
 import prisma from '@/lib/prisma';
 import { apiExternaService } from '@/services/api-externa';
-import { getPedidosDashboard } from '@/lib/dashboard-external-cache';
 
 const STATUS_ORDER = [
   'PEDIDO_NOVO',
@@ -583,54 +582,52 @@ export async function sincronizarLogisticaSnapshot(options: {
       options.password,
       timeoutMs
     );
-    const pedidosComTipoResultado = await getPedidosDashboard(
-      options.username,
-      options.password,
-      options.limit || 1500,
-      12_000,
-      { data_inicio: options.dataInicioIso || undefined, data_fim: options.dataFimIso || undefined }
-    );
+    const pedidosComTipoResultado = await apiExternaService
+      .listarPedidos(
+        {
+          data_inicio: options.dataInicioIso || undefined,
+          data_fim: options.dataFimIso || undefined,
+          limit: options.limit || 500,
+          offset: 0,
+        },
+        options.username,
+        options.password,
+        8_000
+      )
+      .catch(() => null);
     const notasCompletas = await apiExternaService
       .listarTodasNotasFiscaisCompletas(options.username, options.password, 12_000)
       .catch(() => []);
 
-    const entradasPorPedido = new Map<number, Record<string, unknown>>();
-    for (const item of (dashboardExterno?.data || []) as Record<string, unknown>[]) {
-      const normalizado = normalizarPedidoConsolidado(item);
-      const pedidoId = getPedidoId(normalizado);
-      if (pedidoId) entradasPorPedido.set(pedidoId, normalizado);
-    }
-    const entradas = Array.from(entradasPorPedido.values());
-
-    for (const item of (pedidosComTipoResultado || []) as Record<string, unknown>[]) {
+    const pedidosComTipo = ((pedidosComTipoResultado?.data || []) as Record<string, unknown>[]);
+    const entradas: Record<string, unknown>[] = [
+      ...((dashboardExterno?.data || []) as Record<string, unknown>[]).map(normalizarPedidoConsolidado),
+      ...pedidosComTipo,
+    ].filter((item, index, entries) => {
       const pedidoId = getPedidoId(item);
-      const tipoEntrega = getTipoEntregaPrincipal(item, null);
-      const atual = pedidoId ? entradasPorPedido.get(pedidoId) : null;
-      if (pedidoId && atual && tipoEntrega) {
-        entradasPorPedido.set(pedidoId, {
-          ...atual,
-          tipo_entrega: tipoEntrega,
-          TIPO_ENTREGA: tipoEntrega,
-        });
-      }
-    }
+      return Boolean(pedidoId) && entries.findIndex((candidate) => getPedidoId(candidate) === pedidoId) === index;
+    });
 
-    const entradasComTipo = Array.from(entradasPorPedido.values());
-
-    if (!dashboardExterno) {
-      throw new Error('API externa retornou indisponibilidade no dashboard logistico');
+    if (!dashboardExterno && pedidosComTipo.length === 0) {
+      throw new Error('API externa retornou indisponibilidade nas consultas de dashboard e pedidos');
     }
 
     // O dashboard consolidado nem sempre inclui tipo de entrega. Preservamos
     // o ultimo tipo conhecido enquanto a lista geral do ERP estiver lenta,
     // em vez de sobrescrever ENT/EPG com vazio e perder o pedido no alerta.
     const existentes = await (prisma as any).pedidoLogisticaSnapshot.findMany({
-      where: { pedidoId: { in: entradasComTipo.map((entrada) => getPedidoId(entrada)).filter(Boolean) as number[] } },
+      where: { pedidoId: { in: entradas.map((entrada) => getPedidoId(entrada)).filter(Boolean) as number[] } },
       select: { pedidoId: true, tipoEntrega: true, assinatura: true },
     });
     const existentePorPedido = new Map<number, { tipoEntrega: string | null; assinatura: string }>(
       existentes.map((item: { pedidoId: number; tipoEntrega: string | null; assinatura: string }) => [item.pedidoId, item])
     );
+    const tipoEntregaPorPedido = new Map<number, string>();
+    for (const pedido of pedidosComTipo) {
+      const pedidoId = getPedidoId(pedido);
+      const tipoEntrega = getTipoEntregaPrincipal(pedido, null);
+      if (pedidoId && tipoEntrega) tipoEntregaPorPedido.set(pedidoId, tipoEntrega);
+    }
 
     const notaPorPedido = new Map<number, { numeroNota: string | null; chave: string; numerosNotas: string[] }>();
     for (const nota of notasCompletas) {
@@ -650,15 +647,16 @@ export async function sincronizarLogisticaSnapshot(options: {
     }
 
     let detalhesUsados = 0;
-    const snapshots = await mapWithConcurrency(entradasComTipo, 10, async (entry) => {
+    const snapshots = await mapWithConcurrency(entradas, 10, async (entry) => {
       const pedidoId = getPedidoId(entry);
       if (!pedidoId) return null;
 
       let pedido = entry;
       let logistica = ((pedido.logistica as Record<string, any> | undefined) || {}) as Record<string, any>;
+      const tipoEntregaLista = tipoEntregaPorPedido.get(pedidoId);
       const tipoEntregaAnterior = existentePorPedido.get(pedidoId)?.tipoEntrega || null;
-      if (!getTipoEntregaPrincipal(pedido, logistica) && tipoEntregaAnterior) {
-        const tipoEntrega = tipoEntregaAnterior;
+      if (!getTipoEntregaPrincipal(pedido, logistica) && (tipoEntregaLista || tipoEntregaAnterior)) {
+        const tipoEntrega = tipoEntregaLista || tipoEntregaAnterior;
         pedido = { ...pedido, tipo_entrega: tipoEntrega, TIPO_ENTREGA: tipoEntrega };
       }
       const statusLogisticoInicial = ((pedido.status_logistico || {}) as Record<string, unknown>) || {};
@@ -670,7 +668,7 @@ export async function sincronizarLogisticaSnapshot(options: {
         pedido.__origemDashboardLogistica === true &&
         (['S', 'SIM', 'TRUE', '1'].includes(
           String(pedido.possui_produtos_faltando ?? pedido.POSSUI_PRODUTO_FALTANDO ?? '').trim().toUpperCase()
-        ) || totalPendenteInformado > 0);
+        ) && totalPendenteInformado > 0);
       const referenciaInicialDireta = getNotaReferencia(pedido, logistica);
       const referenciaInicial =
         referenciaInicialDireta.numeroNota || referenciaInicialDireta.chave.length === 44
@@ -811,7 +809,7 @@ export async function sincronizarLogisticaSnapshot(options: {
         chave: syncKey,
         dataInicio,
         dataFim,
-        totalLidos: entradasComTipo.length,
+        totalLidos: entradas.length,
         totalAtualizados: alterados.length,
         totalComErro,
         ultimoErro: null,
@@ -819,7 +817,7 @@ export async function sincronizarLogisticaSnapshot(options: {
       update: {
         dataInicio,
         dataFim,
-        totalLidos: entradasComTipo.length,
+        totalLidos: entradas.length,
         totalAtualizados: alterados.length,
         totalComErro,
         ultimoErro: null,
