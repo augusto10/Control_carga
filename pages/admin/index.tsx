@@ -62,57 +62,18 @@ function AdminDashboardContent() {
       const resumo = await resumoRes.json();
 
       const statsData: DashboardStats = {
-        totalUsuarios: 0,
-        usuariosAtivos: 0,
-        totalControles: 0,
-        controlesFinalizados: 0,
-        controlesPendentes: 0,
-        pedidosHoje: 0,
-        pedidosMes: 0,
-        ultimosUsuarios: []
+        totalUsuarios: Number(resumo.totalUsuarios || 0),
+        usuariosAtivos: Number(resumo.usuariosAtivos || 0),
+        totalControles: Number(resumo.totalControles || 0),
+        controlesFinalizados: Math.max(
+          Number(resumo.totalControles || 0) - Number(resumo.controlesPendentes || 0),
+          0
+        ),
+        controlesPendentes: Number(resumo.controlesPendentes || 0),
+        pedidosHoje: Number(resumo.pedidosHoje || 0),
+        pedidosMes: Number(resumo.pedidosMes || 0),
+        ultimosUsuarios: Array.isArray(resumo.ultimosUsuarios) ? resumo.ultimosUsuarios : []
       };
-
-      if (usuariosRes.ok) {
-        const usuarios = await usuariosRes.json();
-        statsData.totalUsuarios = usuarios.length;
-        statsData.usuariosAtivos = usuarios.filter((u: any) => u.ativo).length;
-        statsData.ultimosUsuarios = usuarios
-          .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-          .slice(0, 5)
-          .map((u: any) => ({
-            id: u.id,
-            nome: u.nome,
-            email: u.email,
-            ultimoAcesso: u.updatedAt
-          }));
-      }
-
-      if (controlesRes.ok) {
-        const controles = await controlesRes.json();
-        statsData.totalControles = controles.length;
-        statsData.controlesFinalizados = controles.filter((c: any) => c.finalizado).length;
-        statsData.controlesPendentes = controles.filter((c: any) => !c.finalizado).length;
-      }
-
-      if (pedidosHojeRes.ok) {
-        const data = await pedidosHojeRes.json();
-        if (data.error) {
-          console.error('[Dashboard] Erro ao carregar pedidos de hoje:', data.error);
-          statsData.pedidosHoje = 0;
-        } else {
-          statsData.pedidosHoje = Number(data.total || 0);
-        }
-      }
-
-      if (pedidosMesRes.ok) {
-        const data = await pedidosMesRes.json();
-        if (data.error) {
-          console.error('[Dashboard] Erro ao carregar pedidos do mês:', data.error);
-          statsData.pedidosMes = 0;
-        } else {
-          statsData.pedidosMes = Number(data.total || 0);
-        }
-      }
 
       setStats(statsData);
     } catch (error) {

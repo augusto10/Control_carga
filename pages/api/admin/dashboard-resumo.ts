@@ -221,13 +221,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       prisma.controleCarga.count(),
       prisma.controleCarga.count({ where: { finalizado: false } }),
       prisma.usuario.findMany({
-        orderBy: { createdAt: 'desc' },
+        orderBy: { dataCriacao: 'desc' },
         take: 5,
         select: {
           id: true,
           nome: true,
           email: true,
-          updatedAt: true
+          ultimoAcesso: true
         }
       }),
       calcularPedidosResumo(agora)
@@ -244,7 +244,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         id: usuario.id,
         nome: usuario.nome,
         email: usuario.email,
-        ultimoAcesso: usuario.updatedAt ? usuario.updatedAt.toISOString() : null
+        ultimoAcesso: usuario.ultimoAcesso ? usuario.ultimoAcesso.toISOString() : null
       }))
     };
 
