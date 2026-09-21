@@ -349,15 +349,27 @@ const agruparProdutosPendentes = (itens: Record<string, any>[]) => {
 const getProdutosPendentes = (logistica: Record<string, any> | null) =>
   agruparProdutosPendentes(itensComSaldoPendente(logistica) || []);
 
+// Le a flag oficial do ERP (`possui_produtos_faltando`) em qualquer variante que
+// o consolidado devolva. E ela que autoriza buscar o detalhe do pedido para
+// descobrir a quantidade de itens faltando, independente do total pendente.
+export const possuiProdutosFaltandoNoConsolidado = (pedido: Record<string, unknown>) =>
+  ['S', 'SIM', 'TRUE', '1'].includes(
+    String(
+      pedido.possui_produtos_faltando ??
+        pedido.POSSUI_PRODUTOS_FALTANDO ??
+        pedido.POSSUI_PRODUTO_FALTANDO ??
+        ''
+    )
+      .trim()
+      .toUpperCase()
+  );
+
 const isPedidoComPendencias = (pedido: Record<string, unknown>, logistica: Record<string, any> | null) => {
   if (pedidoTemDevolucao(pedido, logistica)) return false;
   // No consolidado, a flag do ERP e obrigatoria. Itens em separacao nunca
   // devem, por si so, classificar um pedido como produto faltando.
   if (pedido.__origemDashboardLogistica === true) {
-    const confirmadoPeloErp = ['S', 'SIM', 'TRUE', '1'].includes(
-      String(pedido.possui_produtos_faltando ?? pedido.POSSUI_PRODUTOS_FALTANDO ?? pedido.POSSUI_PRODUTO_FALTANDO ?? '').trim().toUpperCase()
-    );
-    if (!confirmadoPeloErp) return false;
+    if (!possuiProdutosFaltandoNoConsolidado(pedido)) return false;
   }
   const statusLogisticoCodigo = toStringValue(
     (pedido.status_logistico as Record<string, unknown> | undefined)?.codigo
@@ -659,12 +671,12 @@ export async function sincronizarLogisticaSnapshot(options: {
       }
       const statusLogisticoInicial = ((pedido.status_logistico || {}) as Record<string, unknown>) || {};
       const statusInicial = deriveDashboardStatus(pedido, statusLogisticoInicial, logistica);
+      // A flag do ERP ja confirma a pendencia. Exigir total_itens_pendentes > 0
+      // aqui deixava o card sem quantidade quando o consolidado mandava a flag
+      // ligada com o total zerado - o detalhe e a unica fonte dos itens.
       const pendenciaConfirmadaNoConsolidado =
         pedido.__origemDashboardLogistica === true &&
-        ['S', 'SIM', 'TRUE', '1'].includes(
-          String(pedido.possui_produtos_faltando ?? pedido.POSSUI_PRODUTO_FALTANDO ?? '').trim().toUpperCase()
-        ) &&
-        (toNumber(pedido.total_itens_pendentes) || 0) > 0;
+        possuiProdutosFaltandoNoConsolidado(pedido);
       const referenciaInicialDireta = getNotaReferencia(pedido, logistica);
       const referenciaInicial =
         referenciaInicialDireta.numeroNota || referenciaInicialDireta.chave.length === 44
@@ -918,13 +930,10 @@ export async function montarDashboardPorSnapshot(
     const controleAtual = embarques.porPedido.get(snapshot.pedidoId);
     const embarcadoNoControle = Boolean(controleAtual || snapshot.embarcadoNoControle);
     const numeroManifesto = controleAtual?.numeroManifesto || snapshot.numeroManifesto;
-    const possuiProdutosFaltandoApi = ['S', 'SIM', 'TRUE', '1'].includes(
-      String(rawPedido.possui_produtos_faltando ?? rawPedido.POSSUI_PRODUTOS_FALTANDO ?? rawPedido.POSSUI_PRODUTO_FALTANDO ?? '').trim().toUpperCase()
-    );
-    const possuiPendencia =
-      possuiProdutosFaltandoApi &&
-      snapshot.possuiPendencia === true &&
-      (Array.isArray(snapshot.produtosPendentes) || snapshot.totalItensPendentes > 0);
+    const possuiProdutosFaltandoApi = possuiProdutosFaltandoNoConsolidado(rawPedido);
+    // A flag do ERP basta para o card aparecer: se o detalhe nao trouxe itens,
+    // mostramos a quantidade do consolidado em vez de esconder a pendencia.
+    const possuiPendencia = possuiProdutosFaltandoApi && snapshot.possuiPendencia === true;
     const produtosPendentes = possuiPendencia && Array.isArray(snapshot.produtosPendentes)
       ? snapshot.produtosPendentes
       : [];

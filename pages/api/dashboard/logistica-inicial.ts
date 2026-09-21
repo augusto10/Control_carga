@@ -364,13 +364,26 @@ const isPedidoEmpresa1Recebido = (pedido: Record<string, unknown>) => {
   return empresaId === 1 && isPedidoRecebido(pedido);
 };
 
+// Le a flag oficial do ERP (`possui_produtos_faltando`) em qualquer variante que
+// o consolidado devolva. E ela que autoriza buscar o detalhe do pedido para
+// descobrir a quantidade de itens faltando, independente do total pendente.
+const possuiProdutosFaltandoNoConsolidado = (pedido: Record<string, unknown>) =>
+  ['S', 'SIM', 'TRUE', '1'].includes(
+    String(
+      pedido.possui_produtos_faltando ??
+        pedido.POSSUI_PRODUTOS_FALTANDO ??
+        pedido.POSSUI_PRODUTO_FALTANDO ??
+        ''
+    )
+      .trim()
+      .toUpperCase()
+  );
+
 const hasResumoPendenciaNoPedido = (pedido: Record<string, unknown>) =>
   (toNumber(pedido.total_itens_pendentes ?? pedido.TOTAL_ITENS_PENDENTES) || 0) > 0 ||
   (toNumber(pedido.itens_em_separacao) || 0) > 0 ||
   (toNumber(pedido.quantidade_em_separacao_total) || 0) > 0 ||
-  ['S', 'SIM', 'TRUE', '1'].includes(
-    String(pedido.possui_produtos_faltando ?? pedido.POSSUI_PRODUTO_FALTANDO ?? '').trim().toUpperCase()
-  );
+  possuiProdutosFaltandoNoConsolidado(pedido);
 
 const isPedidoSomenteComSeparacaoAberta = (pedido: Record<string, unknown>) => {
   const ultimoStatus = toStringValue(pedido.ultimo_status_separacao)?.trim().toUpperCase() || null;
@@ -454,9 +467,7 @@ export const isPedidoComPendencias = (
     pedido.POSSUI_PRODUTOS_FALTANDO ??
     pedido.POSSUI_PRODUTO_FALTANDO;
   if (campoErpFaltando !== undefined && campoErpFaltando !== null && campoErpFaltando !== '') {
-    const erpConfirmaFalta = ['S', 'SIM', 'TRUE', '1'].includes(
-      String(campoErpFaltando).trim().toUpperCase()
-    );
+    const erpConfirmaFalta = possuiProdutosFaltandoNoConsolidado(pedido);
     const erpTotalItens = toNumber(pedido.total_itens_pendentes ?? pedido.TOTAL_ITENS_PENDENTES) || 0;
     if (!erpConfirmaFalta && erpTotalItens <= 0) return false;
   }
@@ -1255,6 +1266,9 @@ export default async function handler(
           const tipoEntregaLista = pedidoId ? tipoEntregaPorPedido.get(pedidoId) : undefined;
           const precisaLogisticaDetalhada =
             (!tipoEntregaInicial && !tipoEntregaLista) ||
+            // Flag do ERP manda sozinha: mesmo com separacao aberta ou total
+            // zerado, so o /logistica diz quantos itens faltam.
+            possuiProdutosFaltandoNoConsolidado(pedido) ||
             (hasResumoPendenciaNoPedido(pedido) && !isPedidoSomenteComSeparacaoAberta(pedido));
 
           if (
