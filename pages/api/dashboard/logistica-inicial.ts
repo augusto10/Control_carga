@@ -551,26 +551,40 @@ const shouldOcultarPedidoNoCardSeparado = (
 
 // Helper: verifica se o pedido deve aparecer nos alertas.
 // Pedidos de dias anteriores entram sempre.
-// Pedidos do dia atual entram somente depois que o horario de corte passar
-// e apenas se tiverem sido recebidos antes de 16:01.
+// Pedidos do dia atual entram somente depois das 16:00.
 const isPedidoParaAlerta = (pedido: Record<string, unknown>): boolean => {
   const dataHoraRecebimento = getPedidoDataHoraRecebimento(pedido);
   if (!dataHoraRecebimento) return true; // Se não tem data, considera para alerta
 
-  const agora = new Date();
-  const hoje = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate());
-  const corte16h01 = new Date(hoje);
-  corte16h01.setHours(16, 1, 0, 0);
+  const agoraPartes = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(new Date()).reduce<Record<string, string>>((resultado, parte) => {
+    resultado[parte.type] = parte.value;
+    return resultado;
+  }, {});
+  const recebimentoPartes = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(dataHoraRecebimento).reduce<Record<string, string>>((resultado, parte) => {
+    resultado[parte.type] = parte.value;
+    return resultado;
+  }, {});
+  const hoje = `${agoraPartes.year}-${agoraPartes.month}-${agoraPartes.day}`;
+  const dataRecebimento = `${recebimentoPartes.year}-${recebimentoPartes.month}-${recebimentoPartes.day}`;
 
-  if (dataHoraRecebimento < hoje) {
-    return true;
-  }
+  if (dataRecebimento < hoje) return true;
+  if (dataRecebimento > hoje) return false;
 
-  if (agora < corte16h01) {
-    return false;
-  }
-
-  return dataHoraRecebimento < corte16h01;
+  const minutosAtuais = Number(agoraPartes.hour || 0) * 60 + Number(agoraPartes.minute || 0);
+  return minutosAtuais >= 16 * 60;
 };
 
 // Helper: deriva o status de alerta baseado no status de separação

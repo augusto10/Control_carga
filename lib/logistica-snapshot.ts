@@ -200,7 +200,13 @@ const normalizarPedidoConsolidado = (entrada: Record<string, unknown>) => {
     ultimo_status_separacao: entrada.ultimo_status_separacao ?? pedidoInterno.ultimo_status_separacao,
     entrega_confirmada: entrada.entrega_confirmada ?? pedidoInterno.entrega_confirmada,
     ultima_entrega_id: entrada.ultima_entrega_id ?? pedidoInterno.ultima_entrega_id,
-    possui_produtos_faltando: entrada.possui_produtos_faltando ?? pedidoInterno.possui_produtos_faltando,
+    possui_produtos_faltando:
+      entrada.possui_produtos_faltando ??
+      entrada.POSSUI_PRODUTOS_FALTANDO ??
+      entrada.POSSUI_PRODUTO_FALTANDO ??
+      pedidoInterno.possui_produtos_faltando ??
+      pedidoInterno.POSSUI_PRODUTOS_FALTANDO ??
+      pedidoInterno.POSSUI_PRODUTO_FALTANDO,
     total_itens_pendentes: entrada.total_itens_pendentes ?? pedidoInterno.total_itens_pendentes,
     __origemDashboardLogistica: true,
   } as Record<string, unknown>;
@@ -349,9 +355,9 @@ const isPedidoComPendencias = (pedido: Record<string, unknown>, logistica: Recor
   // devem, por si so, classificar um pedido como produto faltando.
   if (pedido.__origemDashboardLogistica === true) {
     const confirmadoPeloErp = ['S', 'SIM', 'TRUE', '1'].includes(
-      String(pedido.possui_produtos_faltando ?? pedido.POSSUI_PRODUTO_FALTANDO ?? '').trim().toUpperCase()
+      String(pedido.possui_produtos_faltando ?? pedido.POSSUI_PRODUTOS_FALTANDO ?? pedido.POSSUI_PRODUTO_FALTANDO ?? '').trim().toUpperCase()
     );
-    if (!confirmadoPeloErp || (toNumber(pedido.total_itens_pendentes) || 0) <= 0) return false;
+    if (!confirmadoPeloErp) return false;
   }
   const statusLogisticoCodigo = toStringValue(
     (pedido.status_logistico as Record<string, unknown> | undefined)?.codigo
@@ -412,10 +418,16 @@ const isPedidoParaAlerta = (dataHoraRecebimento: Date | null) => {
     return resultado;
   }, {});
   const hojeSaoPaulo = `${partes.year}-${partes.month}-${partes.day}`;
-  const dataPedido = dataHoraRecebimento.toISOString().slice(0, 10);
+  const pedidoPartes = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(dataHoraRecebimento).reduce<Record<string, string>>((resultado, parte) => {
+    resultado[parte.type] = parte.value;
+    return resultado;
+  }, {});
+  const dataPedido = `${pedidoPartes.year}-${pedidoPartes.month}-${pedidoPartes.day}`;
   if (dataPedido < hojeSaoPaulo) return true;
   if (dataPedido > hojeSaoPaulo) return false;
-  return Number(partes.hour || 0) * 60 + Number(partes.minute || 0) >= 16 * 60 + 1;
+  return Number(partes.hour || 0) * 60 + Number(partes.minute || 0) >= 16 * 60;
 };
 
 const deriveAlertaStatus = (
@@ -906,17 +918,16 @@ export async function montarDashboardPorSnapshot(
     const controleAtual = embarques.porPedido.get(snapshot.pedidoId);
     const embarcadoNoControle = Boolean(controleAtual || snapshot.embarcadoNoControle);
     const numeroManifesto = controleAtual?.numeroManifesto || snapshot.numeroManifesto;
-    // O registro sincronizado ja foi validado contra a flag do ERP e os itens
-    // detalhados. Nao reinterpretamos saldos durante a leitura do card.
-    const resumoIndicaPendencia =
-      ['S', 'SIM', 'TRUE', '1'].includes(String(rawPedido.possui_produtos_faltando ?? rawPedido.POSSUI_PRODUTO_FALTANDO ?? '').trim().toUpperCase()) &&
-      (toNumber(rawPedido.total_itens_pendentes ?? rawPedido.TOTAL_ITENS_PENDENTES) || 0) > 0;
+    const possuiProdutosFaltandoApi = ['S', 'SIM', 'TRUE', '1'].includes(
+      String(rawPedido.possui_produtos_faltando ?? rawPedido.POSSUI_PRODUTOS_FALTANDO ?? rawPedido.POSSUI_PRODUTO_FALTANDO ?? '').trim().toUpperCase()
+    );
     const possuiPendencia =
-      resumoIndicaPendencia &&
+      possuiProdutosFaltandoApi &&
       snapshot.possuiPendencia === true &&
-      Array.isArray(snapshot.produtosPendentes) &&
-      snapshot.produtosPendentes.length > 0;
-    const produtosPendentes = possuiPendencia ? snapshot.produtosPendentes : [];
+      (Array.isArray(snapshot.produtosPendentes) || snapshot.totalItensPendentes > 0);
+    const produtosPendentes = possuiPendencia && Array.isArray(snapshot.produtosPendentes)
+      ? snapshot.produtosPendentes
+      : [];
     const itemBase: DashboardPedidoItem = {
       ...dadosPedido(rawPedido, snapshot.rawLogistica),
       pedidoId: snapshot.pedidoId,
