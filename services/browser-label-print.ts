@@ -477,9 +477,7 @@ export async function printProductLabelsInBrowser(
             border-right: 0.6mm solid #172033;
           }
 
-          .product-image img,
-          .product-image-vertical img,
-          .product-image-vertical-double img {
+          .product-image img {
             position: absolute;
             top: 50%;
             left: 50%;
@@ -629,32 +627,28 @@ export async function printProductLabelsInBrowser(
 
           .product-image-vertical img {
             position: absolute;
-            top: 4mm;
-            left: 4mm;
-            right: 4mm;
-            bottom: 4mm;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
             width: auto;
             height: auto;
             max-width: calc(100% - 8mm);
             max-height: calc(100% - 8mm);
             object-fit: contain;
-            margin: auto;
             background: #ffffff;
             z-index: 2;
           }
 
           .product-image-vertical-double img {
             position: absolute;
-            top: 2.5mm;
-            left: 2.5mm;
-            right: 2.5mm;
-            bottom: 2.5mm;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
             width: auto;
             height: auto;
             max-width: calc(100% - 5mm);
             max-height: calc(100% - 5mm);
             object-fit: contain;
-            margin: auto;
             background: #ffffff;
             z-index: 2;
           }
