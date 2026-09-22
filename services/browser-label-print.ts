@@ -105,8 +105,9 @@ function buildProductLabelMarkup(
       <article class="label ${variant === 'a4-landscape' ? 'label-a4-landscape' : 'label-a4'}">
         <section class="product-details">
           <div class="product-image">
-            <span class="image-placeholder">SEM FOTO</span>
-            ${imageUrl ? `<img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(produto.nome)}" loading="eager" decoding="sync" />` : ''}
+            ${imageUrl
+              ? `<img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(produto.nome)}" loading="eager" decoding="sync" style="display:block;margin:auto;" />`
+              : '<span class="image-placeholder">SEM FOTO</span>'}
           </div>
           <div class="product-copy">
             <div class="adm-large">CÓDIGO ADM: ${escapeHtml(formatProductAdm(produto.codigoAdm))}</div>
@@ -126,21 +127,29 @@ function buildProductLabelMarkup(
   }
 
   if (variant === 'a4-vertical' || variant === 'a4-vertical-double') {
+    const imgClass = variant === 'a4-vertical' ? 'product-image-vertical' : 'product-image-vertical-double';
+    const copyClass = variant === 'a4-vertical' ? 'product-copy-vertical' : 'product-copy-vertical-double';
+    const admClass = variant === 'a4-vertical' ? 'adm-large-vertical' : 'adm-large-vertical-double';
+    const identityClass = variant === 'a4-vertical' ? 'identity-vertical' : 'identity-vertical-double';
+    const metaClass = variant === 'a4-vertical' ? 'meta-line-vertical' : 'meta-line-vertical-double';
+    const descClass = variant === 'a4-vertical' ? 'description-vertical' : 'description-vertical-double';
+    const barcodeClass = variant === 'a4-vertical' ? 'barcode-large-vertical' : 'barcode-large-vertical-double';
     return `
       <article class="label ${variant === 'a4-vertical' ? 'label-a4-vertical' : 'label-a4-vertical-double'}">
-        <section class="product-image ${variant === 'a4-vertical' ? 'product-image-vertical' : 'product-image-vertical-double'}">
-          <span class="image-placeholder">SEM FOTO</span>
-          ${imageUrl ? `<img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(produto.nome)}" loading="eager" decoding="sync" />` : ''}
+        <section class="product-image ${imgClass}">
+          ${imageUrl
+            ? `<img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(produto.nome)}" loading="eager" decoding="sync" style="display:block;margin:auto;" />`
+            : '<span class="image-placeholder">SEM FOTO</span>'}
         </section>
-        <section class="product-copy ${variant === 'a4-vertical' ? 'product-copy-vertical' : 'product-copy-vertical-double'}">
-          <div class="adm-large ${variant === 'a4-vertical' ? 'adm-large-vertical' : 'adm-large-vertical-double'}">CÓDIGO ADM: ${escapeHtml(formatProductAdm(produto.codigoAdm))}</div>
-          <div class="identity ${variant === 'a4-vertical' ? 'identity-vertical' : 'identity-vertical-double'}">
-            <div class="meta-line ${variant === 'a4-vertical' ? 'meta-line-vertical' : 'meta-line-vertical-double'}"><strong>MARCA:</strong> ${escapeHtml(produto.marca || 'SEM MARCA')}</div>
-            <div class="meta-line ${variant === 'a4-vertical' ? 'meta-line-vertical' : 'meta-line-vertical-double'}"><strong>CÓDIGO ORIGINAL:</strong> ${escapeHtml(produto.codigoOriginal || '-')}</div>
+        <section class="product-copy ${copyClass}">
+          <div class="adm-large ${admClass}">CÓDIGO ADM: ${escapeHtml(formatProductAdm(produto.codigoAdm))}</div>
+          <div class="identity ${identityClass}">
+            <div class="meta-line ${metaClass}"><strong>MARCA:</strong> ${escapeHtml(produto.marca || 'SEM MARCA')}</div>
+            <div class="meta-line ${metaClass}"><strong>CÓDIGO ORIGINAL:</strong> ${escapeHtml(produto.codigoOriginal || '-')}</div>
           </div>
-          <div class="description ${variant === 'a4-vertical' ? 'description-vertical' : 'description-vertical-double'}"><strong>DESCRIÇÃO:</strong> ${escapeHtml(produto.nome)}</div>
+          <div class="description ${descClass}"><strong>DESCRIÇÃO:</strong> ${escapeHtml(produto.nome)}</div>
         </section>
-        <div class="barcode barcode-large ${variant === 'a4-vertical' ? 'barcode-large-vertical' : 'barcode-large-vertical-double'}">
+        <div class="barcode barcode-large ${barcodeClass}">
           ${barcodeSvg}
           <div class="barcode-number ${variant === 'a4-vertical-double' ? 'barcode-number-double' : ''}">${escapeHtml(barcodeValue)}</div>
         </div>
