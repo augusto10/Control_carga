@@ -1,0 +1,1 @@
+Next.js 14 application that orchestrates a PostgreSQL-backed cargo control system with Prisma, MUI/Tailwind UI, external logistics APIs, and label/ZPL printing across pages, components, services, and shared libraries.

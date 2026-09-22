@@ -1,0 +1,1 @@
+Provides cross-cutting helpers (auth cookie parsing, class-name merging), MUI theme definitions, Tailwind globals, and Node-side utilities for Zebra label printing and logo-to-GRF conversion.

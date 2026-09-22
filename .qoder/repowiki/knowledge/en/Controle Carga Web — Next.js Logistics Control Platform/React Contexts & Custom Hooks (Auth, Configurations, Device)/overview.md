@@ -1,0 +1,1 @@
+Provides React contexts and custom hooks for authentication state, system configuration management, device capability detection, and responsive styling across the Next.js application.

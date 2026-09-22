@@ -1,0 +1,10 @@
+schema_version: 1
+module_path: contexts_hooks
+title: React Contexts & Custom Hooks (Auth, Configurations, Device)
+scope:
+    - contexts/
+    - hooks/
+source_files: []
+depends_on: []
+related_to:
+    - path: components/shared_reusable

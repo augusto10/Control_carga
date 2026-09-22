@@ -1,0 +1,1 @@
+Central TypeScript type definitions for Prisma-backed entities, auth, labels, and API contracts, plus a Zustand store that orchestrates notes, cargo controls, and carriers.

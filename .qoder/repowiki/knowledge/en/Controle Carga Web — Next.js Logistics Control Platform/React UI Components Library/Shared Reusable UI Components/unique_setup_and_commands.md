@@ -1,0 +1,1 @@
+`LeafletMap` requires importing `leaflet/dist/leaflet.css` and runs a one-time `fixLeafletIcons()` fix that deletes `L.Icon.Default.prototype._getIconUrl` and rewrites icon URLs to unpkg assets; without this, Leaflet markers render as broken images. `SignaturePadPro` dynamically `import('signature_pad')` on first use so the heavy library is code-split.

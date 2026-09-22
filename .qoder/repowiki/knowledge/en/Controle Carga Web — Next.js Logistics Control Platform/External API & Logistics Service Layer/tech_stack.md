@@ -1,0 +1,1 @@
+Axios for the internal and external ERP HTTP clients; native `fetch` plus Node `crypto` for the SSW portal HTML scraping; `qz-tray` for ZPL printer communication over WebSocket; `pdf-lib` + `jsbarcode` for client-side PDF label generation; OpenCage Geocoding API for address-to-coordinate lookup.

@@ -1,0 +1,6 @@
+- Components are written as functional React components with explicit TypeScript interfaces for props and state, exported as `default` exports.
+- Responsive behavior is implemented with MUI's `useTheme` + `useMediaQuery` breakpoints rather than CSS media queries, branching rendering logic inside the component body.
+- User feedback is surfaced through `notistack`'s `enqueueSnackbar` with explicit `variant`, `autoHideDuration`, and `anchorOrigin` options instead of `alert`.
+- Heavy or optional third-party libraries (e.g., `signature_pad`) are loaded via dynamic `import()` inside effects/callbacks to keep bundle size small.
+- Side-effectful initialization (camera streams, map fixes, canvas setup) is isolated in `useEffect` hooks with cleanup functions that stop tracks or remove event listeners.
+- External API calls are made with either `fetch('/api/...')` with JSON bodies or `axios.post`, consistently wrapping responses in try/catch and surfacing errors via snackbar or component-level error state.

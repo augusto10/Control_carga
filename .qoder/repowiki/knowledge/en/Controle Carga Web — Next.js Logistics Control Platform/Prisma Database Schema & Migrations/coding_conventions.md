@@ -1,0 +1,6 @@
+- All primary keys are UUID strings generated at the database level via `@id @default(uuid())`.
+- Timestamps use `DateTime` fields with `@default(now())` for creation time and `@updatedAt` for last-modified timestamps.
+- Foreign-key relationships are declared with named `@relation` aliases (e.g. `ControlePagamentoFrete`, `Auditoria`, `Conferencia`) to support multiple roles between the same pair of models.
+- Indexes are declared inline per model via `@@index([...])` on frequently queried columns such as `dataCriacao`, `usuarioId`, and status fields.
+- Domain constants are modeled as Prisma enums (Transportadora, TipoUsuario, StatusValidacao, CondicaoEmbalagem, etc.) rather than free-form strings.
+- The PrismaClient singleton is cached in `globalThis` outside of production builds to reuse connections across module imports.

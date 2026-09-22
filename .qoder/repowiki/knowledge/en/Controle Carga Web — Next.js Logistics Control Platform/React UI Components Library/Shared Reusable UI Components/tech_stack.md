@@ -1,0 +1,1 @@
+React + TypeScript with Material-UI v5 (`@mui/material`, `@mui/icons-material`), `react-leaflet` + Leaflet 1.7 for maps, `signature_pad` (dynamically imported) for canvas-based signatures, `react-input-mask` for CPF/CNPJ/phone masks, `react-number-format` for currency inputs, `notistack` for snackbars, and Next.js `useRouter` for navigation.

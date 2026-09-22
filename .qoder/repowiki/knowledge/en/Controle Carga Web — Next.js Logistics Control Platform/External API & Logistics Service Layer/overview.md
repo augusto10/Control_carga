@@ -1,0 +1,1 @@
+Client-side service layer that integrates the application with external logistics systems (SSW portal, SSW tracking, external ERP), internal Next.js APIs, label printing, PDF generation, geocoding, and route planning.

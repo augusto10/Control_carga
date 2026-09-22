@@ -1,0 +1,1 @@
+Next.js 14 with SWC, TypeScript 5, Prisma 6 + PostgreSQL, MUI 5 + Tailwind CSS 4, NextAuth 4, Zustand state, Leaflet + react-leaflet for maps, ZXing for barcode scanning, QZ Tray + pdf-lib for Zebra label printing, Chart.js for dashboards, and Zod for runtime validation.

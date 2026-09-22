@@ -1,0 +1,6 @@
+- Pages opt into the global `AppLayout` by assigning a static `usesAppLayout = true` property to the default exported component instead of wrapping themselves manually.
+- Server-side API handlers are organized as one file per route segment under `pages/api/<domain>/`, with dynamic segments expressed as `[id].ts` or nested folders like `[id]/aprove.ts`.
+- Client-to-server data fetching uses plain `fetch` with `credentials: 'include'` against relative `/api/...` paths rather than a centralized HTTP client library.
+- Error responses from API handlers follow a uniform shape `{ success: boolean, message: string, code?: string }` so callers can branch on status without parsing raw errors.
+- Public routes are whitelisted in a single `publicRoutes` array inside `_app.tsx`, and any route not listed there is automatically wrapped by `ProtectedRoute`.
+- Domain-scoped API folders group related operations together (e.g., `solicitacoes-material/[id]/aprovar.ts` and `rejeitar.ts` alongside the resource handler) rather than scattering actions across flat files.

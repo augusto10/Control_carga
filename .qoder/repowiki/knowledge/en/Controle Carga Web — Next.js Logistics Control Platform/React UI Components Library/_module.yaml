@@ -1,0 +1,8 @@
+schema_version: 1
+module_path: components
+title: React UI Components Library
+scope:
+    - components/
+source_files: []
+depends_on: []
+related_to: []

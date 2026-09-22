@@ -1,0 +1,10 @@
+schema_version: 1
+module_path: services
+title: External API & Logistics Service Layer
+scope:
+    - services/
+source_files: []
+depends_on: []
+related_to:
+    - path: pages_and_routes
+    - path: utils_and_styles

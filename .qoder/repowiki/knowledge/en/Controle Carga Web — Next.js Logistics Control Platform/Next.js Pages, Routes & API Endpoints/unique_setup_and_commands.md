@@ -1,0 +1,1 @@
+Authentication relies on a `JWT_SECRET` environment variable and an `ALLOWED_ORIGINS` whitelist in `pages/api/auth/login.ts`; production requires `secure: true` cookie flags set at runtime based on `NODE_ENV`. The app also expects `API_EXTERNA_USERNAME` / `API_EXTERNA_PASSWORD` env vars to enable the external ERP integration shown on the admin health panel.

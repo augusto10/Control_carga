@@ -1,0 +1,26 @@
+schema_version: 1
+module_path: components/shared_reusable
+title: Shared Reusable UI Components
+scope:
+    - components/AdicionarNotasContent.tsx
+    - components/AndroidCamera.tsx
+    - components/AndroidScanner.tsx
+    - components/AssinaturaSimples.tsx
+    - components/CriarControleContent.tsx
+    - components/GlobalBackground.tsx
+    - components/ImageCapture.tsx
+    - components/InputMask.tsx
+    - components/LeafletMap.tsx
+    - components/ListarControlesContent.tsx
+    - components/Map.tsx
+    - components/ModalAssinaturaDigitalPro.tsx
+    - components/ModalAssinaturaSimplesAlternativo.tsx
+    - components/ResponsiveContainer.tsx
+    - components/ResponsiveTable.tsx
+    - components/SignaturePadPro.tsx
+    - components/UserMenu.tsx
+source_files: []
+depends_on: []
+related_to:
+    - path: contexts_hooks
+    - path: shared_types

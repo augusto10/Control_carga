@@ -1,0 +1,1 @@
+Ad-hoc Node/TypeScript and SQL scripts for seeding, migrating, diagnosing, fixing, and synchronizing the PostgreSQL database used by the application.

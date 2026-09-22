@@ -1,0 +1,6 @@
+- Server-side data access goes through the Prisma client in `lib` rather than raw SQL from API routes.
+- Cross-module contracts are defined once in `shared_types` and imported by both UI components and API handlers.
+- External integrations are isolated in `services` and called from pages/components instead of inline fetch calls.
+- Authentication and authorization checks are performed in Next.js middleware or within API route handlers using shared `lib` helpers.
+- Environment-specific behavior (CORS origins, cookie attributes, allowed domains) is gated by `process.env.NODE_ENV` in `middleware.ts`.
+- Database changes are applied via Prisma migrations generated from `prisma_schema`, with ad-hoc fixes kept in `scripts_and_migrations`.

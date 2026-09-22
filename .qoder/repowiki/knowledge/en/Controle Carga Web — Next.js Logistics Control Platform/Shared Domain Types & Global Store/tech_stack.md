@@ -1,0 +1,1 @@
+Zustand for global client state; Prisma-generated types imported from `@prisma/client`; NextAuth ambient typings extended via `next-auth.d.ts`; QZ Tray printer SDK types via `qz-tray.d.ts`.

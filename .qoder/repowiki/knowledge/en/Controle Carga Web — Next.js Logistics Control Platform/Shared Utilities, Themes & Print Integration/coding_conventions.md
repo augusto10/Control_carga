@@ -1,0 +1,5 @@
+- MUI themes are built by calling `createTheme({...})` and exporting the resulting object, with component overrides organized under a top-level `components` map keyed by component name (e.g. `MuiButton`, `MuiCard`, `MuiAppBar`).
+- Server-side utilities expose their functionality via `module.exports` (CommonJS) rather than ES modules, while client-facing helpers use ES `export function` syntax.
+- Cross-platform fallbacks are implemented by detecting `process.platform === 'win32'` and returning mock data or simulated results when running outside Windows.
+- ZPL output is assembled by concatenating `^XA...^XZ` command strings with embedded field directives (`^FO`, `^FD`, `^BCN`, etc.) rather than using a ZPL library.
+- Tailwind classes are composed through the shared `cn(...)` helper that merges inputs via `clsx` and resolves conflicts with `twMerge`.

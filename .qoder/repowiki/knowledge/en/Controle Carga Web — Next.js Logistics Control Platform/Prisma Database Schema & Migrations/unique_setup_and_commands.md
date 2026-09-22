@@ -1,0 +1,1 @@
+Requires a `DATABASE_URL` environment variable pointing to a PostgreSQL instance. Run `npx prisma migrate deploy` to apply migrations from `migrations/`, `npx prisma db seed` to execute `seed.ts`, and the provided `*.sql` files (e.g. `create-admin.sql`, `check-user.sql`) can be run directly against the database for ad-hoc administration.

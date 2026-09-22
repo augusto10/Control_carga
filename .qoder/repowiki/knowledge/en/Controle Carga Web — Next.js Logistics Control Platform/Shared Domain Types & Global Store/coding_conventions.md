@@ -1,0 +1,6 @@
+- Domain interfaces extend or wrap Prisma-generated types using `Omit`/intersection (e.g. `INotaFiscal extends Omit<PrismaNotaFiscal, 'volumes'>`) to adapt DB shapes for the frontend.
+- Transportadora values are enforced as string literal unions (`'ACERT' | 'ACCERT' | ...`) both in Prisma-derived types and in runtime validation inside store actions.
+- API responses are modeled with a generic `ApiResponse<T>` envelope carrying `data`, optional `error: ApiError`, and a `success` boolean.
+- Store actions build query strings with `URLSearchParams`, set `Cache-Control: no-cache` / `Pragma: no-cache` / `Expires: 0` headers, and use `credentials: 'include'` for cookie-based auth.
+- Authentication failures are handled uniformly by dispatching a window `'unauthorized'` event when a 401 is detected, then throwing a descriptive error message.
+- Third-party libraries without built-in typings are shimmed via dedicated `*.d.ts` ambient declaration files rather than inline `declare` blocks.

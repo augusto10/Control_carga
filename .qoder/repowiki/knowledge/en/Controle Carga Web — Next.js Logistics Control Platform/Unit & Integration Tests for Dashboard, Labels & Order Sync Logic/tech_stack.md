@@ -1,0 +1,1 @@
+Node.js native test runner (`node:test`) with `node:assert/strict`; TypeScript source files are transpiled on the fly via `typescript.transpileModule` inside `dashboard-freshness.cjs`; isolated execution uses `node:vm.runInNewContext` to sandbox loaded modules.

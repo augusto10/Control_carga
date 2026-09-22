@@ -1,0 +1,1 @@
+Node test suite exercising barcode/label generation, dashboard freshness rules, order status summaries, pending-order calculations, and batch logistics synchronization against mocked services.

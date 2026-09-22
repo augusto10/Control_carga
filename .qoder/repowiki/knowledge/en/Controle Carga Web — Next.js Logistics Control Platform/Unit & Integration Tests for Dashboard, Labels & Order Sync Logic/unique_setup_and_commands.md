@@ -1,0 +1,1 @@
+Run individual suites with `node tests/<file>.ts` (or `.cjs`); `dashboard-freshness.cjs` requires the project's `tsconfig` so `@/...` path aliases resolve during transpilation, and `sincronizacao-lotes.test.ts` sets `process.env.API_EXTERNA_BASE_URL` to a fake endpoint before invoking the sync function.

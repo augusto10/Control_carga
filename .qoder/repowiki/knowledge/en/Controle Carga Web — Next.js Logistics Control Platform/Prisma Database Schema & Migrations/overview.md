@@ -1,0 +1,1 @@
+Defines the PostgreSQL data model for the cargo control system via Prisma, including typed client configuration, migrations, seed scripts, and ad-hoc SQL utilities.

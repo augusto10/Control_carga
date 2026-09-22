@@ -61,14 +61,44 @@ function resolveAbsoluteImageUrl(url: string | null | undefined): string | null 
   return trimmed;
 }
 
+async function preloadImagesAsDataUrls(produtos: ProdutoEtiqueta[]): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  if (typeof window === 'undefined') return map;
+  const urls = Array.from(new Set(produtos.map((p) => p.imagemUrl).filter((url): url is string => Boolean(url))));
+
+  await Promise.all(
+    urls.map(async (url) => {
+      try {
+        const absoluteUrl = resolveAbsoluteImageUrl(url) || url;
+        const res = await fetch(absoluteUrl, { credentials: 'include' });
+        if (!res.ok) return;
+        const blob = await res.blob();
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+        map.set(url, dataUrl);
+      } catch {
+        // Fallback caso a conversão para data URL falhe
+      }
+    }),
+  );
+
+  return map;
+}
+
 function buildProductLabelMarkup(
   produto: ProdutoEtiqueta,
   barcodeSvg: string,
   barcodeValue: string,
   variant: 'a4-horizontal' | 'a4-landscape' | 'a4-vertical' | 'a4-vertical-double' | 'small',
   isClosedBox: boolean,
+  imageMap?: Map<string, string>,
 ) {
-  const imageUrl = produto.imagemUrl ? resolveAbsoluteImageUrl(produto.imagemUrl) : null;
+  const imageUrl = (produto.imagemUrl && imageMap?.get(produto.imagemUrl))
+    || resolveAbsoluteImageUrl(produto.imagemUrl);
 
   if (variant === 'a4-horizontal' || variant === 'a4-landscape') {
     return `
@@ -129,7 +159,7 @@ function buildProductLabelMarkup(
   `;
 }
 
-export function printProductLabelsInBrowser(
+export async function printProductLabelsInBrowser(
   produtos: ProdutoEtiqueta[],
   printerName: string,
   labelType: LabelType = 'UNITARIA',
@@ -156,6 +186,9 @@ export function printProductLabelsInBrowser(
   const documentTitle = options?.documentTitle?.trim() || previewTitle;
   const primaryButtonLabel = options?.primaryButtonLabel?.trim() || (outputMode === 'pdf' ? 'Salvar como PDF' : 'Imprimir agora');
   if (!produtos.length) throw new Error('Selecione pelo menos um produto.');
+
+  // Pre-carrega imagens como Base64 Data URLs no contexto autenticado da janela principal
+  const imageMap = await preloadImagesAsDataUrls(produtos);
 
   const labelItems = produtos.flatMap((produto) => {
     const selectedBarcode = isClosedBox ? produto.codigoBarrasCaixaFechada : produto.codigoBarras;
@@ -193,6 +226,7 @@ export function printProductLabelsInBrowser(
       barcode.normalizedValue,
       variant,
       isClosedBox,
+      imageMap,
     );
 
     return Array.from({ length: copiesPerProduct }, () => labelMarkup);
@@ -524,61 +558,120 @@ export function printProductLabelsInBrowser(
             max-height: 16mm;
           }
 
-          .label-a4-vertical,
-          .label-a4-vertical-double {
+          .label-a4-vertical {
+            width: 200mm;
+            height: 287mm;
             border: 0.6mm solid #172033;
             border-radius: 3mm;
             overflow: hidden;
-            display: grid;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
             font-family: "Arial Narrow", "Roboto Condensed", Arial, sans-serif;
-          }
-
-          .label-a4-vertical {
-            grid-template-rows: 140fr 100fr 45fr;
+            box-sizing: border-box;
           }
 
           .label-a4-vertical-double {
-            grid-template-rows: 66fr 52fr 22fr;
+            width: 80mm;
+            height: 140mm;
+            border: 0.6mm solid #172033;
+            border-radius: 3mm;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            font-family: "Arial Narrow", "Roboto Condensed", Arial, sans-serif;
+            box-sizing: border-box;
           }
 
           .product-image-vertical {
-            padding: 6mm;
-            border-right: 0;
+            position: relative;
+            width: 100%;
+            height: 115mm;
+            min-height: 115mm;
+            max-height: 115mm;
+            flex-shrink: 0;
             border-bottom: 0.6mm solid #172033;
+            border-right: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            box-sizing: border-box;
+            background: #ffffff;
           }
 
           .product-image-vertical-double {
-            padding: 3.2mm;
-            border-right: 0;
+            position: relative;
+            width: 100%;
+            height: 58mm;
+            min-height: 58mm;
+            max-height: 58mm;
+            flex-shrink: 0;
             border-bottom: 0.6mm solid #172033;
+            border-right: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            box-sizing: border-box;
+            background: #ffffff;
           }
 
           .product-image-vertical img {
-            max-width: calc(100% - 10mm);
-            max-height: calc(100% - 10mm);
-            width: calc(100% - 10mm);
-            height: calc(100% - 10mm);
+            position: absolute;
+            top: 4mm;
+            left: 4mm;
+            right: 4mm;
+            bottom: 4mm;
+            width: auto;
+            height: auto;
+            max-width: calc(100% - 8mm);
+            max-height: calc(100% - 8mm);
+            object-fit: contain;
+            margin: auto;
+            background: #ffffff;
+            z-index: 2;
           }
 
           .product-image-vertical-double img {
-            max-width: calc(100% - 4.8mm);
-            max-height: calc(100% - 4.8mm);
-            width: calc(100% - 4.8mm);
-            height: calc(100% - 4.8mm);
-          }
-
-          .product-copy-vertical,
-          .product-copy-vertical-double {
-            display: grid;
-            min-width: 0;
+            position: absolute;
+            top: 2.5mm;
+            left: 2.5mm;
+            right: 2.5mm;
+            bottom: 2.5mm;
+            width: auto;
+            height: auto;
+            max-width: calc(100% - 5mm);
+            max-height: calc(100% - 5mm);
+            object-fit: contain;
+            margin: auto;
+            background: #ffffff;
+            z-index: 2;
           }
 
           .product-copy-vertical {
-            grid-template-rows: 18fr 24fr 1fr;
+            width: 100%;
+            height: 127mm;
+            min-height: 127mm;
+            max-height: 127mm;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            box-sizing: border-box;
+            overflow: hidden;
           }
 
           .product-copy-vertical-double {
-            grid-template-rows: 12fr 16fr 1fr;
+            width: 100%;
+            height: 58mm;
+            min-height: 58mm;
+            max-height: 58mm;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            box-sizing: border-box;
+            overflow: hidden;
           }
 
           .adm-large-vertical,
@@ -597,37 +690,63 @@ export function printProductLabelsInBrowser(
             border-bottom: 0.6mm solid #172033;
           }
 
-          .adm-large-vertical,
-          .identity-vertical,
-          .description-vertical {
-            padding: 1.5mm 4mm;
-          }
-
-          .adm-large-vertical-double,
-          .identity-vertical-double,
-          .description-vertical-double {
-            padding: 1mm 2.1mm;
-          }
-
           .adm-large-vertical {
-            font-size: 32pt;
+            height: 24mm;
+            min-height: 24mm;
+            max-height: 24mm;
+            display: flex;
+            align-items: center;
+            padding: 0 4mm;
+            color: #07559b;
+            font-size: 30pt;
+            line-height: 1;
+            font-weight: 950;
+            white-space: nowrap;
+            box-sizing: border-box;
           }
 
           .adm-large-vertical-double {
+            height: 13mm;
+            min-height: 13mm;
+            max-height: 13mm;
+            display: flex;
+            align-items: center;
+            padding: 0 2mm;
+            color: #07559b;
             font-size: 13.5pt;
+            line-height: 1;
+            font-weight: 950;
+            white-space: nowrap;
+            box-sizing: border-box;
           }
 
           .identity-vertical {
-            gap: 0.8mm;
+            height: 32mm;
+            min-height: 32mm;
+            max-height: 32mm;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 1.5mm;
+            padding: 0 4mm;
+            box-sizing: border-box;
           }
 
           .identity-vertical-double {
-            gap: 0.25mm;
+            height: 17mm;
+            min-height: 17mm;
+            max-height: 17mm;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 0.4mm;
+            padding: 0 2mm;
+            box-sizing: border-box;
           }
 
           .meta-line-vertical {
-            font-size: 21pt;
-            line-height: 1.08;
+            font-size: 19pt;
+            line-height: 1.1;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -642,32 +761,69 @@ export function printProductLabelsInBrowser(
           }
 
           .description-vertical {
-            font-size: 24pt;
-            line-height: 1.12;
-            padding-top: 2mm;
+            height: 71mm;
+            min-height: 71mm;
+            max-height: 71mm;
+            padding: 3mm 4mm;
+            font-size: 21pt;
+            line-height: 1.18;
+            overflow: hidden;
+            box-sizing: border-box;
           }
 
           .description-vertical-double {
+            height: 28mm;
+            min-height: 28mm;
+            max-height: 28mm;
+            padding: 1mm 2mm;
             font-size: 9.6pt;
-            line-height: 1.12;
-            padding-top: 0.8mm;
+            line-height: 1.15;
+            overflow: hidden;
+            box-sizing: border-box;
           }
 
           .barcode-large-vertical {
-            padding: 1.5mm 18mm 1mm;
+            width: 100%;
+            height: 45mm;
+            min-height: 45mm;
+            max-height: 45mm;
+            flex-shrink: 0;
+            border-top: 0.6mm solid #172033;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2mm 15mm;
+            box-sizing: border-box;
           }
 
           .barcode-large-vertical-double {
-            padding: 0.8mm 6.5mm 0.5mm;
+            width: 100%;
+            height: 24mm;
+            min-height: 24mm;
+            max-height: 24mm;
+            flex-shrink: 0;
+            border-top: 0.6mm solid #172033;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 0.8mm 5mm 0.5mm;
+            box-sizing: border-box;
           }
 
           .barcode-large-vertical svg {
+            width: 100%;
             max-width: 150mm;
-            max-height: 26mm;
+            max-height: 24mm;
           }
 
           .barcode-large-vertical .barcode-number {
-            font-size: 26pt;
+            font-size: 24pt;
+            font-weight: 700;
+            margin-top: 1mm;
+            line-height: 1;
+            text-align: center;
           }
 
           .barcode-large-vertical-double svg {
@@ -780,7 +936,7 @@ export function printProductLabelsInBrowser(
   window.setTimeout(() => popup.focus(), 100);
 }
 
-export function printLabelsInBrowser(
+export async function printLabelsInBrowser(
   produto: ProdutoEtiqueta,
   quantidade: number,
   printerName: string,
@@ -788,7 +944,7 @@ export function printLabelsInBrowser(
   outputMode: 'print' | 'pdf' = 'print',
 ) {
   const total = Math.max(1, Math.floor(quantidade));
-  printProductLabelsInBrowser(Array.from({ length: total }, () => produto), printerName, labelType, outputMode);
+  await printProductLabelsInBrowser(Array.from({ length: total }, () => produto), printerName, labelType, outputMode);
 }
 
 /**

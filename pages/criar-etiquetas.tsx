@@ -242,7 +242,7 @@ export default function CriarEtiquetasPage() {
         const zpl = generateZplLabels(produto, quantidade, labelType);
         await printRawZpl(printer, zpl);
       } else {
-        printLabelsInBrowser(produto, quantidade, printer, labelType);
+        await printLabelsInBrowser(produto, quantidade, printer, labelType);
       }
 
       savePreferredPrinter(printer);
@@ -267,7 +267,7 @@ export default function CriarEtiquetasPage() {
 
     try {
       setDownloadingPdf(true);
-      printLabelsInBrowser(produto, quantidade, printer, labelType, 'pdf');
+      await printLabelsInBrowser(produto, quantidade, printer, labelType, 'pdf');
       enqueueSnackbar('Arquivo aberto. Escolha Salvar como PDF e mantenha a escala em 100%.', { variant: 'success' });
     } catch (error: unknown) {
       enqueueSnackbar(error instanceof Error ? error.message : 'Nao foi possivel gerar o PDF das etiquetas.', { variant: 'error' });

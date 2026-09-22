@@ -1,0 +1,1 @@
+Defines all Next.js page routes and serverless API endpoints for the logistics control application, including authenticated dashboards, admin panels, order/notes/control workflows, and label printing.
