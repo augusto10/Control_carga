@@ -40,6 +40,27 @@ function buildBarcodeSvg(
   return svg.outerHTML;
 }
 
+function resolveAbsoluteImageUrl(url: string | null | undefined): string | null {
+  if (!url || typeof url !== 'string' || !url.trim()) return null;
+  const trimmed = url.trim();
+  if (
+    trimmed.startsWith('http://') ||
+    trimmed.startsWith('https://') ||
+    trimmed.startsWith('data:') ||
+    trimmed.startsWith('blob:')
+  ) {
+    return trimmed;
+  }
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    try {
+      return new URL(trimmed, window.location.origin).href;
+    } catch {
+      return trimmed;
+    }
+  }
+  return trimmed;
+}
+
 function buildProductLabelMarkup(
   produto: ProdutoEtiqueta,
   barcodeSvg: string,
@@ -47,13 +68,15 @@ function buildProductLabelMarkup(
   variant: 'a4-horizontal' | 'a4-landscape' | 'a4-vertical' | 'a4-vertical-double' | 'small',
   isClosedBox: boolean,
 ) {
+  const imageUrl = produto.imagemUrl ? resolveAbsoluteImageUrl(produto.imagemUrl) : null;
+
   if (variant === 'a4-horizontal' || variant === 'a4-landscape') {
     return `
       <article class="label ${variant === 'a4-landscape' ? 'label-a4-landscape' : 'label-a4'}">
         <section class="product-details">
           <div class="product-image">
             <span class="image-placeholder">SEM FOTO</span>
-            ${produto.imagemUrl ? `<img src="${escapeHtml(produto.imagemUrl)}" alt="${escapeHtml(produto.nome)}" />` : ''}
+            ${imageUrl ? `<img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(produto.nome)}" loading="eager" decoding="sync" />` : ''}
           </div>
           <div class="product-copy">
             <div class="adm-large">CÓDIGO ADM: ${escapeHtml(formatProductAdm(produto.codigoAdm))}</div>
@@ -77,7 +100,7 @@ function buildProductLabelMarkup(
       <article class="label ${variant === 'a4-vertical' ? 'label-a4-vertical' : 'label-a4-vertical-double'}">
         <section class="product-image ${variant === 'a4-vertical' ? 'product-image-vertical' : 'product-image-vertical-double'}">
           <span class="image-placeholder">SEM FOTO</span>
-          ${produto.imagemUrl ? `<img src="${escapeHtml(produto.imagemUrl)}" alt="${escapeHtml(produto.nome)}" />` : ''}
+          ${imageUrl ? `<img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(produto.nome)}" loading="eager" decoding="sync" />` : ''}
         </section>
         <section class="product-copy ${variant === 'a4-vertical' ? 'product-copy-vertical' : 'product-copy-vertical-double'}">
           <div class="adm-large ${variant === 'a4-vertical' ? 'adm-large-vertical' : 'adm-large-vertical-double'}">CÓDIGO ADM: ${escapeHtml(formatProductAdm(produto.codigoAdm))}</div>
@@ -187,6 +210,7 @@ export function printProductLabelsInBrowser(
       }).join('')
     : `<section class="sheet last-sheet">${labelsHtml}</section>`;
 
+  const origin = typeof window !== 'undefined' ? window.location.origin : '';
   const popup = window.open('', '_blank', 'width=1200,height=900');
   if (!popup) {
     throw new Error('Nao foi possivel abrir a janela de impressao do navegador.');
@@ -198,6 +222,7 @@ export function printProductLabelsInBrowser(
     <html lang="pt-BR">
       <head>
         <meta charset="utf-8" />
+        <base href="${origin}/" />
         <title>${escapeHtml(documentTitle)}</title>
         <style>
           @page {
@@ -390,28 +415,50 @@ export function printProductLabelsInBrowser(
             min-height: 0;
           }
 
-          .product-image {
+          .product-image,
+          .product-image-vertical,
+          .product-image-vertical-double {
             position: relative;
             display: grid;
             place-items: center;
+            overflow: hidden;
+            width: 100%;
+            height: 100%;
+            min-height: 0;
+            min-width: 0;
+            box-sizing: border-box;
+          }
+
+          .product-image {
             padding: 5mm;
             border-right: 0.6mm solid #172033;
-            overflow: hidden;
+          }
+
+          .product-image img,
+          .product-image-vertical img,
+          .product-image-vertical-double img {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            object-fit: contain;
+            background: #ffffff;
+            z-index: 2;
           }
 
           .product-image img {
-            position: absolute;
-            inset: 4mm;
+            max-width: calc(100% - 8mm);
+            max-height: calc(100% - 8mm);
             width: calc(100% - 8mm);
             height: calc(100% - 8mm);
-            object-fit: contain;
-            background: #ffffff;
           }
 
           .image-placeholder {
             color: #94a3b8;
             font-size: 12pt;
             font-weight: 800;
+            z-index: 1;
+            user-select: none;
           }
 
           .product-copy {
@@ -494,39 +541,28 @@ export function printProductLabelsInBrowser(
             grid-template-rows: 66fr 52fr 22fr;
           }
 
-          .product-image-vertical,
-          .product-image-vertical-double {
-            position: relative;
-            display: grid;
-            place-items: center;
-            border-right: 0;
-            border-bottom: 0.6mm solid #172033;
-            overflow: hidden;
-          }
-
           .product-image-vertical {
             padding: 6mm;
+            border-right: 0;
+            border-bottom: 0.6mm solid #172033;
           }
 
           .product-image-vertical-double {
             padding: 3.2mm;
-          }
-
-          .product-image-vertical img,
-          .product-image-vertical-double img {
-            position: absolute;
-            object-fit: contain;
-            background: #ffffff;
+            border-right: 0;
+            border-bottom: 0.6mm solid #172033;
           }
 
           .product-image-vertical img {
-            inset: 5mm;
+            max-width: calc(100% - 10mm);
+            max-height: calc(100% - 10mm);
             width: calc(100% - 10mm);
             height: calc(100% - 10mm);
           }
 
           .product-image-vertical-double img {
-            inset: 2.4mm;
+            max-width: calc(100% - 4.8mm);
+            max-height: calc(100% - 4.8mm);
             width: calc(100% - 4.8mm);
             height: calc(100% - 4.8mm);
           }
@@ -701,7 +737,7 @@ export function printProductLabelsInBrowser(
                 : `Confira o layout abaixo. Quando estiver certo, clique em imprimir e escolha a impressora ${escapeHtml(targetPrinter)}.`}</p>
             </div>
             <div class="toolbar-actions">
-              <button class="btn btn-primary" onclick="window.print()">${escapeHtml(primaryButtonLabel)}</button>
+              <button class="btn btn-primary" onclick="triggerPrint()">${escapeHtml(primaryButtonLabel)}</button>
               <button class="btn btn-secondary" onclick="window.close()">Fechar</button>
             </div>
           </section>
@@ -709,6 +745,28 @@ export function printProductLabelsInBrowser(
           <p class="summary">${total} etiqueta${total > 1 ? 's' : ''} pronta${total > 1 ? 's' : ''} para impressao.</p>
         </main>
         <script>
+          function triggerPrint() {
+            var imgs = Array.from(document.images);
+            var pending = imgs.filter(function(img) { return !img.complete; });
+            if (pending.length === 0) {
+              window.print();
+              return;
+            }
+            var loaded = 0;
+            var total = pending.length;
+            var done = function() {
+              loaded++;
+              if (loaded >= total) {
+                window.print();
+              }
+            };
+            pending.forEach(function(img) {
+              img.addEventListener('load', done);
+              img.addEventListener('error', done);
+            });
+            setTimeout(function() { window.print(); }, 2500);
+          }
+
           window.onload = function() {
             window.focus();
           };

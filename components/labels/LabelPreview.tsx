@@ -44,7 +44,7 @@ function ProductVerticalPreview({
           position: 'relative',
         }}
       >
-        <Typography sx={{ color: '#94a3b8', fontWeight: 800, fontSize: compact ? 12 : 14 }}>SEM FOTO</Typography>
+        <Typography sx={{ color: '#94a3b8', fontWeight: 800, fontSize: compact ? 12 : 14, zIndex: 1, userSelect: 'none' }}>SEM FOTO</Typography>
         {produto.imagemUrl && (
           <Box
             component="img"
@@ -57,6 +57,7 @@ function ProductVerticalPreview({
               height: compact ? 'calc(100% - 20px)' : 'calc(100% - 28px)',
               objectFit: 'contain',
               bgcolor: '#fff',
+              zIndex: 2,
             }}
           />
         )}
@@ -179,13 +180,13 @@ export function LabelPreview({ produto, quantidade, labelType = 'UNITARIA' }: La
                     position: 'relative',
                   }}
                 >
-                  <Typography sx={{ color: '#94a3b8', fontWeight: 800, fontSize: 12 }}>SEM FOTO</Typography>
+                  <Typography sx={{ color: '#94a3b8', fontWeight: 800, fontSize: 12, zIndex: 1, userSelect: 'none' }}>SEM FOTO</Typography>
                   {produto.imagemUrl && (
                     <Box
                       component="img"
                       src={produto.imagemUrl}
                       alt={produto.nome}
-                      sx={{ position: 'absolute', inset: 10, width: 'calc(100% - 20px)', height: 'calc(100% - 20px)', objectFit: 'contain', bgcolor: '#fff' }}
+                      sx={{ position: 'absolute', inset: 10, width: 'calc(100% - 20px)', height: 'calc(100% - 20px)', objectFit: 'contain', bgcolor: '#fff', zIndex: 2 }}
                     />
                   )}
                 </Box>
