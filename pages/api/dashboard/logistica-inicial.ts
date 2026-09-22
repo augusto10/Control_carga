@@ -419,7 +419,13 @@ const deriveDashboardStatus = (
       .map((item) => item.trim().toUpperCase())
       .filter(Boolean)
   );
-  const entregaConfirmada = String(pedido.entrega_confirmada || '').trim().toUpperCase() === 'S';
+  const entregaConfirmada =
+    String(pedido.entrega_confirmada || '').trim().toUpperCase() === 'S' &&
+    Boolean(
+      statusLogistico.usuario_confirmacao ||
+      statusLogistico.usuario_confirmacao_nome ||
+      statusLogistico.data_hora_confirmacao
+    );
   if (entregaConfirmada) {
     return 'PEDIDO_EMBARCADO';
   }
@@ -437,7 +443,7 @@ const deriveDashboardStatus = (
   }
 
   if (ultimoStatusSeparacao === 'G' || statusSeparacoes.has('G')) {
-    return 'PEDIDO_EMBARCADO';
+    return entregaConfirmada ? 'PEDIDO_EMBARCADO' : 'PEDIDO_SEPARADO';
   }
 
   if (statusSeparacoes.has('E')) {
@@ -449,7 +455,9 @@ const deriveDashboardStatus = (
   }
 
   return statusApi && statusApi !== 'PENDENCIAS' && STATUS_ORDER.includes(statusApi as StatusCode)
-    ? (statusApi as StatusCode)
+    ? statusApi === 'PEDIDO_EMBARCADO' && !entregaConfirmada
+      ? 'PEDIDO_SEPARADO'
+      : (statusApi as StatusCode)
     : null;
 };
 

@@ -305,19 +305,28 @@ const deriveDashboardStatus = (
   const statusApi = toStringValue(statusLogistico.codigo)?.toUpperCase();
   const ultimoStatusSeparacao = toStringValue(pedido.ultimo_status_separacao)?.toUpperCase() || null;
   const statusSeparacoes = new Set(getStatusSeparacoes(pedido));
-  const entregaConfirmada = String(pedido.entrega_confirmada || '').trim().toUpperCase() === 'S';
+  const entregaConfirmada =
+    String(pedido.entrega_confirmada || '').trim().toUpperCase() === 'S' &&
+    Boolean(
+      statusLogistico.usuario_confirmacao ||
+      statusLogistico.usuario_confirmacao_nome ||
+      statusLogistico.data_hora_confirmacao
+    );
 
   if (entregaConfirmada) return 'PEDIDO_EMBARCADO';
   if (ultimoStatusSeparacao === 'A') return 'PEDIDO_NOVO';
   if (ultimoStatusSeparacao === 'S') return 'PEDIDO_EM_SEPARACAO';
   if (ultimoStatusSeparacao === 'E') return 'PEDIDO_SEPARADO';
-  if (ultimoStatusSeparacao === 'G' || statusSeparacoes.has('G')) return 'PEDIDO_EMBARCADO';
+  if (ultimoStatusSeparacao === 'G' || statusSeparacoes.has('G')) {
+    return entregaConfirmada ? 'PEDIDO_EMBARCADO' : 'PEDIDO_SEPARADO';
+  }
   if (statusSeparacoes.has('E')) return 'PEDIDO_SEPARADO';
   if (statusApi === 'SEM_LOGISTICA') return 'PEDIDO_NOVO';
 
   const logisticaPedido = (logistica?.pedido || {}) as Record<string, unknown>;
   const statusLogistica = toStringValue(logisticaPedido.status_codigo)?.toUpperCase();
   const candidate = statusApi || statusLogistica;
+  if (candidate === 'PEDIDO_EMBARCADO' && !entregaConfirmada) return 'PEDIDO_SEPARADO';
   return candidate && STATUS_ORDER.includes(candidate as StatusCode) ? (candidate as StatusCode) : null;
 };
 
