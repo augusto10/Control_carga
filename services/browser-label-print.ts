@@ -423,11 +423,28 @@ export async function printProductLabelsInBrowser(
           }
 
           .label-a4-landscape .product-details {
-            grid-template-columns: 88mm 1fr;
+            width: 100%;
+            min-width: 0;
+            grid-template-columns: 88mm minmax(0, 1fr);
+            align-items: stretch;
           }
 
           .label-a4-landscape .product-copy {
-            grid-template-rows: 36fr 48fr 51fr;
+            grid-template-rows: 36mm 48mm 1fr;
+            width: 100%;
+            min-width: 0;
+            margin: 0;
+            padding: 0;
+            justify-self: stretch;
+            align-self: stretch;
+          }
+
+          .label-a4-landscape .product-copy > .adm-large,
+          .label-a4-landscape .product-copy > .identity,
+          .label-a4-landscape .product-copy > .description {
+            justify-self: stretch;
+            width: auto;
+            margin: 0;
           }
 
           .label-a4-landscape .adm-large {
@@ -505,14 +522,24 @@ export async function printProductLabelsInBrowser(
           .product-copy {
             display: grid;
             grid-template-rows: 19fr 25fr 30fr;
+            width: 100%;
             min-width: 0;
+            box-sizing: border-box;
+          }
+
+          .product-copy > div {
+            width: 100%;
+            min-width: 0;
+            box-sizing: border-box;
           }
 
           .adm-large,
           .identity,
           .description {
+            width: 100%;
             padding: 1.2mm 3mm;
             overflow: hidden;
+            box-sizing: border-box;
           }
 
           .adm-large,
@@ -551,6 +578,7 @@ export async function printProductLabelsInBrowser(
           }
 
           .barcode-large {
+            width: 100%;
             margin: 0;
             padding: 1mm 36mm 0.5mm;
             border-top: 0.6mm solid #172033;

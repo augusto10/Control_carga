@@ -419,7 +419,16 @@ const isPedidoComPendencias = (pedido: Record<string, unknown>, logistica: Recor
   return possuiSeparacaoEfetivada && possuiProdutosFaltando && pedidoTemEntregaGerada(pedido, logistica);
 };
 
-const isPedidoParaAlerta = (dataHoraRecebimento: Date | null) => {
+const isPedidoEntregue = (logistica: Record<string, any> | null) => {
+  const entregas = Array.isArray(logistica?.entregas) ? logistica.entregas : [];
+  return entregas.some((entrega: Record<string, any>) =>
+    ['S', 'SIM', 'TRUE', '1'].includes(String(entrega.ENTREGUE ?? entrega.entregue ?? '').trim().toUpperCase()) ||
+    Boolean(entrega.BAIXA_ENTREGA_ID ?? entrega.baixa_entrega_id ?? entrega.DATA_HORA_BAIXA ?? entrega.data_hora_baixa)
+  );
+};
+
+const isPedidoParaAlerta = (dataHoraRecebimento: Date | null, logistica: Record<string, any> | null) => {
+  if (isPedidoEntregue(logistica)) return false;
   if (!dataHoraRecebimento) return true;
 
   const partes = new Intl.DateTimeFormat('en-CA', {
@@ -870,6 +879,22 @@ export async function montarDashboardPorSnapshot(
   try {
     const sync = await (prisma as any).sincronizacaoLogistica.findUnique({ where: { chave: syncKey } });
 
+    // Um controle criado depois da ultima sincronizacao torna o snapshot
+    // incompleto para o card de embarcados. Nesse caso, deixa a API externa
+    // reconstruir o indicador usando as notas vinculadas ao controle.
+    const ultimoControle = await prisma.controleCarga.findFirst({
+      where: { notas: { some: {} } },
+      select: { dataCriacao: true },
+      orderBy: { dataCriacao: 'desc' },
+    });
+    if (
+      sync?.ultimaSincronizacao &&
+      ultimoControle?.dataCriacao &&
+      ultimoControle.dataCriacao > sync.ultimaSincronizacao
+    ) {
+      return null;
+    }
+
     if (options.exigirSincronizacaoRecenteMs && sync?.ultimaSincronizacao) {
       const idade = Date.now() - new Date(sync.ultimaSincronizacao).getTime();
       if (idade > options.exigirSincronizacaoRecenteMs) return null;
@@ -895,7 +920,11 @@ export async function montarDashboardPorSnapshot(
       take: 1500,
     });
   } catch (error: any) {
-    if (error?.code === 'P2021' || String(error?.message || '').includes('does not exist')) {
+    if (
+      error?.code === 'P2021' ||
+      error?.code === 'P2022' ||
+      String(error?.message || '').includes('does not exist')
+    ) {
       return null;
     }
     throw error;
@@ -995,7 +1024,7 @@ export async function montarDashboardPorSnapshot(
       });
     }
 
-    const alertaStatus = isPedidoParaAlerta(snapshot.dataHoraRecebimento)
+    const alertaStatus = isPedidoParaAlerta(snapshot.dataHoraRecebimento, snapshot.rawLogistica)
       ? deriveAlertaStatus(statusBase, possuiPendencia, embarcadoNoControle)
       : null;
     if (alertaStatus) {

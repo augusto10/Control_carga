@@ -169,7 +169,7 @@ export function LabelPreview({ produto, quantidade, labelType = 'UNITARIA' }: La
                 gridTemplateRows: isA4ProductLandscape ? '135fr 65fr' : '74fr 36fr',
               }}
             >
-              <Box sx={{ display: 'grid', gridTemplateColumns: isA4ProductLandscape ? '31% 69%' : '31% 69%', minHeight: 0 }}>
+              <Box sx={{ display: 'grid', gridTemplateColumns: '31% minmax(0, 69%)', width: '100%', minWidth: 0, minHeight: 0 }}>
                 <Box
                   sx={{
                     borderRight: '2px solid #172033',
@@ -190,13 +190,13 @@ export function LabelPreview({ produto, quantidade, labelType = 'UNITARIA' }: La
                     />
                   )}
                 </Box>
-                <Box sx={{ display: 'grid', gridTemplateRows: isA4ProductLandscape ? '36fr 48fr 51fr' : '19fr 25fr 30fr', minWidth: 0 }}>
-                  <Box sx={{ px: 1.4, display: 'flex', alignItems: 'center', borderBottom: '2px solid #172033' }}>
+                <Box sx={{ display: 'grid', gridTemplateRows: isA4ProductLandscape ? '36fr 48fr 51fr' : '19fr 25fr 30fr', width: '100%', minWidth: 0, boxSizing: 'border-box' }}>
+                  <Box sx={{ width: '100%', minWidth: 0, px: 1.4, display: 'flex', alignItems: 'center', borderBottom: '2px solid #172033' }}>
                     <Typography sx={{ color: '#07559b', fontWeight: 950, fontSize: isA4ProductLandscape ? 'clamp(24px, 4vw, 42px)' : 'clamp(17px, 3.2vw, 28px)', lineHeight: 1 }}>
                       CODIGO ADM: {formatProductAdm(produto.codigoAdm)}
                     </Typography>
                   </Box>
-                  <Box sx={{ px: 1.4, py: 0.25, display: 'flex', flexDirection: 'column', justifyContent: 'center', borderBottom: '2px solid #172033', minWidth: 0, gap: 0.15 }}>
+                  <Box sx={{ width: '100%', minWidth: 0, px: 1.4, py: 0.25, display: 'flex', flexDirection: 'column', justifyContent: 'center', borderBottom: '2px solid #172033', gap: 0.15 }}>
                       <Typography noWrap sx={{ fontSize: isA4ProductLandscape ? 'clamp(18px, 3vw, 30px)' : 'clamp(14px, 2.3vw, 22px)', lineHeight: 1.05 }}>
                       <strong>MARCA:</strong> {produto.marca || 'SEM MARCA'}
                     </Typography>
@@ -204,7 +204,7 @@ export function LabelPreview({ produto, quantidade, labelType = 'UNITARIA' }: La
                       <strong>CODIGO ORIGINAL:</strong> {produto.codigoOriginal || '-'}
                     </Typography>
                   </Box>
-                  <Box sx={{ px: 1.4, py: 0.25, overflow: 'hidden' }}>
+                  <Box sx={{ width: '100%', minWidth: 0, px: 1.4, py: 0.25, overflow: 'hidden' }}>
                     <Typography sx={{ fontSize: isA4ProductLandscape ? 'clamp(18px, 3vw, 30px)' : 'clamp(14px, 2.3vw, 22px)', lineHeight: 1.1 }}>
                       <strong>DESCRICAO:</strong> {produto.nome}
                     </Typography>

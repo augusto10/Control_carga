@@ -8,7 +8,6 @@ const DASHBOARD_PREVISAO_FINAL = '2050-12-31';
 const DEFAULT_CACHE_KEY = 'sem-inicio:sem-fim';
 const DASHBOARD_CACHE_TTL_MS = 3 * 60_000;
 const DASHBOARD_STALE_TTL_MS = 60 * 60_000;
-const MAX_NOTAS_EM_CONTROLE_DETALHE = 500;
 const DASHBOARD_EXTERNAL_TIMEOUT_MS = 15_000;
 const DASHBOARD_ENRICH_CONCURRENCY = 20;
 const MAX_LOGISTICA_LOOKUPS_PER_REQUEST = 40;
@@ -563,7 +562,21 @@ const shouldOcultarPedidoNoCardSeparado = (
 // Helper: verifica se o pedido deve aparecer nos alertas.
 // Pedidos de dias anteriores entram sempre.
 // Pedidos do dia atual entram somente depois das 16:00.
-const isPedidoParaAlerta = (pedido: Record<string, unknown>): boolean => {
+const isPedidoEntregue = (pedido: Record<string, unknown>, logistica: Record<string, any> | null) => {
+  const entregas = [
+    ...(Array.isArray(logistica?.entregas) ? logistica.entregas : []),
+    ...(Array.isArray((pedido.logistica as Record<string, any> | undefined)?.entregas)
+      ? (pedido.logistica as Record<string, any>).entregas
+      : []),
+  ];
+  return entregas.some((entrega: Record<string, any>) =>
+    ['S', 'SIM', 'TRUE', '1'].includes(String(entrega.ENTREGUE ?? entrega.entregue ?? '').trim().toUpperCase()) ||
+    Boolean(entrega.BAIXA_ENTREGA_ID ?? entrega.baixa_entrega_id ?? entrega.DATA_HORA_BAIXA ?? entrega.data_hora_baixa)
+  );
+};
+
+const isPedidoParaAlerta = (pedido: Record<string, unknown>, logistica: Record<string, any> | null): boolean => {
+  if (isPedidoEntregue(pedido, logistica)) return false;
   const dataHoraRecebimento = getPedidoDataHoraRecebimento(pedido);
   if (!dataHoraRecebimento) return true; // Se não tem data, considera para alerta
 
@@ -947,14 +960,13 @@ export default async function handler(
       )),
       timed(
         'notas_externas',
-        // Sempre buscar notas externas para poder vincular com controles locais
-        // mesmo em escopo principal, mas com limite menor
         apiExternaService.listarNotasFiscaisCompletas(
-          { limit: escopoPrincipal ? 100 : 500, offset: 0 },
+          { limit: 500, offset: 0 },
           username,
           password,
-          escopoPrincipal ? 4_000 : 6_000
-        ).catch(() => null) // Se falhar em escopo principal, continua sem notas
+          escopoPrincipal ? 8_000 : 10_000
+        )
+          .catch(() => null) // Se falhar em escopo principal, continua sem notas
       ),
       timed('notas_locais', prisma.notaFiscal.findMany({
         where: {
@@ -995,7 +1007,6 @@ export default async function handler(
           },
         },
         orderBy: { dataCriacao: 'desc' },
-        take: MAX_NOTAS_EM_CONTROLE_DETALHE,
       })),
     ]);
     res.setHeader(
@@ -1194,7 +1205,7 @@ export default async function handler(
           notaExterna.tipoEntrega,
           notaExterna.TIPO_ENTREGA_DESCRICAO,
           notaExterna.tipo_entrega_descricao
-        ) || null;
+        ) || 'EPG';
       if (
         !isPedidoPermitidoNoDashboard(
           {
@@ -1365,7 +1376,7 @@ export default async function handler(
             produtosPendentes,
           };
 
-          const alertaStatus = isPedidoParaAlerta(pedido)
+          const alertaStatus = isPedidoParaAlerta(pedido, logistica)
             ? deriveAlertaStatus(statusCodigo, possuiPendencia, embarcadoNoControle)
             : null;
 
