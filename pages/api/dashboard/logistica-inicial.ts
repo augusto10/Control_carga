@@ -1135,36 +1135,6 @@ export default async function handler(
         notaCompletaPorChave.get(onlyDigits(notaLocal.codigo)) ||
         notaCompletaPorNumero.get(normalizeNumeroNota(notaLocal.numeroNota));
       if (!notaExterna) {
-        const numeroNotaLocal = normalizeNumeroNota(notaLocal.numeroNota);
-        const pedidoIdLocal = toNumber(numeroNotaLocal);
-        if (pedidoIdLocal && !pedidosEmbarcadosLocais.has(pedidoIdLocal)) {
-          const controleInfo =
-            getControleInfoByReferencia({
-              numeroNota: notaLocal.numeroNota,
-              chave: onlyDigits(notaLocal.codigo),
-            }) || null;
-          pedidosEmbarcadosLocais.set(pedidoIdLocal, {
-            pedidoId: pedidoIdLocal,
-            tipoEntrega: 'EPG',
-            clienteNome: `Nota fiscal ${notaLocal.numeroNota}`,
-            nomeFantasia: null,
-            valorPedido: null,
-            dataHoraRecebimento: notaLocal.dataCriacao?.toISOString?.() || null,
-            previsaoEntrega: null,
-            localNome: getControleLocalNome(controleInfo),
-            statusCodigo: 'PEDIDOS_EMBARCADOS',
-            statusDescricao: STATUS_META.PEDIDOS_EMBARCADOS.titulo,
-            statusSeparacao: STATUS_META.PEDIDOS_EMBARCADOS.statusSeparacao,
-            situacaoAtual: STATUS_META.PEDIDOS_EMBARCADOS.titulo,
-            usuarioConfirmacaoNome: null,
-            dataHoraConfirmacao: null,
-            dataHoraControle: controleInfo?.dataHoraControle || null,
-            transportadoraNome: controleInfo?.transportadoraNome || null,
-            possuiProdutosFaltando: false,
-            totalItensPendentes: 0,
-            produtosPendentes: [],
-          });
-        }
         continue;
       }
 
@@ -1191,6 +1161,11 @@ export default async function handler(
       ) {
         continue;
       }
+
+      const notaConfirmada =
+        deriveDashboardStatus(notaExterna, (notaExterna.status_logistico || {}) as Record<string, unknown>, {}) ===
+        'PEDIDO_EMBARCADO';
+      if (!notaConfirmada) continue;
 
       if (dashboardPedidoIds.has(pedidoId)) {
         pedidosEmbarcadosPorNota.add(pedidoId);
@@ -1317,7 +1292,8 @@ export default async function handler(
           }
 
           const embarcadoNoControle =
-            pedidosEmbarcadosPorNota.has(pedidoId) || isNotaEmControle(referenciaNota);
+            statusCodigoBase === 'PEDIDO_EMBARCADO' &&
+            (pedidosEmbarcadosPorNota.has(pedidoId) || isNotaEmControle(referenciaNota));
           const controleInfo = getControleInfoByReferencia(referenciaNota);
           const produtosPendentes = possuiPendencia ? getProdutosPendentes(logistica, 'PENDENCIA') : [];
 

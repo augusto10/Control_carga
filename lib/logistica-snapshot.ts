@@ -959,7 +959,8 @@ export async function montarDashboardPorSnapshot(
     if (!statusBase) continue;
 
     const controleAtual = embarques.porPedido.get(snapshot.pedidoId);
-    const embarcadoNoControle = Boolean(controleAtual || snapshot.embarcadoNoControle);
+    const embarcadoNoControle =
+      statusBase === 'PEDIDO_EMBARCADO' && Boolean(controleAtual || snapshot.embarcadoNoControle);
     const numeroManifesto = controleAtual?.numeroManifesto || snapshot.numeroManifesto;
     const possuiProdutosFaltandoApi = possuiProdutosFaltandoNoConsolidado(rawPedido);
     // A flag do ERP basta para o card aparecer: se o detalhe nao trouxe itens,
