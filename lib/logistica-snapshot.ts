@@ -719,13 +719,7 @@ export async function sincronizarLogisticaSnapshot(options: {
       if (!statusCodigoBase) return null;
 
       const possuiPendencia = isPedidoComPendencias(pedido, logistica);
-      const statusCodigo =
-        statusCodigoBase === 'PEDIDO_SEPARADO' &&
-        possuiPendencia &&
-        hasStatusSeparacao(pedido, 'G') &&
-        hasStatusSeparacao(pedido, 'E')
-          ? 'PEDIDO_EMBARCADO'
-          : statusCodigoBase;
+      const statusCodigo = statusCodigoBase;
       const produtosPendentes = possuiPendencia ? getProdutosPendentes(logistica) : [];
       const referenciaDireta = getNotaReferencia(pedido, logistica);
       const referenciaNota =

@@ -1265,9 +1265,7 @@ export default async function handler(
           }
 
           const possuiPendencia = isPedidoComPendencias(pedido, logistica);
-          const ocultarNoCardSeparado =
-            statusCodigoBase === 'PEDIDO_SEPARADO' && shouldOcultarPedidoNoCardSeparado(pedido, logistica);
-          const statusCodigo = ocultarNoCardSeparado ? 'PEDIDO_EMBARCADO' : statusCodigoBase;
+          const statusCodigo = statusCodigoBase;
           const statusSeparacaoAtual = STATUS_META[statusCodigo].statusSeparacao;
           let referenciaNota = notaPorPedido.get(pedidoId) || null;
 
