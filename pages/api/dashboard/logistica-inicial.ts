@@ -381,8 +381,7 @@ const possuiProdutosFaltandoNoConsolidado = (pedido: Record<string, unknown>) =>
 const hasResumoPendenciaNoPedido = (pedido: Record<string, unknown>) =>
   (toNumber(pedido.total_itens_pendentes ?? pedido.TOTAL_ITENS_PENDENTES) || 0) > 0 ||
   (toNumber(pedido.itens_em_separacao) || 0) > 0 ||
-  (toNumber(pedido.quantidade_em_separacao_total) || 0) > 0 ||
-  possuiProdutosFaltandoNoConsolidado(pedido);
+  (toNumber(pedido.quantidade_em_separacao_total) || 0) > 0;
 
 const isPedidoSomenteComSeparacaoAberta = (pedido: Record<string, unknown>) => {
   const ultimoStatus = toStringValue(pedido.ultimo_status_separacao)?.trim().toUpperCase() || null;
@@ -465,20 +464,6 @@ export const isPedidoComPendencias = (
   pedido: Record<string, unknown>,
   logistica: Record<string, any> | null
 ) => {
-  // Gate do ERP consolidado: se o campo existe e diz explicitamente que NAO
-  // ha produtos faltando (e total_itens_pendentes e zero), nao classificar
-  // como pendencia. Isso evita falso-positivos de status logistico stale
-  // (ex: pedidos 198714, 198712, 198685).
-  const campoErpFaltando =
-    pedido.possui_produtos_faltando ??
-    pedido.POSSUI_PRODUTOS_FALTANDO ??
-    pedido.POSSUI_PRODUTO_FALTANDO;
-  if (campoErpFaltando !== undefined && campoErpFaltando !== null && campoErpFaltando !== '') {
-    const erpConfirmaFalta = possuiProdutosFaltandoNoConsolidado(pedido);
-    const erpTotalItens = toNumber(pedido.total_itens_pendentes ?? pedido.TOTAL_ITENS_PENDENTES) || 0;
-    if (!erpConfirmaFalta && erpTotalItens <= 0) return false;
-  }
-
   const statusLogisticoCodigo = toStringValue(
     (pedido.status_logistico as Record<string, unknown> | undefined)?.codigo
   )?.toUpperCase();
@@ -488,23 +473,6 @@ export const isPedidoComPendencias = (
     .map((item) => item.trim().toUpperCase())
     .filter(Boolean);
 
-  const possuiProdutoFaltando = (item: Record<string, unknown>) =>
-    ['S', 'SIM', 'TRUE', '1'].includes(
-      String(
-        item.POSSUI_PRODUTOS_FALTANDO ??
-          item.possui_produtos_faltando ??
-          item.POSSUI_PRODUTO_FALTANDO ??
-          item.possui_produto_faltando ??
-          ''
-      ).trim().toUpperCase()
-    );
-  const itensComparativo = Array.isArray(logistica?.comparativo_separacao_pendentes)
-    ? logistica.comparativo_separacao_pendentes
-    : [];
-  const itensEntregasPendentes = Array.isArray(logistica?.itens_entregas_pendentes)
-    ? logistica.itens_entregas_pendentes
-    : [];
-  const totalItensPendentes = toNumber(logistica?.resumo_pendencias_logisticas?.total_itens_pendentes) || 0;
   const separacoes = Array.isArray(logistica?.separacoes) ? logistica.separacoes : [];
   const itensSeparacoes = Array.isArray(logistica?.itens_separacoes) ? logistica.itens_separacoes : [];
   const possuiSeparacaoEfetivada =
@@ -519,6 +487,13 @@ export const isPedidoComPendencias = (
       );
     }) ||
     itensSeparacoes.some((item) => (toNumber(item.QUANTIDADE_BAIXADA) || 0) > 0);
+
+  const itensComparativo = Array.isArray(logistica?.comparativo_separacao_pendentes)
+    ? logistica.comparativo_separacao_pendentes
+    : [];
+  const itensEntregasPendentes = Array.isArray(logistica?.itens_entregas_pendentes)
+    ? logistica.itens_entregas_pendentes
+    : [];
   const possuiSaldoPendente =
     itensComparativo.some((item) =>
       (toNumber(item.SALDO_PENDENTE) || 0) > 0 ||
@@ -532,22 +507,13 @@ export const isPedidoComPendencias = (
       (toNumber(item.QTD_EM_SEPARACAO_TRAN_ENT_PEN) || 0) > 0
     );
 
-  const possuiProdutosFaltando =
-    possuiProdutoFaltando(pedido) ||
-    possuiProdutoFaltando(logistica?.resumo_pendencias_logisticas || {}) ||
-    itensComparativo.some(possuiProdutoFaltando) ||
-    itensEntregasPendentes.some(possuiProdutoFaltando);
-
   const possuiIndicadorDePendencia =
-    possuiProdutosFaltando ||
+    possuiSaldoPendente ||
     statusLogisticoCodigo === 'PENDENCIAS' ||
     ultimoStatusSeparacao === 'PENDENCIA' ||
     statusSeparacoes.includes('PENDENCIA');
 
-  // A regra do card deve exigir que a resposta realmente indique produto faltando.
-  // Quando o ERP/endpoint não sinaliza explicitamente a falha, não contar como
-  // pedido faltando apenas por quantidade pendente isolada.
-  return possuiIndicadorDePendencia && (possuiSeparacaoEfetivada || possuiProdutosFaltando);
+  return possuiIndicadorDePendencia && possuiSeparacaoEfetivada;
 };
 
 const hasStatusSeparacao = (pedido: Record<string, unknown>, status: string) => {

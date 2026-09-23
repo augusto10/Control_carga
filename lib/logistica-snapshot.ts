@@ -375,23 +375,13 @@ export const possuiProdutosFaltandoNoConsolidado = (pedido: Record<string, unkno
 
 const isPedidoComPendencias = (pedido: Record<string, unknown>, logistica: Record<string, any> | null) => {
   if (pedidoTemDevolucao(pedido, logistica)) return false;
-  // No consolidado, a flag do ERP e obrigatoria. Itens em separacao nunca
-  // devem, por si so, classificar um pedido como produto faltando.
-  if (pedido.__origemDashboardLogistica === true) {
-    if (!possuiProdutosFaltandoNoConsolidado(pedido)) return false;
-  }
+
   const statusLogisticoCodigo = toStringValue(
     (pedido.status_logistico as Record<string, unknown> | undefined)?.codigo
   )?.toUpperCase();
   const ultimoStatusSeparacao = toStringValue(pedido.ultimo_status_separacao)?.toUpperCase() || null;
   const statusSeparacoes = getStatusSeparacoes(pedido);
-  const itensComparativo = Array.isArray(logistica?.comparativo_separacao_pendentes)
-    ? logistica.comparativo_separacao_pendentes
-    : [];
-  const itensEntregasPendentes = Array.isArray(logistica?.itens_entregas_pendentes)
-    ? logistica.itens_entregas_pendentes
-    : [];
-  const totalItensPendentes = toNumber(logistica?.resumo_pendencias_logisticas?.total_itens_pendentes) || 0;
+
   const separacoes = Array.isArray(logistica?.separacoes) ? logistica.separacoes : [];
   const itensSeparacoes = Array.isArray(logistica?.itens_separacoes) ? logistica.itens_separacoes : [];
   const possuiSeparacaoEfetivada =
@@ -402,6 +392,13 @@ const isPedidoComPendencias = (pedido: Record<string, unknown>, logistica: Recor
       return status === 'G' || Boolean(separacao.DATA_HORA_BAIXA ?? separacao.DATA_BAIXA);
     }) ||
     itensSeparacoes.some((item) => (toNumber(item.QUANTIDADE_BAIXADA) || 0) > 0);
+
+  const itensComparativo = Array.isArray(logistica?.comparativo_separacao_pendentes)
+    ? logistica.comparativo_separacao_pendentes
+    : [];
+  const itensEntregasPendentes = Array.isArray(logistica?.itens_entregas_pendentes)
+    ? logistica.itens_entregas_pendentes
+    : [];
   const possuiSaldoPendente =
     itensComparativo.some((item) =>
       (toNumber(item.SALDO_PENDENTE) || 0) > 0 ||
@@ -414,18 +411,14 @@ const isPedidoComPendencias = (pedido: Record<string, unknown>, logistica: Recor
       (toNumber(item.QUANTIDADE_EM_SEPARACAO) || 0) > 0 ||
       (toNumber(item.QTD_EM_SEPARACAO_TRAN_ENT_PEN) || 0) > 0
     );
-  const possuiProdutosFaltando =
-    ['S', 'SIM', 'TRUE', '1'].includes(
-      String(pedido.possui_produtos_faltando ?? pedido.POSSUI_PRODUTO_FALTANDO ?? pedido.PRODUTO_FALTANDO ?? pedido.produto_faltando ?? pedido.PRODUTO_NAO_ENCONTRADO ?? pedido.produto_nao_encontrado ?? pedido.NAO_ENCONTRADO ?? pedido.nao_encontrado ?? pedido.FALTA ?? pedido.falta ?? '').trim().toUpperCase()
-    ) ||
-    ['S', 'SIM', 'TRUE', '1'].includes(
-      String(logistica?.resumo_pendencias_logisticas?.POSSUI_PRODUTO_FALTANDO ?? logistica?.resumo_pendencias_logisticas?.PRODUTO_FALTANDO ?? '').trim().toUpperCase()
-    ) ||
-    [...itensComparativo, ...itensEntregasPendentes].some((item) =>
-      ['S', 'SIM', 'TRUE', '1'].includes(String(item.POSSUI_PRODUTO_FALTANDO ?? item.possui_produto_faltando ?? item.PRODUTO_FALTANDO ?? item.produto_faltando ?? item.PRODUTO_NAO_ENCONTRADO ?? item.produto_nao_encontrado ?? item.NAO_ENCONTRADO ?? item.nao_encontrado ?? item.FALTA ?? item.falta ?? '').trim().toUpperCase()) ||
-      (toNumber(item.QUANTIDADE_FALTANTE ?? item.quantidade_faltante ?? item.QTD_FALTANTE ?? item.qtd_faltante) || 0) > 0
-    );
-  return possuiSeparacaoEfetivada && possuiProdutosFaltando && pedidoTemEntregaGerada(pedido, logistica);
+
+  const possuiIndicadorDePendencia =
+    possuiSaldoPendente ||
+    statusLogisticoCodigo === 'PENDENCIAS' ||
+    ultimoStatusSeparacao === 'PENDENCIA' ||
+    statusSeparacoes.includes('PENDENCIA');
+
+  return possuiIndicadorDePendencia && possuiSeparacaoEfetivada && pedidoTemEntregaGerada(pedido, logistica);
 };
 
 const isPedidoEntregue = (logistica: Record<string, any> | null) => {
