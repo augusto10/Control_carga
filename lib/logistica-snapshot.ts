@@ -430,8 +430,16 @@ const isPedidoEntregue = (logistica: Record<string, any> | null) => {
   );
 };
 
+const isSeparacaoCancelada = (logistica: Record<string, any> | null) => {
+  const separacoes = Array.isArray(logistica?.separacoes) ? logistica.separacoes : [];
+  return separacoes.some((separacao: Record<string, any>) =>
+    String(separacao.STATUS ?? '').trim().toUpperCase() === 'C' ||
+    String(separacao.PROCESSO_ALTERACAO ?? '').trim().toUpperCase().startsWith('CANC_SEP')
+  );
+};
+
 const isPedidoParaAlerta = (dataHoraRecebimento: Date | null, logistica: Record<string, any> | null) => {
-  if (isPedidoEntregue(logistica)) return false;
+  if (isPedidoEntregue(logistica) || isSeparacaoCancelada(logistica)) return false;
   if (!dataHoraRecebimento) return true;
 
   const partes = new Intl.DateTimeFormat('en-CA', {
@@ -943,6 +951,7 @@ export async function montarDashboardPorSnapshot(
       .filter(
         (snapshot) =>
           !isPedidoEntregue(snapshot.rawLogistica) &&
+          !isSeparacaoCancelada(snapshot.rawLogistica) &&
           isPedidoParaAlerta(snapshot.dataHoraRecebimento, snapshot.rawLogistica)
       )
       .map((snapshot) => ({
