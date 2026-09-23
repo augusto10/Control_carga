@@ -1130,6 +1130,30 @@ function Home() {
                   total: pedidosAlertasCombinados.length,
                   pedidos: pedidosAlertasCombinados,
                 }),
+              onNaoSeparadoClick: () => abrirListaPedidos({
+                codigo: 'ALERTAS_NAO_SEPARADOS',
+                titulo: 'PEDIDOS NÃO SEPARADOS',
+                descricao: '',
+                statusSeparacao: 'ALERTAS',
+                total: alertasNaoSeparados.length,
+                pedidos: alertasNaoSeparados,
+              }),
+              onNaoConferidoClick: () => abrirListaPedidos({
+                codigo: 'ALERTAS_NAO_CONFERIDOS',
+                titulo: 'PEDIDOS SEPARADOS E NÃO CONFERIDOS',
+                descricao: '',
+                statusSeparacao: 'ALERTAS',
+                total: alertasNaoConferidos.length,
+                pedidos: alertasNaoConferidos,
+              }),
+              onNaoEmbarcadoClick: () => abrirListaPedidos({
+                codigo: 'ALERTAS_NAO_EMBARCADOS',
+                titulo: 'PEDIDOS CONFERIDOS E NÃO EMBARCADOS',
+                descricao: '',
+                statusSeparacao: 'ALERTAS',
+                total: alertasNaoEmbarcados.length,
+                pedidos: alertasNaoEmbarcados,
+              }),
             }}
             pendencias={{
               total: pendencias?.total || 0,

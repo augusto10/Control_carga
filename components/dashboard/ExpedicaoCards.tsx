@@ -20,6 +20,9 @@ interface AlertSummary {
   naoEmbarcado: number;
   total: number;
   onClick: () => void;
+  onNaoSeparadoClick: () => void;
+  onNaoConferidoClick: () => void;
+  onNaoEmbarcadoClick: () => void;
 }
 
 interface PendenciasSummary {
@@ -138,12 +141,19 @@ export function ExpedicaoCards({
       </div>
 
       <div className={cn('grid gap-3', wideLayout ? 'grid-cols-2' : 'xl:grid-cols-2')}>
-        <motion.button
-          type="button"
+        <motion.div
+          role="button"
+          tabIndex={0}
           initial={{ opacity: 0, y: 18 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3, duration: 0.35 }}
           onClick={alertas.onClick}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              alertas.onClick();
+            }
+          }}
           style={{
             backgroundColor: '#991b1b',
             backgroundImage: 'linear-gradient(135deg, #450a0a 0%, #b91c1c 52%, #4c0519 100%)',
@@ -180,21 +190,21 @@ export function ExpedicaoCards({
             </div>
 
             <div className="mt-3 space-y-1 text-[11px] font-bold sm:text-xs">
-              <div className="grid grid-cols-[1fr_auto] items-center gap-3">
+              <button type="button" onClick={(event) => { event.stopPropagation(); alertas.onNaoSeparadoClick(); }} className="grid w-full grid-cols-[1fr_auto] items-center gap-3 rounded-md text-left transition hover:bg-white/10">
                 <span className="uppercase">Não foram separados:</span>
                 <strong className="text-2xl sm:text-3xl">{loadingSecondary ? '-' : alertas.naoSeparado || ''}</strong>
-              </div>
-              <div className="grid grid-cols-[1fr_auto] items-center gap-3">
+              </button>
+              <button type="button" onClick={(event) => { event.stopPropagation(); alertas.onNaoConferidoClick(); }} className="grid w-full grid-cols-[1fr_auto] items-center gap-3 rounded-md text-left transition hover:bg-white/10">
                 <span className="uppercase">Não foram conferidos:</span>
                 <strong className="text-2xl sm:text-3xl">{loadingSecondary ? '-' : alertas.naoConferido || ''}</strong>
-              </div>
-              <div className="grid grid-cols-[1fr_auto] items-center gap-3">
+              </button>
+              <button type="button" onClick={(event) => { event.stopPropagation(); alertas.onNaoEmbarcadoClick(); }} className="grid w-full grid-cols-[1fr_auto] items-center gap-3 rounded-md text-left transition hover:bg-white/10">
                 <span className="uppercase">Não foram embarcados:</span>
                 <strong className="text-2xl sm:text-3xl">{loadingSecondary ? '-' : alertas.naoEmbarcado || ''}</strong>
-              </div>
+              </button>
             </div>
           </div>
-        </motion.button>
+        </motion.div>
 
         <motion.button
           type="button"

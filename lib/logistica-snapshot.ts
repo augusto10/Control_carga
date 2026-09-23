@@ -430,16 +430,23 @@ const isPedidoEntregue = (logistica: Record<string, any> | null) => {
   );
 };
 
-const isSeparacaoCancelada = (logistica: Record<string, any> | null) => {
+const isSeparacaoCancelada = (pedido: Record<string, unknown> | null, logistica: Record<string, any> | null) => {
   const separacoes = Array.isArray(logistica?.separacoes) ? logistica.separacoes : [];
-  return separacoes.some((separacao: Record<string, any>) =>
+  const statusPedido = [
+    pedido?.ultimo_status_separacao,
+    pedido?.status_separacoes,
+    (pedido?.status_logistico as Record<string, unknown> | undefined)?.status_separacao,
+  ]
+    .map((status) => String(status ?? '').trim().toUpperCase())
+    .filter(Boolean);
+  return statusPedido.some((status) => status === 'C' || status.includes('CANC_SEP')) || separacoes.some((separacao: Record<string, any>) =>
     String(separacao.STATUS ?? '').trim().toUpperCase() === 'C' ||
     String(separacao.PROCESSO_ALTERACAO ?? '').trim().toUpperCase().startsWith('CANC_SEP')
   );
 };
 
-const isPedidoParaAlerta = (dataHoraRecebimento: Date | null, logistica: Record<string, any> | null) => {
-  if (isPedidoEntregue(logistica) || isSeparacaoCancelada(logistica)) return false;
+const isPedidoParaAlerta = (dataHoraRecebimento: Date | null, pedido: Record<string, unknown> | null, logistica: Record<string, any> | null) => {
+  if (isPedidoEntregue(logistica) || isSeparacaoCancelada(pedido, logistica)) return false;
   if (!dataHoraRecebimento) return true;
 
   const partes = new Intl.DateTimeFormat('en-CA', {
@@ -951,8 +958,8 @@ export async function montarDashboardPorSnapshot(
       .filter(
         (snapshot) =>
           !isPedidoEntregue(snapshot.rawLogistica) &&
-          !isSeparacaoCancelada(snapshot.rawLogistica) &&
-          isPedidoParaAlerta(snapshot.dataHoraRecebimento, snapshot.rawLogistica)
+          !isSeparacaoCancelada(snapshot.rawPedido, snapshot.rawLogistica) &&
+          isPedidoParaAlerta(snapshot.dataHoraRecebimento, snapshot.rawPedido, snapshot.rawLogistica)
       )
       .map((snapshot) => ({
         pedidoId: snapshot.pedidoId,
@@ -1045,7 +1052,7 @@ export async function montarDashboardPorSnapshot(
       });
     }
 
-    const alertaStatus = !pedidosEntregues.has(snapshot.pedidoId) && isPedidoParaAlerta(snapshot.dataHoraRecebimento, snapshot.rawLogistica)
+    const alertaStatus = !pedidosEntregues.has(snapshot.pedidoId) && isPedidoParaAlerta(snapshot.dataHoraRecebimento, snapshot.rawPedido, snapshot.rawLogistica)
       ? deriveAlertaStatus(statusBase, possuiPendencia, embarcadoNoControle)
       : null;
     if (alertaStatus) {

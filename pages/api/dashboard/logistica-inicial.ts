@@ -549,16 +549,23 @@ const isPedidoEntregue = (pedido: Record<string, unknown>, logistica: Record<str
   );
 };
 
-const isSeparacaoCancelada = (logistica: Record<string, any> | null) => {
+const isSeparacaoCancelada = (pedido: Record<string, unknown>, logistica: Record<string, any> | null) => {
   const separacoes = Array.isArray(logistica?.separacoes) ? logistica.separacoes : [];
-  return separacoes.some((separacao: Record<string, any>) =>
+  const statusPedido = [
+    pedido.ultimo_status_separacao,
+    pedido.status_separacoes,
+    (pedido.status_logistico as Record<string, unknown> | undefined)?.status_separacao,
+  ]
+    .map((status) => String(status ?? '').trim().toUpperCase())
+    .filter(Boolean);
+  return statusPedido.some((status) => status === 'C' || status.includes('CANC_SEP')) || separacoes.some((separacao: Record<string, any>) =>
     String(separacao.STATUS ?? '').trim().toUpperCase() === 'C' ||
     String(separacao.PROCESSO_ALTERACAO ?? '').trim().toUpperCase().startsWith('CANC_SEP')
   );
 };
 
 const isPedidoParaAlerta = (pedido: Record<string, unknown>, logistica: Record<string, any> | null): boolean => {
-  if (isPedidoEntregue(pedido, logistica) || isSeparacaoCancelada(logistica)) return false;
+  if (isPedidoEntregue(pedido, logistica) || isSeparacaoCancelada(pedido, logistica)) return false;
   const dataHoraRecebimento = getPedidoDataHoraRecebimento(pedido);
   if (!dataHoraRecebimento) return true; // Se não tem data, considera para alerta
 
