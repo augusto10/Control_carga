@@ -535,7 +535,7 @@ const shouldOcultarPedidoNoCardSeparado = (
 
 // Helper: verifica se o pedido deve aparecer nos alertas.
 // Pedidos de dias anteriores entram sempre.
-// Pedidos do dia atual entram somente depois das 16:00.
+// Pedidos recebidos no dia atual ainda nao entram como atrasados.
 const isPedidoEntregue = (pedido: Record<string, unknown>, logistica: Record<string, any> | null) => {
   const entregas = [
     ...(Array.isArray(logistica?.entregas) ? logistica.entregas : []),
@@ -582,7 +582,7 @@ const isPedidoParaAlerta = (pedido: Record<string, unknown>, logistica: Record<s
   if (dataRecebimento > hoje) return false;
 
   const minutosAtuais = Number(agoraPartes.hour || 0) * 60 + Number(agoraPartes.minute || 0);
-  return minutosAtuais >= 16 * 60;
+  return false;
 };
 
 // Helper: deriva o status de alerta baseado no status de separação
