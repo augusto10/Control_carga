@@ -91,7 +91,8 @@ export default function CriarEtiquetasPage() {
     labelType === 'A4_PRODUTO'
     || labelType === 'A4_PRODUTO_LANDSCAPE'
     || labelType === 'A4_PRODUTO_VERTICAL'
-    || labelType === 'A4_PRODUTO_VERTICAL_DUPLA';
+    || labelType === 'A4_PRODUTO_VERTICAL_DUPLA'
+    || labelType === 'A4_PRODUTO_VERTICAL_GRANDE_DUPLA';
   const printsDirectlyInZebra = printerIsCompatible && !usesBrowserA4Layout;
   const canPrint = Boolean(
     produto
@@ -359,6 +360,7 @@ export default function CriarEtiquetasPage() {
                     <MenuItem value="A4_PRODUTO_LANDSCAPE">Produto grande A4 paisagem (1 por A4)</MenuItem>
                     <MenuItem value="A4_PRODUTO_VERTICAL">Produto vertical 20 x 28,7 cm (1 por A4)</MenuItem>
                     <MenuItem value="A4_PRODUTO_VERTICAL_DUPLA">Produto vertical 8 x 14 cm A4 paisagem (3 por A4)</MenuItem>
+                    <MenuItem value="A4_PRODUTO_VERTICAL_GRANDE_DUPLA">Produto vertical grande 13,5 x 19 cm A4 paisagem (2 por A4)</MenuItem>
                   </TextField>
                 </Grid>
                 <Grid item xs={12} md={4}>

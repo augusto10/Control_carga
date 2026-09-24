@@ -39,6 +39,7 @@ const LABEL_OPTIONS: Array<{ value: LabelType; label: string }> = [
   { value: 'A4_PRODUTO_LANDSCAPE', label: 'Produto grande A4 paisagem (1 por A4)' },
   { value: 'A4_PRODUTO_VERTICAL', label: 'Produto vertical 20 x 28,7 cm (1 por A4)' },
   { value: 'A4_PRODUTO_VERTICAL_DUPLA', label: 'Produto vertical 8 x 14 cm A4 paisagem (3 por A4)' },
+  { value: 'A4_PRODUTO_VERTICAL_GRANDE_DUPLA', label: 'Produto vertical grande 13,5 x 19 cm A4 paisagem (2 por A4)' },
   { value: 'UNITARIA', label: 'Produto (3 por linha)' },
   { value: 'CAIXA_FECHADA', label: 'Caixa fechada 100 x 60 mm' },
 ];
@@ -161,7 +162,6 @@ export default function EtiquetasPorMarcaPage() {
         previewTitle: selectedBrand ? `Etiquetas da marca ${selectedBrand}` : 'Etiquetas da marca selecionada',
         documentTitle: `pdf-etiquetas-${normalizedBrand}`,
         primaryButtonLabel: 'Salvar as etiquetas',
-        copiesPerProduct: labelType === 'A4_PRODUTO' ? 2 : labelType === 'A4_PRODUTO_VERTICAL_DUPLA' ? 3 : 1,
       });
       enqueueSnackbar('Previa aberta. Clique em Salvar como PDF e mantenha a escala em 100%.', { variant: 'success' });
     } catch (error) {

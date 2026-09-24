@@ -13,10 +13,12 @@ function ProductVerticalPreview({
   produto,
   selectedBarcode,
   compact = false,
+  large = false,
 }: {
   produto: ProdutoEtiqueta;
   selectedBarcode: string | null;
   compact?: boolean;
+  large?: boolean;
 }) {
   return (
     <Box
@@ -24,7 +26,7 @@ function ProductVerticalPreview({
         width: '100%',
         maxWidth: compact ? 420 : 720,
         mx: 'auto',
-        aspectRatio: compact ? '80 / 140' : '200 / 287',
+        aspectRatio: large ? '135 / 190' : compact ? '80 / 140' : '200 / 287',
         border: '2px solid #172033',
         borderRadius: 2,
         overflow: 'hidden',
@@ -122,6 +124,7 @@ export function LabelPreview({ produto, quantidade, labelType = 'UNITARIA' }: La
   const isA4ProductLandscape = labelType === 'A4_PRODUTO_LANDSCAPE';
   const isA4ProductVertical = labelType === 'A4_PRODUTO_VERTICAL';
   const isA4ProductVerticalDouble = labelType === 'A4_PRODUTO_VERTICAL_DUPLA';
+  const isA4ProductVerticalLargeDouble = labelType === 'A4_PRODUTO_VERTICAL_GRANDE_DUPLA';
   const selectedBarcode = isClosedBox ? produto.codigoBarrasCaixaFechada : produto.codigoBarras;
   const barcode = analyzeBarcode(selectedBarcode);
   const total = Math.max(1, quantidade);
@@ -138,12 +141,14 @@ export function LabelPreview({ produto, quantidade, labelType = 'UNITARIA' }: La
               ? ' - 1 por folha A4'
               : isA4ProductVerticalDouble
                 ? ' - 3 por folha A4 paisagem'
+                : isA4ProductVerticalLargeDouble
+                  ? ' - 2 por folha A4 paisagem'
                 : ''}
       </Typography>
       <Box
         sx={{
           display: 'grid',
-          gridTemplateColumns: isA4Product || isA4ProductLandscape || isA4ProductVertical || isA4ProductVerticalDouble
+          gridTemplateColumns: isA4Product || isA4ProductLandscape || isA4ProductVertical || isA4ProductVerticalDouble || isA4ProductVerticalLargeDouble
             ? '1fr'
             : isClosedBox
               ? { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' }
@@ -222,7 +227,7 @@ export function LabelPreview({ produto, quantidade, labelType = 'UNITARIA' }: La
             </Box>
           ) : isA4ProductVertical ? (
             <ProductVerticalPreview key={index} produto={produto} selectedBarcode={selectedBarcode} />
-          ) : isA4ProductVerticalDouble ? (
+          ) : isA4ProductVerticalDouble || isA4ProductVerticalLargeDouble ? (
             <Box
               key={index}
               sx={{
@@ -238,13 +243,13 @@ export function LabelPreview({ produto, quantidade, labelType = 'UNITARIA' }: La
               <Box
                 sx={{
                   display: 'grid',
-                  gridTemplateColumns: { xs: '1fr', md: 'repeat(3, minmax(0, 1fr))' },
+                  gridTemplateColumns: { xs: '1fr', md: `repeat(${isA4ProductVerticalDouble ? 3 : 2}, minmax(0, 1fr))` },
                   gap: 2.5,
                 }}
               >
-                <ProductVerticalPreview produto={produto} selectedBarcode={selectedBarcode} compact />
-                <ProductVerticalPreview produto={produto} selectedBarcode={selectedBarcode} compact />
-                <ProductVerticalPreview produto={produto} selectedBarcode={selectedBarcode} compact />
+                {Array.from({ length: isA4ProductVerticalDouble ? 3 : 2 }).map((_, previewIndex) => (
+                  <ProductVerticalPreview key={previewIndex} produto={produto} selectedBarcode={selectedBarcode} compact large={isA4ProductVerticalLargeDouble} />
+                ))}
               </Box>
             </Box>
           ) : (
