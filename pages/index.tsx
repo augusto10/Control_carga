@@ -682,6 +682,7 @@ function Home() {
   const pendencias = indicadoresAlertasOrdenados.find(
     (item) => item.codigo === 'PENDENCIAS'
   );
+
   const periodoAtivo = useMemo(() => {
     const inicio = formatDateLabel(periodoAplicado.dataInicio);
     const fim = formatDateLabel(periodoAplicado.dataFim);
@@ -802,7 +803,7 @@ function Home() {
           const quantidade = saldoPendente(item);
           if (quantidade <= 0) return;
           const produtoId = Number(item.PRODUTO_ID ?? item.produto_id);
-          const codigo = formatText(item.CODIGO_ORIGINAL, formatText(item.CODIGO_BARRAS, '')) || null;
+          const codigo = formatText(item.CODIGO_ADM, formatText(item.codigo_adm, formatText(item.CODIGO_ORIGINAL, formatText(item.CODIGO_BARRAS, '')))) || null;
           const nome = formatText(item.PRODUTO_NOME, 'Produto não informado');
           const chave = String(Number.isFinite(produtoId) ? produtoId : codigo || nome);
           const existente = produtos.get(chave);
@@ -901,7 +902,7 @@ function Home() {
 
         return {
           produtoId: typeof item.PRODUTO_ID === 'number' ? item.PRODUTO_ID : null,
-          codigo: formatText(item.CODIGO_ORIGINAL, formatText(item.CODIGO_BARRAS, '')),
+          codigo: formatText(item.CODIGO_ADM, formatText(item.codigo_adm, formatText(item.CODIGO_ORIGINAL, formatText(item.CODIGO_BARRAS, '')))),
           nome: formatText(item.PRODUTO_NOME, 'Produto nao informado'),
           quantidade: saldo,
         };
@@ -925,6 +926,10 @@ function Home() {
   const alertasNaoEmbarcados = useMemo(
     () => indicadoresAlertasOrdenados.find((item) => item.codigo === 'ALERTAS_NAO_EMBARCADOS')?.pedidos || [],
     [indicadoresAlertasOrdenados]
+  );
+  const alertasNaoEntregues = useMemo(
+    () => indicadoresOrdenados.find((item) => item.codigo === 'PEDIDOS_EMBARCADOS')?.pedidos || [],
+    [indicadoresOrdenados]
   );
   const cardsHome = useMemo(() => ([
     {
@@ -978,8 +983,9 @@ function Home() {
       naoSeparado: alertasNaoSeparados.length,
       naoConferido: alertasNaoConferidos.length,
       naoEmbarcado: alertasNaoEmbarcados.length,
+      naoEntregue: alertasNaoEntregues.length,
     }),
-    [alertasNaoConferidos.length, alertasNaoEmbarcados.length, alertasNaoSeparados.length]
+    [alertasNaoConferidos.length, alertasNaoEmbarcados.length, alertasNaoSeparados.length, alertasNaoEntregues.length]
   );
   const pedidosAlertasCombinados = useMemo(
     () => Array.from(new Map(
@@ -1153,6 +1159,15 @@ function Home() {
                 statusSeparacao: 'ALERTAS',
                 total: alertasNaoEmbarcados.length,
                 pedidos: alertasNaoEmbarcados,
+              }),
+              naoEntregue: totaisAlertas.naoEntregue,
+              onNaoEntregueClick: () => abrirListaPedidos({
+                codigo: 'PEDIDOS_EMBARCADOS',
+                titulo: 'PEDIDOS EMBARCADOS NÃO ENTREGUES',
+                descricao: 'Pedidos embarcados no controle de carga ainda não confirmados como entregues.',
+                statusSeparacao: 'EMBARCADO NO CONTROLE',
+                total: alertasNaoEntregues.length,
+                pedidos: alertasNaoEntregues,
               }),
             }}
             pendencias={{
@@ -1906,7 +1921,7 @@ function Home() {
                                 {formatText(item.PRODUTO_NOME, 'Produto nao informado')}
                               </p>
                               <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
-                                <span>Cod.: {formatText(item.CODIGO_ORIGINAL, formatText(item.CODIGO_BARRAS))}</span>
+                                <span>Cod. ADM: {formatText(item.CODIGO_ADM, formatText(item.CODIGO_ORIGINAL, formatText(item.CODIGO_BARRAS)))}</span>
                                 <span>Qtd.: {formatQuantity(item.QUANTIDADE)}</span>
                                 <span>Baixada: {formatQuantity(item.QUANTIDADE_BAIXADA)}</span>
                                 <span>Saldo: {formatQuantity(item.SALDO)}</span>
@@ -2010,7 +2025,7 @@ function Home() {
                   Nenhum pedido encontrado nesta etapa.
                 </div>
               ) : (
-                <div className="divide-y divide-slate-200 overflow-hidden rounded-xl border border-slate-200 bg-white">
+                <div className="max-h-[60vh] divide-y divide-slate-200 overflow-y-auto rounded-xl border border-slate-200 bg-white">
                   {(listaPedidos.titulo === 'PEDIDOS ATRASADOS' ? [
                     { titulo: 'PEDIDOS NÃO SEPARADOS', pedidos: listaPedidos.pedidos.filter((pedido) => pedido.statusCodigo === 'ALERTAS_NAO_SEPARADOS') },
                     { titulo: 'PEDIDOS SEPARADOS E NÃO CONFERIDOS', pedidos: listaPedidos.pedidos.filter((pedido) => pedido.statusCodigo === 'ALERTAS_NAO_CONFERIDOS') },

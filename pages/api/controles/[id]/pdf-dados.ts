@@ -49,6 +49,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           dataEmissao: pick(dados.dataEmissao, dados.DATA_EMISSAO, dados.DATA_HORA_EMISSAO),
           cnpj: pick(dados.cnpj, dados.CNPJ, dados.CNPJ_CPF, dados.CNPJ_DESTINATARIO),
           volumes: String(pick(nota.volumes, dados.volumes, dados.VOLUMES) ?? '1'),
+          produtos: Array.isArray(dados.itens) ? dados.itens.map((item: any) => ({
+            produtoId: item.produtoId,
+            codigo: item.codigo,
+            nome: item.nome,
+            quantidade: item.quantidade,
+            valorUnitario: item.valorUnitario,
+            valorTotal: item.valorTotal,
+            unidade: item.unidade,
+          })) : [],
         };
       } catch (error) {
         console.error(`[PDF Controle] Falha ao completar NF ${nota.numeroNota}:`, error);

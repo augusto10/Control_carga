@@ -619,6 +619,7 @@ function Home() {
   const pendencias = indicadoresAlertasOrdenados.find(
     (item) => item.codigo === 'PENDENCIAS'
   );
+
   const periodoAtivo = useMemo(() => {
     const inicio = formatDateLabel(periodoAplicado.dataInicio);
     const fim = formatDateLabel(periodoAplicado.dataFim);
@@ -783,8 +784,11 @@ function Home() {
             ? (item.PRODUTO_ID ?? item.produto_id) as number
             : null,
           codigo: formatText(
-            item.CODIGO_ORIGINAL ?? item.codigo_original,
-            formatText(item.CODIGO_BARRAS ?? item.codigo_barras, formatText(item.CODIGO, ''))
+            item.CODIGO_ADM ?? item.codigo_adm,
+            formatText(
+              item.CODIGO_ORIGINAL ?? item.codigo_original,
+              formatText(item.CODIGO_BARRAS ?? item.codigo_barras, formatText(item.CODIGO, ''))
+            )
           ),
           nome: formatText(
             item.PRODUTO_NOME ?? item.produto_nome,
@@ -1645,7 +1649,7 @@ function Home() {
                                 {formatText(item.PRODUTO_NOME, 'Produto nao informado')}
                               </p>
                               <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
-                                <span>Cod.: {formatText(item.CODIGO_ORIGINAL, formatText(item.CODIGO_BARRAS))}</span>
+                                <span>Cod. ADM: {formatText(item.CODIGO_ADM, formatText(item.CODIGO_ORIGINAL, formatText(item.CODIGO_BARRAS)))}</span>
                                 <span>Qtd.: {formatQuantity(item.QUANTIDADE)}</span>
                                 <span>Baixada: {formatQuantity(item.QUANTIDADE_BAIXADA)}</span>
                                 <span>Saldo: {formatQuantity(item.SALDO)}</span>
@@ -1749,7 +1753,7 @@ function Home() {
                   Nenhum pedido encontrado nesta etapa.
                 </div>
               ) : (
-                <div className="grid gap-2 sm:grid-cols-2">
+                <div className="max-h-[60vh] grid gap-2 overflow-y-auto sm:grid-cols-2">
                   {(listaPedidos.titulo === 'ATRASADOS' ? [
                     { titulo: 'PEDIDOS NÃO SEPARADOS', pedidos: listaPedidos.pedidos.filter((pedido) => pedido.statusCodigo === 'ALERTAS_NAO_SEPARADOS') },
                     { titulo: 'PEDIDOS SEPARADOS E NÃO CONFERIDOS', pedidos: listaPedidos.pedidos.filter((pedido) => pedido.statusCodigo === 'ALERTAS_NAO_CONFERIDOS') },

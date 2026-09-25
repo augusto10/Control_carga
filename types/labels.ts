@@ -6,7 +6,8 @@ export type LabelType =
   | 'A4_PRODUTO_LANDSCAPE'
   | 'A4_PRODUTO_VERTICAL'
   | 'A4_PRODUTO_VERTICAL_DUPLA'
-  | 'A4_PRODUTO_VERTICAL_GRANDE_DUPLA';
+  | 'A4_PRODUTO_VERTICAL_GRANDE_DUPLA'
+  | 'A4_PRODUTO_VERTICAL_TRIPLA';
 
 export interface ProdutoEtiqueta {
   produtoId: string;

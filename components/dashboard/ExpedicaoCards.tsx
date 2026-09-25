@@ -18,11 +18,13 @@ interface AlertSummary {
   naoSeparado: number;
   naoConferido: number;
   naoEmbarcado: number;
+  naoEntregue: number;
   total: number;
   onClick: () => void;
   onNaoSeparadoClick: () => void;
   onNaoConferidoClick: () => void;
   onNaoEmbarcadoClick: () => void;
+  onNaoEntregueClick: () => void;
 }
 
 interface PendenciasSummary {
@@ -201,6 +203,10 @@ export function ExpedicaoCards({
               <button type="button" onClick={(event) => { event.stopPropagation(); alertas.onNaoEmbarcadoClick(); }} className="grid w-full grid-cols-[1fr_auto] items-center gap-3 rounded-md text-left transition hover:bg-white/10">
                 <span className="uppercase">Não foram embarcados:</span>
                 <strong className="text-2xl sm:text-3xl">{loadingSecondary ? '-' : alertas.naoEmbarcado || ''}</strong>
+              </button>
+              <button type="button" onClick={(event) => { event.stopPropagation(); alertas.onNaoEntregueClick(); }} className="grid w-full grid-cols-[1fr_auto] items-center gap-3 rounded-md text-left transition hover:bg-white/10">
+                <span className="uppercase">Não entregues:</span>
+                <strong className="text-2xl sm:text-3xl">{loadingSecondary ? '-' : alertas.naoEntregue || ''}</strong>
               </button>
             </div>
           </div>

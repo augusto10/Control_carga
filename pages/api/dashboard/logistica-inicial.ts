@@ -8,6 +8,7 @@ const DASHBOARD_PREVISAO_FINAL = '2050-12-31';
 const DEFAULT_CACHE_KEY = 'sem-inicio:sem-fim';
 const DASHBOARD_CACHE_TTL_MS = 3 * 60_000;
 const DASHBOARD_STALE_TTL_MS = 60 * 60_000;
+const MAX_NOTAS_EM_CONTROLE_DETALHE = 500;
 const DASHBOARD_EXTERNAL_TIMEOUT_MS = 15_000;
 const DASHBOARD_ENRICH_CONCURRENCY = 20;
 const MAX_LOGISTICA_LOOKUPS_PER_REQUEST = 40;
@@ -381,7 +382,8 @@ const possuiProdutosFaltandoNoConsolidado = (pedido: Record<string, unknown>) =>
 const hasResumoPendenciaNoPedido = (pedido: Record<string, unknown>) =>
   (toNumber(pedido.total_itens_pendentes ?? pedido.TOTAL_ITENS_PENDENTES) || 0) > 0 ||
   (toNumber(pedido.itens_em_separacao) || 0) > 0 ||
-  (toNumber(pedido.quantidade_em_separacao_total) || 0) > 0;
+  (toNumber(pedido.quantidade_em_separacao_total) || 0) > 0 ||
+  possuiProdutosFaltandoNoConsolidado(pedido);
 
 const isPedidoSomenteComSeparacaoAberta = (pedido: Record<string, unknown>) => {
   const ultimoStatus = toStringValue(pedido.ultimo_status_separacao)?.trim().toUpperCase() || null;
@@ -418,13 +420,7 @@ const deriveDashboardStatus = (
       .map((item) => item.trim().toUpperCase())
       .filter(Boolean)
   );
-  const entregaConfirmada =
-    String(pedido.entrega_confirmada || '').trim().toUpperCase() === 'S' &&
-    Boolean(
-      statusLogistico.usuario_confirmacao ||
-      statusLogistico.usuario_confirmacao_nome ||
-      statusLogistico.data_hora_confirmacao
-    );
+  const entregaConfirmada = String(pedido.entrega_confirmada || '').trim().toUpperCase() === 'S';
   if (entregaConfirmada) {
     return 'PEDIDO_EMBARCADO';
   }
@@ -442,7 +438,7 @@ const deriveDashboardStatus = (
   }
 
   if (ultimoStatusSeparacao === 'G' || statusSeparacoes.has('G')) {
-    return entregaConfirmada ? 'PEDIDO_EMBARCADO' : 'PEDIDO_SEPARADO';
+    return 'PEDIDO_EMBARCADO';
   }
 
   if (statusSeparacoes.has('E')) {
@@ -454,9 +450,7 @@ const deriveDashboardStatus = (
   }
 
   return statusApi && statusApi !== 'PENDENCIAS' && STATUS_ORDER.includes(statusApi as StatusCode)
-    ? statusApi === 'PEDIDO_EMBARCADO' && !entregaConfirmada
-      ? 'PEDIDO_SEPARADO'
-      : (statusApi as StatusCode)
+    ? (statusApi as StatusCode)
     : null;
 };
 
@@ -464,6 +458,20 @@ export const isPedidoComPendencias = (
   pedido: Record<string, unknown>,
   logistica: Record<string, any> | null
 ) => {
+  // Gate do ERP consolidado: se o campo existe e diz explicitamente que NAO
+  // ha produtos faltando (e total_itens_pendentes e zero), nao classificar
+  // como pendencia. Isso evita falso-positivos de status logistico stale
+  // (ex: pedidos 198714, 198712, 198685).
+  const campoErpFaltando =
+    pedido.possui_produtos_faltando ??
+    pedido.POSSUI_PRODUTOS_FALTANDO ??
+    pedido.POSSUI_PRODUTO_FALTANDO;
+  if (campoErpFaltando !== undefined && campoErpFaltando !== null && campoErpFaltando !== '') {
+    const erpConfirmaFalta = possuiProdutosFaltandoNoConsolidado(pedido);
+    const erpTotalItens = toNumber(pedido.total_itens_pendentes ?? pedido.TOTAL_ITENS_PENDENTES) || 0;
+    if (!erpConfirmaFalta && erpTotalItens <= 0) return false;
+  }
+
   const statusLogisticoCodigo = toStringValue(
     (pedido.status_logistico as Record<string, unknown> | undefined)?.codigo
   )?.toUpperCase();
@@ -473,6 +481,23 @@ export const isPedidoComPendencias = (
     .map((item) => item.trim().toUpperCase())
     .filter(Boolean);
 
+  const possuiProdutoFaltando = (item: Record<string, unknown>) =>
+    ['S', 'SIM', 'TRUE', '1'].includes(
+      String(
+        item.POSSUI_PRODUTOS_FALTANDO ??
+          item.possui_produtos_faltando ??
+          item.POSSUI_PRODUTO_FALTANDO ??
+          item.possui_produto_faltando ??
+          ''
+      ).trim().toUpperCase()
+    );
+  const itensComparativo = Array.isArray(logistica?.comparativo_separacao_pendentes)
+    ? logistica.comparativo_separacao_pendentes
+    : [];
+  const itensEntregasPendentes = Array.isArray(logistica?.itens_entregas_pendentes)
+    ? logistica.itens_entregas_pendentes
+    : [];
+  const totalItensPendentes = toNumber(logistica?.resumo_pendencias_logisticas?.total_itens_pendentes) || 0;
   const separacoes = Array.isArray(logistica?.separacoes) ? logistica.separacoes : [];
   const itensSeparacoes = Array.isArray(logistica?.itens_separacoes) ? logistica.itens_separacoes : [];
   const possuiSeparacaoEfetivada =
@@ -487,13 +512,6 @@ export const isPedidoComPendencias = (
       );
     }) ||
     itensSeparacoes.some((item) => (toNumber(item.QUANTIDADE_BAIXADA) || 0) > 0);
-
-  const itensComparativo = Array.isArray(logistica?.comparativo_separacao_pendentes)
-    ? logistica.comparativo_separacao_pendentes
-    : [];
-  const itensEntregasPendentes = Array.isArray(logistica?.itens_entregas_pendentes)
-    ? logistica.itens_entregas_pendentes
-    : [];
   const possuiSaldoPendente =
     itensComparativo.some((item) =>
       (toNumber(item.SALDO_PENDENTE) || 0) > 0 ||
@@ -507,13 +525,22 @@ export const isPedidoComPendencias = (
       (toNumber(item.QTD_EM_SEPARACAO_TRAN_ENT_PEN) || 0) > 0
     );
 
+  const possuiProdutosFaltando =
+    possuiProdutoFaltando(pedido) ||
+    possuiProdutoFaltando(logistica?.resumo_pendencias_logisticas || {}) ||
+    itensComparativo.some(possuiProdutoFaltando) ||
+    itensEntregasPendentes.some(possuiProdutoFaltando);
+
   const possuiIndicadorDePendencia =
-    possuiSaldoPendente ||
+    possuiProdutosFaltando ||
     statusLogisticoCodigo === 'PENDENCIAS' ||
     ultimoStatusSeparacao === 'PENDENCIA' ||
     statusSeparacoes.includes('PENDENCIA');
 
-  return possuiIndicadorDePendencia && possuiSeparacaoEfetivada;
+  // A regra do card deve exigir que a resposta realmente indique produto faltando.
+  // Quando o ERP/endpoint não sinaliza explicitamente a falha, não contar como
+  // pedido faltando apenas por quantidade pendente isolada.
+  return possuiIndicadorDePendencia && (possuiSeparacaoEfetivada || possuiProdutosFaltando);
 };
 
 const hasStatusSeparacao = (pedido: Record<string, unknown>, status: string) => {
@@ -535,37 +562,8 @@ const shouldOcultarPedidoNoCardSeparado = (
 
 // Helper: verifica se o pedido deve aparecer nos alertas.
 // Pedidos de dias anteriores entram sempre.
-// Pedidos recebidos no dia atual ainda nao entram como atrasados.
-const isPedidoEntregue = (pedido: Record<string, unknown>, logistica: Record<string, any> | null) => {
-  const entregas = [
-    ...(Array.isArray(logistica?.entregas) ? logistica.entregas : []),
-    ...(Array.isArray((pedido.logistica as Record<string, any> | undefined)?.entregas)
-      ? (pedido.logistica as Record<string, any>).entregas
-      : []),
-  ];
-  return entregas.some((entrega: Record<string, any>) =>
-    ['S', 'SIM', 'TRUE', '1'].includes(String(entrega.ENTREGUE ?? entrega.entregue ?? '').trim().toUpperCase()) ||
-    Boolean(entrega.BAIXA_ENTREGA_ID ?? entrega.baixa_entrega_id ?? entrega.DATA_HORA_BAIXA ?? entrega.data_hora_baixa)
-  );
-};
-
-const isSeparacaoCancelada = (pedido: Record<string, unknown>, logistica: Record<string, any> | null) => {
-  const separacoes = Array.isArray(logistica?.separacoes) ? logistica.separacoes : [];
-  const statusPedido = [
-    pedido.ultimo_status_separacao,
-    pedido.status_separacoes,
-    (pedido.status_logistico as Record<string, unknown> | undefined)?.status_separacao,
-  ]
-    .map((status) => String(status ?? '').trim().toUpperCase())
-    .filter(Boolean);
-  return statusPedido.some((status) => status === 'C' || status.includes('CANC_SEP')) || separacoes.some((separacao: Record<string, any>) =>
-    String(separacao.STATUS ?? '').trim().toUpperCase() === 'C' ||
-    String(separacao.PROCESSO_ALTERACAO ?? '').trim().toUpperCase().startsWith('CANC_SEP')
-  );
-};
-
-const isPedidoParaAlerta = (pedido: Record<string, unknown>, logistica: Record<string, any> | null): boolean => {
-  if (isPedidoEntregue(pedido, logistica) || isSeparacaoCancelada(pedido, logistica)) return false;
+// Pedidos do dia atual entram somente depois das 16:00.
+const isPedidoParaAlerta = (pedido: Record<string, unknown>): boolean => {
   const dataHoraRecebimento = getPedidoDataHoraRecebimento(pedido);
   if (!dataHoraRecebimento) return true; // Se não tem data, considera para alerta
 
@@ -597,7 +595,7 @@ const isPedidoParaAlerta = (pedido: Record<string, unknown>, logistica: Record<s
   if (dataRecebimento > hoje) return false;
 
   const minutosAtuais = Number(agoraPartes.hour || 0) * 60 + Number(agoraPartes.minute || 0);
-  return false;
+  return minutosAtuais >= 16 * 60;
 };
 
 // Helper: deriva o status de alerta baseado no status de separação
@@ -949,13 +947,14 @@ export default async function handler(
       )),
       timed(
         'notas_externas',
+        // Sempre buscar notas externas para poder vincular com controles locais
+        // mesmo em escopo principal, mas com limite menor
         apiExternaService.listarNotasFiscaisCompletas(
-          { limit: 500, offset: 0 },
+          { limit: escopoPrincipal ? 100 : 500, offset: 0 },
           username,
           password,
-          escopoPrincipal ? 8_000 : 10_000
-        )
-          .catch(() => null) // Se falhar em escopo principal, continua sem notas
+          escopoPrincipal ? 4_000 : 6_000
+        ).catch(() => null) // Se falhar em escopo principal, continua sem notas
       ),
       timed('notas_locais', prisma.notaFiscal.findMany({
         where: {
@@ -996,6 +995,7 @@ export default async function handler(
           },
         },
         orderBy: { dataCriacao: 'desc' },
+        take: MAX_NOTAS_EM_CONTROLE_DETALHE,
       })),
     ]);
     res.setHeader(
@@ -1150,6 +1150,36 @@ export default async function handler(
         notaCompletaPorChave.get(onlyDigits(notaLocal.codigo)) ||
         notaCompletaPorNumero.get(normalizeNumeroNota(notaLocal.numeroNota));
       if (!notaExterna) {
+        const numeroNotaLocal = normalizeNumeroNota(notaLocal.numeroNota);
+        const pedidoIdLocal = toNumber(numeroNotaLocal);
+        if (pedidoIdLocal && !pedidosEmbarcadosLocais.has(pedidoIdLocal)) {
+          const controleInfo =
+            getControleInfoByReferencia({
+              numeroNota: notaLocal.numeroNota,
+              chave: onlyDigits(notaLocal.codigo),
+            }) || null;
+          pedidosEmbarcadosLocais.set(pedidoIdLocal, {
+            pedidoId: pedidoIdLocal,
+            tipoEntrega: 'EPG',
+            clienteNome: `Nota fiscal ${notaLocal.numeroNota}`,
+            nomeFantasia: null,
+            valorPedido: null,
+            dataHoraRecebimento: notaLocal.dataCriacao?.toISOString?.() || null,
+            previsaoEntrega: null,
+            localNome: getControleLocalNome(controleInfo),
+            statusCodigo: 'PEDIDOS_EMBARCADOS',
+            statusDescricao: STATUS_META.PEDIDOS_EMBARCADOS.titulo,
+            statusSeparacao: STATUS_META.PEDIDOS_EMBARCADOS.statusSeparacao,
+            situacaoAtual: STATUS_META.PEDIDOS_EMBARCADOS.titulo,
+            usuarioConfirmacaoNome: null,
+            dataHoraConfirmacao: null,
+            dataHoraControle: controleInfo?.dataHoraControle || null,
+            transportadoraNome: controleInfo?.transportadoraNome || null,
+            possuiProdutosFaltando: false,
+            totalItensPendentes: 0,
+            produtosPendentes: [],
+          });
+        }
         continue;
       }
 
@@ -1164,7 +1194,7 @@ export default async function handler(
           notaExterna.tipoEntrega,
           notaExterna.TIPO_ENTREGA_DESCRICAO,
           notaExterna.tipo_entrega_descricao
-        ) || 'EPG';
+        ) || null;
       if (
         !isPedidoPermitidoNoDashboard(
           {
@@ -1176,11 +1206,6 @@ export default async function handler(
       ) {
         continue;
       }
-
-      const notaConfirmada =
-        deriveDashboardStatus(notaExterna, (notaExterna.status_logistico || {}) as Record<string, unknown>, {}) ===
-        'PEDIDO_EMBARCADO';
-      if (!notaConfirmada) continue;
 
       if (dashboardPedidoIds.has(pedidoId)) {
         pedidosEmbarcadosPorNota.add(pedidoId);
@@ -1280,7 +1305,9 @@ export default async function handler(
           }
 
           const possuiPendencia = isPedidoComPendencias(pedido, logistica);
-          const statusCodigo = statusCodigoBase;
+          const ocultarNoCardSeparado =
+            statusCodigoBase === 'PEDIDO_SEPARADO' && shouldOcultarPedidoNoCardSeparado(pedido, logistica);
+          const statusCodigo = ocultarNoCardSeparado ? 'PEDIDO_EMBARCADO' : statusCodigoBase;
           const statusSeparacaoAtual = STATUS_META[statusCodigo].statusSeparacao;
           let referenciaNota = notaPorPedido.get(pedidoId) || null;
 
@@ -1305,8 +1332,7 @@ export default async function handler(
           }
 
           const embarcadoNoControle =
-            statusCodigoBase === 'PEDIDO_EMBARCADO' &&
-            (pedidosEmbarcadosPorNota.has(pedidoId) || isNotaEmControle(referenciaNota));
+            pedidosEmbarcadosPorNota.has(pedidoId) || isNotaEmControle(referenciaNota);
           const controleInfo = getControleInfoByReferencia(referenciaNota);
           const produtosPendentes = possuiPendencia ? getProdutosPendentes(logistica, 'PENDENCIA') : [];
 
@@ -1339,7 +1365,7 @@ export default async function handler(
             produtosPendentes,
           };
 
-          const alertaStatus = isPedidoParaAlerta(pedido, logistica)
+          const alertaStatus = isPedidoParaAlerta(pedido)
             ? deriveAlertaStatus(statusCodigo, possuiPendencia, embarcadoNoControle)
             : null;
 

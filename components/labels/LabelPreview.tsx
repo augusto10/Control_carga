@@ -125,6 +125,7 @@ export function LabelPreview({ produto, quantidade, labelType = 'UNITARIA' }: La
   const isA4ProductVertical = labelType === 'A4_PRODUTO_VERTICAL';
   const isA4ProductVerticalDouble = labelType === 'A4_PRODUTO_VERTICAL_DUPLA';
   const isA4ProductVerticalLargeDouble = labelType === 'A4_PRODUTO_VERTICAL_GRANDE_DUPLA';
+  const isA4ProductVerticalTriple = labelType === 'A4_PRODUTO_VERTICAL_TRIPLA';
   const selectedBarcode = isClosedBox ? produto.codigoBarrasCaixaFechada : produto.codigoBarras;
   const barcode = analyzeBarcode(selectedBarcode);
   const total = Math.max(1, quantidade);
@@ -140,15 +141,17 @@ export function LabelPreview({ produto, quantidade, labelType = 'UNITARIA' }: La
             : isA4ProductVertical
               ? ' - 1 por folha A4'
               : isA4ProductVerticalDouble
-                ? ' - 3 por folha A4 paisagem'
+                ? ' - 3 por folha A4'
                 : isA4ProductVerticalLargeDouble
                   ? ' - 2 por folha A4 paisagem'
+                  : isA4ProductVerticalTriple
+                    ? ' - 3 por folha A4'
                 : ''}
       </Typography>
       <Box
         sx={{
           display: 'grid',
-          gridTemplateColumns: isA4Product || isA4ProductLandscape || isA4ProductVertical || isA4ProductVerticalDouble || isA4ProductVerticalLargeDouble
+          gridTemplateColumns: isA4Product || isA4ProductLandscape || isA4ProductVertical || isA4ProductVerticalDouble || isA4ProductVerticalLargeDouble || isA4ProductVerticalTriple
             ? '1fr'
             : isClosedBox
               ? { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' }
@@ -157,14 +160,14 @@ export function LabelPreview({ produto, quantidade, labelType = 'UNITARIA' }: La
         }}
       >
         {Array.from({ length: total }).map((_, index) => (
-          isA4Product || isA4ProductLandscape ? (
+          isA4Product || isA4ProductLandscape || isA4ProductVerticalTriple ? (
             <Box
               key={index}
               sx={{
                 width: '100%',
                 maxWidth: isA4ProductLandscape ? 1280 : 720,
                 mx: 'auto',
-                aspectRatio: isA4ProductLandscape ? '287 / 200' : '180 / 110',
+                aspectRatio: isA4ProductLandscape ? '287 / 200' : isA4ProductVerticalTriple ? '150 / 60' : '180 / 110',
                 border: '2px solid #172033',
                 borderRadius: 2,
                 overflow: 'hidden',
@@ -227,7 +230,7 @@ export function LabelPreview({ produto, quantidade, labelType = 'UNITARIA' }: La
             </Box>
           ) : isA4ProductVertical ? (
             <ProductVerticalPreview key={index} produto={produto} selectedBarcode={selectedBarcode} />
-          ) : isA4ProductVerticalDouble || isA4ProductVerticalLargeDouble ? (
+          ) : isA4ProductVerticalDouble || isA4ProductVerticalLargeDouble || isA4ProductVerticalTriple ? (
             <Box
               key={index}
               sx={{
@@ -243,12 +246,12 @@ export function LabelPreview({ produto, quantidade, labelType = 'UNITARIA' }: La
               <Box
                 sx={{
                   display: 'grid',
-                  gridTemplateColumns: { xs: '1fr', md: `repeat(${isA4ProductVerticalDouble ? 3 : 2}, minmax(0, 1fr))` },
+                  gridTemplateColumns: { xs: '1fr', md: `repeat(${isA4ProductVerticalDouble || isA4ProductVerticalTriple ? 3 : 2}, minmax(0, 1fr))` },
                   gap: 2.5,
                 }}
               >
-                {Array.from({ length: isA4ProductVerticalDouble ? 3 : 2 }).map((_, previewIndex) => (
-                  <ProductVerticalPreview key={previewIndex} produto={produto} selectedBarcode={selectedBarcode} compact large={isA4ProductVerticalLargeDouble} />
+                {Array.from({ length: isA4ProductVerticalDouble || isA4ProductVerticalTriple ? 3 : 2 }).map((_, previewIndex) => (
+                  <ProductVerticalPreview key={previewIndex} produto={produto} selectedBarcode={selectedBarcode} compact large={isA4ProductVerticalLargeDouble || isA4ProductVerticalTriple} />
                 ))}
               </Box>
             </Box>

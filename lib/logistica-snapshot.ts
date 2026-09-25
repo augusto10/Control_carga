@@ -917,14 +917,20 @@ export async function montarDashboardPorSnapshot(
     const dataFimLimite = periodo.dataFim
       ? new Date(periodo.dataFim.getFullYear(), periodo.dataFim.getMonth(), periodo.dataFim.getDate(), 23, 59, 59, 999)
       : null;
+    const periodoDatas = periodo.dataInicio || dataFimLimite
+      ? {
+          ...(periodo.dataInicio ? { gte: periodo.dataInicio } : {}),
+          ...(dataFimLimite ? { lte: dataFimLimite } : {}),
+        }
+      : null;
     snapshots = await (prisma as any).pedidoLogisticaSnapshot.findMany({
       where: {
-        ...(periodo.dataInicio || dataFimLimite
+        ...(periodoDatas
           ? {
-              dataRecebimentoDia: {
-                ...(periodo.dataInicio ? { gte: periodo.dataInicio } : {}),
-                ...(dataFimLimite ? { lte: dataFimLimite } : {}),
-              },
+              OR: [
+                { dataRecebimentoDia: periodoDatas },
+                { dataHoraControle: periodoDatas },
+              ],
             }
           : {}),
       },

@@ -38,6 +38,15 @@ interface NotaFiscalExterna {
   volumes?: number;
   peso?: number;
   observacoes?: string;
+  itens?: Array<{
+    produtoId?: number;
+    codigo?: string;
+    nome?: string;
+    quantidade?: number;
+    valorUnitario?: number;
+    valorTotal?: number;
+    unidade?: string;
+  }>;
   [key: string]: any;
 }
 

@@ -40,6 +40,7 @@ const LABEL_OPTIONS: Array<{ value: LabelType; label: string }> = [
   { value: 'A4_PRODUTO_VERTICAL', label: 'Produto vertical 20 x 28,7 cm (1 por A4)' },
   { value: 'A4_PRODUTO_VERTICAL_DUPLA', label: 'Produto vertical 8 x 14 cm A4 paisagem (3 por A4)' },
   { value: 'A4_PRODUTO_VERTICAL_GRANDE_DUPLA', label: 'Produto vertical grande 13,5 x 19 cm A4 paisagem (2 por A4)' },
+  { value: 'A4_PRODUTO_VERTICAL_TRIPLA', label: 'Produto 15 x 6 cm (3 por A4)' },
   { value: 'UNITARIA', label: 'Produto (3 por linha)' },
   { value: 'CAIXA_FECHADA', label: 'Caixa fechada 100 x 60 mm' },
 ];

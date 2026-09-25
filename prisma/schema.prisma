@@ -552,6 +552,23 @@ model Roteirizacao {
   @@index([criadoPor])
 }
 
+model RotaPrazoEntrega {
+  id              String   @id @default(uuid())
+  codigo          String
+  uf              String
+  prazo           String
+  regiao          String
+  transportadora  String
+  ativo           Boolean  @default(true)
+  dataCriacao     DateTime @default(now())
+  dataAtualizacao DateTime @updatedAt
+
+  @@unique([codigo, transportadora])
+  @@index([uf])
+  @@index([regiao])
+  @@index([transportadora])
+}
+
 enum CondicaoEmbalagem {
   OTIMA
   BOA

@@ -112,7 +112,7 @@ const isDashboardFallbackVazio = (data: DashboardResponse) =>
 const getPedidosEntrega = (item?: DashboardItem) => Array.from(
   new Map(
     (item?.pedidos || [])
-      .filter((pedido) => ['ENT', 'EPG'].includes(String(pedido.tipoEntrega || '').trim().toUpperCase()))
+      .filter((pedido) => !pedido.tipoEntrega || ['ENT', 'EPG'].includes(String(pedido.tipoEntrega || '').trim().toUpperCase()))
       .map((pedido) => [pedido.pedidoId, pedido] as const)
   ).values()
 );
@@ -256,8 +256,13 @@ export default function ControlePedidosPainel() {
                   naoSeparado: getTotalAlerta('ALERTAS_NAO_SEPARADOS'),
                   naoConferido: getTotalAlerta('ALERTAS_NAO_CONFERIDOS'),
                   naoEmbarcado: getTotalAlerta('ALERTAS_NAO_EMBARCADOS'),
+                  naoEntregue: getTotal('PEDIDOS_EMBARCADOS'),
                   total: totalPedidosAlertas,
                   onClick: () => undefined,
+                  onNaoSeparadoClick: () => undefined,
+                  onNaoConferidoClick: () => undefined,
+                  onNaoEmbarcadoClick: () => undefined,
+                  onNaoEntregueClick: () => undefined,
                 }}
                 pendencias={{
                   total: getTotalAlerta('PENDENCIAS'),

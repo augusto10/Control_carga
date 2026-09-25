@@ -75,22 +75,27 @@ function formatPercent(done, total) {
 }
 
 async function readEnv(projectRoot) {
-  const envFile = path.join(projectRoot, ".env.local");
+  const envFiles = [
+    path.join(projectRoot, ".env.local"),
+    path.join(projectRoot, ".env")
+  ];
   const env = { ...process.env };
 
-  try {
-    const content = await fs.readFile(envFile, "utf8");
-    for (const line of content.split(/\r?\n/)) {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith("#")) continue;
-      const separator = trimmed.indexOf("=");
-      if (separator === -1) continue;
-      const key = trimmed.slice(0, separator);
-      const value = trimmed.slice(separator + 1);
-      if (!env[key]) env[key] = value;
+  for (const envFile of envFiles) {
+    try {
+      const content = await fs.readFile(envFile, "utf8");
+      for (const line of content.split(/\r?\n/)) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith("#")) continue;
+        const separator = trimmed.indexOf("=");
+        if (separator === -1) continue;
+        const key = trimmed.slice(0, separator);
+        const value = trimmed.slice(separator + 1);
+        if (!env[key]) env[key] = value;
+      }
+    } catch {
+      // Permite uso somente com variaveis de ambiente do processo.
     }
-  } catch {
-    // Permite uso somente com variaveis de ambiente do processo.
   }
 
   return env;
@@ -831,6 +836,10 @@ async function getAccessToken(env, baseUrl) {
   const username = env.ERP_API_USERNAME ?? env.API_EXTERNA_USERNAME;
   const password = env.ERP_API_PASSWORD ?? env.API_EXTERNA_PASSWORD;
 
+  console.log(`[DEBUG] Tentando login com URL: ${baseUrl}/token`);
+  console.log(`[DEBUG] Username: ${username}`);
+  console.log(`[DEBUG] Password configurado: ${password ? 'SIM' : 'NAO'}`);
+
   if (!username || !password) {
     throw new Error("Configure ERP_API_USERNAME e ERP_API_PASSWORD em .env.local");
   }
@@ -840,19 +849,21 @@ async function getAccessToken(env, baseUrl) {
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
     },
-    body: new URLSearchParams({ username, password }).toString(),
+    body: new URLSearchParams({ username, password, grant_type: "password" }).toString(),
   });
 
+  console.log(`[DEBUG] Response status: ${response.status}`);
+  console.log(`[DEBUG] Response headers:`, Object.fromEntries(response.headers.entries()));
+
   if (!response.ok) {
+    const errorText = await response.text();
+    console.log(`[DEBUG] Error response body: ${errorText}`);
     throw new Error(`Token response ${response.status}`);
   }
 
-  const payload = await response.json();
-  if (!payload.access_token) {
-    throw new Error("Token nao retornado pela integracao");
-  }
-
-  return payload.access_token;
+  const data = await response.json();
+  const token = data.access_token || data.token;
+  return token;
 }
 
 function tokenExpiresAt(token) {
@@ -1148,7 +1159,7 @@ function normalizeProduct(detail, index, images, companyId, syncListSignature = 
 async function main() {
   const projectRoot = process.cwd();
   const env = await readEnv(projectRoot);
-  const baseUrl = env.ERP_API_URL || env.ERP_API_BASE_URL || DEFAULT_BASE_URL;
+  const baseUrl = env.ERP_API_URL || env.ERP_API_BASE_URL || env.API_EXTERNA_BASE_URL || DEFAULT_BASE_URL;
   const legacyProductsPath = env.ERP_SYNC_PRODUCTS_PATH ?? env.ERP_PRODUCTS_PATH ?? "";
   const productsPath =
     !legacyProductsPath || legacyProductsPath === "/api/v1/consultas/produtos"
