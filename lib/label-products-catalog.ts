@@ -51,3 +51,15 @@ export function getLabelProductsCatalogInfo() {
     }, null),
   };
 }
+
+/** Map de id (=PRODUTO_ID do ERP) para codigoAdm, para lookup rápido nos itens de pedido. */
+const admById = new Map<string, string>(products.map((p) => [String(p.id), p.codigoAdm]));
+
+/**
+ * Retorna o Código ADM do produto dado seu ID (PRODUTO_ID do ERP).
+ * Retorna null se o produto não estiver na base local.
+ */
+export function getLabelProductAdmById(produtoId: string | number | null | undefined): string | null {
+  if (produtoId === null || produtoId === undefined) return null;
+  return admById.get(String(produtoId)) ?? null;
+}

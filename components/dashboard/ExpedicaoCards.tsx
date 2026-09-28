@@ -18,13 +18,13 @@ interface AlertSummary {
   naoSeparado: number;
   naoConferido: number;
   naoEmbarcado: number;
-  naoEntregue: number;
+  naoEntregue?: number;
   total: number;
   onClick: () => void;
-  onNaoSeparadoClick: () => void;
-  onNaoConferidoClick: () => void;
-  onNaoEmbarcadoClick: () => void;
-  onNaoEntregueClick: () => void;
+  onNaoSeparadoClick?: () => void;
+  onNaoConferidoClick?: () => void;
+  onNaoEmbarcadoClick?: () => void;
+  onNaoEntregueClick?: () => void;
 }
 
 interface PendenciasSummary {
@@ -192,21 +192,21 @@ export function ExpedicaoCards({
             </div>
 
             <div className="mt-3 space-y-1 text-[11px] font-bold sm:text-xs">
-              <button type="button" onClick={(event) => { event.stopPropagation(); alertas.onNaoSeparadoClick(); }} className="grid w-full grid-cols-[1fr_auto] items-center gap-3 rounded-md text-left transition hover:bg-white/10">
+              <button type="button" onClick={(event) => { event.stopPropagation(); alertas.onNaoSeparadoClick?.(); }} className="grid w-full grid-cols-[1fr_auto] items-center gap-3 rounded-md text-left transition hover:bg-white/10">
                 <span className="uppercase">Não foram separados:</span>
-                <strong className="text-2xl sm:text-3xl">{loadingSecondary ? '-' : alertas.naoSeparado || ''}</strong>
+                <strong className="text-xl sm:text-2xl">{loadingSecondary ? '-' : alertas.naoSeparado || '0'}</strong>
               </button>
-              <button type="button" onClick={(event) => { event.stopPropagation(); alertas.onNaoConferidoClick(); }} className="grid w-full grid-cols-[1fr_auto] items-center gap-3 rounded-md text-left transition hover:bg-white/10">
+              <button type="button" onClick={(event) => { event.stopPropagation(); alertas.onNaoConferidoClick?.(); }} className="grid w-full grid-cols-[1fr_auto] items-center gap-3 rounded-md text-left transition hover:bg-white/10">
                 <span className="uppercase">Não foram conferidos:</span>
-                <strong className="text-2xl sm:text-3xl">{loadingSecondary ? '-' : alertas.naoConferido || ''}</strong>
+                <strong className="text-xl sm:text-2xl">{loadingSecondary ? '-' : alertas.naoConferido || '0'}</strong>
               </button>
-              <button type="button" onClick={(event) => { event.stopPropagation(); alertas.onNaoEmbarcadoClick(); }} className="grid w-full grid-cols-[1fr_auto] items-center gap-3 rounded-md text-left transition hover:bg-white/10">
+              <button type="button" onClick={(event) => { event.stopPropagation(); alertas.onNaoEmbarcadoClick?.(); }} className="grid w-full grid-cols-[1fr_auto] items-center gap-3 rounded-md text-left transition hover:bg-white/10">
                 <span className="uppercase">Não foram embarcados:</span>
-                <strong className="text-2xl sm:text-3xl">{loadingSecondary ? '-' : alertas.naoEmbarcado || ''}</strong>
+                <strong className="text-xl sm:text-2xl">{loadingSecondary ? '-' : alertas.naoEmbarcado || '0'}</strong>
               </button>
-              <button type="button" onClick={(event) => { event.stopPropagation(); alertas.onNaoEntregueClick(); }} className="grid w-full grid-cols-[1fr_auto] items-center gap-3 rounded-md text-left transition hover:bg-white/10">
-                <span className="uppercase">Não entregues:</span>
-                <strong className="text-2xl sm:text-3xl">{loadingSecondary ? '-' : alertas.naoEntregue || ''}</strong>
+              <button type="button" onClick={(event) => { event.stopPropagation(); alertas.onNaoEntregueClick?.(); }} className="grid w-full grid-cols-[1fr_auto] items-center gap-3 rounded-md text-left transition hover:bg-white/10">
+                <span className="uppercase">Pedidos não entregues:</span>
+                <strong className="text-xl sm:text-2xl">{loadingSecondary ? '-' : alertas.naoEntregue || '0'}</strong>
               </button>
             </div>
           </div>
@@ -253,31 +253,41 @@ export function ExpedicaoCards({
               </div>
             </div>
 
-            <div className="mt-3 grid min-h-0 flex-1 content-start gap-1 overflow-y-auto pr-1 text-[10px] sm:text-[11px]">
+            <div className="relative mt-3 h-[145px] min-h-[145px] overflow-hidden pr-1 text-[10px] sm:text-[11px]">
               {loadingSecondary ? (
                 <div className="flex items-center gap-2 font-bold">
                   <Loader2 className="h-4 w-4 animate-spin" />
                   <span>Carregando produtos não encontrados...</span>
                 </div>
               ) : pendencias.pedidos.length > 0 ? (
-                pendencias.pedidos.slice(0, 6).map((pedido) => (
-                  <div key={pedido.pedidoId} className="rounded-lg border border-white/20 bg-black/10 px-2.5 py-2">
-                    <strong className="text-xs uppercase sm:text-sm">Pedido #{pedido.pedidoId}</strong>
-                    <div className="mt-1 space-y-0.5 font-semibold">
-                      {pedido.produtosPendentes?.length ? pedido.produtosPendentes.map((produto) => (
-                        <div key={`${pedido.pedidoId}-${produto.produtoId ?? produto.codigo ?? produto.nome}`} className="grid grid-cols-[1fr_auto] gap-2">
-                          <span className="truncate">{produto.codigo ? `${produto.codigo} - ` : ''}{produto.nome}</span>
-                          <strong>Qtd. {produto.quantidade}</strong>
-                        </div>
-                      )) : (
-                        <div className="grid grid-cols-[1fr_auto] gap-2">
-                          <span>Itens pendentes</span>
-                          <strong>{pedido.totalItensPendentes}</strong>
-                        </div>
-                      )}
+                <motion.div
+                  className="flex flex-col gap-1.5"
+                  animate={pendencias.pedidos.length > 2 ? { y: ['0%', '-50%'] } : undefined}
+                  transition={pendencias.pedidos.length > 2 ? {
+                    duration: Math.max(10, pendencias.pedidos.length * 3.5),
+                    ease: 'linear',
+                    repeat: Infinity,
+                  } : undefined}
+                >
+                  {(pendencias.pedidos.length > 2 ? [...pendencias.pedidos, ...pendencias.pedidos] : pendencias.pedidos).map((pedido, idx) => (
+                    <div key={`pend-${pedido.pedidoId}-${idx}`} className="rounded-lg border border-white/20 bg-black/15 px-2.5 py-1.5">
+                      <strong className="text-xs uppercase sm:text-sm text-amber-200">Pedido #{pedido.pedidoId}</strong>
+                      <div className="mt-1 space-y-0.5 font-semibold">
+                        {pedido.produtosPendentes?.length ? pedido.produtosPendentes.map((produto, pIdx) => (
+                          <div key={`p-${pedido.pedidoId}-${idx}-${pIdx}`} className="grid grid-cols-[1fr_auto] gap-2">
+                            <span className="truncate">{produto.codigo ? `${produto.codigo} - ` : ''}{produto.nome}</span>
+                            <strong className="text-red-300">Qtd. {produto.quantidade}</strong>
+                          </div>
+                        )) : (
+                          <div className="grid grid-cols-[1fr_auto] gap-2">
+                            <span>Itens pendentes</span>
+                            <strong>{pedido.totalItensPendentes}</strong>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))
+                  ))}
+                </motion.div>
               ) : hasPendencias ? (
                 <div className="grid grid-cols-[1fr_auto] items-center gap-2 font-bold leading-tight">
                   <span className="uppercase">Pedido:</span>

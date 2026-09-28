@@ -9,11 +9,19 @@ const SIM = new Set(['S', 'SIM', 'TRUE', '1', 'Y', 'YES']);
 const ehVerdadeiro = (value: unknown) => SIM.has(String(value ?? '').trim().toUpperCase());
 
 /** Usa o ADM do produto no painel; CODIGO_ORIGINAL e CODIGO_BARRAS sao apenas identificadores auxiliares. */
-export const codigoAdmDoProduto = (item: Record<string, unknown>): string | null =>
-  ['CODIGO_ADM', 'codigo_adm', 'CODIGO_ADM_PRODUTO', 'codigoAdm', 'ADM', 'adm']
+export const codigoAdmDoProduto = (item: Record<string, unknown>): string | null => {
+  const direto = ['CODIGO_ADM', 'codigo_adm', 'CODIGO_ADM_PRODUTO', 'codigoAdm', 'ADM', 'adm']
     .map((campo) => item[campo])
-    .map((value) => typeof value === 'string' || typeof value === 'number' ? String(value).trim() : '')
-    .find(Boolean) || null;
+    .map((value) => (typeof value === 'string' || typeof value === 'number') ? String(value).trim() : '')
+    .find(Boolean);
+  if (direto) return direto;
+
+  const id = item.PRODUTO_ID ?? item.produto_id ?? item.PRODUTO ?? item.produto;
+  if (id !== null && id !== undefined && String(id).trim() !== '') {
+    return String(id).trim();
+  }
+  return null;
+};
 
 const temQuantidadeDevolvida = (value: Record<string, unknown>) =>
   ['DEVOLVIDOS', 'devolvidos', 'QUANTIDADE_DEVOLVIDA', 'quantidade_devolvida', 'QTD_DEVOLVIDA', 'qtd_devolvida']

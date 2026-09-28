@@ -58,23 +58,20 @@ export default function EtiquetasPorMarcaPage() {
   const [catalogUpdatedAt, setCatalogUpdatedAt] = useState<string | null>(null);
   const [visibleCount, setVisibleCount] = useState(PRODUCTS_BATCH_SIZE);
 
-  const printableProducts = useMemo(() => produtos.filter((produto) => {
-    const code = labelType === 'CAIXA_FECHADA' ? produto.codigoBarrasCaixaFechada : produto.codigoBarras;
-    return analyzeBarcode(code).isValid;
-  }), [labelType, produtos]);
+  // Todos os produtos da marca (com ou sem código de barras)
+  const allProducts = useMemo(() => produtos, [produtos]);
 
   const visibleProducts = useMemo(
-    () => printableProducts.slice(0, visibleCount),
-    [printableProducts, visibleCount],
+    () => allProducts.slice(0, visibleCount),
+    [allProducts, visibleCount],
   );
-  const printableIds = useMemo(() => new Set(printableProducts.map((produto) => produto.produtoId)), [printableProducts]);
-  const selectedCount = Array.from(selecionados).filter((id) => printableIds.has(id)).length;
-  const allSelected = printableProducts.length > 0 && selectedCount === printableProducts.length;
+  const selectedCount = selecionados.size;
+  const allSelected = allProducts.length > 0 && selectedCount === allProducts.length;
   const someSelected = selectedCount > 0 && !allSelected;
 
   useEffect(() => {
     setVisibleCount(PRODUCTS_BATCH_SIZE);
-  }, [printableProducts.length, labelType]);
+  }, [allProducts.length, labelType]);
 
   async function handleSearch() {
     const value = marca.trim();
@@ -123,7 +120,7 @@ export default function EtiquetasPorMarcaPage() {
   }
 
   function toggleAll() {
-    setSelecionados(allSelected ? new Set() : new Set(printableProducts.map((produto) => produto.produtoId)));
+    setSelecionados(allSelected ? new Set() : new Set(allProducts.map((produto) => produto.produtoId)));
   }
 
   function handleLabelTypeChange(nextType: LabelType) {
@@ -137,14 +134,14 @@ export default function EtiquetasPorMarcaPage() {
     if (remaining > 120) return;
 
     setVisibleCount((current) => (
-      current >= printableProducts.length
+      current >= allProducts.length
         ? current
-        : Math.min(current + PRODUCTS_BATCH_SIZE, printableProducts.length)
+        : Math.min(current + PRODUCTS_BATCH_SIZE, allProducts.length)
     ));
   }
 
   function handleGeneratePdf() {
-    const selectedProducts = printableProducts.filter((produto) => selecionados.has(produto.produtoId));
+    const selectedProducts = allProducts.filter((produto) => selecionados.has(produto.produtoId));
     if (!selectedProducts.length) {
       enqueueSnackbar('Selecione pelo menos um produto para gerar o PDF.', { variant: 'warning' });
       return;
@@ -238,7 +235,7 @@ export default function EtiquetasPorMarcaPage() {
                   <Box>
                     <Typography variant="h6" fontWeight={900}>Produtos encontrados</Typography>
                     <Typography variant="body2" color="text.secondary">
-                      {printableProducts.length} compativeis com o modelo escolhido.
+                      {allProducts.length} produto(s) encontrado(s).
                     </Typography>
                     {catalogUpdatedAt && (
                       <Typography variant="caption" color="text.secondary">
@@ -249,7 +246,7 @@ export default function EtiquetasPorMarcaPage() {
                   <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} alignItems={{ sm: 'center' }}>
                     <FormControlLabel
                       control={<Checkbox checked={allSelected} indeterminate={someSelected} onChange={toggleAll} />}
-                      label={`Selecionar todos (${printableProducts.length})`}
+                      label={`Selecionar todos (${allProducts.length})`}
                     />
                     <Button
                       variant="contained"
@@ -264,11 +261,11 @@ export default function EtiquetasPorMarcaPage() {
                   </Stack>
                 </Stack>
 
-                {printableProducts.length === 0 ? (
+                {allProducts.length === 0 ? (
                   <Box sx={{ p: 6, textAlign: 'center' }}>
-                    <Typography fontWeight={800}>Nenhum produto compativel encontrado.</Typography>
+                    <Typography fontWeight={800}>Nenhum produto encontrado para esta marca.</Typography>
                     <Typography variant="body2" color="text.secondary">
-                      Confira a marca pesquisada ou troque o modelo da etiqueta.
+                      Confira a marca pesquisada.
                     </Typography>
                   </Box>
                 ) : (
@@ -295,6 +292,8 @@ export default function EtiquetasPorMarcaPage() {
                       <TableBody>
                         {visibleProducts.map((produto) => {
                           const selected = selecionados.has(produto.produtoId);
+                          const barcode = labelType === 'CAIXA_FECHADA' ? produto.codigoBarrasCaixaFechada : produto.codigoBarras;
+                          const hasBarcodeValido = analyzeBarcode(barcode).isValid;
                           return (
                             <TableRow key={produto.produtoId} hover selected={selected}>
                               <TableCell padding="checkbox">
@@ -316,21 +315,27 @@ export default function EtiquetasPorMarcaPage() {
                               </TableCell>
                               <TableCell>{produto.marca || '-'}</TableCell>
                               <TableCell>{produto.codigoAdm}</TableCell>
-                              <TableCell>{labelType === 'CAIXA_FECHADA' ? produto.codigoBarrasCaixaFechada || '-' : produto.codigoBarras || '-'}</TableCell>
+                              <TableCell>{barcode || '-'}</TableCell>
                               <TableCell align="center">
-                                <Typography variant="caption" fontWeight={800} color="success.main">
-                                  Pronto
-                                </Typography>
+                                {hasBarcodeValido ? (
+                                  <Typography variant="caption" fontWeight={800} color="success.main">
+                                    Pronto
+                                  </Typography>
+                                ) : (
+                                  <Typography variant="caption" fontWeight={800} color="warning.main">
+                                    Sem código de barras
+                                  </Typography>
+                                )}
                               </TableCell>
                             </TableRow>
                           );
                         })}
                       </TableBody>
                     </Table>
-                    {visibleProducts.length < printableProducts.length && (
+                    {visibleProducts.length < allProducts.length && (
                       <Box sx={{ p: 2, textAlign: 'center', color: 'text.secondary' }}>
                         <Typography variant="caption">
-                          Role para baixo para carregar mais produtos ({visibleProducts.length} de {printableProducts.length}).
+                          Role para baixo para carregar mais produtos ({visibleProducts.length} de {allProducts.length}).
                         </Typography>
                       </Box>
                     )}

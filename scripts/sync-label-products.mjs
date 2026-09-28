@@ -89,8 +89,11 @@ async function readEnv(projectRoot) {
         if (!trimmed || trimmed.startsWith("#")) continue;
         const separator = trimmed.indexOf("=");
         if (separator === -1) continue;
-        const key = trimmed.slice(0, separator);
-        const value = trimmed.slice(separator + 1);
+        const key = trimmed.slice(0, separator).trim();
+        let value = trimmed.slice(separator + 1).trim();
+        if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+          value = value.slice(1, -1);
+        }
         if (!env[key]) env[key] = value;
       }
     } catch {
@@ -836,10 +839,6 @@ async function getAccessToken(env, baseUrl) {
   const username = env.ERP_API_USERNAME ?? env.API_EXTERNA_USERNAME;
   const password = env.ERP_API_PASSWORD ?? env.API_EXTERNA_PASSWORD;
 
-  console.log(`[DEBUG] Tentando login com URL: ${baseUrl}/token`);
-  console.log(`[DEBUG] Username: ${username}`);
-  console.log(`[DEBUG] Password configurado: ${password ? 'SIM' : 'NAO'}`);
-
   if (!username || !password) {
     throw new Error("Configure ERP_API_USERNAME e ERP_API_PASSWORD em .env.local");
   }
@@ -852,12 +851,7 @@ async function getAccessToken(env, baseUrl) {
     body: new URLSearchParams({ username, password, grant_type: "password" }).toString(),
   });
 
-  console.log(`[DEBUG] Response status: ${response.status}`);
-  console.log(`[DEBUG] Response headers:`, Object.fromEntries(response.headers.entries()));
-
   if (!response.ok) {
-    const errorText = await response.text();
-    console.log(`[DEBUG] Error response body: ${errorText}`);
     throw new Error(`Token response ${response.status}`);
   }
 

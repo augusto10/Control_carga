@@ -1,6 +1,7 @@
 import { buscarEmbarquesAtuais } from '@/lib/pedido-embarques-atuais';
 import { dadosPedido } from '@/lib/pedido-apresentacao';
 import { saldoPendente, itensComSaldoPendente, pedidoTemDevolucao, pedidoTemEntregaGerada, codigoAdmDoProduto } from '@/lib/pedido-pendencias';
+import { getLabelProductAdmById } from '@/lib/label-products-catalog';
 import type { Prisma } from '@prisma/client';
 import prisma from '@/lib/prisma';
 import { apiExternaService } from '@/services/api-externa';
@@ -16,6 +17,7 @@ const STATUS_ORDER = [
   'ALERTAS_NAO_SEPARADOS',
   'ALERTAS_NAO_CONFERIDOS',
   'ALERTAS_NAO_EMBARCADOS',
+  'ALERTAS_NAO_ENTREGUES',
 ] as const;
 
 type StatusCode = (typeof STATUS_ORDER)[number];
@@ -110,6 +112,12 @@ const STATUS_META: Record<StatusCode, { codigo: StatusCode; titulo: string; desc
     titulo: 'PEDIDOS ATRASADOS: CONFERIDOS E NÃO EMBARCADOS',
     descricao: 'Pedidos conferidos aguardando embarque no controle',
     statusSeparacao: 'ALERTA_NAO_EMBARCADO',
+  },
+  ALERTAS_NAO_ENTREGUES: {
+    codigo: 'ALERTAS_NAO_ENTREGUES',
+    titulo: 'PEDIDOS ATRASADOS: NÃO ENTREGUES',
+    descricao: 'Pedidos embarcados aguardando confirmação de entrega',
+    statusSeparacao: 'ALERTA_NAO_ENTREGUE',
   },
 };
 
@@ -344,8 +352,8 @@ const agruparProdutosPendentes = (itens: Record<string, any>[]) => {
     const quantidade = saldoPendente(item);
     if (quantidade <= 0) continue;
 
-    const produtoId = toNumber(item.PRODUTO_ID);
-    const codigo = codigoAdmDoProduto(item);
+    const produtoId = toNumber(item.PRODUTO_ID ?? item.produto_id);
+    const codigo = getLabelProductAdmById(produtoId) || codigoAdmDoProduto(item) || (produtoId ? String(produtoId) : null);
     const nome = toStringValue(item.PRODUTO_NOME) || 'Produto nao informado';
     const chave = String(produtoId ?? codigo ?? nome);
     const atual = agrupados.get(chave);
@@ -374,8 +382,24 @@ export const possuiProdutosFaltandoNoConsolidado = (pedido: Record<string, unkno
       .toUpperCase()
   );
 
+const isSeparacaoCancelada = (pedido: Record<string, unknown> | null, logistica: Record<string, any> | null) => {
+  const separacoes = Array.isArray(logistica?.separacoes) ? logistica.separacoes : [];
+  const statusPedido = [
+    pedido?.ultimo_status_separacao,
+    pedido?.status_separacoes,
+    (pedido?.status_logistico as Record<string, unknown> | undefined)?.status_separacao,
+  ]
+    .map((status) => String(status ?? '').trim().toUpperCase())
+    .filter(Boolean);
+  return statusPedido.some((status) => status === 'C' || status.includes('CANC_SEP') || status === 'CANCELADA') || separacoes.some((separacao: Record<string, any>) =>
+    String(separacao.STATUS ?? '').trim().toUpperCase() === 'C' ||
+    String(separacao.STATUS ?? '').trim().toUpperCase() === 'CANCELADA' ||
+    String(separacao.PROCESSO_ALTERACAO ?? '').trim().toUpperCase().startsWith('CANC_SEP')
+  );
+};
+
 const isPedidoComPendencias = (pedido: Record<string, unknown>, logistica: Record<string, any> | null) => {
-  if (pedidoTemDevolucao(pedido, logistica)) return false;
+  if (pedidoTemDevolucao(pedido, logistica) || isSeparacaoCancelada(pedido, logistica)) return false;
 
   const statusLogisticoCodigo = toStringValue(
     (pedido.status_logistico as Record<string, unknown> | undefined)?.codigo
@@ -430,21 +454,6 @@ const isPedidoEntregue = (logistica: Record<string, any> | null) => {
   );
 };
 
-const isSeparacaoCancelada = (pedido: Record<string, unknown> | null, logistica: Record<string, any> | null) => {
-  const separacoes = Array.isArray(logistica?.separacoes) ? logistica.separacoes : [];
-  const statusPedido = [
-    pedido?.ultimo_status_separacao,
-    pedido?.status_separacoes,
-    (pedido?.status_logistico as Record<string, unknown> | undefined)?.status_separacao,
-  ]
-    .map((status) => String(status ?? '').trim().toUpperCase())
-    .filter(Boolean);
-  return statusPedido.some((status) => status === 'C' || status.includes('CANC_SEP')) || separacoes.some((separacao: Record<string, any>) =>
-    String(separacao.STATUS ?? '').trim().toUpperCase() === 'C' ||
-    String(separacao.PROCESSO_ALTERACAO ?? '').trim().toUpperCase().startsWith('CANC_SEP')
-  );
-};
-
 const isPedidoParaAlerta = (dataHoraRecebimento: Date | null, pedido: Record<string, unknown> | null, logistica: Record<string, any> | null) => {
   if (isPedidoEntregue(logistica) || isSeparacaoCancelada(pedido, logistica)) return false;
   if (!dataHoraRecebimento) return true;
@@ -474,7 +483,8 @@ const deriveAlertaStatus = (
   possuiPendencia: boolean,
   embarcadoNoControle: boolean
 ): StatusCode | null => {
-  if (embarcadoNoControle || possuiPendencia) return null;
+  if (possuiPendencia) return null;
+  if (embarcadoNoControle) return 'ALERTAS_NAO_ENTREGUES';
   if (statusCodigo === 'PEDIDO_NOVO' || statusCodigo === 'PEDIDO_EM_SEPARACAO') return 'ALERTAS_NAO_SEPARADOS';
   if (statusCodigo === 'PEDIDO_SEPARADO') return 'ALERTAS_NAO_CONFERIDOS';
   if (statusCodigo === 'PEDIDO_EMBARCADO') return 'ALERTAS_NAO_EMBARCADOS';
@@ -917,20 +927,14 @@ export async function montarDashboardPorSnapshot(
     const dataFimLimite = periodo.dataFim
       ? new Date(periodo.dataFim.getFullYear(), periodo.dataFim.getMonth(), periodo.dataFim.getDate(), 23, 59, 59, 999)
       : null;
-    const periodoDatas = periodo.dataInicio || dataFimLimite
-      ? {
-          ...(periodo.dataInicio ? { gte: periodo.dataInicio } : {}),
-          ...(dataFimLimite ? { lte: dataFimLimite } : {}),
-        }
-      : null;
     snapshots = await (prisma as any).pedidoLogisticaSnapshot.findMany({
       where: {
-        ...(periodoDatas
+        ...(periodo.dataInicio || dataFimLimite
           ? {
-              OR: [
-                { dataRecebimentoDia: periodoDatas },
-                { dataHoraControle: periodoDatas },
-              ],
+              dataRecebimentoDia: {
+                ...(periodo.dataInicio ? { gte: periodo.dataInicio } : {}),
+                ...(dataFimLimite ? { lte: dataFimLimite } : {}),
+              },
             }
           : {}),
       },

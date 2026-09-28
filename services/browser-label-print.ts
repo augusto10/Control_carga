@@ -205,22 +205,23 @@ export async function printProductLabelsInBrowser(
   const labelItems = produtos.flatMap((produto) => {
     const selectedBarcode = isClosedBox ? produto.codigoBarrasCaixaFechada : produto.codigoBarras;
     const barcode = analyzeBarcode(selectedBarcode);
-    if (!barcode.isValid || barcode.type === 'UNSUPPORTED') {
-      throw new Error(`${produto.nome}: ${barcode.reason || 'codigo de barras invalido.'}`);
-    }
 
-    const barcodeSvg = buildBarcodeSvg(
-      barcode.normalizedValue,
-      barcode.type,
-      isBrowserA4Product
-        ? {
-            displayValue: false,
-            height: isA4ProductVerticalDouble ? 34 : isA4ProductVerticalLargeDouble || isA4ProductVerticalTriple ? 46 : 50,
-            width: isA4ProductVerticalDouble ? (barcode.type === 'CODE128' ? 1.25 : 1.45) : isA4ProductVerticalLargeDouble || isA4ProductVerticalTriple ? (barcode.type === 'CODE128' ? 1.8 : 2.1) : (barcode.type === 'CODE128' ? 2.1 : 2.4),
-            textMargin: 0,
-          }
-        : undefined,
-    );
+    // Produtos sem código de barras válido: gerar etiqueta sem barcode
+    const barcodeSvg = (barcode.isValid && barcode.type !== 'UNSUPPORTED')
+      ? buildBarcodeSvg(
+          barcode.normalizedValue,
+          barcode.type,
+          isBrowserA4Product
+            ? {
+                displayValue: false,
+                height: isA4ProductVerticalDouble ? 34 : isA4ProductVerticalLargeDouble || isA4ProductVerticalTriple ? 46 : 50,
+                width: isA4ProductVerticalDouble ? (barcode.type === 'CODE128' ? 1.25 : 1.45) : isA4ProductVerticalLargeDouble || isA4ProductVerticalTriple ? (barcode.type === 'CODE128' ? 1.8 : 2.1) : (barcode.type === 'CODE128' ? 2.1 : 2.4),
+                textMargin: 0,
+              }
+            : undefined,
+        )
+      : '<span style="font-size:10px;color:#b45309;font-weight:700;">SEM CÓDIGO DE BARRAS</span>';
+    const barcodeValue = (barcode.isValid && barcode.type !== 'UNSUPPORTED') ? barcode.normalizedValue : '';
 
     const variant = isA4Product
       ? 'a4-horizontal'
@@ -239,7 +240,7 @@ export async function printProductLabelsInBrowser(
     const labelMarkup = buildProductLabelMarkup(
       produto,
       barcodeSvg,
-      barcode.normalizedValue,
+      barcodeValue,
       variant,
       isClosedBox,
       imageMap,

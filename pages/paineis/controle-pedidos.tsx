@@ -19,7 +19,8 @@ type StatusCode =
   | 'PENDENCIAS'
   | 'ALERTAS_NAO_SEPARADOS'
   | 'ALERTAS_NAO_CONFERIDOS'
-  | 'ALERTAS_NAO_EMBARCADOS';
+  | 'ALERTAS_NAO_EMBARCADOS'
+  | 'ALERTAS_NAO_ENTREGUES';
 
 type DashboardItem = {
   codigo: StatusCode;
@@ -57,6 +58,7 @@ const statusConfig: Record<StatusCode, { icon: typeof Package; colorClass: strin
   ALERTAS_NAO_SEPARADOS: { icon: AlertCircle, colorClass: 'from-red-700 to-red-950' },
   ALERTAS_NAO_CONFERIDOS: { icon: AlertCircle, colorClass: 'from-amber-500 to-amber-800' },
   ALERTAS_NAO_EMBARCADOS: { icon: AlertCircle, colorClass: 'from-orange-600 to-orange-950' },
+  ALERTAS_NAO_ENTREGUES: { icon: AlertCircle, colorClass: 'from-rose-700 to-rose-950' },
 };
 
 const emptyDashboard: DashboardResponse = {
@@ -112,7 +114,7 @@ const isDashboardFallbackVazio = (data: DashboardResponse) =>
 const getPedidosEntrega = (item?: DashboardItem) => Array.from(
   new Map(
     (item?.pedidos || [])
-      .filter((pedido) => !pedido.tipoEntrega || ['ENT', 'EPG'].includes(String(pedido.tipoEntrega || '').trim().toUpperCase()))
+      .filter((pedido) => ['ENT', 'EPG'].includes(String(pedido.tipoEntrega || '').trim().toUpperCase()))
       .map((pedido) => [pedido.pedidoId, pedido] as const)
   ).values()
 );
@@ -256,13 +258,9 @@ export default function ControlePedidosPainel() {
                   naoSeparado: getTotalAlerta('ALERTAS_NAO_SEPARADOS'),
                   naoConferido: getTotalAlerta('ALERTAS_NAO_CONFERIDOS'),
                   naoEmbarcado: getTotalAlerta('ALERTAS_NAO_EMBARCADOS'),
-                  naoEntregue: getTotal('PEDIDOS_EMBARCADOS'),
+                  naoEntregue: getTotalAlerta('ALERTAS_NAO_ENTREGUES'),
                   total: totalPedidosAlertas,
                   onClick: () => undefined,
-                  onNaoSeparadoClick: () => undefined,
-                  onNaoConferidoClick: () => undefined,
-                  onNaoEmbarcadoClick: () => undefined,
-                  onNaoEntregueClick: () => undefined,
                 }}
                 pendencias={{
                   total: getTotalAlerta('PENDENCIAS'),

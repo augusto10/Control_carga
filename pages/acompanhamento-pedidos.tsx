@@ -2,7 +2,8 @@ import { useCurrentDashboard } from '@/hooks/useCurrentDashboard';
 import { resumirPedidosPorStatus } from '@/lib/pedido-resumo-status';
 import { PedidoInformacoes } from '@/components/dashboard/PedidoInformacoes';
 import { ResumoStatusPedidos } from '@/components/dashboard/ResumoStatusPedidos';
-import { saldoPendente } from '@/lib/pedido-pendencias';
+import { saldoPendente, codigoAdmDoProduto } from '@/lib/pedido-pendencias';
+import { getLabelProductAdmById } from '@/lib/label-products-catalog';
 import { dadosPedido } from '@/lib/pedido-apresentacao';
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useRouter } from 'next/router';
@@ -38,7 +39,8 @@ type StatusCode =
   | 'PENDENCIAS'
   | 'ALERTAS_NAO_SEPARADOS'
   | 'ALERTAS_NAO_CONFERIDOS'
-  | 'ALERTAS_NAO_EMBARCADOS';
+  | 'ALERTAS_NAO_EMBARCADOS'
+  | 'ALERTAS_NAO_ENTREGUES';
 
 interface DashboardPedidoItem {
   statusOperacionalCodigo?: string;
@@ -192,6 +194,13 @@ const STATUS_VISUAL: Record<
     accent: 'text-orange-600',
     soft: 'bg-orange-50 border-orange-100',
   },
+  ALERTAS_NAO_ENTREGUES: {
+    icon: AlertCircle,
+    statColor: 'indigo',
+    badge: 'warning',
+    accent: 'text-indigo-600',
+    soft: 'bg-indigo-50 border-indigo-100',
+  },
 };
 
 const STATUS_ORDER: StatusCode[] = [
@@ -204,6 +213,7 @@ const STATUS_ORDER: StatusCode[] = [
   'ALERTAS_NAO_SEPARADOS',
   'ALERTAS_NAO_CONFERIDOS',
   'ALERTAS_NAO_EMBARCADOS',
+  'ALERTAS_NAO_ENTREGUES',
 ];
 
 const STATUS_DEFAULTS: Record<
@@ -254,6 +264,11 @@ const STATUS_DEFAULTS: Record<
     titulo: 'ATRASADOS: NÃO EMBARCADOS',
     descricao: 'Pedidos conferidos (G) recebidos em dias anteriores ou, no dia atual, após passar o corte de 16:00',
     statusSeparacao: 'ALERTA_NAO_EMBARCADO',
+  },
+  ALERTAS_NAO_ENTREGUES: {
+    titulo: 'ATRASADOS: NÃO ENTREGUES',
+    descricao: 'Pedidos embarcados mas sem confirmação de entrega',
+    statusSeparacao: 'ALERTA_NAO_ENTREGUE',
   },
 };
 
@@ -619,7 +634,6 @@ function Home() {
   const pendencias = indicadoresAlertasOrdenados.find(
     (item) => item.codigo === 'PENDENCIAS'
   );
-
   const periodoAtivo = useMemo(() => {
     const inicio = formatDateLabel(periodoAplicado.dataInicio);
     const fim = formatDateLabel(periodoAplicado.dataFim);
@@ -783,13 +797,12 @@ function Home() {
           produtoId: typeof (item.PRODUTO_ID ?? item.produto_id) === 'number'
             ? (item.PRODUTO_ID ?? item.produto_id) as number
             : null,
-          codigo: formatText(
-            item.CODIGO_ADM ?? item.codigo_adm,
+          codigo: getLabelProductAdmById((item.PRODUTO_ID ?? item.produto_id) as any) ||
+            codigoAdmDoProduto(item) ||
             formatText(
               item.CODIGO_ORIGINAL ?? item.codigo_original,
               formatText(item.CODIGO_BARRAS ?? item.codigo_barras, formatText(item.CODIGO, ''))
-            )
-          ),
+            ),
           nome: formatText(
             item.PRODUTO_NOME ?? item.produto_nome,
             formatText(item.NOME_PRODUTO ?? item.nome_produto, formatText(item.NOME ?? item.nome, 'Produto nao informado'))
@@ -815,6 +828,10 @@ function Home() {
   );
   const alertasNaoEmbarcados = useMemo(
     () => indicadoresAlertasOrdenados.find((item) => item.codigo === 'ALERTAS_NAO_EMBARCADOS')?.pedidos || [],
+    [indicadoresAlertasOrdenados]
+  );
+  const alertasNaoEntregues = useMemo(
+    () => indicadoresAlertasOrdenados.find((item) => item.codigo === 'ALERTAS_NAO_ENTREGUES')?.pedidos || [],
     [indicadoresAlertasOrdenados]
   );
   const cardsHome = useMemo(() => ([
@@ -878,15 +895,16 @@ function Home() {
       naoSeparado: alertasNaoSeparados.length,
       naoConferido: alertasNaoConferidos.length,
       naoEmbarcado: alertasNaoEmbarcados.length,
+      naoEntregue: alertasNaoEntregues.length,
     }),
-    [alertasNaoConferidos.length, alertasNaoEmbarcados.length, alertasNaoSeparados.length]
+    [alertasNaoConferidos.length, alertasNaoEmbarcados.length, alertasNaoEntregues.length, alertasNaoSeparados.length]
   );
   const pedidosAlertasCombinados = useMemo(
     () => Array.from(new Map(
-      [...alertasNaoSeparados, ...alertasNaoConferidos, ...alertasNaoEmbarcados]
+      [...alertasNaoSeparados, ...alertasNaoConferidos, ...alertasNaoEmbarcados, ...alertasNaoEntregues]
         .map((pedido) => [pedido.pedidoId, pedido] as const)
     ).values()),
-    [alertasNaoConferidos, alertasNaoEmbarcados, alertasNaoSeparados]
+    [alertasNaoConferidos, alertasNaoEmbarcados, alertasNaoEntregues, alertasNaoSeparados]
   );
   const previewPendencias = useMemo(
     () =>
@@ -1649,7 +1667,7 @@ function Home() {
                                 {formatText(item.PRODUTO_NOME, 'Produto nao informado')}
                               </p>
                               <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
-                                <span>Cod. ADM: {formatText(item.CODIGO_ADM, formatText(item.CODIGO_ORIGINAL, formatText(item.CODIGO_BARRAS)))}</span>
+                                <span>ADM: {getLabelProductAdmById((item.PRODUTO_ID ?? item.produto_id) as any) || codigoAdmDoProduto(item) || formatText(item.CODIGO_ORIGINAL, formatText(item.CODIGO_BARRAS))}</span>
                                 <span>Qtd.: {formatQuantity(item.QUANTIDADE)}</span>
                                 <span>Baixada: {formatQuantity(item.QUANTIDADE_BAIXADA)}</span>
                                 <span>Saldo: {formatQuantity(item.SALDO)}</span>
@@ -1753,11 +1771,12 @@ function Home() {
                   Nenhum pedido encontrado nesta etapa.
                 </div>
               ) : (
-                <div className="max-h-[60vh] grid gap-2 overflow-y-auto sm:grid-cols-2">
+                <div className="grid gap-2 sm:grid-cols-2">
                   {(listaPedidos.titulo === 'ATRASADOS' ? [
                     { titulo: 'PEDIDOS NÃO SEPARADOS', pedidos: listaPedidos.pedidos.filter((pedido) => pedido.statusCodigo === 'ALERTAS_NAO_SEPARADOS') },
                     { titulo: 'PEDIDOS SEPARADOS E NÃO CONFERIDOS', pedidos: listaPedidos.pedidos.filter((pedido) => pedido.statusCodigo === 'ALERTAS_NAO_CONFERIDOS') },
                     { titulo: 'PEDIDOS NÃO EMBARCADOS', pedidos: listaPedidos.pedidos.filter((pedido) => pedido.statusCodigo === 'ALERTAS_NAO_EMBARCADOS') },
+                    { titulo: 'PEDIDOS NÃO ENTREGUES', pedidos: listaPedidos.pedidos.filter((pedido) => pedido.statusCodigo === 'ALERTAS_NAO_ENTREGUES') },
                   ] : [{ titulo: '', pedidos: listaPedidos.pedidos }]).map((grupo) => (
                     <div key={grupo.titulo}>
                       {grupo.titulo && <h4 className="bg-slate-100 px-4 py-3 text-sm font-bold text-slate-800">{grupo.pedidos.length > 0 ? `${grupo.pedidos.length} ` : ''}{grupo.titulo}</h4>}
