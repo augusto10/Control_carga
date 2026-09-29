@@ -30,6 +30,8 @@ type StatusCode = (typeof STATUS_ORDER)[number];
 
 type DashboardPedidoItem = {
   pedidoId: number;
+  numeroNota?: string | null;
+  chaveNfe?: string | null;
   tipoEntrega: string | null;
   clienteNome: string;
   nomeFantasia: string | null;
@@ -1091,6 +1093,7 @@ export default async function handler(
 
     const controleInfoPorNumeroNota = new Map<string, ControleVinculoInfo>();
     const controleInfoPorChaveNota = new Map<string, ControleVinculoInfo>();
+    const chaveNfeControlePorNumeroNota = new Map<string, string>();
     for (const nota of notasEmControles) {
       const controleInfo: ControleVinculoInfo = {
         numeroManifesto: nota.controle?.numeroManifesto || null,
@@ -1101,6 +1104,9 @@ export default async function handler(
       const chaveNormalizada = onlyDigits(nota.codigo);
       if (numeroNormalizado) controleInfoPorNumeroNota.set(numeroNormalizado, controleInfo);
       if (chaveNormalizada) controleInfoPorChaveNota.set(chaveNormalizada, controleInfo);
+      if (numeroNormalizado && chaveNormalizada.length === 44 && !chaveNfeControlePorNumeroNota.has(numeroNormalizado)) {
+        chaveNfeControlePorNumeroNota.set(numeroNormalizado, chaveNormalizada);
+      }
     }
 
     const numerosEmbarcados = new Set(controleInfoPorNumeroNota.keys());
@@ -1217,6 +1223,8 @@ export default async function handler(
             toStringValue(notaExterna.DATA_EMISSAO) ||
             toStringValue(notaExterna.DATA_CADASTRO),
           previsaoEntrega: toStringValue(notaExterna.DATA_ENTREGA),
+          numeroNota: notaLocal.numeroNota || null,
+          chaveNfe: onlyDigits(notaLocal.codigo).length === 44 ? onlyDigits(notaLocal.codigo) : null,
           localNome: getControleLocalNome(controleInfo),
           statusCodigo: 'PEDIDOS_EMBARCADOS',
           statusDescricao: STATUS_META.PEDIDOS_EMBARCADOS.titulo,
@@ -1319,6 +1327,13 @@ export default async function handler(
             if (numeroNota || chave.length === 44) referenciaNota = { numeroNota, chave };
           }
 
+          const chaveControle = referenciaNota?.numeroNota
+            ? chaveNfeControlePorNumeroNota.get(normalizeNumeroNota(referenciaNota.numeroNota))
+            : null;
+          if (referenciaNota && chaveControle && referenciaNota.chave.length !== 44) {
+            referenciaNota = { ...referenciaNota, chave: chaveControle };
+          }
+
           const embarcadoNoControle =
             statusCodigoBase === 'PEDIDO_EMBARCADO' &&
             (pedidosEmbarcadosPorNota.has(pedidoId) || isNotaEmControle(referenciaNota));
@@ -1327,6 +1342,8 @@ export default async function handler(
 
           const pedidoItem: DashboardPedidoItem = {
             pedidoId,
+            numeroNota: referenciaNota?.numeroNota || null,
+            chaveNfe: referenciaNota?.chave.length === 44 ? referenciaNota.chave : null,
             tipoEntrega: getTipoEntregaPrincipal(pedido, logistica),
             clienteNome: toStringValue(pedido.cliente_nome) || 'Cliente nao informado',
             nomeFantasia: toStringValue(pedido.nome_fantasia),
@@ -1354,7 +1371,8 @@ export default async function handler(
             produtosPendentes,
           };
 
-          const alertaStatus = isPedidoParaAlerta(pedido, logistica)
+          const elegivelParaAlerta = isPedidoParaAlerta(pedido, logistica);
+          const alertaStatus = elegivelParaAlerta
             ? deriveAlertaStatus(statusCodigo, possuiPendencia, embarcadoNoControle)
             : null;
 

@@ -5,7 +5,6 @@ import { getLabelProductAdmById } from '@/lib/label-products-catalog';
 import type { Prisma } from '@prisma/client';
 import prisma from '@/lib/prisma';
 import { apiExternaService } from '@/services/api-externa';
-import { buscarPedidosEntregues } from '@/lib/pedido-entrega';
 
 const STATUS_ORDER = [
   'PEDIDO_NOVO',
@@ -963,22 +962,6 @@ export async function montarDashboardPorSnapshot(
 
   const entries: { statusCodigo: StatusCode; item: DashboardPedidoItem }[] = [];
   let totalRetirados = 0;
-  const pedidosEntregues = await buscarPedidosEntregues(
-    snapshots
-      .filter(
-        (snapshot) =>
-          !isPedidoEntregue(snapshot.rawLogistica) &&
-          !isSeparacaoCancelada(snapshot.rawPedido, snapshot.rawLogistica) &&
-          isPedidoParaAlerta(snapshot.dataHoraRecebimento, snapshot.rawPedido, snapshot.rawLogistica)
-      )
-      .map((snapshot) => ({
-        pedidoId: snapshot.pedidoId,
-        chaveNfe: snapshot.chaveNfe,
-        numeroNota: snapshot.numeroNota,
-        transportadoraNome: snapshot.transportadoraNome,
-      }))
-  );
-
   for (const snapshot of snapshots) {
     const tipoEntrega = String(snapshot.tipoEntrega || '').trim().toUpperCase();
     const rawPedido = (snapshot.rawPedido || {}) as Record<string, unknown>;
@@ -1062,7 +1045,7 @@ export async function montarDashboardPorSnapshot(
       });
     }
 
-    const alertaStatus = !pedidosEntregues.has(snapshot.pedidoId) && isPedidoParaAlerta(snapshot.dataHoraRecebimento, snapshot.rawPedido, snapshot.rawLogistica)
+    const alertaStatus = isPedidoParaAlerta(snapshot.dataHoraRecebimento, snapshot.rawPedido, snapshot.rawLogistica)
       ? deriveAlertaStatus(statusBase, possuiPendencia, embarcadoNoControle)
       : null;
     if (alertaStatus) {

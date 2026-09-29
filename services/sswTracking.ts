@@ -69,6 +69,12 @@ function normalizeFreeText(value: string | null | undefined): string {
     .trim();
 }
 
+export function isSswDeliveryConfirmed(value: string | null | undefined): boolean {
+  const normalized = normalizeFreeText(value);
+  if (/\bnao\b.{0,24}\b(entregue|entrega|realizada|efetuada|concluida|baixado)\b/.test(normalized)) return false;
+  return /\b(entregue|entrega realizada|entrega efetuada|entrega concluida|recebido pelo destinatario|baixado)\b/.test(normalized);
+}
+
 export function hasPortalCredentials(): boolean {
   return Boolean(
     (process.env.SSW_ACCERT_DOMAIN &&
@@ -334,12 +340,7 @@ function parseTracking(
     }`
   );
 
-  const delivered =
-    normalized.includes('entregue') ||
-    normalized.includes('entrega realizada') ||
-    normalized.includes('mercadoria entregue') ||
-    normalized.includes('recebido pelo destinatario') ||
-    normalized.includes('baixado');
+  const delivered = isSswDeliveryConfirmed(normalized);
 
   const deliveredEvent = delivered
     ? [...events]
@@ -371,7 +372,7 @@ function parseTracking(
     normalized.includes('inexistente');
 
   return {
-    found: !notFound,
+    found: !notFound && Boolean(events.length || status || message),
     delivered,
     status,
     message,

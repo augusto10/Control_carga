@@ -1,5 +1,5 @@
 import React, { Fragment } from 'react';
-import { X } from 'lucide-react';
+import { ArrowLeft, X } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -10,6 +10,7 @@ function cn(...inputs: ClassValue[]) {
 interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onBack?: () => void;
   title: string;
   titleClassName?: string;
   children: React.ReactNode;
@@ -20,6 +21,7 @@ interface ModalProps {
 export function Modal({ 
   isOpen, 
   onClose, 
+  onBack,
   title,
   titleClassName,
   children, 
@@ -51,9 +53,25 @@ export function Modal({
         )}>
           {/* Header */}
           <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-            <h3 className={cn("text-lg font-bold text-slate-900", titleClassName)}>{title}</h3>
+            <div className="flex min-w-0 items-center gap-3">
+              {onBack && (
+                <button
+                  type="button"
+                  onClick={onBack}
+                  aria-label="Voltar"
+                  title="Voltar"
+                  className="shrink-0 rounded-full p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-colors"
+                >
+                  <ArrowLeft className="h-5 w-5" />
+                </button>
+              )}
+              <h3 className={cn("truncate text-lg font-bold text-slate-900", titleClassName)}>{title}</h3>
+            </div>
             <button
+              type="button"
               onClick={onClose}
+              aria-label="Fechar"
+              title="Fechar"
               className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
             >
               <X className="w-5 h-5" />

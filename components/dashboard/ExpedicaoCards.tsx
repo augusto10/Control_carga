@@ -19,6 +19,8 @@ interface AlertSummary {
   naoConferido: number;
   naoEmbarcado: number;
   naoEntregue?: number;
+  naoEntregueForaDoPrazo?: number;
+  naoEntregueConsultando?: boolean;
   total: number;
   onClick: () => void;
   onNaoSeparadoClick?: () => void;
@@ -205,7 +207,19 @@ export function ExpedicaoCards({
                 <strong className="text-xl sm:text-2xl">{loadingSecondary ? '-' : alertas.naoEmbarcado || '0'}</strong>
               </button>
               <button type="button" onClick={(event) => { event.stopPropagation(); alertas.onNaoEntregueClick?.(); }} className="grid w-full grid-cols-[1fr_auto] items-center gap-3 rounded-md text-left transition hover:bg-white/10">
-                <span className="uppercase">Pedidos não entregues:</span>
+                <span className="uppercase">
+                  Pedidos não entregues:
+                  {alertas.naoEntregueConsultando && (
+                    <span className="ml-1 inline-flex items-center gap-1 text-[10px] font-normal normal-case text-rose-200">
+                      <Loader2 className="h-3 w-3 animate-spin" /> verificando SSW
+                    </span>
+                  )}
+                  {typeof alertas.naoEntregueForaDoPrazo === 'number' && alertas.naoEntregueForaDoPrazo > 0 && (
+                    <span className="ml-1 text-[10px] font-normal text-rose-200">
+                      ({alertas.naoEntregueForaDoPrazo} fora do prazo)
+                    </span>
+                  )}
+                </span>
                 <strong className="text-xl sm:text-2xl">{loadingSecondary ? '-' : alertas.naoEntregue || '0'}</strong>
               </button>
             </div>

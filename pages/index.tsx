@@ -43,6 +43,8 @@ type StatusCode =
   | 'ALERTAS_NAO_ENTREGUES';
 
 interface DashboardPedidoItem {
+  numeroNota?: string | null;
+  chaveNfe?: string | null;
   statusOperacionalCodigo?: string;
   cidade?: string | null;
   bairro?: string | null;
@@ -73,6 +75,18 @@ interface DashboardPedidoItem {
     nome: string;
     quantidade: number;
   }[];
+  sswStatus?: string | null;
+  sswMensagem?: string | null;
+  trackingDeliveredAt?: string | null;
+  trackingReceiverName?: string | null;
+  trackingPhotoUrl?: string | null;
+  trackingOccurrences?: Array<{
+    dataHora: string | null;
+    ocorrencia: string | null;
+    descricao: string | null;
+    cidade: string | null;
+    dominio: string | null;
+  }>;
 }
 
 interface DashboardStatusItem {
@@ -117,6 +131,22 @@ interface PedidoDetalheApiResponse {
     itens_separacoes?: Record<string, unknown>[];
     entregas?: Record<string, unknown>[];
     notas_fiscais?: Record<string, unknown>[];
+  } | null;
+  ssw?: {
+    found: boolean;
+    delivered: boolean;
+    status: string | null;
+    message: string | null;
+    deliveredAt: string | null;
+    receiverName: string | null;
+    photoUrl: string | null;
+    occurrences: Array<{
+      dataHora: string | null;
+      ocorrencia: string | null;
+      descricao: string | null;
+      cidade: string | null;
+      dominio: string | null;
+    }>;
   } | null;
 }
 
@@ -279,8 +309,10 @@ const EMPTY_RESUMO_HOJE: ResumoHojeData = {
 };
 const DASHBOARD_LOCAL_CACHE_KEY = 'dashboard-logistica-cache-v11';
 // Descarta alertas gravados antes da validacao atual no ERP.
-const DASHBOARD_ALERTAS_LOCAL_CACHE_KEY = 'dashboard-logistica-alertas-cache-v10';
+const DASHBOARD_ALERTAS_LOCAL_CACHE_KEY = 'dashboard-logistica-alertas-cache-v11';
 const DASHBOARD_AUTO_REFRESH_INTERVAL_MS = 3 * 60_000;
+const SSW_RESULT_CACHE_TTL_MS = 2 * 60_000;
+const SSW_BACKGROUND_CONCURRENCY = 4;
 const DASHBOARD_LEGACY_CACHE_KEYS = [
   'dashboard-logistica-cache-v3',
   'dashboard-logistica-cache-v4',
@@ -345,6 +377,92 @@ const formatDateInputValue = (date: Date) => {
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+};
+
+const parseDataCalendario = (valor?: string | null) => {
+  if (!valor) return null;
+  const texto = String(valor).trim();
+  const compacta = texto.match(/^(\d{4})(\d{2})(\d{2})(?:\d{6})?$/);
+  const iso = texto.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  const partes = compacta || iso;
+
+  if (partes) {
+    const data = new Date(Number(partes[1]), Number(partes[2]) - 1, Number(partes[3]));
+    return Number.isNaN(data.getTime()) ? null : data;
+  }
+
+  const data = new Date(texto);
+  return Number.isNaN(data.getTime()) ? null : new Date(data.getFullYear(), data.getMonth(), data.getDate());
+};
+
+const diferencaDiasCalendario = (dataFim: Date, dataInicio: Date) => {
+  const inicioUtc = Date.UTC(dataInicio.getFullYear(), dataInicio.getMonth(), dataInicio.getDate());
+  const fimUtc = Date.UTC(dataFim.getFullYear(), dataFim.getMonth(), dataFim.getDate());
+  return Math.round((fimUtc - inicioUtc) / (1000 * 60 * 60 * 24));
+};
+
+const calcularPrazoEntregaInfo = ({
+  dataBase,
+  prazo,
+}: {
+  dataBase?: string | null;
+  prazo?: string | null;
+}) => {
+  const textoPrazo = prazo?.trim().toUpperCase() || '';
+  const prazoDiasDeclarado = textoPrazo.match(/^D\+(\d+)$/i);
+  const dataReferencia = parseDataCalendario(dataBase);
+  const dataLimiteInformada = prazoDiasDeclarado ? null : parseDataCalendario(prazo);
+  const prazoDias = prazoDiasDeclarado
+    ? Number(prazoDiasDeclarado[1])
+    : dataLimiteInformada && dataReferencia
+      ? diferencaDiasCalendario(dataLimiteInformada, dataReferencia)
+      : null;
+  const dataLimite = prazoDiasDeclarado && dataReferencia
+    ? new Date(dataReferencia.getFullYear(), dataReferencia.getMonth(), dataReferencia.getDate() + prazoDias!)
+    : dataLimiteInformada;
+
+  if (!dataLimite) {
+    return {
+      prazoTexto: 'Sem prazo',
+      statusTexto: 'Prazo indisponível',
+      foraDoPrazo: false,
+      diasRestantes: null,
+      dataLimite: null,
+    };
+  }
+
+  const hoje = new Date();
+  const diffDias = diferencaDiasCalendario(dataLimite, hoje);
+  const prazoTexto = prazoDias === null ? `Até ${formatDateLabel(formatDateInputValue(dataLimite))}` : `D+${prazoDias}`;
+
+  if (diffDias > 0) {
+    return {
+      prazoTexto,
+      statusTexto: `Dentro do prazo — faltam ${diffDias} dia${diffDias === 1 ? '' : 's'}`,
+      foraDoPrazo: false,
+      diasRestantes: diffDias,
+      dataLimite,
+    };
+  }
+
+  if (diffDias === 0) {
+    return {
+      prazoTexto,
+      statusTexto: 'Dentro do prazo — vence hoje',
+      foraDoPrazo: false,
+      diasRestantes: 0,
+      dataLimite,
+    };
+  }
+
+  const diasAtraso = Math.abs(diffDias);
+  return {
+    prazoTexto,
+    statusTexto: `Fora do prazo — atrasado há ${diasAtraso} dia${diasAtraso === 1 ? '' : 's'}`,
+    foraDoPrazo: true,
+    diasRestantes: -diasAtraso,
+    dataLimite,
+  };
 };
 
 const getDefaultPeriodo = () => {
@@ -421,12 +539,15 @@ function Home() {
     descricao: string;
     pedidos: DashboardPedidoItem[];
   } | null>(null);
-  const pedidoDetalheCacheRef = useRef<Record<number, PedidoDetalheApiResponse>>({});
-  const pedidoDetalheRequestRef = useRef<Record<number, Promise<PedidoDetalheApiResponse> | undefined>>({});
+  const pedidoDetalheCacheRef = useRef<Record<string, PedidoDetalheApiResponse>>({});
+  const pedidoDetalheRequestRef = useRef<Record<string, Promise<PedidoDetalheApiResponse> | undefined>>({});
   const pedidoSelecionadoRef = useRef<number | null>(null);
   const dashboardRef = useRef<DashboardLogisticaData | null>(null);
   const acaoFiltroPendenteRef = useRef<'apply' | 'clear' | null>(null);
   const lastDashboardSyncRef = useRef(0);
+  const sswResultadosRef = useRef(new Map<string, { entregue: boolean; consultadoEm: number }>());
+  const sswConsultasAtivasRef = useRef(new Set<string>());
+  const [sswConsultasPendentes, setSswConsultasPendentes] = useState(0);
 
   useEffect(() => {
     dashboardRef.current = dashboard;
@@ -447,6 +568,84 @@ function Home() {
 
   const dashboardRequestId = useRef(0);
   useEffect(() => () => { dashboardRequestId.current += 1; }, []);
+
+  const consultarAlertasSswEmSegundoPlano = useCallback((data: DashboardLogisticaData) => {
+    const candidatos = data.indicadores.find((item) => item.codigo === 'ALERTAS_NAO_ENTREGUES')?.pedidos || [];
+    const agora = Date.now();
+    const chaveDoPedido = (pedido: DashboardPedidoItem) =>
+      `${pedido.pedidoId}:${String(pedido.chaveNfe || '').replace(/\D/g, '')}:${String(pedido.numeroNota || '').trim()}`;
+    const resultadoRecente = (pedido: DashboardPedidoItem) => {
+      const resultado = sswResultadosRef.current.get(chaveDoPedido(pedido));
+      return resultado && agora - resultado.consultadoEm < SSW_RESULT_CACHE_TTL_MS ? resultado : null;
+    };
+
+    const dadosValidados = {
+      ...data,
+      indicadores: data.indicadores.map((item) => {
+        if (item.codigo !== 'ALERTAS_NAO_ENTREGUES') return item;
+        const pedidos = candidatos.filter((pedido) => {
+          const resultado = resultadoRecente(pedido);
+          return resultado !== null && !resultado.entregue;
+        });
+        return { ...item, pedidos, total: pedidos.length };
+      }),
+    };
+    setDashboardAlertas(dadosValidados);
+
+    const fila = candidatos.filter((pedido) => {
+      if (resultadoRecente(pedido) || sswConsultasAtivasRef.current.has(chaveDoPedido(pedido))) return false;
+      sswConsultasAtivasRef.current.add(chaveDoPedido(pedido));
+      return true;
+    });
+    setSswConsultasPendentes(sswConsultasAtivasRef.current.size);
+    if (fila.length === 0) return;
+
+    let proximo = 0;
+    const worker = async () => {
+      while (proximo < fila.length) {
+        const pedido = fila[proximo++];
+        const cacheKey = chaveDoPedido(pedido);
+        const params = new URLSearchParams({ sswOnly: '1' });
+        if (pedido.chaveNfe) params.set('chaveNfe', pedido.chaveNfe);
+        if (pedido.numeroNota) params.set('numeroNota', pedido.numeroNota);
+        if (pedido.transportadoraNome) params.set('transportadora', pedido.transportadoraNome);
+
+        let entregue = false;
+        try {
+          const response = await fetch(`/api/pedidos/${pedido.pedidoId}/logistica?${params.toString()}`, {
+            credentials: 'include',
+            cache: 'no-store',
+          });
+          const payload = await response.json().catch(() => null);
+          entregue = response.ok && payload?.ssw?.delivered === true;
+        } catch {
+          entregue = false;
+        }
+
+        sswResultadosRef.current.set(cacheKey, { entregue, consultadoEm: Date.now() });
+        setDashboardAlertas((atual) => {
+          if (!atual) return atual;
+          return {
+            ...atual,
+            indicadores: atual.indicadores.map((item) => {
+              if (item.codigo !== 'ALERTAS_NAO_ENTREGUES') return item;
+              const pedidos = item.pedidos.filter((candidato) => candidato.pedidoId !== pedido.pedidoId);
+              if (!entregue) pedidos.push(pedido);
+              pedidos.sort((a, b) => b.pedidoId - a.pedidoId);
+              return { ...item, pedidos, total: pedidos.length };
+            }),
+          };
+        });
+
+        sswConsultasAtivasRef.current.delete(cacheKey);
+        setSswConsultasPendentes(sswConsultasAtivasRef.current.size);
+      }
+    };
+
+    void Promise.all(
+      Array.from({ length: Math.min(SSW_BACKGROUND_CONCURRENCY, fila.length) }, () => worker())
+    );
+  }, [setDashboardAlertas]);
 
   const loadDashboard = useCallback(async (
     forceRefresh = false,
@@ -563,7 +762,7 @@ function Home() {
         if (isDashboardFallbackVazio(data)) {
           if (!nextError) nextError = data.warning || 'Nao foi possivel atualizar alertas e pendencias agora.';
         } else {
-          setDashboardAlertas(data);
+          consultarAlertasSswEmSegundoPlano(data);
         }
       } else if (!nextError) {
         const data = await response.json().catch(() => null);
@@ -603,7 +802,7 @@ function Home() {
     setRefreshingDashboard(false);
     setAcaoFiltroAtiva(null);
     lastDashboardSyncRef.current = Date.now();
-  }, [periodoAplicado]);
+  }, [consultarAlertasSswEmSegundoPlano, periodoAplicado]);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -768,14 +967,26 @@ function Home() {
     setListaPedidos(null);
   };
 
-  const fetchPedidoDetalhe = useCallback(async (pedidoId: number) => {
-    const cached = pedidoDetalheCacheRef.current[pedidoId];
+  const fetchPedidoDetalhe = useCallback(async (
+    pedidoId: number,
+    referencia?: Pick<DashboardPedidoItem, 'numeroNota' | 'chaveNfe' | 'transportadoraNome'>
+  ) => {
+    const chaveNfe = String(referencia?.chaveNfe || '').replace(/\D/g, '');
+    const numeroNota = String(referencia?.numeroNota || '').trim();
+    const transportadora = String(referencia?.transportadoraNome || '').trim();
+    const cacheKey = `${pedidoId}:${chaveNfe}:${numeroNota}:${transportadora}`;
+    const cached = pedidoDetalheCacheRef.current[cacheKey];
     if (cached) return cached;
 
-    const inFlight = pedidoDetalheRequestRef.current[pedidoId];
+    const inFlight = pedidoDetalheRequestRef.current[cacheKey];
     if (inFlight) return inFlight;
 
-    const request = fetch(`/api/pedidos/${pedidoId}/logistica`, {
+    const params = new URLSearchParams();
+    if (chaveNfe.length === 44) params.set('chaveNfe', chaveNfe);
+    if (numeroNota) params.set('numeroNota', numeroNota);
+    if (transportadora) params.set('transportadora', transportadora);
+    const query = params.toString();
+    const request = fetch(`/api/pedidos/${pedidoId}/logistica${query ? `?${query}` : ''}`, {
       credentials: 'include',
       cache: 'no-store',
     }).then(async (response) => {
@@ -785,13 +996,13 @@ function Home() {
       }
 
       const data: PedidoDetalheApiResponse = await response.json();
-      pedidoDetalheCacheRef.current[pedidoId] = data;
+      pedidoDetalheCacheRef.current[cacheKey] = data;
       return data;
     }).finally(() => {
-      delete pedidoDetalheRequestRef.current[pedidoId];
+      delete pedidoDetalheRequestRef.current[cacheKey];
     });
 
-    pedidoDetalheRequestRef.current[pedidoId] = request;
+    pedidoDetalheRequestRef.current[cacheKey] = request;
     return request;
   }, []);
 
@@ -866,9 +1077,12 @@ function Home() {
     pedidoSelecionadoRef.current = pedido.pedidoId;
     setPedidoSelecionado(pedido);
     setPedidoDetalheErro(null);
-    setListaPedidos(null);
 
-    const cached = pedidoDetalheCacheRef.current[pedido.pedidoId];
+    const chaveNfe = String(pedido.chaveNfe || '').replace(/\D/g, '');
+    const numeroNota = String(pedido.numeroNota || '').trim();
+    const transportadora = String(pedido.transportadoraNome || '').trim();
+    const cacheKey = `${pedido.pedidoId}:${chaveNfe}:${numeroNota}:${transportadora}`;
+    const cached = pedidoDetalheCacheRef.current[cacheKey];
     if (cached) {
       setPedidoDetalhe(cached);
       setLoadingPedidoDetalhe(false);
@@ -879,7 +1093,7 @@ function Home() {
     setLoadingPedidoDetalhe(true);
 
     try {
-      const data = await fetchPedidoDetalhe(pedido.pedidoId);
+      const data = await fetchPedidoDetalhe(pedido.pedidoId, pedido);
       if (pedidoSelecionadoRef.current === pedido.pedidoId) {
         setPedidoDetalhe(data);
       }
@@ -929,6 +1143,10 @@ function Home() {
   const pedidoNotasFiscais = Array.isArray(pedidoDetalhe?.logistica?.notas_fiscais)
     ? pedidoDetalhe.logistica?.notas_fiscais || []
     : [];
+  const prazoEntregaInfo = calcularPrazoEntregaInfo({
+    dataBase: pedidoSelecionado?.dataHoraControle || pedidoSelecionado?.dataHoraRecebimento,
+    prazo: pedidoSelecionado?.previsaoEntrega || (pedidoDetalhe?.pedido?.PREVISAO_ENTREGA as string | null) || null,
+  });
   const alertasNaoSeparados = useMemo(
     () => indicadoresAlertasOrdenados.find((item) => item.codigo === 'ALERTAS_NAO_SEPARADOS')?.pedidos || [],
     [indicadoresAlertasOrdenados]
@@ -1141,6 +1359,7 @@ function Home() {
               naoConferido: totaisAlertas.naoConferido,
               naoEmbarcado: totaisAlertas.naoEmbarcado,
               naoEntregue: totaisAlertas.naoEntregue,
+              naoEntregueConsultando: sswConsultasPendentes > 0,
               total: pedidosAlertasCombinados.length,
               onClick: () =>
                 abrirListaPedidos({
@@ -1695,6 +1914,7 @@ function Home() {
       <Modal
         isOpen={Boolean(pedidoSelecionado)}
         onClose={fecharModalPedido}
+        onBack={fecharModalPedido}
         title={pedidoSelecionado ? `Pedido #${pedidoSelecionado.pedidoId}` : 'Detalhes do pedido'}
         titleClassName="text-2xl sm:text-3xl"
         size="xl"
@@ -1857,6 +2077,41 @@ function Home() {
                         <MapPin className="h-4 w-4 text-slate-500" />
                         <h4 className="text-sm font-bold text-slate-900">Entrega e nota</h4>
                       </div>
+                      <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                        <p className="text-[11px] uppercase tracking-[0.16em] text-slate-500">Consulta SSW</p>
+                        <div className="mt-2 space-y-2 text-sm text-slate-700">
+                          <p><span className="font-semibold">Status:</span> {pedidoDetalhe?.ssw?.status || 'Sem consulta'}</p>
+                          <p><span className="font-semibold">Resposta:</span> {pedidoDetalhe?.ssw?.message || 'Nenhuma resposta retornada pela consulta SSW.'}</p>
+                          <p><span className="font-semibold">Entrega confirmada:</span> {pedidoDetalhe?.ssw?.delivered ? 'Sim' : 'Não'}</p>
+                          {pedidoDetalhe?.ssw?.deliveredAt && <p><span className="font-semibold">Entregue em:</span> {formatDateTime(pedidoDetalhe.ssw.deliveredAt)}</p>}
+                          {pedidoDetalhe?.ssw?.receiverName && <p><span className="font-semibold">Recebedor:</span> {pedidoDetalhe.ssw.receiverName}</p>}
+                          {(pedidoDetalhe?.ssw?.occurrences || []).length > 0 && (
+                            <div className="border-t border-slate-200 pt-2">
+                              <p className="font-semibold">Ocorrências</p>
+                              <div className="mt-1 space-y-2">
+                                {(pedidoDetalhe?.ssw?.occurrences || []).map((occurrence, index) => (
+                                  <div key={`ssw-occurrence-${index}`}>
+                                    <p>{occurrence.descricao || occurrence.ocorrencia || 'Ocorrência sem descrição'}</p>
+                                    <p className="text-xs text-slate-500">
+                                      {[formatDateTime(occurrence.dataHora), occurrence.cidade, occurrence.dominio].filter(Boolean).join(' · ')}
+                                    </p>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          {pedidoDetalhe?.ssw?.photoUrl && (
+                            <a
+                              href={pedidoDetalhe.ssw.photoUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex text-xs font-medium text-blue-700 underline"
+                            >
+                              Ver comprovante
+                            </a>
+                          )}
+                        </div>
+                      </div>
                       <div className="mt-4 space-y-3 text-sm text-slate-600">
                         <div className="flex items-center justify-between gap-3">
                           <span>Nota fiscal</span>
@@ -1887,6 +2142,15 @@ function Home() {
                           <strong className="text-slate-900">
                             {pedidoSelecionado.transportadoraNome || '-'}
                           </strong>
+                        </div>
+                        <div className="flex items-center justify-between gap-3">
+                          <span>Prazo de entrega</span>
+                          <div className="text-right">
+                            <strong className="block text-slate-900">{prazoEntregaInfo.prazoTexto}</strong>
+                            <span className={`block text-xs ${prazoEntregaInfo.foraDoPrazo ? 'text-amber-700' : 'text-emerald-700'}`}>
+                              {prazoEntregaInfo.statusTexto}
+                            </span>
+                          </div>
                         </div>
                         <div className="flex items-center justify-between gap-3">
                           <span>Vinculado ao controle</span>
@@ -2015,7 +2279,7 @@ function Home() {
       </Modal>
 
         <Modal
-          isOpen={Boolean(listaPedidos)}
+          isOpen={Boolean(listaPedidos) && !pedidoSelecionado}
           onClose={fecharListaPedidos}
           title={listaPedidos?.titulo || 'Pedidos'}
           size="xl"
