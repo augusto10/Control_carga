@@ -309,7 +309,7 @@ const EMPTY_RESUMO_HOJE: ResumoHojeData = {
 };
 const DASHBOARD_LOCAL_CACHE_KEY = 'dashboard-logistica-cache-v11';
 // Descarta alertas gravados antes da validacao atual no ERP.
-const DASHBOARD_ALERTAS_LOCAL_CACHE_KEY = 'dashboard-logistica-alertas-cache-v11';
+const DASHBOARD_ALERTAS_LOCAL_CACHE_KEY = 'dashboard-logistica-alertas-cache-v12';
 const DASHBOARD_AUTO_REFRESH_INTERVAL_MS = 3 * 60_000;
 const SSW_RESULT_CACHE_TTL_MS = 2 * 60_000;
 const SSW_BACKGROUND_CONCURRENCY = 4;
@@ -2315,7 +2315,12 @@ function Home() {
                       {grupo.titulo && grupo.pedidos.length === 0 && <p className="px-4 py-3 text-sm text-slate-500">Nenhum pedido nesta etapa.</p>}
                       {grupo.pedidos.map((pedido) => {
                     const ehAlerta = pedido.statusCodigo.startsWith('ALERTAS_');
+                    const ehNaoEntregue = pedido.statusCodigo === 'ALERTAS_NAO_ENTREGUES';
                     const ehPendencia = pedido.statusCodigo === 'PENDENCIAS' || pedido.possuiProdutosFaltando;
+                    const prazoNaoEntregue = ehNaoEntregue ? calcularPrazoEntregaInfo({
+                      dataBase: pedido.dataHoraControle || pedido.dataHoraRecebimento,
+                      prazo: pedido.previsaoEntrega,
+                    }) : null;
 
                     return (
                       <button
@@ -2338,11 +2343,16 @@ function Home() {
                             {ehAlerta && (
                               <>
                               <div className="mt-2 inline-flex max-w-full items-center rounded-md bg-rose-100 px-2 py-1 text-[11px] font-bold uppercase tracking-wide text-rose-800">
-                                Situacao: {pedido.situacaoAtual || pedido.statusDescricao}
+                                Situação: {ehNaoEntregue ? 'Pedido não entregue' : pedido.situacaoAtual || pedido.statusDescricao}
                               </div>
                               <p className="mt-1 text-[11px] font-medium text-rose-700">
                                 Recebido às {formatTimeOnlyFromDateTime(pedido.dataHoraRecebimento)}
                               </p>
+                              {prazoNaoEntregue && (
+                                <p className={`mt-1 text-[11px] font-semibold ${prazoNaoEntregue.foraDoPrazo ? 'text-amber-700' : 'text-emerald-700'}`}>
+                                  {prazoNaoEntregue.statusTexto}
+                                </p>
+                              )}
                               </>
                             )}
                             {(pedido.transportadoraNome || pedido.dataHoraControle) && !ehAlerta && (

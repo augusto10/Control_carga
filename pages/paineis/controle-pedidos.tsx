@@ -30,6 +30,9 @@ type DashboardItem = {
   pedidos?: Array<{
     pedidoId: number;
     tipoEntrega?: string | null;
+    chaveNfe?: string | null;
+    numeroNota?: string | null;
+    transportadoraNome?: string | null;
     totalItensPendentes: number;
     produtosPendentes?: Array<{ nome: string; quantidade: number }>;
   }>;
@@ -104,7 +107,7 @@ const getDashboardQueries = () => {
 const PAINEL_AUTO_REFRESH_INTERVAL_MS = 3 * 60_000;
 const DASHBOARD_LOCAL_CACHE_KEY = 'dashboard-logistica-cache-v11';
 // Os alertas precisam iniciar sem a lista salva antes da validacao direta no ERP.
-const DASHBOARD_ALERTAS_LOCAL_CACHE_KEY = 'dashboard-logistica-alertas-cache-v11';
+const DASHBOARD_ALERTAS_LOCAL_CACHE_KEY = 'dashboard-logistica-alertas-cache-v12';
 
 const isDashboardFallbackVazio = (data: DashboardResponse) =>
   Boolean(data.warning) &&
@@ -114,10 +117,48 @@ const isDashboardFallbackVazio = (data: DashboardResponse) =>
 const getPedidosEntrega = (item?: DashboardItem) => Array.from(
   new Map(
     (item?.pedidos || [])
-      .filter((pedido) => ['ENT', 'EPG'].includes(String(pedido.tipoEntrega || '').trim().toUpperCase()))
       .map((pedido) => [pedido.pedidoId, pedido] as const)
   ).values()
 );
+
+const validarNaoEntreguesNoSsw = async (data: DashboardResponse): Promise<DashboardResponse> => {
+  const candidatos = getPedidosEntrega(data.indicadores.find((item) => item.codigo === 'ALERTAS_NAO_ENTREGUES'));
+  const naoEntregues: NonNullable<DashboardItem['pedidos']> = [];
+  let proximo = 0;
+
+  const worker = async () => {
+    while (proximo < candidatos.length) {
+      const pedido = candidatos[proximo++];
+      const params = new URLSearchParams({ sswOnly: '1' });
+      if (pedido.chaveNfe) params.set('chaveNfe', pedido.chaveNfe);
+      if (pedido.numeroNota) params.set('numeroNota', pedido.numeroNota);
+      if (pedido.transportadoraNome) params.set('transportadora', pedido.transportadoraNome);
+
+      let entregue = false;
+      try {
+        const response = await fetch(`/api/pedidos/${pedido.pedidoId}/logistica?${params.toString()}`, {
+          credentials: 'include',
+          cache: 'no-store',
+        });
+        const payload = await response.json().catch(() => null);
+        entregue = response.ok && payload?.ssw?.delivered === true;
+      } catch {
+        entregue = false;
+      }
+
+      if (!entregue) naoEntregues.push(pedido);
+    }
+  };
+
+  await Promise.all(Array.from({ length: Math.min(4, candidatos.length) }, () => worker()));
+  naoEntregues.sort((a, b) => b.pedidoId - a.pedidoId);
+  return {
+    ...data,
+    indicadores: data.indicadores.map((item) => item.codigo === 'ALERTAS_NAO_ENTREGUES'
+      ? { ...item, pedidos: naoEntregues, total: naoEntregues.length }
+      : item),
+  };
+};
 
 export default function ControlePedidosPainel() {
   const [dashboard, setDashboard] = useCurrentDashboard<DashboardResponse>(emptyDashboard, DASHBOARD_LOCAL_CACHE_KEY);
@@ -160,7 +201,9 @@ export default function ControlePedidosPainel() {
         const alertasData = await alertasResponse.json();
         if (requestId !== dashboardRequestId.current) return;
         if (!isDashboardFallbackVazio(alertasData)) {
-          setDashboardAlertas(alertasData);
+          const alertasValidados = await validarNaoEntreguesNoSsw(alertasData);
+          if (requestId !== dashboardRequestId.current) return;
+          setDashboardAlertas(alertasValidados);
         }
       } finally {
         if (requestId === dashboardRequestId.current) setLoadingSecondary(false);
