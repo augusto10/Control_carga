@@ -1,4 +1,5 @@
 import productsData from '@/src/data/products-maxima.json';
+import productsMetadata from '@/src/data/products-maxima-meta.json';
 import { analyzeBarcode } from '@/lib/barcode-validation';
 import type { ProdutoEtiqueta, ProdutoEtiquetaCatalogo } from '@/types/labels';
 
@@ -45,7 +46,7 @@ export function searchLabelProductsByBrand(search: string): ProdutoEtiqueta[] {
 export function getLabelProductsCatalogInfo() {
   return {
     total: products.length,
-    atualizadoEm: products.reduce<string | null>((latest, product) => {
+    atualizadoEm: productsMetadata.sincronizadoEm || products.reduce<string | null>((latest, product) => {
       if (!latest || product.updatedAt > latest) return product.updatedAt;
       return latest;
     }, null),

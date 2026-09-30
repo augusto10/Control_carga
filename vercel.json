@@ -8,5 +8,11 @@
     "pages/api/**/*.ts": {
       "maxDuration": 60
     }
+  },
+  "crons": [
+    {
+      "path": "/api/dashboard/sincronizar-rastreios",
+      "schedule": "*/15 * * * *"
+    }
   }
 }

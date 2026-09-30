@@ -1176,6 +1176,7 @@ async function main() {
   const keepLocalProducts = process.argv.includes("--keep-local-products") || envFlagEnabled(env.ERP_SYNC_KEEP_LOCAL_PRODUCTS);
   const skipPhotoSync = envFlagEnabled(env.ERP_SYNC_SKIP_PHOTOS);
   const dataFile = path.join(projectRoot, "src", "data", "products-maxima.json");
+  const metadataFile = path.join(projectRoot, "src", "data", "products-maxima-meta.json");
   const incrementalOnly = process.argv.includes("--incremental") || envFlagEnabled(env.ERP_SYNC_INCREMENTAL_ONLY);
   const fullRefresh = !incrementalOnly && !explicitProductIds.length && maxProducts === 0 && startIndex === 0;
 
@@ -1514,6 +1515,10 @@ async function main() {
   const finalProducts = Array.from(normalizedById.values());
   const sortedProducts = sortCatalogProducts(finalProducts);
   await writeJsonFileAtomic(dataFile, sortedProducts);
+  await writeJsonFileAtomic(metadataFile, {
+    sincronizadoEm: new Date().toISOString(),
+    totalProdutos: sortedProducts.length,
+  });
   const reportPaths = await writeSyncReport({ projectRoot, report });
   process.stdout.write(
     `${colorize("green", "Sincronizacao concluida.")} Produtos no catalogo: ${sortedProducts.length}. ` +

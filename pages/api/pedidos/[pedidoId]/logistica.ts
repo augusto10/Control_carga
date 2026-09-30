@@ -3,12 +3,14 @@ import prisma from '@/lib/prisma';
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiExternaService } from '@/services/api-externa';
 import { fetchMergedTracking } from '@/services/sswTracking';
+import { buscarPrazoDaRota, type RotaPrazoEntrega } from '@/lib/rota-prazo-entrega';
 
 const PEDIDO_LOGISTICA_CACHE_TTL_MS = 60_000;
 
 type PedidoLogisticaResponse = {
   pedido: Record<string, any>;
   logistica: Record<string, any> | null;
+  prazoEntregaRota?: string | null;
   ssw?: {
     found: boolean;
     delivered: boolean;
@@ -224,9 +226,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const cacheKey = `${id}:${chaveNfeInformada || ''}:${numeroNotaInformado || ''}:${transportadoraInformada || ''}`;
   const cached = pedidoLogisticaCache.get(cacheKey);
-  if (cached && cached.expiresAt > Date.now()) {
+  if (
+    cached &&
+    cached.expiresAt > Date.now() &&
+    Object.prototype.hasOwnProperty.call(cached.payload, 'prazoEntregaRota')
+  ) {
     return res.status(200).json(cached.payload);
   }
+  if (cached) pedidoLogisticaCache.delete(cacheKey);
 
   try {
     const logistica = await buscarLogisticaAtual(id, username, password);
@@ -236,7 +243,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(404).json({ error: 'Pedido nao encontrado' });
     }
 
-    const pedidoDetalhado = mergePedidoComLogistica(
+    const pedidoDetalhado: Record<string, any> = mergePedidoComLogistica(
       (pedidoBase || {}) as Record<string, any>,
       logistica as Record<string, any> | null
     );
@@ -280,6 +287,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       pedidoDetalhado.TRANSPORTADORA,
       pedidoDetalhado.transportadora
     ) || null;
+    let prazoEntregaRota: string | null = null;
+    try {
+      const rotas: RotaPrazoEntrega[] = await prisma.rotaPrazoEntrega.findMany({
+        where: { ativo: true },
+        select: { codigo: true, uf: true, prazo: true, transportadora: true, ativo: true },
+      });
+      prazoEntregaRota = buscarPrazoDaRota({
+        bairro: pickString(pedidoDetalhado.NOME_BAIRRO_NOTA, pedidoDetalhado.BAIRRO),
+        cidade: pickString(pedidoDetalhado.NOME_CIDADE, pedidoDetalhado.CIDADE),
+        uf: pickString(pedidoDetalhado.ESTADO_DESTINO, pedidoDetalhado.UF),
+        transportadora,
+      }, rotas);
+    } catch (error) {
+      console.error('[Pedido Logistica] Falha ao consultar prazo da rota:', error);
+    }
 
     const ssw =
       chaveNfe
@@ -333,6 +355,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         CHAVE_NFE: chaveNfe || pedidoDetalhado.CHAVE_NFE || null,
       },
       logistica,
+      prazoEntregaRota,
       ssw,
     };
 

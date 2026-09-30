@@ -49,14 +49,14 @@ jobs:
       - name: Publicar atualizacao
         shell: bash
         run: |
-          if git diff --quiet -- src/data/products-maxima.json public/products/erp; then
+          if git diff --quiet -- src/data/products-maxima.json src/data/products-maxima-meta.json public/products/erp; then
             echo "Nenhuma alteracao encontrada."
             exit 0
           fi
 
           git config user.name "Etiquetas ERP Bot"
           git config user.email "etiquetas-erp-bot@users.noreply.github.com"
-          git add src/data/products-maxima.json public/products/erp
+          git add src/data/products-maxima.json src/data/products-maxima-meta.json public/products/erp
           git commit -m "Atualiza produtos das etiquetas"
           git pull --rebase origin "${GITHUB_REF_NAME}"
           git push origin "HEAD:${GITHUB_REF_NAME}"

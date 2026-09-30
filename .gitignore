@@ -51,6 +51,7 @@ prisma/test-*.sql
 data/
 !src/data/
 !src/data/products-maxima.json
+!src/data/products-maxima-meta.json
 nul
 map-api.js
 scripts/output*.json

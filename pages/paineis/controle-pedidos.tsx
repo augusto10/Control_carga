@@ -107,7 +107,7 @@ const getDashboardQueries = () => {
 const PAINEL_AUTO_REFRESH_INTERVAL_MS = 3 * 60_000;
 const DASHBOARD_LOCAL_CACHE_KEY = 'dashboard-logistica-cache-v11';
 // Os alertas precisam iniciar sem a lista salva antes da validacao direta no ERP.
-const DASHBOARD_ALERTAS_LOCAL_CACHE_KEY = 'dashboard-logistica-alertas-cache-v12';
+const DASHBOARD_ALERTAS_LOCAL_CACHE_KEY = 'dashboard-logistica-alertas-cache-v14';
 
 const isDashboardFallbackVazio = (data: DashboardResponse) =>
   Boolean(data.warning) &&

@@ -67,6 +67,7 @@ interface DashboardPedidoItem {
   dataHoraConfirmacao: string | null;
   dataHoraControle: string | null;
   transportadoraNome: string | null;
+  prazoEntregaRota?: string | null;
   possuiProdutosFaltando: boolean;
   totalItensPendentes: number;
   produtosPendentes: {
@@ -132,6 +133,7 @@ interface PedidoDetalheApiResponse {
     entregas?: Record<string, unknown>[];
     notas_fiscais?: Record<string, unknown>[];
   } | null;
+  prazoEntregaRota?: string | null;
   ssw?: {
     found: boolean;
     delivered: boolean;
@@ -309,7 +311,7 @@ const EMPTY_RESUMO_HOJE: ResumoHojeData = {
 };
 const DASHBOARD_LOCAL_CACHE_KEY = 'dashboard-logistica-cache-v11';
 // Descarta alertas gravados antes da validacao atual no ERP.
-const DASHBOARD_ALERTAS_LOCAL_CACHE_KEY = 'dashboard-logistica-alertas-cache-v12';
+const DASHBOARD_ALERTAS_LOCAL_CACHE_KEY = 'dashboard-logistica-alertas-cache-v14';
 const DASHBOARD_AUTO_REFRESH_INTERVAL_MS = 3 * 60_000;
 const SSW_RESULT_CACHE_TTL_MS = 2 * 60_000;
 const SSW_BACKGROUND_CONCURRENCY = 4;
@@ -539,6 +541,7 @@ function Home() {
     descricao: string;
     pedidos: DashboardPedidoItem[];
   } | null>(null);
+  const [prazosRotaConsultados, setPrazosRotaConsultados] = useState<Set<number>>(() => new Set());
   const pedidoDetalheCacheRef = useRef<Record<string, PedidoDetalheApiResponse>>({});
   const pedidoDetalheRequestRef = useRef<Record<string, Promise<PedidoDetalheApiResponse> | undefined>>({});
   const pedidoSelecionadoRef = useRef<number | null>(null);
@@ -976,7 +979,8 @@ function Home() {
     const transportadora = String(referencia?.transportadoraNome || '').trim();
     const cacheKey = `${pedidoId}:${chaveNfe}:${numeroNota}:${transportadora}`;
     const cached = pedidoDetalheCacheRef.current[cacheKey];
-    if (cached) return cached;
+    if (cached && Object.prototype.hasOwnProperty.call(cached, 'prazoEntregaRota')) return cached;
+    if (cached) delete pedidoDetalheCacheRef.current[cacheKey];
 
     const inFlight = pedidoDetalheRequestRef.current[cacheKey];
     if (inFlight) return inFlight;
@@ -1109,6 +1113,16 @@ function Home() {
     }
   }, [fetchPedidoDetalhe]);
 
+  const atualizarPrazoDaLista = useCallback((pedidoId: number, prazoEntregaRota: string | null) => {
+    setListaPedidos((atual) => atual ? {
+      ...atual,
+      pedidos: atual.pedidos.map((pedido) => pedido.pedidoId === pedidoId
+        ? { ...pedido, prazoEntregaRota }
+        : pedido),
+    } : atual);
+    setPrazosRotaConsultados((atuais) => new Set(atuais).add(pedidoId));
+  }, []);
+
   const pedidoStatusLogistico = pedidoDetalhe?.logistica?.status_logistico || null;
   const pedidoSeparacoes = Array.isArray(pedidoDetalhe?.logistica?.separacoes)
     ? pedidoDetalhe.logistica?.separacoes || []
@@ -1144,8 +1158,12 @@ function Home() {
     ? pedidoDetalhe.logistica?.notas_fiscais || []
     : [];
   const prazoEntregaInfo = calcularPrazoEntregaInfo({
-    dataBase: pedidoSelecionado?.dataHoraControle || pedidoSelecionado?.dataHoraRecebimento,
-    prazo: pedidoSelecionado?.previsaoEntrega || (pedidoDetalhe?.pedido?.PREVISAO_ENTREGA as string | null) || null,
+    dataBase: pedidoSelecionado?.dataHoraControle ||
+      pedidoSelecionado?.dataHoraRecebimento ||
+      (pedidoDetalhe?.pedido?.DATA_HORA_RECEBIMENTO as string | null) ||
+      (pedidoDetalhe?.pedido?.DATA_RECEBIMENTO as string | null) ||
+      null,
+    prazo: pedidoSelecionado?.prazoEntregaRota || pedidoDetalhe?.prazoEntregaRota || null,
   });
   const alertasNaoSeparados = useMemo(
     () => indicadoresAlertasOrdenados.find((item) => item.codigo === 'ALERTAS_NAO_SEPARADOS')?.pedidos || [],
@@ -2146,10 +2164,19 @@ function Home() {
                         <div className="flex items-center justify-between gap-3">
                           <span>Prazo de entrega</span>
                           <div className="text-right">
-                            <strong className="block text-slate-900">{prazoEntregaInfo.prazoTexto}</strong>
-                            <span className={`block text-xs ${prazoEntregaInfo.foraDoPrazo ? 'text-amber-700' : 'text-emerald-700'}`}>
-                              {prazoEntregaInfo.statusTexto}
-                            </span>
+                            {loadingPedidoDetalhe ? (
+                              <>
+                                <strong className="block text-slate-900">Consultando rota...</strong>
+                                <span className="block text-xs text-slate-500">Buscando destino e prazo na tabela</span>
+                              </>
+                            ) : (
+                              <>
+                                <strong className="block text-slate-900">{prazoEntregaInfo.prazoTexto}</strong>
+                                <span className={`block text-xs ${prazoEntregaInfo.foraDoPrazo ? 'text-amber-700' : 'text-emerald-700'}`}>
+                                  {prazoEntregaInfo.statusTexto}
+                                </span>
+                              </>
+                            )}
                           </div>
                         </div>
                         <div className="flex items-center justify-between gap-3">
@@ -2317,9 +2344,9 @@ function Home() {
                     const ehAlerta = pedido.statusCodigo.startsWith('ALERTAS_');
                     const ehNaoEntregue = pedido.statusCodigo === 'ALERTAS_NAO_ENTREGUES';
                     const ehPendencia = pedido.statusCodigo === 'PENDENCIAS' || pedido.possuiProdutosFaltando;
-                    const prazoNaoEntregue = ehNaoEntregue ? calcularPrazoEntregaInfo({
+                    const prazoNaoEntregue = ehNaoEntregue && pedido.prazoEntregaRota ? calcularPrazoEntregaInfo({
                       dataBase: pedido.dataHoraControle || pedido.dataHoraRecebimento,
-                      prazo: pedido.previsaoEntrega,
+                      prazo: pedido.prazoEntregaRota,
                     }) : null;
 
                     return (
@@ -2348,9 +2375,14 @@ function Home() {
                               <p className="mt-1 text-[11px] font-medium text-rose-700">
                                 Recebido às {formatTimeOnlyFromDateTime(pedido.dataHoraRecebimento)}
                               </p>
-                              {prazoNaoEntregue && (
-                                <p className={`mt-1 text-[11px] font-semibold ${prazoNaoEntregue.foraDoPrazo ? 'text-amber-700' : 'text-emerald-700'}`}>
-                                  {prazoNaoEntregue.statusTexto}
+                              {ehNaoEntregue && (pedido.bairro || pedido.cidade) && (
+                                <p className="mt-1 text-[11px] font-medium text-slate-600">
+                                  Destino: {[pedido.bairro, pedido.cidade, pedido.uf].filter(Boolean).join(' - ')}
+                                </p>
+                              )}
+                              {ehNaoEntregue && (
+                                <p className={`mt-1 text-[11px] font-semibold ${prazoNaoEntregue ? (prazoNaoEntregue.foraDoPrazo ? 'text-amber-700' : 'text-emerald-700') : 'text-slate-500'}`}>
+                                  {prazoNaoEntregue?.statusTexto || (prazosRotaConsultados.has(pedido.pedidoId) ? 'Prazo indisponível' : 'Consultando rota...')}
                                 </p>
                               )}
                               </>
@@ -2371,7 +2403,11 @@ function Home() {
 
                         </div>
 
-                        <PedidoInformacoes pedido={pedido} carregarDetalhe={fetchPedidoDetalhe} />
+                        <PedidoInformacoes
+                          pedido={pedido}
+                          carregarDetalhe={fetchPedidoDetalhe}
+                          onPrazoEntregaResolvido={atualizarPrazoDaLista}
+                        />
 
                         {ehPendencia && pedido.produtosPendentes.length > 0 && (
                           <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">

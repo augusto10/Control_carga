@@ -176,6 +176,24 @@ model SincronizacaoLogistica {
   ultimaSincronizacao DateTime @updatedAt
 }
 
+model SswEntregaConsulta {
+  chaveNfe           String   @id
+  pedidoId           Int?
+  numeroNota         String?
+  transportadoraNome String?
+  situacao           String
+  entregue           Boolean  @default(false)
+  sswStatus          String?
+  dataEntrega        String?
+  consultadoEm       DateTime @default(now())
+  proximaConsultaEm  DateTime?
+  dataCriacao        DateTime @default(now())
+  dataAtualizacao    DateTime @updatedAt
+
+  @@index([pedidoId])
+  @@index([entregue, proximaConsultaEm])
+}
+
 model Motorista {
   id               String         @id @default(uuid())
   dataCriacao      DateTime       @default(now())

@@ -4,6 +4,7 @@ import { getPedidosDashboard } from '@/lib/dashboard-external-cache';
 import { montarDashboardPorSnapshot } from '@/lib/logistica-snapshot';
 import { codigoAdmDoProduto } from '@/lib/pedido-pendencias';
 import { getLabelProductAdmById } from '@/lib/label-products-catalog';
+import { buscarPrazoDaRota, type RotaPrazoEntrega } from '@/lib/rota-prazo-entrega';
 import prisma from '@/lib/prisma';
 
 const DASHBOARD_PREVISAO_FINAL = '2050-12-31';
@@ -13,6 +14,13 @@ const DASHBOARD_STALE_TTL_MS = 60 * 60_000;
 const DASHBOARD_EXTERNAL_TIMEOUT_MS = 15_000;
 const DASHBOARD_ENRICH_CONCURRENCY = 20;
 const MAX_LOGISTICA_LOOKUPS_PER_REQUEST = 40;
+const DASHBOARD_ADDRESS_CACHE_TTL_MS = 10 * 60_000;
+const dashboardAddressCache = new Map<number, {
+  expiresAt: number;
+  bairro: string | null;
+  cidade: string | null;
+  uf: string | null;
+}>();
 const STATUS_ORDER = [
   'PEDIDO_NOVO',
   'PEDIDO_EM_SEPARACAO',
@@ -47,6 +55,10 @@ type DashboardPedidoItem = {
   dataHoraConfirmacao: string | null;
   dataHoraControle: string | null;
   transportadoraNome: string | null;
+  bairro?: string | null;
+  cidade?: string | null;
+  uf?: string | null;
+  prazoEntregaRota?: string | null;
   possuiProdutosFaltando: boolean;
   totalItensPendentes: number;
   produtosPendentes: {
@@ -83,6 +95,105 @@ type DashboardResponse = {
   cached?: boolean;
   stale?: boolean;
   warning?: string;
+};
+
+const aplicarPrazosDaTabelaDeRotas = async (dashboard: DashboardResponse): Promise<DashboardResponse> => {
+  let rotas: RotaPrazoEntrega[] = [];
+  try {
+    rotas = await prisma.rotaPrazoEntrega.findMany({
+      where: { ativo: true },
+      select: { codigo: true, uf: true, prazo: true, transportadora: true, ativo: true },
+    });
+  } catch (error) {
+    console.error('[Dashboard Logistica Inicial] Falha ao carregar tabela de prazos de rota:', error);
+  }
+
+  const statusComPrazoDeRota = new Set<StatusCode>([
+    'PEDIDO_SEPARADO',
+    'PEDIDO_EMBARCADO',
+    'PEDIDOS_EMBARCADOS',
+    'ALERTAS_NAO_EMBARCADOS',
+    'ALERTAS_NAO_ENTREGUES',
+  ]);
+  const pedidosPorId = new Map<number, DashboardPedidoItem>();
+  dashboard.indicadores
+    .filter((indicador) => statusComPrazoDeRota.has(indicador.codigo))
+    .flatMap((indicador) => indicador.pedidos)
+    .forEach((pedido) => {
+      const atual = pedidosPorId.get(pedido.pedidoId);
+      pedidosPorId.set(pedido.pedidoId, atual ? {
+        ...atual,
+        ...pedido,
+        bairro: pedido.bairro || atual.bairro,
+        cidade: pedido.cidade || atual.cidade,
+        uf: pedido.uf || atual.uf,
+        transportadoraNome: pedido.transportadoraNome || atual.transportadoraNome,
+      } : pedido);
+    });
+  const pedidosComPrazoDeRota = Array.from(pedidosPorId.values());
+  const enderecosConsultados = new Map<number, Pick<DashboardPedidoItem, 'bairro' | 'cidade' | 'uf'>>();
+  const agora = Date.now();
+  for (const pedido of pedidosComPrazoDeRota) {
+    const cached = dashboardAddressCache.get(pedido.pedidoId);
+    if (cached && cached.expiresAt > agora) {
+      enderecosConsultados.set(pedido.pedidoId, cached);
+    } else if (cached) {
+      dashboardAddressCache.delete(pedido.pedidoId);
+    }
+  }
+  const pedidosSemRota = pedidosComPrazoDeRota
+    .filter((pedido) => !buscarPrazoDaRota({ ...pedido, ...enderecosConsultados.get(pedido.pedidoId) }, rotas))
+    .filter((pedido) => !enderecosConsultados.has(pedido.pedidoId))
+    .slice(0, MAX_LOGISTICA_LOOKUPS_PER_REQUEST);
+  const username = process.env.API_EXTERNA_USERNAME;
+  const password = process.env.API_EXTERNA_PASSWORD;
+
+  if (rotas.length && username && password && pedidosSemRota.length) {
+    const resultados = await mapWithConcurrency(pedidosSemRota, 4, async (pedido) => {
+      try {
+        const detalhe = await apiExternaService.buscarPedidoPorId(String(pedido.pedidoId), username, password);
+        const dados = ((detalhe as Record<string, unknown> | null)?.pedido ||
+          (detalhe as Record<string, unknown> | null)?.data ||
+          detalhe || {}) as Record<string, unknown>;
+
+        return {
+          pedidoId: pedido.pedidoId,
+          bairro: pickString(dados.BAIRRO_ENTREGA_NOME, dados.NOME_BAIRRO_NOTA, dados.BAIRRO, dados.bairro),
+          cidade: pickString(dados.CIDADE_ENTREGA_NOME, dados.NOME_CIDADE, dados.CIDADE, dados.cidade),
+          uf: pickString(dados.UF_ENTREGA, dados.ESTADO_DESTINO, dados.UF, dados.uf),
+        };
+      } catch {
+        return { pedidoId: pedido.pedidoId, bairro: null, cidade: null, uf: null };
+      }
+    });
+
+    resultados.forEach((endereco) => {
+      enderecosConsultados.set(endereco.pedidoId, endereco);
+      dashboardAddressCache.set(endereco.pedidoId, {
+        ...endereco,
+        expiresAt: Date.now() + DASHBOARD_ADDRESS_CACHE_TTL_MS,
+      });
+    });
+  }
+
+  return {
+    ...dashboard,
+    indicadores: dashboard.indicadores.map((indicador) => ({
+      ...indicador,
+      pedidos: indicador.pedidos.map((pedido) => {
+        const enderecoConsultado = statusComPrazoDeRota.has(indicador.codigo)
+          ? enderecosConsultados.get(pedido.pedidoId)
+          : null;
+        const pedidoComEndereco = enderecoConsultado
+          ? { ...pedido, ...enderecoConsultado }
+          : pedido;
+        return {
+          ...pedidoComEndereco,
+          prazoEntregaRota: buscarPrazoDaRota(pedidoComEndereco, rotas),
+        };
+      }),
+    })),
+  };
 };
 
 const STATUS_META: Record<StatusCode, Omit<DashboardStatusItem, 'total' | 'pedidos'>> = {
@@ -902,7 +1013,8 @@ export default async function handler(
   if (!username || !password) {
     const cacheFallback = getCacheByPeriodo(periodoFiltro.cacheKey);
     if (cacheFallback) {
-      return res.status(200).json({ ...cacheFallback.payload, stale: true });
+      const payload = await aplicarPrazosDaTabelaDeRotas(cacheFallback.payload);
+      return res.status(200).json({ ...payload, stale: true });
     }
 
     return res.status(503).json({
@@ -917,14 +1029,16 @@ export default async function handler(
     // A tabela local e a fonte preferencial; a API externa alimenta o snapshot.
     const snapshotLocal = await montarDashboardPorSnapshot(periodoFiltro);
     if (snapshotLocal) {
-      setCacheByPeriodo(periodoFiltro.cacheKey, snapshotLocal);
-      return res.status(200).json(snapshotLocal);
+      const payload = await aplicarPrazosDaTabelaDeRotas(snapshotLocal);
+      setCacheByPeriodo(periodoFiltro.cacheKey, payload);
+      return res.status(200).json(payload);
     }
 
     // Mesmo sem snapshot recente, aproveitamos o cache em memoria antes da API.
     if (cacheAtual && cacheAtual.staleAt > Date.now()) {
+      const payload = await aplicarPrazosDaTabelaDeRotas(cacheAtual.payload);
       return res.status(200).json({
-        ...cacheAtual.payload,
+        ...payload,
         cached: true,
         stale: cacheAtual.expiresAt <= Date.now(),
       });
@@ -1340,6 +1454,10 @@ export default async function handler(
           const controleInfo = getControleInfoByReferencia(referenciaNota);
           const produtosPendentes = possuiPendencia ? getProdutosPendentes(logistica, 'PENDENCIA') : [];
 
+          const pedidoLogisticaParaRota = ((logistica as Record<string, any>).pedido || {}) as Record<string, any>;
+          const notaLogisticaParaRota = Array.isArray((logistica as Record<string, any>).notas_fiscais)
+            ? (logistica as Record<string, any>).notas_fiscais[0] || {}
+            : {};
           const pedidoItem: DashboardPedidoItem = {
             pedidoId,
             numeroNota: referenciaNota?.numeroNota || null,
@@ -1348,7 +1466,14 @@ export default async function handler(
             clienteNome: toStringValue(pedido.cliente_nome) || 'Cliente nao informado',
             nomeFantasia: toStringValue(pedido.nome_fantasia),
             valorPedido: toNumber(pedido.valor_pedido),
-            dataHoraRecebimento: toStringValue(pedido.data_hora_recebimento),
+            dataHoraRecebimento: pickString(
+              pedido.data_hora_recebimento,
+              pedido.DATA_HORA_RECEBIMENTO,
+              pedido.DATA_RECEBIMENTO,
+              pedidoLogisticaParaRota.data_hora_recebimento,
+              pedidoLogisticaParaRota.DATA_HORA_RECEBIMENTO,
+              pedidoLogisticaParaRota.DATA_RECEBIMENTO
+            ),
             previsaoEntrega,
             localNome: embarcadoNoControle && controleInfo
               ? getControleLocalNome(controleInfo)
@@ -1361,6 +1486,31 @@ export default async function handler(
             dataHoraConfirmacao: toStringValue(statusLogistico.data_hora_confirmacao),
             dataHoraControle: controleInfo?.dataHoraControle || null,
             transportadoraNome: controleInfo?.transportadoraNome || null,
+            bairro: pickString(
+              pedido.BAIRRO_ENTREGA_NOME,
+              pedido.NOME_BAIRRO_NOTA,
+              pedido.BAIRRO,
+              pedidoLogisticaParaRota.BAIRRO_ENTREGA_NOME,
+              pedidoLogisticaParaRota.BAIRRO_CADASTRO_NOME,
+              notaLogisticaParaRota.NOME_BAIRRO_NOTA
+            ),
+            cidade: pickString(
+              pedido.CIDADE_ENTREGA_NOME,
+              pedido.NOME_CIDADE,
+              pedido.CIDADE,
+              pedidoLogisticaParaRota.CIDADE_ENTREGA_NOME,
+              pedidoLogisticaParaRota.CIDADE_CADASTRO_NOME,
+              notaLogisticaParaRota.NOME_CIDADE
+            ),
+            uf: pickString(
+              pedido.UF_ENTREGA,
+              pedido.ESTADO_DESTINO,
+              pedido.UF,
+              pedidoLogisticaParaRota.UF_ENTREGA,
+              pedidoLogisticaParaRota.ESTADO_ENTREGA_ID,
+              pedidoLogisticaParaRota.UF_CADASTRO,
+              notaLogisticaParaRota.ESTADO_DESTINO
+            ),
             possuiProdutosFaltando:
               possuiPendencia ||
               produtosPendentes.length > 0 ||
@@ -1516,15 +1666,17 @@ export default async function handler(
       indicadores,
     };
 
-    setCacheByPeriodo(periodoFiltro.cacheKey, payload);
+    const payloadComPrazoRota = await aplicarPrazosDaTabelaDeRotas(payload);
+    setCacheByPeriodo(periodoFiltro.cacheKey, payloadComPrazoRota);
 
-    return res.status(200).json(payload);
+    return res.status(200).json(payloadComPrazoRota);
   } catch (error) {
     console.error('[Dashboard Logistica Inicial] Erro:', error);
     const cacheStale = getCacheByPeriodo(periodoFiltro.cacheKey);
 
     if (cacheStale && cacheStale.staleAt > Date.now()) {
-      return res.status(200).json({ ...cacheStale.payload, stale: true });
+      const payload = await aplicarPrazosDaTabelaDeRotas(cacheStale.payload);
+      return res.status(200).json({ ...payload, stale: true });
     }
 
     const snapshotFallback = await montarDashboardPorSnapshot(periodoFiltro, {
@@ -1532,8 +1684,9 @@ export default async function handler(
     });
 
     if (snapshotFallback) {
-      setCacheByPeriodo(periodoFiltro.cacheKey, snapshotFallback);
-      return res.status(200).json(snapshotFallback);
+      const payload = await aplicarPrazosDaTabelaDeRotas(snapshotFallback);
+      setCacheByPeriodo(periodoFiltro.cacheKey, payload);
+      return res.status(200).json(payload);
     }
 
     return res.status(200).json(

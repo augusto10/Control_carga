@@ -9,7 +9,11 @@ type Pedido = Partial<Informacoes> & {
   statusOperacionalCodigo?: string;
 };
 type Detalhe = Parameters<typeof dadosPedido>;
-type CarregarDetalhe = (id: number) => Promise<{ pedido: NonNullable<Detalhe[0]>; logistica: Detalhe[1] }>;
+type CarregarDetalhe = (id: number) => Promise<{
+  pedido: NonNullable<Detalhe[0]>;
+  logistica: Detalhe[1];
+  prazoEntregaRota?: string | null;
+}>;
 
 // Limita as consultas ao ERP quando varios pedidos entram na area visivel.
 let consultasAtivas = 0;
@@ -25,7 +29,15 @@ function processarFila() {
   }
 }
 
-export function PedidoInformacoes({ pedido, carregarDetalhe }: { pedido: Pedido; carregarDetalhe: CarregarDetalhe }) {
+export function PedidoInformacoes({
+  pedido,
+  carregarDetalhe,
+  onPrazoEntregaResolvido,
+}: {
+  pedido: Pedido;
+  carregarDetalhe: CarregarDetalhe;
+  onPrazoEntregaResolvido?: (pedidoId: number, prazoEntregaRota: string | null) => void;
+}) {
   const elemento = useRef<HTMLDivElement>(null);
   const [informacoes, setInformacoes] = useState<Informacoes | null>(null);
   const [situacao, setSituacao] = useState<'carregando' | 'pronto' | 'erro'>('carregando');
@@ -45,9 +57,13 @@ export function PedidoInformacoes({ pedido, carregarDetalhe }: { pedido: Pedido;
           if (!cancelado) {
             setInformacoes(dadosPedido(detalhe.pedido, detalhe.logistica));
             setSituacao('pronto');
+            onPrazoEntregaResolvido?.(pedido.pedidoId, detalhe.prazoEntregaRota || null);
           }
         } catch {
-          if (!cancelado) setSituacao('erro');
+          if (!cancelado) {
+            setSituacao('erro');
+            onPrazoEntregaResolvido?.(pedido.pedidoId, null);
+          }
         }
       });
       processarFila();
@@ -61,7 +77,7 @@ export function PedidoInformacoes({ pedido, carregarDetalhe }: { pedido: Pedido;
     if (observador && elemento.current) observador.observe(elemento.current);
     else carregar();
     return () => { cancelado = true; observador?.disconnect(); };
-  }, [pedido.pedidoId, carregarDetalhe]);
+  }, [pedido.pedidoId, carregarDetalhe, onPrazoEntregaResolvido]);
 
   const ausente = situacao === 'carregando' ? 'Carregando...' : situacao === 'erro' ? 'Indisponível' : 'Não informado';
   const valor = (campo: keyof Informacoes) => informacoes?.[campo] || pedido[campo] || (campo === 'conferenteNome' ? pedido.usuarioConfirmacaoNome : null) || ausente;
