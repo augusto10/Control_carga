@@ -22,7 +22,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   res.setHeader('Cache-Control', 'private, no-store, max-age=0');
 
   try {
-    const pedidos = await (prisma as any).pedidoLogisticaSnapshot.findMany({
+    const pedidos = await prisma.pedidoLogisticaSnapshot.findMany({
       where: {
         embarcadoNoControle: true,
         tipoEntrega: { in: ['ENT', 'EPG'] },

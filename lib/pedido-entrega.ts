@@ -9,6 +9,9 @@ type PedidoParaConsultaEntrega = {
 };
 
 const onlyDigits = (value: unknown) => String(value ?? '').replace(/\D/g, '');
+const MAX_CONSULTAS_POR_EXECUCAO = 100;
+const INTERVALO_RECONSULTA_MINUTOS = 60;
+const INTERVALO_RETRY_MINUTOS = 15;
 
 export function pedidoFoiEmbarcadoHoje(
   valores: Array<Date | string | null | undefined> | Date | string | null | undefined,
@@ -158,4 +161,130 @@ export async function buscarEntregasSswPorPedido(
   );
 
   return mapa;
+}
+
+export async function sincronizarCacheSituacoesEntrega(
+  pedidos: PedidoParaConsultaEntrega[],
+  agora: Date = new Date(),
+  concorrencia = 20
+) {
+  const pedidosPorChave = new Map<string, PedidoParaConsultaEntrega>();
+  for (const pedido of pedidos) {
+    const chaveNfe = onlyDigits(pedido.chaveNfe);
+    if (chaveNfe.length !== 44 || !Number.isFinite(pedido.pedidoId)) continue;
+    if (!pedidosPorChave.has(chaveNfe)) {
+      pedidosPorChave.set(chaveNfe, { ...pedido, chaveNfe });
+    }
+  }
+
+  const candidatos = Array.from(pedidosPorChave.values());
+  if (!candidatos.length) {
+    return { consultados: 0, entregues: 0, pendentes: 0, falhas: 0, ignorados: pedidos.length, restantes: 0 };
+  }
+
+  const existentes = await prisma.sswEntregaConsulta.findMany({
+    where: { chaveNfe: { in: candidatos.map((pedido) => pedido.chaveNfe!) } },
+    select: { chaveNfe: true, entregue: true, proximaConsultaEm: true },
+  });
+  const cachePorChave = new Map(existentes.map((registro) => [registro.chaveNfe, registro]));
+  const ignoradosPorCache = candidatos.filter((pedido) => {
+    const registro = cachePorChave.get(pedido.chaveNfe!);
+    return registro?.entregue || Boolean(registro?.proximaConsultaEm && registro.proximaConsultaEm > agora);
+  }).length;
+  const vencidos = candidatos.filter((pedido) => {
+    const registro = cachePorChave.get(pedido.chaveNfe!);
+    return !registro?.entregue && (!registro?.proximaConsultaEm || registro.proximaConsultaEm <= agora);
+  });
+  const lote = vencidos.slice(0, MAX_CONSULTAS_POR_EXECUCAO);
+
+  let entregues = 0;
+  let pendentes = 0;
+  let falhas = 0;
+  let proximo = 0;
+  const limiteConcorrencia = Math.max(1, Math.min(20, Math.floor(concorrencia) || 1));
+
+  const worker = async () => {
+    while (proximo < lote.length) {
+      const pedido = lote[proximo++];
+      const chaveNfe = pedido.chaveNfe!;
+
+      try {
+        const tracking = await fetchMergedTracking({
+          chave: chaveNfe,
+          numeroNota: pedido.numeroNota,
+          transportadora: pedido.transportadoraNome,
+        });
+        const entregue = Boolean(tracking.delivered);
+        await prisma.sswEntregaConsulta.upsert({
+          where: { chaveNfe },
+          create: {
+            chaveNfe,
+            pedidoId: pedido.pedidoId,
+            numeroNota: pedido.numeroNota || null,
+            transportadoraNome: pedido.transportadoraNome || null,
+            situacao: tracking.status || tracking.message || 'SEM_SITUACAO',
+            entregue,
+            sswStatus: tracking.status,
+            dataEntrega: tracking.deliveredAt,
+            consultadoEm: agora,
+            proximaConsultaEm: entregue
+              ? null
+              : new Date(agora.getTime() + INTERVALO_RECONSULTA_MINUTOS * 60_000),
+          },
+          update: {
+            pedidoId: pedido.pedidoId,
+            numeroNota: pedido.numeroNota || null,
+            transportadoraNome: pedido.transportadoraNome || null,
+            situacao: tracking.status || tracking.message || 'SEM_SITUACAO',
+            entregue,
+            sswStatus: tracking.status,
+            dataEntrega: tracking.deliveredAt,
+            consultadoEm: agora,
+            proximaConsultaEm: entregue
+              ? null
+              : new Date(agora.getTime() + INTERVALO_RECONSULTA_MINUTOS * 60_000),
+          },
+        });
+        if (entregue) entregues += 1;
+        else pendentes += 1;
+      } catch (error) {
+        falhas += 1;
+        const mensagem = error instanceof Error ? error.message.slice(0, 500) : 'ERRO_CONSULTA';
+        await prisma.sswEntregaConsulta.upsert({
+          where: { chaveNfe },
+          create: {
+            chaveNfe,
+            pedidoId: pedido.pedidoId,
+            numeroNota: pedido.numeroNota || null,
+            transportadoraNome: pedido.transportadoraNome || null,
+            situacao: mensagem || 'ERRO_CONSULTA',
+            entregue: false,
+            consultadoEm: agora,
+            proximaConsultaEm: new Date(agora.getTime() + INTERVALO_RETRY_MINUTOS * 60_000),
+          },
+          update: {
+            pedidoId: pedido.pedidoId,
+            numeroNota: pedido.numeroNota || null,
+            transportadoraNome: pedido.transportadoraNome || null,
+            situacao: mensagem || 'ERRO_CONSULTA',
+            entregue: false,
+            consultadoEm: agora,
+            proximaConsultaEm: new Date(agora.getTime() + INTERVALO_RETRY_MINUTOS * 60_000),
+          },
+        });
+      }
+    }
+  };
+
+  await Promise.all(Array.from({ length: Math.min(limiteConcorrencia, lote.length) }, () => worker()));
+
+  return {
+    consultados: lote.length,
+    entregues,
+    pendentes,
+    falhas,
+    ignorados: pedidos.length - vencidos.length + (vencidos.length - lote.length),
+    restantes: Math.max(0, vencidos.length - lote.length),
+    ignoradosPorCache,
+  };
 }
