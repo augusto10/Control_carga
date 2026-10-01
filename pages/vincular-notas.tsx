@@ -59,7 +59,9 @@ const VincularNotasPage = () => {
   const [motorista, setMotorista] = useState('');
   const [cpfMotorista, setCpfMotorista] = useState('');
   const [responsavel, setResponsavel] = useState('');
-  const [transportadora, setTransportadora] = useState<'ACERT' | 'EXPRESSO_GOIAS'>('ACERT');
+  const [transportadora, setTransportadora] = useState<
+    'ACERT' | 'ACCERT' | 'EXPRESSO_GOIAS' | 'TERCEIRIZADA' | 'DETAFRA_TRANSPORTES' | 'RETIRA_VENDEDOR' | 'RETIRA_CLIENTE' | 'VLOG' | 'ZANUELO_TRANSPORTE_LOGISTICA'
+  >('ACCERT');
   const [numeroManifesto, setNumeroManifesto] = useState('');
   const [qtdPallets, setQtdPallets] = useState<number>(0);
   const [observacao, setObservacao] = useState('');
@@ -77,29 +79,6 @@ const VincularNotasPage = () => {
           fetchNotas(),
           fetchControles()
         ]);
-        
-        // Se estiver editando, carrega os dados do controle
-        if (controleId) {
-          const controle = controles.find(c => c.id === controleId);
-          if (controle) {
-            setControleEncontrado(true);
-            setMotorista(controle.motorista || '');
-            setCpfMotorista(controle.cpfMotorista || '');
-            setResponsavel(controle.responsavel || '');
-            setTransportadora(controle.transportadora || 'ACERT');
-            setNumeroManifesto(controle.numeroManifesto || '');
-            setQtdPallets(controle.qtdPallets || 0);
-            setObservacao(controle.observacao || '');
-            
-            // Marca as notas já vinculadas como selecionadas
-            const notasVinculadas = controle.notas
-              .filter((nota: NotaFiscal) => nota.controleId === controleId)
-              .map((nota: NotaFiscal) => nota.id);
-            setNotasSelecionadas(notasVinculadas);
-          } else {
-            setControleEncontrado(false);
-          }
-        }
       } catch (error) {
         console.error('Erro ao carregar dados:', error);
         enqueueSnackbar('Erro ao carregar dados. Tente novamente.', { 
@@ -112,7 +91,32 @@ const VincularNotasPage = () => {
     };
     
     loadData();
-  }, [controleId, fetchNotas, fetchControles, controles, enqueueSnackbar]);
+  }, []); // Executar apenas uma vez ao montar o componente
+
+  // Carrega os dados do controle quando controleId ou controles mudam
+  useEffect(() => {
+    if (controleId && controles.length > 0) {
+      const controle = controles.find(c => c.id === controleId);
+      if (controle) {
+        setControleEncontrado(true);
+        setMotorista(controle.motorista || '');
+        setCpfMotorista(controle.cpfMotorista || '');
+        setResponsavel(controle.responsavel || '');
+        setTransportadora(controle.transportadora || 'ACCERT');
+        setNumeroManifesto(controle.numeroManifesto || '');
+        setQtdPallets(controle.qtdPallets || 0);
+        setObservacao(controle.observacao || '');
+        
+        // Marca as notas já vinculadas como selecionadas
+        const notasVinculadas = controle.notas
+          .filter((nota: NotaFiscal) => nota.controleId === controleId)
+          .map((nota: NotaFiscal) => nota.id);
+        setNotasSelecionadas(notasVinculadas);
+      } else {
+        setControleEncontrado(false);
+      }
+    }
+  }, [controleId, controles]);
 
   const handleToggleNota = (notaId: string) => {
     const currentIndex = notasSelecionadas.indexOf(notaId);
@@ -309,7 +313,7 @@ const VincularNotasPage = () => {
             anchorOrigin: { vertical: 'top', horizontal: 'center' }
           }
         );
-        router.push('/listar-controles');
+        router.push('/controles');
       }
     } catch (error) {
       console.error('Erro ao processar o formulário:', error);
@@ -352,7 +356,7 @@ const VincularNotasPage = () => {
           <Button 
             variant="contained" 
             color="primary" 
-            onClick={() => router.push('/listar-controles')}
+            onClick={() => router.push('/controles')}
           >
             Voltar para a lista
           </Button>
@@ -412,14 +416,32 @@ const VincularNotasPage = () => {
               select
               label="Transportadora"
               value={transportadora}
-              onChange={(e: React.ChangeEvent<{ value: unknown }>) => 
-                setTransportadora(e.target.value as 'ACERT' | 'EXPRESSO_GOIAS')
+              onChange={(e: React.ChangeEvent<{ value: unknown }>) =>
+                setTransportadora(
+                  e.target.value as
+                    | 'ACERT'
+                    | 'ACCERT'
+                    | 'EXPRESSO_GOIAS'
+                    | 'TERCEIRIZADA'
+                    | 'DETAFRA_TRANSPORTES'
+                    | 'RETIRA_VENDEDOR'
+                    | 'RETIRA_CLIENTE'
+                    | 'VLOG'
+                    | 'ZANUELO_TRANSPORTE_LOGISTICA'
+                )
               }
               fullWidth
               margin="normal"
             >
-              <MenuItem value="ACERT">ACERT</MenuItem>
+              <MenuItem value="ACERT">ACERT Transportes</MenuItem>
+              <MenuItem value="ACCERT">ACCERT</MenuItem>
               <MenuItem value="EXPRESSO_GOIAS">Expresso Goiás</MenuItem>
+              <MenuItem value="TERCEIRIZADA">TERCEIRIZADA</MenuItem>
+              <MenuItem value="DETAFRA_TRANSPORTES">Detafra Transportes</MenuItem>
+              <MenuItem value="RETIRA_VENDEDOR">Retira Vendedor</MenuItem>
+              <MenuItem value="RETIRA_CLIENTE">Retira Cliente</MenuItem>
+              <MenuItem value="VLOG">VLOG Transportes</MenuItem>
+              <MenuItem value="ZANUELO_TRANSPORTE_LOGISTICA">Zanuelo Transporte e Logistica</MenuItem>
             </TextField>
             
             <TextField
@@ -538,7 +560,7 @@ const VincularNotasPage = () => {
         <Box display="flex" justifyContent="flex-end" gap={2}>
           <Button 
             variant="outlined" 
-            onClick={() => router.push('/listar-controles')}
+            onClick={() => router.push('/controles')}
           >
             Cancelar
           </Button>

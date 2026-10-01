@@ -5,7 +5,7 @@ import Cookies from 'js-cookie';
 import { api } from '../services/api';
 import { User, USER_TYPES, LoginCredentials, AuthError } from '../types/auth-types';
 import { AuthState, AuthContextType } from '../types/auth-context';
-import jwt from 'jsonwebtoken';
+import * as jwt from 'jsonwebtoken';
 
 type ServerRequest = NextPageContext['req'] & {
   headers: {
@@ -154,9 +154,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
           error: null
         });
         
-        // Se estiver na página de login, redireciona para o dashboard apropriado
+        // Se estiver na página de login, redireciona para a página apropriada
         if (router.pathname === '/login') {
-          const redirectPath = response.data.user.tipo === USER_TYPES.ADMIN ? '/admin' : '/dashboard';
+          const redirectPath = response.data.user.tipo === USER_TYPES.ADMIN ? '/admin' : '/';
           console.log(`[AuthContext] Redirecionando para ${redirectPath}...`);
           router.push(redirectPath);
         }
@@ -271,8 +271,28 @@ export function AuthProvider({ children }: AuthProviderProps) {
       });
       
       // Redireciona com base no tipo de usuário
-      const redirectPath = userResponse.data.user.tipo === USER_TYPES.ADMIN ? '/admin' : '/dashboard';
-      console.log(`[AuthContext] Redirecionando para: ${redirectPath}`);
+      const loggedInUser = userResponse.data.user;
+      let redirectPath = '/'; // Rota padrão
+
+      switch (loggedInUser.tipo) {
+        case 'ADMIN':
+          redirectPath = '/admin';
+          break;
+        case 'SEPARADOR':
+        case 'CONFERENTE':
+        case 'AUDITOR':
+        case 'GERENTE':
+        case 'USUARIO':
+        case 'FUNCIONARIO':
+        case 'CLIENTE':
+          redirectPath = '/';
+          break;
+        default:
+          redirectPath = '/';
+          break;
+      }
+
+      console.log(`[AuthContext] Redirecionando usuário do tipo ${loggedInUser.tipo} para ${redirectPath}`);
       await router.push(redirectPath);
       
     } catch (error: any) {

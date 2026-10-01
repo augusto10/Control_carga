@@ -1,5 +1,17 @@
 # Controle de Carga Web
 
+## Produtos das etiquetas
+
+A busca de etiquetas por marca usa o snapshot local em `src/data/products-maxima.json` e as fotos em `public/products/erp`. Assim, a consulta da tela nao depende da disponibilidade da API do ERP.
+
+O workflow `.github/workflows/sync-label-products.yml` executa a sincronizacao incremental a cada tres dias e tambem pode ser iniciado manualmente pelo GitHub Actions. Configure no repositorio os secrets `ERP_API_USERNAME` e `ERP_API_PASSWORD`; a variavel opcional `ERP_API_URL` permite trocar o endereco padrao da API.
+
+Para atualizar localmente:
+
+```bash
+npm run sync:label-products
+```
+
 Sistema web para controle de carga e notas fiscais com leitura de código de barras.
 
 ## Funcionalidades

@@ -83,9 +83,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
       // Faz a requisição de login
       const response = await api.post('/api/auth/login', { email, senha });
       
-      if (response.data?.user) {
+      if (response.data?.data) {
         // Atualiza o estado do usuário
-        setUser(response.data.user);
+        setUser(response.data.data);
         
         // Redireciona para a página inicial ou para a página que o usuário tentou acessar
         const redirectTo = router.query.redirectTo || '/';

@@ -1,27 +1,26 @@
 import { useState, useEffect } from 'react';
+import Head from 'next/head';
 import { 
-  Container, 
-  Typography, 
-  Paper, 
-  Box, 
-  TextField, 
-  Button, 
-  CircularProgress, 
-  Alert, 
-  Snackbar,
-  Divider,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  SelectChangeEvent,
-  FormControlLabel,
-  Switch
-} from '@mui/material';
-import { Save as SaveIcon } from '@mui/icons-material';
-import { useAuth } from '../../../contexts/AuthContext';
-import AdminRoute from '../../../components/admin/AdminRoute';
+  Settings, 
+  Save, 
+  Mail, 
+  Shield, 
+  Bell, 
+  Database, 
+  Sliders, 
+  HelpCircle,
+  RefreshCw,
+  AlertCircle,
+  CheckCircle2,
+  XCircle,
+  Info
+} from 'lucide-react';
+import { AppLayout } from '@/components/layout/AppLayout';
+import { Card } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { cn } from '@/utils/cn';
 import { api } from '@/services/api';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface ConfiguracoesSistema {
   id: string;
@@ -33,20 +32,22 @@ interface ConfiguracoesSistema {
 }
 
 function ConfiguracoesContent() {
-  const { user } = useAuth();
   const [configuracoes, setConfiguracoes] = useState<ConfiguracoesSistema[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [snackbar, setSnackbar] = useState<{ 
-    open: boolean; 
-    message: string; 
-    severity: 'success' | 'error' | 'warning' | 'info' 
-  }>({ 
-    open: false, 
+  
+  // Toast
+  const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({ 
+    show: false, 
     message: '', 
-    severity: 'success' 
+    type: 'success' 
   });
+
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ show: true, message, type });
+    setTimeout(() => setToast(prev => ({ ...prev, show: false })), 3000);
+  };
 
   // Carregar configurações quando o componente for montado
   useEffect(() => {
@@ -56,12 +57,12 @@ function ConfiguracoesContent() {
   const carregarConfiguracoes = async () => {
     try {
       setLoading(true);
+      setError(null);
       const response = await api.get('/api/admin/configuracoes');
-      setConfiguracoes(response.data);
-    } catch (error: unknown) {
+      setConfiguracoes(response.data.data || []);
+    } catch (error: any) {
       console.error('Erro ao carregar configurações:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Erro ao carregar configurações';
-      setError(`Erro ao carregar configurações: ${errorMessage}`);
+      setError('Não foi possível carregar as configurações do sistema.');
     } finally {
       setLoading(false);
     }
@@ -73,16 +74,6 @@ function ConfiguracoesContent() {
         config.id === id ? { ...config, valor: String(value) } : config
       )
     );
-  };
-
-  const handleSelectChange = (e: SelectChangeEvent<string>, id: string) => {
-    const { value } = e.target;
-    handleInputChange(id, value);
-  };
-
-  const handleSwitchChange = (e: React.ChangeEvent<HTMLInputElement>, id: string) => {
-    const { checked } = e.target;
-    handleInputChange(id, String(checked));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -97,170 +88,218 @@ function ConfiguracoesContent() {
       }));
       
       await api.put('/api/admin/configuracoes', { configuracoes: configuracoesAtualizadas });
-      
-      setSnackbar({ 
-        open: true, 
-        message: 'Configurações salvas com sucesso!', 
-        severity: 'success' 
-      });
-    } catch (error: unknown) {
+      showToast('Configurações salvas com sucesso!');
+    } catch (error: any) {
       console.error('Erro ao salvar configurações:', error);
-      const errorMessage = error && typeof error === 'object' && 'response' in error && 
-                         error.response && typeof error.response === 'object' && 
-                         'data' in error.response && 
-                         error.response.data && typeof error.response.data === 'object' &&
-                         'message' in error.response.data ?
-                         String(error.response.data.message) : 'Erro ao salvar configurações';
-      
-      setSnackbar({ 
-        open: true, 
-        message: errorMessage, 
-        severity: 'error' as const
-      });
+      showToast(error.response?.data?.message || 'Erro ao salvar configurações', 'error');
     } finally {
       setSaving(false);
     }
   };
 
-  const handleCloseSnackbar = () => {
-    setSnackbar(prev => ({ ...prev, open: false }));
+  const getIconForConfig = (chave: string) => {
+    const chaveLower = chave.toLowerCase();
+    if (chaveLower.includes('email') || chaveLower.includes('smtp')) return Mail;
+    if (chaveLower.includes('seguranca') || chaveLower.includes('senha')) return Shield;
+    if (chaveLower.includes('notificacao')) return Bell;
+    if (chaveLower.includes('banco') || chaveLower.includes('storage')) return Database;
+    if (chaveLower.includes('geral')) return Sliders;
+    return Settings;
   };
 
   const renderConfiguracaoInput = (config: ConfiguracoesSistema) => {
     switch (config.tipo) {
       case 'BOOLEANO':
+        const isEnabled = config.valor === 'true';
         return (
-          <FormControlLabel
-            control={
-              <Switch
-                checked={config.valor === 'true'}
-                onChange={(e) => handleSwitchChange(e, config.id)}
-                color="primary"
+          <div className="flex items-center justify-between p-4 bg-slate-50/50 rounded-xl border border-slate-100 transition-all hover:bg-slate-50">
+            <span className="text-sm font-medium text-textMuted">
+              {isEnabled ? 'Ativado' : 'Desativado'}
+            </span>
+            <button
+              type="button"
+              onClick={() => handleInputChange(config.id, !isEnabled)}
+              className={cn(
+                "relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary/20",
+                isEnabled ? "bg-primary" : "bg-slate-300"
+              )}
+            >
+              <span
+                className={cn(
+                  "inline-block h-4 w-4 transform rounded-full bg-white transition-transform",
+                  isEnabled ? "translate-x-6" : "translate-x-1"
+                )}
               />
-            }
-            label={config.valor === 'true' ? 'Ativado' : 'Desativado'}
-          />
+            </button>
+          </div>
         );
       case 'SELECAO':
         return (
-          <FormControl fullWidth variant="outlined" margin="normal">
-            <InputLabel id={`${config.id}-label`}>{config.descricao}</InputLabel>
-            <Select
-              labelId={`${config.id}-label`}
-              value={config.valor}
-              onChange={(e) => handleSelectChange(e, config.id)}
-              label={config.descricao}
-            >
-              {config.opcoes?.map((opcao) => (
-                <MenuItem key={opcao} value={opcao}>
-                  {opcao}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <select 
+            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm appearance-none"
+            value={config.valor}
+            onChange={(e) => handleInputChange(config.id, e.target.value)}
+          >
+            {config.opcoes?.map((opcao) => (
+              <option key={opcao} value={opcao}>
+                {opcao}
+              </option>
+            ))}
+          </select>
         );
       case 'NUMERO':
         return (
-          <TextField
-            fullWidth
+          <input 
             type="number"
-            margin="normal"
-            label={config.descricao}
+            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm"
             value={config.valor}
             onChange={(e) => handleInputChange(config.id, e.target.value)}
-            variant="outlined"
           />
         );
       case 'TEXTO':
       default:
         return (
-          <TextField
-            fullWidth
-            margin="normal"
-            label={config.descricao}
+          <textarea 
+            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm min-h-[42px] resize-y"
+            rows={config.valor.length > 50 ? 3 : 1}
             value={config.valor}
             onChange={(e) => handleInputChange(config.id, e.target.value)}
-            variant="outlined"
-            multiline
-            rows={3}
           />
         );
     }
   };
 
-  if (error) {
-    return (
-      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-        <Alert severity="error">{error}</Alert>
-      </Container>
-    );
-  }
-
   if (loading) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
-        <CircularProgress />
-      </Box>
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+        <RefreshCw className="w-10 h-10 text-primary animate-spin opacity-20" />
+        <p className="text-textMuted font-medium animate-pulse">Carregando configurações...</p>
+      </div>
     );
   }
 
   return (
-    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-      <Box mb={4}>
-        <Typography variant="h4" component="h1" gutterBottom>
-          Configurações do Sistema
-        </Typography>
-        <Typography variant="body1" color="textSecondary" paragraph>
-          Gerencie as configurações gerais do sistema.
-        </Typography>
-      </Box>
+    <AppLayout 
+      title="Configurações do Sistema" 
+      subtitle="Personalize o comportamento e parâmetros globais da plataforma"
+    >
+      <Head>
+        <title>Configurações | ControlCarga</title>
+      </Head>
 
-      <Paper component="form" onSubmit={handleSubmit} sx={{ p: 3 }}>
-        {configuracoes.map((config, index) => (
-          <Box key={config.id} mb={4}>
-            <Typography variant="h6" gutterBottom>
-              {config.chave}
-            </Typography>
-            <Typography variant="body2" color="textSecondary" paragraph>
-              {config.descricao}
-            </Typography>
-            
-            {renderConfiguracaoInput(config)}
-            
-            {index < configuracoes.length - 1 && <Divider sx={{ my: 3 }} />}
-          </Box>
-        ))}
-        
-        <Box display="flex" justifyContent="flex-end" mt={4}>
-          <Button
-            type="submit"
-            variant="contained"
-            color="primary"
-            startIcon={saving ? <CircularProgress size={20} color="inherit" /> : <SaveIcon />}
-            disabled={saving}
+      <div className="max-w-5xl mx-auto">
+        {error ? (
+          <div className="bg-rose-50 border border-rose-100 rounded-2xl p-8 text-center flex flex-col items-center gap-4">
+            <AlertCircle className="w-12 h-12 text-rose-500 opacity-50" />
+            <div className="space-y-1">
+              <h3 className="font-bold text-rose-900">Erro ao carregar dados</h3>
+              <p className="text-rose-700 text-sm">{error}</p>
+            </div>
+            <Button variant="danger" onClick={carregarConfiguracoes}>
+              Tentar Novamente
+            </Button>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-8 pb-20">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {configuracoes.map((config, index) => {
+                const ConfigIcon = getIconForConfig(config.chave);
+                return (
+                  <motion.div
+                    key={config.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.05 }}
+                  >
+                    <Card className="h-full group hover:border-primary/30 transition-all duration-300">
+                      <div className="space-y-4">
+                        <div className="flex items-start gap-4">
+                          <div className="p-2.5 rounded-xl bg-primary/10 text-primary group-hover:bg-primary group-hover:text-white transition-colors duration-300">
+                            <ConfigIcon className="w-5 h-5" />
+                          </div>
+                          <div className="space-y-1 flex-1">
+                            <h3 className="font-bold text-textMain capitalize leading-tight">
+                              {config.chave.replace(/_/g, ' ')}
+                            </h3>
+                            <p className="text-xs text-textMuted leading-relaxed">
+                              {config.descricao}
+                            </p>
+                          </div>
+                        </div>
+                        
+                        <div className="pt-2">
+                          {renderConfiguracaoInput(config)}
+                        </div>
+                      </div>
+                    </Card>
+                  </motion.div>
+                );
+              })}
+            </div>
+
+            {/* Ações do Formulário */}
+            <div className="fixed bottom-4 sm:bottom-8 left-0 right-0 px-4 sm:px-6 md:left-[calc(50%+140px)] md:w-[calc(100%-320px)] md:max-w-5xl md:mx-auto z-50">
+              <div className="bg-white/80 backdrop-blur-md border border-slate-200 rounded-2xl p-3 sm:p-4 shadow-2xl flex items-center justify-between gap-4 animate-in slide-in-from-bottom-4">
+                <div className="hidden lg:flex items-center gap-2 text-textMuted text-sm">
+                  <Info className="w-4 h-4 text-primary" />
+                  <span>As alterações só serão aplicadas após salvar.</span>
+                </div>
+                <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
+                  <Button 
+                    type="button" 
+                    variant="ghost" 
+                    onClick={carregarConfiguracoes}
+                    disabled={saving}
+                    className="flex-1 sm:flex-none text-xs sm:text-sm h-10 sm:h-11"
+                  >
+                    Descartar
+                  </Button>
+                  <Button 
+                    type="submit" 
+                    variant="primary" 
+                    loading={saving}
+                    iconLeft={<Save className="w-4 h-4" />}
+                    className="flex-1 sm:flex-none px-4 sm:px-8 text-xs sm:text-sm h-10 sm:h-11"
+                  >
+                    {saving ? 'Salvando...' : 'Salvar Alterações'}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </form>
+        )}
+      </div>
+
+      {/* Toast Notification */}
+      <AnimatePresence>
+        {toast.show && (
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="fixed bottom-28 left-1/2 -translate-x-1/2 md:left-auto md:translate-x-0 md:right-6 z-[100] px-6 py-3 rounded-xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-bottom-10 md:slide-in-from-right-10 w-[calc(100%-2rem)] max-w-[400px] md:w-auto"
           >
-            {saving ? 'Salvando...' : 'Salvar Configurações'}
-          </Button>
-        </Box>
-      </Paper>
-
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={6000}
-        onClose={handleCloseSnackbar}
-        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
-      >
-        <Alert 
-          onClose={handleCloseSnackbar} 
-          severity={snackbar.severity} 
-          sx={{ width: '100%' }}
-        >
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
-    </Container>
+            <div className={cn(
+              "flex items-center gap-3 px-6 py-3.5 rounded-2xl shadow-2xl border text-sm font-semibold whitespace-nowrap w-full",
+              toast.type === 'success' 
+                ? "bg-emerald-600 text-white border-emerald-500" 
+                : "bg-rose-600 text-white border-rose-500"
+            )}>
+              {toast.type === 'success' ? (
+                <CheckCircle2 className="w-5 h-5" />
+              ) : (
+                <XCircle className="w-5 h-5" />
+              )}
+              {toast.message}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </AppLayout>
   );
 }
+
+import AdminRoute from '../../../components/admin/AdminRoute';
 
 export default function Configuracoes() {
   return (
@@ -269,3 +308,5 @@ export default function Configuracoes() {
     </AdminRoute>
   );
 }
+
+(Configuracoes as any).usesAppLayout = true;

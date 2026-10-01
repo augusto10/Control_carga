@@ -1,0 +1,11 @@
+schema_version: 1
+module_path: utils_and_styles
+title: Shared Utilities, Themes & Print Integration
+scope:
+    - utils/
+    - styles/
+    - src/
+source_files: []
+depends_on: []
+related_to:
+    - path: services

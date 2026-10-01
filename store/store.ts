@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { useSnackbar } from 'notistack';
+import { api } from '../services/api';
 
 export type ControleResumido = {
   id: string;
@@ -23,22 +24,28 @@ export type NotaFiscal = {
 export type Transportadora = {
   id: string;
   nome: string;
-  cnpj: string;
-  ativo: boolean;
+  descricao: string;
 };
 
 export type ControleCarga = {
   id: string;
   dataCriacao: Date;
   motorista: string;
-  cpfMotorista?: string;  // Tornando opcional
+  cpfMotorista: string;
   responsavel: string;
-  transportadora: 'ACERT' | 'EXPRESSO_GOIAS';
-  numeroManifesto?: string;
+  transportadora: 'ACERT' | 'ACCERT' | 'EXPRESSO_GOIAS' | 'TERCEIRIZADA' | 'DETAFRA_TRANSPORTES' | 'RETIRA_VENDEDOR' | 'RETIRA_CLIENTE' | 'VLOG' | 'ZANUELO_TRANSPORTE_LOGISTICA';
+  numeroManifesto: string | null;
   qtdPallets: number;
-  observacao?: string;
+  observacao: string | null;
   finalizado: boolean;
   notas: NotaFiscal[];
+  freteInformado?: boolean;
+  valorFrete?: number | null;
+  imagens?: string[];
+  assinaturaMotorista?: string | null;
+  assinaturaResponsavel?: string | null;
+  dataAssinaturaMotorista?: Date | null;
+  dataAssinaturaResponsavel?: Date | null;
 };
 
 interface StoreState {
@@ -47,14 +54,23 @@ interface StoreState {
   transportadoras: Transportadora[];
   status: 'success' | 'error' | null;
   loading: boolean;
-  fetchNotas: (start?: string, end?: string) => Promise<void>;
-  fetchControles: () => Promise<void>;
+  fetchNotas: (start?: string, end?: string, numeroNota?: string, codigo?: string) => Promise<void>;
+  fetchControles: (filters?: {
+    start?: string;
+    end?: string;
+    transportadora?: string;
+    notaFiscal?: string;
+    motorista?: string;
+    responsavel?: string;
+    limit?: number;
+  }) => Promise<void>;
   fetchTransportadoras: () => Promise<void>;
   addNota: (nota: Omit<NotaFiscal, 'id' | 'dataCriacao' | 'controleId'>) => Promise<NotaFiscal>;
   criarControle: (controle: Omit<ControleCarga, 'id' | 'dataCriacao' | 'finalizado' | 'notas'> & { notasIds?: string[] }) => Promise<ControleCarga>;
   vincularNotas: (controleId: string, notasIds: string[]) => Promise<void>;
   finalizarControle: (controleId: string) => Promise<void>;
   atualizarControle: (controleId: string, dados: Partial<Omit<ControleCarga, 'id' | 'dataCriacao' | 'notas'>>) => Promise<ControleCarga | null>;
+  deleteNota: (notaId: string) => Promise<boolean>;
 }
 
 export const useStore = create<StoreState>((set) => ({
@@ -64,27 +80,66 @@ export const useStore = create<StoreState>((set) => ({
   status: null,
   loading: false,
 
-  fetchNotas: async (start?: string, end?: string) => {
+  fetchNotas: async (start?: string, end?: string, numeroNota?: string, codigo?: string) => {
+    console.log('[fetchNotas] Iniciando busca de notas');
+    console.log('[fetchNotas] Parâmetros:', { start, end, numeroNota, codigo });
+    
     const params = new URLSearchParams();
     if (start) params.append('start', start);
     if (end) params.append('end', end);
-    const response = await fetch(`/api/notas${params.toString() ? '?' + params.toString() : ''}`, {
-      headers: {
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0'
-      },
-      credentials: 'include' // Inclui cookies na requisição
-    });
-    const notas = await response.json();
-    set({ notas });
+    if (numeroNota) params.append('numeroNota', numeroNota);
+    if (codigo) params.append('codigo', codigo);
+    
+    const url = `/api/notas${params.toString() ? '?' + params.toString() : ''}`;
+    console.log('[fetchNotas] URL da requisição:', url);
+    
+    try {
+      const response = await fetch(url, {
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+          'Accept': 'application/json'
+        },
+        credentials: 'include' // Inclui cookies na requisição
+      });
+      
+      console.log('[fetchNotas] Resposta recebida, status:', response.status);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[fetchNotas] Erro na resposta:', errorText);
+        throw new Error('Erro ao carregar notas');
+      }
+      
+      const notas = await response.json();
+      console.log(`[fetchNotas] ${notas.length} notas carregadas`);
+      set({ notas });
+      
+    } catch (error) {
+      console.error('[fetchNotas] Erro ao buscar notas:', error);
+      throw error;
+    }
   },
 
-  fetchControles: async () => {
-    console.log('Iniciando fetchControles...');
+  fetchControles: async (filters = {}) => {
+    console.log('Iniciando fetchControles com filtros:', filters);
     set({ loading: true });
     try {
-      const response = await fetch('/api/controles', {
+      // Construir query string com filtros
+      const params = new URLSearchParams();
+      if (filters.start) params.append('start', filters.start);
+      if (filters.end) params.append('end', filters.end);
+      if (filters.transportadora) params.append('transportadora', filters.transportadora);
+      if (filters.notaFiscal) params.append('notaFiscal', filters.notaFiscal);
+      if (filters.motorista) params.append('motorista', filters.motorista);
+      if (filters.responsavel) params.append('responsavel', filters.responsavel);
+      if (filters.limit) params.append('limit', filters.limit.toString());
+      
+      const url = `/api/controles${params.toString() ? '?' + params.toString() : ''}`;
+      console.log('URL da requisição:', url);
+      
+      const response = await fetch(url, {
         headers: {
           'Cache-Control': 'no-cache, no-store, must-revalidate',
           'Pragma': 'no-cache',
@@ -225,7 +280,7 @@ export const useStore = create<StoreState>((set) => ({
       
       console.log('[criarControle] Transportadora recebida:', controle.transportadora);
       
-      if (!['ACERT', 'EXPRESSO_GOIAS'].includes(controle.transportadora)) {
+      if (!['ACERT', 'ACCERT', 'EXPRESSO_GOIAS', 'TERCEIRIZADA', 'DETAFRA_TRANSPORTES', 'RETIRA_VENDEDOR', 'RETIRA_CLIENTE', 'VLOG', 'ZANUELO_TRANSPORTE_LOGISTICA'].includes(controle.transportadora)) {
         console.error('[criarControle] Transportadora inválida:', controle.transportadora);
         throw new Error('Transportadora inválida. Valor recebido: ' + controle.transportadora);
       }
@@ -357,61 +412,155 @@ export const useStore = create<StoreState>((set) => ({
   },
 
   finalizarControle: async (controleId) => {
-    await fetch('/api/controles/finalizar', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ controleId }),
-    });
-    
-    await useStore.getState().fetchControles();
+    try {
+      const response = await fetch(`/api/controles/${controleId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        },
+        body: JSON.stringify({ finalizado: true }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Erro ao finalizar controle');
+      }
+      
+      await useStore.getState().fetchControles();
+    } catch (error) {
+      console.error('Erro ao finalizar controle:', error);
+      throw error;
+    }
   },
 
   atualizarControle: async (controleId, dados): Promise<ControleCarga | null> => {
     console.log('Iniciando atualizarControle...');
     try {
-      console.log('Enviando requisição para /api/controles/atualizar com dados:', {
-        controleId,
+      const isCriacao = !controleId;
+      const url = isCriacao ? '/api/controles' : `/api/controles/${controleId}`;
+      const method = isCriacao ? 'POST' : 'PUT';
+      const payload = {
         ...dados,
         qtdPallets: Number(dados.qtdPallets) || 0
+      };
+
+      console.log(`Enviando requisi????o ${method} para ${url} com dados:`, {
+        controleId,
+        ...payload
       });
-      
-      const response = await fetch('/api/controles/atualizar', {
-        method: 'POST',
+
+      const response = await fetch(url, {
+        method,
         headers: { 
           'Content-Type': 'application/json',
           'Cache-Control': 'no-cache, no-store, must-revalidate',
           'Pragma': 'no-cache',
           'Expires': '0'
         },
-        body: JSON.stringify({ 
-          controleId, 
-          ...dados,
-          // Garante que qtdPallets seja um número
-          qtdPallets: Number(dados.qtdPallets) || 0
-        }),
+        credentials: 'include',
+        body: JSON.stringify(payload),
       });
 
       console.log('Resposta recebida, status:', response.status);
-      
+
       if (!response.ok) {
         console.error('Erro na resposta da API:', response.status, response.statusText);
         const errorData = await response.json().catch(() => ({}));
         console.error('Detalhes do erro:', errorData);
-        throw new Error(errorData.error || 'Erro ao atualizar controle');
+        throw new Error(errorData.error || errorData.message || 'Erro ao atualizar controle');
       }
-      
-      // Atualiza a lista de controles após a atualização
-      console.log('Atualizando lista de controles...');
+
       const result = await response.json();
-      await useStore.getState().fetchControles();
+
+      set((state) => {
+        if (isCriacao) {
+          return {
+            controles: [result, ...state.controles]
+          };
+        }
+
+        return {
+          controles: state.controles.map((controle) =>
+            controle.id === controleId ? result : controle
+          )
+        };
+      });
+
       console.log('Controle atualizado com sucesso:', result);
       return result as ControleCarga;
-      
+
     } catch (error) {
       console.error('Erro ao atualizar controle:', error);
-      return null;
+      throw error;
+    }
+  },
+
+  deleteNota: async (notaId: string): Promise<boolean> => {
+    console.log(`[deleteNota] Iniciando exclusão da nota ${notaId}`);
+    
+    try {
+      // Usando a instância do Axios configurada
+      console.log(`[deleteNota] Iniciando requisição DELETE para /api/notas/${notaId}`);
+      
+      // Corrigido para usar DELETE na rota correta
+      const response = await api.delete(`/api/notas/${notaId}`);
+      
+      console.log(`[deleteNota] Resposta recebida:`, {
+        status: response.status,
+        data: response.data
+      });
+      
+      // Remove a nota do estado local
+      console.log(`[deleteNota] Removendo nota ${notaId} do estado local`);
+      set((state) => ({
+        notas: state.notas.filter((nota) => {
+          const shouldKeep = nota.id !== notaId;
+          if (!shouldKeep) {
+            console.log(`[deleteNota] Nota ${notaId} removida do estado`);
+          }
+          return shouldKeep;
+        })
+      }));
+
+      console.log(`[deleteNota] Nota ${notaId} excluída com sucesso`);
+      return true;
+      
+    } catch (error: any) {
+      console.error('[deleteNota] Erro ao excluir nota:', error);
+      
+      let errorMessage = 'Erro ao excluir nota. Tente novamente.';
+      
+      if (error.response) {
+        // A requisição foi feita e o servidor respondeu com um status fora do intervalo 2xx
+        console.error('[deleteNota] Erro na resposta:', {
+          status: error.response.status,
+          data: error.response.data,
+          headers: error.response.headers
+        });
+        
+        if (error.response.data && error.response.data.error) {
+          errorMessage = error.response.data.error;
+        } else if (error.response.status === 401) {
+          errorMessage = 'Sessão expirada. Por favor, faça login novamente.';
+        } else if (error.response.status === 403) {
+          errorMessage = 'Você não tem permissão para excluir esta nota.';
+        } else if (error.response.status === 404) {
+          errorMessage = 'Nota não encontrada.';
+        }
+      } else if (error.request) {
+        // A requisição foi feita mas não houve resposta
+        console.error('[deleteNota] Sem resposta do servidor:', error.request);
+        errorMessage = 'Não foi possível conectar ao servidor. Verifique sua conexão de internet.';
+      } else {
+        // Algo aconteceu ao configurar a requisição
+        console.error('[deleteNota] Erro ao configurar a requisição:', error.message);
+        errorMessage = `Erro ao processar a requisição: ${error.message}`;
+      }
+      
+      throw new Error(errorMessage);
     }
   },
 }));

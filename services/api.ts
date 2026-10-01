@@ -1,5 +1,22 @@
 import axios, { AxiosInstance } from 'axios';
 
+function resolveApiBaseUrl(): string {
+  let baseURL = process.env.NEXT_PUBLIC_API_URL || '';
+
+  if (typeof window !== 'undefined') {
+    const normalized = baseURL.trim().toLowerCase();
+    if (!normalized || normalized.includes('localhost') || normalized.includes('127.0.0.1')) {
+      return '';
+    }
+  }
+
+  if (baseURL.endsWith('/api')) {
+    baseURL = baseURL.slice(0, -4);
+  }
+
+  return baseURL.endsWith('/') ? baseURL.slice(0, -1) : baseURL;
+}
+
 // Cria uma instância do Axios com configurações padrão
 const createApi = (): AxiosInstance => {
   // Define a URL base da API.
@@ -13,7 +30,7 @@ const createApi = (): AxiosInstance => {
   const cleanBaseURL = baseURL.endsWith('/') ? baseURL.slice(0, -1) : baseURL;
   
   const instance = axios.create({
-    baseURL: cleanBaseURL,
+    baseURL: resolveApiBaseUrl(),
     headers: {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
@@ -39,13 +56,60 @@ const createApi = (): AxiosInstance => {
       // Garante que withCredentials está habilitado para enviar cookies
       config.withCredentials = true;
       
-      // Log dos headers da requisição para depuração
+      // Adiciona o token JWT do cookie, se existir
+      if (typeof document !== 'undefined') {
+        // Tenta primeiro com 'auth_token' (padrão do servidor) e depois com 'token' para compatibilidade
+        const token = document.cookie.split('; ').find(row => row.startsWith('auth_token='))?.split('=')[1] ||
+                     document.cookie.split('; ').find(row => row.startsWith('token='))?.split('=')[1];
+        
+        if (token) {
+          console.log('[API] Token JWT encontrado nos cookies');
+          config.headers['Authorization'] = `Bearer ${token}`;
+        } else {
+          console.log('[API] Nenhum token JWT encontrado nos cookies');
+        }
+      }
+      
       console.log('[API] Headers da requisição:', JSON.stringify(config.headers, null, 2));
       
       return config;
     },
     (error) => {
       console.error('[API] Erro no interceptor de requisição:', error);
+      return Promise.reject(error);
+    }
+  );
+  
+  // Interceptor de resposta para tratamento de erros
+  instance.interceptors.response.use(
+    (response) => {
+      console.log('[API] Resposta recebida:', {
+        status: response.status,
+        url: response.config.url,
+        method: response.config.method,
+        data: response.data
+      });
+      return response;
+    },
+    (error) => {
+      console.error('[API] Erro na resposta:', {
+        status: error.response?.status,
+        url: error.config?.url,
+        method: error.config?.method,
+        data: error.response?.data,
+        headers: error.config?.headers
+      });
+      
+      if (error.response?.status === 401) {
+        console.error('[API] Erro de autenticação - Token inválido ou expirado');
+        console.log('[API] Cookies atuais:', document.cookie);
+        
+        // Redireciona para a página de login se não estiver nela
+        if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
+          console.log('[API] Redirecionando para a página de login');
+          window.location.href = '/login';
+        }
+      }
       return Promise.reject(error);
     }
   );

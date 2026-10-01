@@ -1,0 +1,5 @@
+- Each script is a standalone entry point that instantiates its own `PrismaClient`, performs work in an async function, and ensures cleanup via `await prisma.$disconnect()` in a `finally` block.
+- Scripts use console logging with emoji prefixes (✅, ❌, 🔄, 📊) to mark status lines, making terminal output visually scannable during ad-hoc operations.
+- Database access uses Prisma's raw query methods (`$executeRawUnsafe`, `$queryRaw`) when direct SQL is needed, while structured reads/writes use typed Prisma model methods.
+- Environment-driven behavior is common: scripts read `process.env.DIRECT_URL` / `DATABASE_URL` / `NODE_ENV` and branch logging or execution paths accordingly.
+- File naming follows semantic prefixes indicating intent: `check-*` for diagnostics, `debug-*` / `diagnostico-*` for deeper inspection, `fix-*` / `corrigir-*` for corrective migrations, `test-*` for verification, and `aplicar-*` / `executar-*` for running migrations.

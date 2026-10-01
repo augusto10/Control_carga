@@ -1,0 +1,1 @@
+A collection of cross-cutting React components for barcode scanning, digital signatures, image capture, responsive tables/maps, and user/session UI used across the application.

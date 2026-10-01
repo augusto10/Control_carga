@@ -1,28 +1,55 @@
 generator client {
-  provider = "prisma-client-js"
-  engineType = "binary"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  // uncomment next line if you use Prisma <5.10
-  // directUrl = env("DATABASE_URL_UNPOOLED")
-  relationMode = "prisma"
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model ControleCarga {
-  id              String         @id @default(uuid())
-  dataCriacao     DateTime       @default(now())
-  motorista       String
-  responsavel     String
-  transportadora  Transportadora @default(ACCERT)
-  numeroManifesto String?
-  qtdPallets      Int            @default(0)
-  observacao      String?
-  finalizado      Boolean        @default(false)
-  cpfMotorista    String         @default("PENDENTE")
-  notas           NotaFiscal[]
+  id                        String         @id @default(uuid())
+  dataCriacao               DateTime       @default(now())
+  motorista                 String
+  responsavel               String
+  transportadora            Transportadora @default(ACCERT)
+  numeroManifesto           String?
+  qtdPallets                Int            @default(0)
+  observacao                String?
+  finalizado                Boolean        @default(false)
+  cpfMotorista              String         @default("PENDENTE")
+  assinaturaMotorista       String?
+  assinaturaResponsavel     String?
+  dataAssinaturaMotorista   DateTime?
+  dataAssinaturaResponsavel DateTime?
+  placaVeiculo              String?
+  qtdPalletsDevolvidos      Int            @default(0)
+  qtdPalletsLevados         Int            @default(0)
+  freteInformado            Boolean        @default(false)
+  valorFrete                Float?
+  fretePago                 Boolean        @default(false)
+  fretePagoEm               DateTime?
+  fretePagamentoId          String?
+  fretePagamento            FretePagamento? @relation("ControlePagamentoFrete", fields: [fretePagamentoId], references: [id], onDelete: SetNull)
+  fretePagamentoItens       FretePagamentoControle? @relation("ControleFreteItens")
+  imagens                   String[]       // Array de imagens em base64
+  notas                     NotaFiscal[]
+  pedidos                   Pedido[]
+
+  @@index([dataCriacao])
+  @@index([finalizado])
+}
+
+model Pedido {
+  id           String           @id @default(uuid())
+  numeroPedido String
+  dataCriacao  DateTime         @default(now())
+  controleId   String?
+  controle     ControleCarga?   @relation(fields: [controleId], references: [id])
+  conferido    PedidoConferido?
+
+  @@index([dataCriacao])
 }
 
 model NotaFiscal {
@@ -35,19 +62,37 @@ model NotaFiscal {
   volumes     String         @default("1")
   controle    ControleCarga? @relation(fields: [controleId], references: [id])
   usuario     Usuario?       @relation(fields: [usuarioId], references: [id])
+
+  @@index([dataCriacao])
 }
 
 model Usuario {
-  id               String            @id @default(uuid())
-  nome             String
-  email            String            @unique
-  senha            String
-  tipo             TipoUsuario       @default(USUARIO)
-  ativo            Boolean           @default(true)
-  dataCriacao      DateTime          @default(now())
-  ultimoAcesso     DateTime?
-  notas            NotaFiscal[]
-  auditoriasAcesso AuditoriaAcesso[]
+  id                   String                  @id @default(uuid())
+  nome                 String
+  email                String                  @unique
+  senha                String
+  tipo                 TipoUsuario             @default(USUARIO)
+  ativo                Boolean                 @default(true)
+  dataCriacao          DateTime                @default(now())
+  ultimoAcesso         DateTime?
+  foto                 String?
+  historicoPontos      HistoricoPontuacao[]
+  notas                NotaFiscal[]
+  ajustesPallets       PalletAjuste[]
+  pedidosAuditados     PedidoConferido[]       @relation("Auditoria")
+  pedidosConferidos    PedidoConferido[]       @relation("Conferencia")
+  pedidosSeparados     PedidoConferido[]       @relation("Separacao")
+  pedidosValidados     PedidoConferido[]       @relation("Validacao")
+  fretePagamentos      FretePagamento[]
+  pontuacao            PontuacaoUsuario?
+  auditoriasAcesso     AuditoriaAcesso[]
+  solicitacoesMaterial SolicitacaoMaterial[]   @relation("SolicitacoesMaterial")
+  aprovacoesMateria    SolicitacaoMaterial[]   @relation("AprovacoesMateria")
+  historicosEstoque    HistoricoEstoque[]
+  etiquetasLotes       EtiquetaLote[]         // Etiquetas de transporte criadas
+  historicoImpressaoEtiquetas LabelPrintHistory[]
+  checklistsRecebimento ChecklistRecebimento[] // Checklists de recebimento criados
+  roteirizacoes       Roteirizacao[]         // Roteirizações criadas
 }
 
 model AuditoriaAcesso {
@@ -79,23 +124,219 @@ model ConfiguracaoSistema {
   @@index([chave])
 }
 
+model PedidoLogisticaSnapshot {
+  id                      String   @id @default(uuid())
+  pedidoId                Int      @unique
+  tipoEntrega             String?
+  clienteNome             String?
+  nomeFantasia            String?
+  valorPedido             Float?
+  dataHoraRecebimento     DateTime?
+  dataRecebimentoDia      DateTime?
+  previsaoEntrega         DateTime?
+  localNome               String?
+  statusCodigo            String?
+  statusSeparacao         String?
+  statusLogisticoCodigo   String?
+  situacaoAtual           String?
+  usuarioConfirmacaoNome  String?
+  dataHoraConfirmacao     DateTime?
+  numeroNota              String?
+  numerosNotas            String[] @default([])
+  chaveNfe                String?
+  embarcadoNoControle     Boolean  @default(false)
+  numeroManifesto         String?
+  transportadoraNome      String?
+  dataHoraControle        DateTime?
+  possuiPendencia         Boolean  @default(false)
+  totalItensPendentes     Int      @default(0)
+  produtosPendentes       Json?
+  assinatura              String
+  rawPedido               Json?
+  rawLogistica            Json?
+  dataCriacao             DateTime @default(now())
+  sincronizadoEm          DateTime @updatedAt
 
-model Motorista {
-  id             String         @id @default(uuid())
-  dataCriacao    DateTime       @default(now())
-  nome           String
-  telefone       String
-  cpf            String         @unique
-  cnh            String
-  transportadoraId Transportadora
+  @@index([dataRecebimentoDia])
+  @@index([sincronizadoEm])
+  @@index([statusCodigo])
+  @@index([possuiPendencia])
+  @@index([embarcadoNoControle])
 }
 
+model SincronizacaoLogistica {
+  chave              String   @id
+  dataInicio         DateTime?
+  dataFim            DateTime?
+  totalLidos         Int      @default(0)
+  totalAtualizados   Int      @default(0)
+  totalComErro       Int      @default(0)
+  ultimoErro         String?
+  dataCriacao        DateTime @default(now())
+  ultimaSincronizacao DateTime @updatedAt
+}
 
+model SswEntregaConsulta {
+  chaveNfe           String   @id
+  pedidoId           Int?
+  numeroNota         String?
+  transportadoraNome String?
+  situacao           String
+  entregue           Boolean  @default(false)
+  sswStatus          String?
+  dataEntrega        String?
+  consultadoEm       DateTime @default(now())
+  proximaConsultaEm  DateTime?
+  dataCriacao        DateTime @default(now())
+  dataAtualizacao    DateTime @updatedAt
+
+  @@index([pedidoId])
+  @@index([entregue, proximaConsultaEm])
+}
+
+model Motorista {
+  id               String         @id @default(uuid())
+  dataCriacao      DateTime       @default(now())
+  nome             String
+  telefone         String
+  cpf              String         @unique
+  cnh              String?
+  transportadoraId Transportadora
+  tipo             TipoPessoa     @default(MOTORISTA)
+  ativo            Boolean        @default(true)
+}
+
+model PedidoConferido {
+  id                    String          @id @default(uuid())
+  dataCriacao           DateTime        @default(now())
+  pedidoId              String          @unique
+  separadorId           String?
+  conferenciaRealizada  Boolean         @default(false)
+  dataConferencia       DateTime?
+  conferenteId          String?
+  pedido100             Boolean?
+  inconsistencia        Boolean?
+  motivosInconsistencia String[]
+  auditoriaRealizada    Boolean         @default(false)
+  dataAuditoria         DateTime?
+  auditorId             String?
+  auditoriaComErro      Boolean?
+  observacaoAuditoria   String?
+  observacoes           String?
+  dataValidacao         DateTime?
+  statusValidacao       StatusValidacao @default(PENDENTE)
+  validadorId           String?
+  auditor               Usuario?        @relation("Auditoria", fields: [auditorId], references: [id])
+  conferente            Usuario?        @relation("Conferencia", fields: [conferenteId], references: [id])
+  pedido                Pedido          @relation(fields: [pedidoId], references: [id])
+  separador             Usuario?        @relation("Separacao", fields: [separadorId], references: [id])
+  validador             Usuario?        @relation("Validacao", fields: [validadorId], references: [id])
+}
+
+model PontuacaoUsuario {
+  id                String   @id @default(uuid())
+  usuarioId         String   @unique
+  pontuacaoTotal    Int      @default(0)
+  pedidosCorretos   Int      @default(0)
+  pedidosIncorretos Int      @default(0)
+  posicaoRanking    Int?
+  dataAtualizacao   DateTime @updatedAt
+  dataCriacao       DateTime @default(now())
+  usuario           Usuario  @relation(fields: [usuarioId], references: [id])
+
+  @@index([pontuacaoTotal])
+  @@index([posicaoRanking])
+}
+
+model HistoricoPontuacao {
+  id           String        @id @default(uuid())
+  usuarioId    String
+  pedidoId     String?
+  acao         AcaoPontuacao
+  pontosGanhos Int
+  descricao    String?
+  dataAcao     DateTime      @default(now())
+  usuario      Usuario       @relation(fields: [usuarioId], references: [id])
+
+  @@index([usuarioId])
+  @@index([dataAcao])
+}
+
+/// Registros de recebimento/ajuste de pallets devolvidos "avulsos"
+model PalletAjuste {
+  id              String   @id @default(uuid())
+  dataCriacao     DateTime @default(now())
+  dataRecebimento DateTime @default(now())
+  motorista       String?
+  transportadora  String?
+  quantidade      Int
+  observacao      String?
+  usuarioId       String
+  usuario         Usuario  @relation(fields: [usuarioId], references: [id])
+
+  @@index([dataRecebimento])
+  @@index([transportadora])
+  @@index([usuarioId])
+}
+
+model FretePagamento {
+  id               String                   @id @default(uuid())
+  dataCriacao      DateTime                 @default(now())
+  dataPagamento    DateTime                 @default(now())
+  valorTotal       Float
+  comprovante      String?
+  observacao       String?
+  criadoPor        String
+  criadoPorUser    Usuario                  @relation(fields: [criadoPor], references: [id])
+  controlesPagos   ControleCarga[]          @relation("ControlePagamentoFrete")
+  controles        FretePagamentoControle[] @relation("PagamentoFreteItens")
+
+  @@index([dataCriacao])
+  @@index([dataPagamento])
+  @@index([criadoPor])
+}
+
+model FretePagamentoControle {
+  id                String          @id @default(uuid())
+  fretePagamentoId  String
+  controleId        String          @unique
+  valorFrete        Float
+  fretePagamento    FretePagamento  @relation("PagamentoFreteItens", fields: [fretePagamentoId], references: [id], onDelete: Cascade)
+  controle          ControleCarga   @relation("ControleFreteItens", fields: [controleId], references: [id], onDelete: Restrict)
+
+  @@index([fretePagamentoId])
+  @@index([controleId])
+}
 
 enum Transportadora {
-  ACERT // valor legado (em desuso)
+  ACERT
   ACCERT
   EXPRESSO_GOIAS
+  TERCEIRIZADA
+  DETAFRA_TRANSPORTES
+  RETIRA_VENDEDOR
+  RETIRA_CLIENTE
+  VLOG
+  ZANUELO_TRANSPORTE_LOGISTICA
+}
+
+enum AcaoPontuacao {
+  PEDIDO_CORRETO
+  PEDIDO_INCORRETO
+  BONUS_ADMIN
+  PENALIDADE_ADMIN
+}
+
+enum StatusValidacao {
+  PENDENTE
+  VALIDADO_CORRETO
+  VALIDADO_INCORRETO
+}
+
+enum TipoPessoa {
+  MOTORISTA
+  FUNCIONARIO
+  CLIENTE
 }
 
 enum TipoUsuario {
@@ -107,4 +348,247 @@ enum TipoUsuario {
   SEPARADOR
   CONFERENTE
   AUDITOR
+}
+
+/// Sistema de Controle de Materiais (fitas, stretch, resmas, etc)
+model MaterialEstoque {
+  id                String                     @id @default(uuid())
+  dataCriacao       DateTime                   @default(now())
+  dataAtualizacao   DateTime                   @updatedAt
+  nome              String
+  descricao         String?
+  unidadeMedida     String                     @default("UN") // UN, CX, PCT, RL, etc
+  quantidadeEstoque Int                        @default(0)
+  estoqueMinimo     Int                        @default(0)
+  valor             Float?                     // Valor unitário do material
+  ativo             Boolean                    @default(true)
+  itens             ItemSolicitacaoMaterial[]
+  historicos        HistoricoEstoque[]
+
+  @@index([ativo])
+  @@index([nome])
+}
+
+model SolicitacaoMaterial {
+  id              String                     @id @default(uuid())
+  dataCriacao     DateTime                   @default(now())
+  dataAtualizacao DateTime                   @updatedAt
+  solicitanteId   String
+  solicitante     Usuario                    @relation("SolicitacoesMaterial", fields: [solicitanteId], references: [id])
+  status          StatusSolicitacao          @default(PENDENTE)
+  observacao      String?
+  dataAprovacao   DateTime?
+  aprovadorId     String?
+  aprovador       Usuario?                   @relation("AprovacoesMateria", fields: [aprovadorId], references: [id])
+  motivoRejeicao  String?
+  itens           ItemSolicitacaoMaterial[]
+
+  @@index([solicitanteId])
+  @@index([status])
+  @@index([dataCriacao])
+}
+
+model ItemSolicitacaoMaterial {
+  id             String              @id @default(uuid())
+  solicitacaoId  String
+  solicitacao    SolicitacaoMaterial @relation(fields: [solicitacaoId], references: [id], onDelete: Cascade)
+  materialId     String
+  material       MaterialEstoque     @relation(fields: [materialId], references: [id])
+  quantidade     Int
+  quantidadeAprovada Int?
+  observacao     String?
+
+  @@index([solicitacaoId])
+  @@index([materialId])
+}
+
+enum StatusSolicitacao {
+  PENDENTE
+  APROVADA
+  REJEITADA
+  ENTREGUE
+}
+
+/// Histórico de movimentações de estoque de materiais
+model HistoricoEstoque {
+  id               String            @id @default(uuid())
+  dataCriacao      DateTime          @default(now())
+  materialId       String
+  material         MaterialEstoque   @relation(fields: [materialId], references: [id])
+  tipo             TipoMovimentacao
+  quantidade       Int
+  quantidadeAntes  Int
+  quantidadeDepois Int
+  usuarioId        String
+  usuario          Usuario           @relation(fields: [usuarioId], references: [id])
+  observacao       String?
+  solicitacaoId    String?           // Se foi por solicitação
+
+  @@index([materialId])
+  @@index([dataCriacao])
+  @@index([usuarioId])
+}
+
+/// Sistema de Etiquetas de Transporte (Zebra ZD-220)
+model EtiquetaLote {
+  id              String           @id @default(uuid())
+  dataCriacao     DateTime         @default(now())
+  codigoBarras    String           // Código de barras da NF-e lida
+  numeroNota      String           // Número da nota fiscal
+  cliente         String           // Nome do cliente
+  cnpj            String?          // CNPJ do cliente
+  transportadora  Transportadora   // Transportadora selecionada
+  numeroPedido    String           // Número do pedido
+  volumes         Int              // Total de volumes/etiquetas
+  observacoes     String?          // Observações opcionais
+  criadoPor       String           // ID do usuário que criou
+  criadoPorUser   Usuario          @relation(fields: [criadoPor], references: [id])
+  volumesEtiquetas EtiquetaVolume[] // Volumes individuais
+
+  @@index([dataCriacao])
+  @@index([codigoBarras])
+  @@index([numeroNota])
+  @@index([numeroPedido])
+  @@index([criadoPor])
+}
+
+model EtiquetaVolume {
+  id              String         @id @default(uuid())
+  loteId          String         // FK para EtiquetaLote
+  lote            EtiquetaLote   @relation(fields: [loteId], references: [id], onDelete: Cascade)
+  indiceVolume    Int            // 1, 2, 3... (sequencial)
+  totalVolumes    Int            // Total de volumes do lote
+  codigoVolume    String         @unique // Código único para este volume
+  impressoEm      DateTime?      // Quando foi impresso
+
+  @@index([loteId])
+  @@index([codigoVolume])
+  @@index([impressoEm])
+}
+
+model LabelPrintHistory {
+  id             String   @id @default(uuid())
+  dataCriacao    DateTime @default(now())
+  usuarioId      String
+  usuario        Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
+  produtoId      String
+  codigoAdm      String
+  nomeProduto    String
+  marcaProduto   String?
+  codigoBarras   String
+  quantidade     Int
+  impressora     String
+  resultado      String
+  mensagemErro   String?
+
+  @@index([usuarioId])
+  @@index([produtoId])
+  @@index([codigoAdm])
+  @@index([dataCriacao])
+  @@map("label_print_history")
+}
+
+enum TipoMovimentacao {
+  ENTRADA
+  SAIDA
+  AJUSTE
+}
+
+/// Sistema de Checklist de Recebimento
+model ChecklistRecebimento {
+  id                    String    @id @default(uuid())
+  dataCriacao          DateTime  @default(now())
+  
+  // Dados básicos do recebimento
+  dataRecebimento      DateTime
+  horarioRecebimento   String
+  nomeConferente       String
+  nomeFabricante       String
+  descricaoProduto     String
+  numeroLote           String
+  dataFabricacao       DateTime
+  dataVencimento       DateTime
+  
+  // Fotos
+  fotoRecebimento      String?   // URL da foto
+  fotoDevolucao        String?   // URL da foto
+  
+  // Códigos de barras
+  admProduto           String?
+  codigoBarrasCaixaMaster   String?
+  codigoBarrasCaixaInterna  String?
+  codigoBarrasItem          String?
+  
+  // Perguntas do checklist
+  recebimentoPocket         Boolean
+  motivoNaoPocket          String?
+  possuiCodigoBarras       Boolean
+  solicitouCadastroCodigoBarras Boolean
+  paraQuemSolicitou        String?
+  dadosLoteCadastradosSantri Boolean
+  condicaoEmbalagens       CondicaoEmbalagem
+  houveRessalva            Boolean
+  descricaoRessalva        String?
+  paraQuemInformouRessalva String?
+  houveDevolucao           Boolean
+  itensDevolvidos          String?
+  quantidadeDevolvida      Int?
+  fotoTiradaDevolucao      Boolean
+  notaDevolucaoEmitida     Boolean
+  numeroNotaDevolucao      String?
+  
+  // Alertas de validade (novos campos)
+  alertaValidadeAutorizado    Boolean @default(false)
+  nomeAutorizadorLider        String?
+  produtosComAlertaValidade   String? // JSON com lista dos produtos
+  
+  // Auditoria
+  criadoPor            String
+  criadoPorUser        Usuario   @relation(fields: [criadoPor], references: [id])
+  
+  @@index([dataCriacao])
+  @@index([dataRecebimento])
+  @@index([nomeConferente])
+  @@index([nomeFabricante])
+  @@index([alertaValidadeAutorizado])
+  @@index([nomeAutorizadorLider])
+}
+
+model Roteirizacao {
+  id            String   @id @default(uuid())
+  dataCriacao   DateTime @default(now())
+  notasIds      String[] // Array de IDs das notas fiscais
+  estrategia    String   // 'cidade', 'bairro', 'logradouro'
+  capacidadeBox Int      @default(10)
+  rotas         String   // JSON com as rotas geradas
+  boxes         String   // JSON com os boxes criados
+  relatorio     String   // Relatório em texto
+  criadoPor     String
+  criadoPorUser Usuario  @relation(fields: [criadoPor], references: [id])
+  
+  @@index([dataCriacao])
+  @@index([criadoPor])
+}
+
+model RotaPrazoEntrega {
+  id              String   @id @default(uuid())
+  codigo          String
+  uf              String
+  prazo           String
+  regiao          String
+  transportadora  String
+  ativo           Boolean  @default(true)
+  dataCriacao     DateTime @default(now())
+  dataAtualizacao DateTime @updatedAt
+
+  @@unique([codigo, transportadora])
+  @@index([uf])
+  @@index([regiao])
+  @@index([transportadora])
+}
+
+enum CondicaoEmbalagem {
+  OTIMA
+  BOA
+  RUIM
 }

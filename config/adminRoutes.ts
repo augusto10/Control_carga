@@ -14,6 +14,12 @@ export const ADMIN_ROUTES = [
     roles: [USER_TYPES.ADMIN],
   },
   {
+    path: '/admin/pedidos',
+    title: 'Ciclo do Pedido',
+    icon: 'receipt',
+    roles: [USER_TYPES.ADMIN],
+  },
+  {
     path: '/admin/configuracoes',
     title: 'Configurações',
     icon: 'settings',

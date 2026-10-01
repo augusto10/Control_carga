@@ -1,0 +1,1 @@
+Next.js API route utilities, Prisma Client with raw `$queryRawUnsafe` for schema-evolution-safe queries, Supabase JS client, `jsonwebtoken` for JWT verification, `nookies` for cookie parsing, Axios for HTTP, and a child-process bridge to a Python script for ERP automation.

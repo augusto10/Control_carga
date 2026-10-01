@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../contexts/AuthContext';
+import GlobalBackground from './GlobalBackground';
 import { styled, useTheme, Theme, CSSObject } from '@mui/material/styles';
 import { 
   Box, 
@@ -23,31 +24,68 @@ import {
   Avatar,
   Button,
   Menu,
-  MenuItem
+  MenuItem,
+  SwipeableDrawer
 } from '@mui/material';
 import {
   Menu as MenuIcon,
+  Dashboard as DashboardIcon,
+  Analytics as AnalyticsIcon,
+  FactCheck as FactCheckIcon,
+  Groups as GroupsIcon,
+  Inventory2 as InventoryIcon,
+  LocalShipping as TruckIcon,
+  Assessment as ReportIcon,
+  Logout as LogoutIcon,
+  AdminPanelSettings as AdminIcon,
+  EmojiEvents as TrophyIcon,
+  Leaderboard as LeaderboardIcon,
+  Person as PersonIcon,
+  ChevronLeft as ChevronLeftIcon,
+  ChevronRight as ChevronRightIcon,
+  ExpandLess,
+  ExpandMore,
   Receipt as ReceiptIcon,
   PlaylistAdd as PlaylistAddIcon,
   ListAlt as ListAltIcon,
   AssignmentTurnedIn as AssignmentTurnedInIcon,
-  ChevronLeft as ChevronLeftIcon,
-  ChevronRight as ChevronRightIcon,
-  Home as HomeIcon,
   Search as SearchIcon,
-  Link as LinkIcon,
-  ExpandLess,
-  ExpandMore,
-  Person as PersonIcon,
-  LocalShipping as TruckIcon,
-  Assessment as ReportIcon,
-  Logout as LogoutIcon,
-  AdminPanelSettings as AdminIcon
+  Speed as SpeedIcon,
+  Timeline as TimelineIcon,
+  TrendingUp as TrendingUpIcon,
+  BusinessCenter as BusinessIcon,
+  Star as StarIcon,
+  Insights as InsightsIcon,
+  Print as PrintIcon,
+  // Novos ícones modernos
+  HomeRounded as HomeIcon,
+  DescriptionRounded as DocumentIcon,
+  AddCircleOutlineRounded as AddIcon,
+  SearchRounded as SearchModernIcon,
+  QrCodeScannerRounded as QrIcon,
+  AssignmentRounded as ChecklistModernIcon,
+  AssessmentRounded as ReportsIcon,
+  NotificationsActiveRounded as AlertsIcon,
+  PeopleRounded as PeopleIcon,
+  VerifiedUserRounded as VerifiedIcon,
+  WorkspacesRounded as WorkspaceIcon,
+  InventoryRounded as InventoryModernIcon,
+  RequestQuoteRounded as RequestIcon,
+  ApprovalRounded as ApprovalIcon,
+  BarChartRounded as ChartIcon,
+  AccountCircleRounded as ProfileIcon,
+  StarRounded as StarModernIcon,
+  EmojiEventsRounded as TrophyModernIcon,
+  TimelineRounded as TimelineModernIcon,
+  BusinessCenterRounded as BusinessModernIcon,
+  LocalShippingRounded as ShippingIcon,
+  ReceiptLongRounded as ReceiptModernIcon,
+  PrintRounded as PrintModernIcon
 } from '@mui/icons-material';
 import Link from 'next/link';
 import Image from 'next/image';
 
-const drawerWidth = 260;
+const drawerWidth = 240;
 
 // Estilos para o menu expandido
 const openedMixin = (theme: Theme): CSSObject => ({
@@ -57,8 +95,10 @@ const openedMixin = (theme: Theme): CSSObject => ({
     duration: theme.transitions.duration.enteringScreen,
   }),
   overflowX: 'hidden',
-  backgroundColor: theme.palette.background.paper,
-  boxShadow: theme.shadows[3],
+  backgroundColor: 'rgba(255, 255, 255, 0.9)',
+  backdropFilter: 'blur(12px)',
+  boxShadow: '4px 0 20px rgba(0,0,0,0.04)',
+  borderRight: '1px solid rgba(226, 232, 240, 0.8)',
 });
 
 // Estilos para o menu recolhido
@@ -72,19 +112,22 @@ const closedMixin = (theme: Theme): CSSObject => ({
   [theme.breakpoints.up('sm')]: {
     width: `calc(${theme.spacing(8)} + 1px)`,
   },
-  backgroundColor: theme.palette.background.paper,
-  boxShadow: theme.shadows[3],
+  backgroundColor: 'rgba(255, 255, 255, 0.9)',
+  backdropFilter: 'blur(12px)',
+  boxShadow: '4px 0 20px rgba(0,0,0,0.04)',
+  borderRight: '1px solid rgba(226, 232, 240, 0.8)',
 });
 
 const DrawerHeader = styled('div')(({ theme }) => ({
   display: 'flex',
   alignItems: 'center',
-  justifyContent: 'space-between',
-  padding: theme.spacing(0, 1.5),
+  justifyContent: 'center',
+  padding: theme.spacing(0, 1),
   ...theme.mixins.toolbar,
-  borderBottom: `1px solid ${theme.palette.divider}`,
-  backgroundColor: theme.palette.primary.main,
-  color: theme.palette.primary.contrastText,
+  background: 'transparent',
+  color: '#1e293b',
+  position: 'relative',
+  marginBottom: theme.spacing(2),
 }));
 
 interface AppBarPropsExtended extends AppBarProps {
@@ -99,17 +142,21 @@ const AppBar = styled(MuiAppBar, {
     easing: theme.transitions.easing.sharp,
     duration: theme.transitions.duration.leavingScreen,
   }),
-  backgroundColor: theme.palette.primary.main,
-  color: theme.palette.primary.contrastText,
-  boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-  ...(open && {
-    marginLeft: drawerWidth,
-    width: `calc(100% - ${drawerWidth}px)`,
-    transition: theme.transitions.create(['width', 'margin'], {
-      easing: theme.transitions.easing.sharp,
-      duration: theme.transitions.duration.enteringScreen,
+  background: 'rgba(255, 255, 255, 0.8)',
+  color: '#1e293b',
+  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.03)',
+  backdropFilter: 'blur(12px)',
+  borderBottom: '1px solid rgba(226, 232, 240, 0.8)',
+  [theme.breakpoints.up('md')]: {
+    ...(open && {
+      marginLeft: drawerWidth,
+      width: `calc(100% - ${drawerWidth}px)`,
+      transition: theme.transitions.create(['width', 'margin'], {
+        easing: theme.transitions.easing.sharp,
+        duration: theme.transitions.duration.enteringScreen,
+      }),
     }),
-  }),
+  },
 }));
 
 const StyledDrawer = styled(Drawer, {
@@ -127,38 +174,111 @@ const StyledDrawer = styled(Drawer, {
       duration: theme.transitions.duration.enteringScreen,
     }),
     borderRight: 'none',
+    background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)',
+    boxShadow: '4px 0 20px rgba(0, 0, 0, 0.08)',
+    backdropFilter: 'blur(8px)',
     ...(open ? openedMixin(theme) : closedMixin(theme)),
   },
 }));
 
 const MenuItemButton = styled(ListItemButton)(({ theme }) => ({
-  minHeight: 48,
-  borderRadius: theme.shape.borderRadius,
-  margin: theme.spacing(0.5, 1.5),
-  padding: theme.spacing(1, 2),
-  '&:hover': {
-    backgroundColor: alpha(theme.palette.primary.main, 0.1),
+  minHeight: 56,
+  borderRadius: '10px',
+  margin: theme.spacing(0.4, 1.25),
+  paddingLeft: theme.spacing(3),
+  paddingRight: theme.spacing(2),
+  transition: 'box-shadow 0.25s ease, background 0.25s ease, transform 0.18s ease',
+  position: 'relative',
+  overflow: 'hidden',
+  // Mobile-first adjustments
+  [theme.breakpoints.down('sm')]: {
+    minHeight: 56,
+    padding: theme.spacing(1.25, 2),
+    margin: theme.spacing(0.3, 1),
+  },
+  '&::before': {
+    content: '""',
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: '4px',
+    background: 'transparent',
+    transition: 'all 0.25s ease',
   },
   '&.active': {
-    backgroundColor: alpha(theme.palette.primary.main, 0.15),
+    background: 'linear-gradient(135deg, rgba(25, 118, 210, 0.06) 0%, rgba(25, 118, 210, 0.03) 100%)',
+    boxShadow: '0 6px 18px rgba(25, 118, 210, 0.06)',
+    border: '1px solid rgba(25, 118, 210, 0.12)',
+    '&::before': {
+      background: '#1976d2',
+    },
     '& .MuiListItemIcon-root': {
-      color: theme.palette.primary.main,
+      color: '#1976d2',
+      transform: 'scale(1.06)',
     },
-    '& .MuiListItemText-primary': {
-      fontWeight: 600,
-      color: theme.palette.primary.main,
-    },
+  '& .MuiListItemText-primary': {
+    color: '#1e293b',
+    fontWeight: 700,
   },
+  // Ensure full word visibility
+  '& .MuiListItemText-root': {
+    margin: 0,
+    '& .MuiTypography-root': {
+      whiteSpace: 'normal',
+      lineHeight: 1.2,
+      display: '-webkit-box',
+      WebkitLineClamp: 2,
+      WebkitBoxOrient: 'vertical',
+      overflow: 'hidden',
+    }
+  },
+},
+'&:hover': {
+  background: 'rgba(25, 118, 210, 0.03)',
+  transform: 'translateX(2px)',
+  '&::before': {
+    background: '#1976d2',
+    width: '3px',
+  },
+  '& .MuiListItemIcon-root': {
+    color: '#1976d2',
+  },
+  '& .MuiListItemText-primary': {
+    color: '#1e293b', 
+    fontWeight: 600,
+  },
+},
 }));
 
 const SubMenuItemButton = styled(MenuItemButton)(({ theme }) => ({
   paddingLeft: theme.spacing(4),
-  minHeight: 40,
-  margin: theme.spacing(0.2, 1.5),
+  minHeight: 44,
+  margin: theme.spacing(0.25, 1.75),
+  borderRadius: '10px',
+  '&::before': {
+    width: '2px',
+  },
   '&.active': {
-    backgroundColor: alpha(theme.palette.primary.main, 0.1),
+    background: 'rgba(25, 118, 210, 0.04)',
+    border: '1px solid rgba(25, 118, 210, 0.08)',
+    '&::before': {
+      background: '#1976d2',
+    },
     '& .MuiListItemIcon-root': {
-      color: theme.palette.primary.main,
+      color: '#1976d2',
+      transform: 'scale(1.03)'
+    },
+    '& .MuiListItemText-primary': {
+      color: '#1e293b', 
+      fontWeight: 600,
+    },
+  },
+  '&:hover': {
+    transform: 'translateX(1px)',
+    background: 'rgba(25, 118, 210, 0.02)',
+    '& .MuiListItemText-primary': {
+      color: '#1e293b',
     },
   },
 }));
@@ -166,94 +286,239 @@ const SubMenuItemButton = styled(MenuItemButton)(({ theme }) => ({
 const menuItems = [
   { 
     text: 'Início', 
-    icon: <HomeIcon />, 
+    icon: <HomeIcon sx={{ fontSize: 22 }} />, 
     path: '/',
     exact: true
   },
-  { 
-    text: 'Notas', 
-    icon: <ReceiptIcon />,
+  {
+    text: 'Painel Gerencial',
+    icon: <ChartIcon sx={{ fontSize: 22 }} />,
+    path: '/painel-gerencial',
+    adminOnly: true
+  },
+  {
+    text: 'Pedidos',
+    icon: <ReceiptModernIcon sx={{ fontSize: 22 }} />,
+    adminOnly: true,
     subItems: [
-      { 
-        text: 'Adicionar Notas', 
-        icon: <PlaylistAddIcon />, 
-        path: '/adicionar-notas' 
+      {
+        text: 'Pedidos Entregas',
+        icon: <ReceiptModernIcon sx={{ fontSize: 20 }} />,
+        path: '/admin/pedidos'
       },
-      { 
-        text: 'Consultar Notas', 
-        icon: <SearchIcon />, 
-        path: '/listar-notas' 
+    ]
+  },
+  {
+    text: 'Gestão de Notas',
+    icon: <ReceiptModernIcon sx={{ fontSize: 22 }} />,
+    subItems: [
+      {
+        text: 'Consultar Notas',
+        icon: <SearchModernIcon sx={{ fontSize: 20 }} />,
+        path: '/listar-notas'
       }
     ]
   },
-  {
-    text: 'Controles',
-    icon: <ListAltIcon />,
-    subItems: [
       { 
-        text: 'Criar Controle', 
-        icon: <PlaylistAddIcon fontSize="small" />, 
-        path: '/criar-controle' 
+        text: 'Controle de Carga',
+        icon: <ShippingIcon sx={{ fontSize: 22 }} />,
+        subItems: [
+          { 
+            text: 'Criar Controle', 
+            icon: <AddIcon sx={{ fontSize: 20 }} />, 
+            path: '/criar-controle' 
+          },
+          { 
+            text: 'Listar Controles', 
+            icon: <DocumentIcon sx={{ fontSize: 20 }} />, 
+            path: '/controles' 
+          },
+        ]
       },
-      { 
-        text: 'Listar Controles', 
-        icon: <ListAltIcon fontSize="small" />, 
-        path: '/listar-controles' 
-      },
-    ]
-  },
   {
-    text: 'Separação e Conferência',
-    icon: <ListAltIcon />,
+    text: 'Checklist Recebimento',
+    icon: <ChecklistModernIcon sx={{ fontSize: 22 }} />,
     subItems: [
       {
-        text: 'Separadores',
-        icon: <PersonIcon />,
+        text: 'Novo Checklist',
+        icon: <AddIcon sx={{ fontSize: 20 }} />,
+        path: '/checklist-recebimento/regras-ouro'
+      },
+      {
+        text: 'Relatórios Checklist',
+        icon: <ReportsIcon sx={{ fontSize: 20 }} />,
+        path: '/checklist-recebimento/relatorios'
+      },
+      {
+        text: 'Alertas de Validade',
+        icon: <AlertsIcon sx={{ fontSize: 20 }} />,
+        path: '/checklist-recebimento/relatorio-validade'
+      },
+      {
+        text: 'Relatórios Avançados',
+        icon: <ChartIcon sx={{ fontSize: 20 }} />,
+        path: '/checklist-recebimento/relatorios-avancados'
+      }
+    ]
+  },
+  /* {
+    text: 'Separação',
+    icon: <VerifiedIcon sx={{ fontSize: 22 }} />,
+    subItems: [
+      {
+        text: 'Cadastrar Separação',
+        icon: <AddIcon sx={{ fontSize: 20 }} />,
         path: '/separacao-conferencia/separadores'
       },
       {
-        text: 'Conferentes',
-        icon: <PersonIcon />,
+        text: 'Separadores',
+        icon: <PeopleIcon sx={{ fontSize: 20 }} />,
+        path: '/separacao-conferencia/separadores'
+      },
+      {
+        text: 'Confirmar Separação',
+        icon: <VerifiedIcon sx={{ fontSize: 20 }} />,
+        path: '/separacao-conferencia/confirmar-auditoria'
+      },
+      {
+        text: 'Relatório de Separação',
+        icon: <ReportsIcon sx={{ fontSize: 20 }} />,
         path: '/separacao-conferencia/conferentes'
       },
       {
         text: 'Auditores',
-        icon: <PersonIcon />,
+        icon: <VerifiedIcon sx={{ fontSize: 20 }} />,
         path: '/separacao-conferencia/auditores'
       },
       {
         text: 'Gerentes',
-        icon: <AdminIcon />,
+        icon: <AdminIcon sx={{ fontSize: 20 }} />,
         path: '/separacao-conferencia/gerentes'
+      }
+    ]
+  }, */
+  /* {
+    text: 'Separation Pro',
+    icon: <TrophyModernIcon sx={{ fontSize: 22, color: '#ffd700' }} />,
+    subItems: [
+      {
+        text: 'Ranking',
+        icon: <LeaderboardIcon sx={{ fontSize: 20 }} />,
+        path: '/gamificacao/ranking'
+      },
+      {
+        text: 'Meu Histórico',
+        icon: <TimelineModernIcon sx={{ fontSize: 20 }} />,
+        path: '/gamificacao/historico'
+      }
+    ]
+  }, */
+  {
+    text: 'Cadastros',
+    icon: <WorkspaceIcon sx={{ fontSize: 22 }} />,
+    subItems: [
+      {
+        text: 'Motoristas',
+        icon: <SpeedIcon sx={{ fontSize: 20 }} />,
+        path: '/admin/motoristas'
+      },
+      {
+        text: 'Funcionários',
+        icon: <PeopleIcon sx={{ fontSize: 20 }} />,
+        path: '/funcionarios',
+        adminOnly: true
+      },
+      {
+        text: 'Clientes',
+        icon: <BusinessModernIcon sx={{ fontSize: 20 }} />,
+        path: '/clientes',
+        adminOnly: true
       }
     ]
   },
   {
-    text: 'Checklist Empilhadeiras',
-    icon: <AssignmentTurnedInIcon />,
-    path: '/checklist-empilhadeiras',
+    text: 'Controle de Materiais',
+    icon: <InventoryModernIcon sx={{ fontSize: 22 }} />,
+    subItems: [
+      {
+        text: 'Cadastro de Materiais',
+        icon: <AddIcon sx={{ fontSize: 20 }} />,
+        path: '/materiais/cadastro',
+        roles: ['ADMIN', 'GERENTE'] // Apenas ADMIN e GERENTE
+      },
+      {
+        text: 'Solicitar Materiais',
+        icon: <RequestIcon sx={{ fontSize: 20 }} />,
+        path: '/materiais/solicitar',
+        roles: ['ADMIN', 'GERENTE', 'SEPARADOR', 'CONFERENTE', 'AUDITOR', 'USUARIO'] // Todos podem solicitar
+      },
+      {
+        text: 'Aprovar Solicitações',
+        icon: <ApprovalIcon sx={{ fontSize: 20 }} />,
+        path: '/materiais/aprovar',
+        roles: ['ADMIN', 'GERENTE'] // Apenas ADMIN e GERENTE podem aprovar
+      },
+      {
+        text: 'Relatórios',
+        icon: <ReportsIcon sx={{ fontSize: 20 }} />,
+        path: '/materiais/relatorios',
+        roles: ['ADMIN', 'GERENTE'] // Apenas ADMIN e GERENTE
+      }
+    ]
   },
   { 
-    text: 'Relatórios', 
-    icon: <ReportIcon />,
-    path: '/relatorios'
+    text: 'Relatórios e Análises', 
+    icon: <ChartIcon sx={{ fontSize: 22 }} />,
+    subItems: [
+      {
+        text: 'Relatório de Entregas',
+        icon: <ShippingIcon sx={{ fontSize: 20 }} />,
+        path: '/relatorios/entregas'
+      },
+      {
+        text: 'Relatório de Pallets',
+        icon: <AnalyticsIcon sx={{ fontSize: 20 }} />,
+        path: '/relatorios/pallets'
+      },
+      {
+        text: 'Relatório de Controles',
+        icon: <ReportsIcon sx={{ fontSize: 20 }} />,
+        path: '/relatorios/controles-carga'
+      },
+      {
+        text: 'Fretes',
+        icon: <ReceiptModernIcon sx={{ fontSize: 20 }} />,
+        path: '/relatorios/fretes'
+      }
+    ]
   },
   { 
-    text: 'Perfil', 
-    icon: <PersonIcon />,
+    text: 'Meu Perfil', 
+    icon: <ProfileIcon sx={{ fontSize: 22 }} />,
     path: '/perfil'
   },
 ];
 
-const Layout = ({ children }: { children: React.ReactNode }) => {
+const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const theme = useTheme();
-  const { user, logout } = useAuth();
   const router = useRouter();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-  const [open, setOpen] = useState(!isMobile);
-  const [openSubmenus, setOpenSubmenus] = useState<Record<string, boolean>>({});
+  const { user, logout } = useAuth();
+  const [open, setOpen] = useState(true);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [openSubmenus, setOpenSubmenus] = useState<Record<string, boolean>>({});
   const menuOpen = Boolean(anchorEl);
+  
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const isTablet = useMediaQuery(theme.breakpoints.down('lg'));
+  
+  useEffect(() => {
+    if (isMobile) {
+      setOpen(false);
+    } else {
+      setOpen(true);
+    }
+  }, [isMobile]);
 
   const handleMenuClick = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
@@ -287,7 +552,19 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
   }, [router.pathname]);
 
   const toggleDrawer = () => {
-    setOpen(!open);
+    if (isMobile) {
+      setMobileOpen(!mobileOpen);
+    } else {
+      setOpen(!open);
+    }
+  };
+
+  const handleDrawerClose = () => {
+    setMobileOpen(false);
+  };
+
+  const handleDrawerToggle = () => {
+    setMobileOpen(!mobileOpen);
   };
 
   const toggleSubmenu = (itemText: string) => {
@@ -295,6 +572,11 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
       ...prev,
       [itemText]: !prev[itemText]
     }));
+
+    // Se o drawer está recolhido no desktop, abrir automaticamente ao expandir submenu
+    if (!isMobile && !open) {
+      setOpen(true);
+    }
   };
 
   const isActive = (path: string, exact = false) => {
@@ -321,9 +603,28 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
         <ListItemIcon 
           sx={{ 
             minWidth: 0, 
-            mr: open ? 2 : 'auto',
+            mr: open || isMobile ? 2.5 : 'auto',
+            color: active ? '#0d47a1' : '#64748b',
+            fontSize: isMobile ? '1.35rem' : '1.2rem',
+            transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+            display: 'flex',
+            alignItems: 'center',
             justifyContent: 'center',
-            color: active ? 'primary.main' : 'text.secondary',
+            width: 44,
+            height: 44,
+            borderRadius: '12px',
+            background: active 
+              ? 'linear-gradient(135deg, rgba(13, 71, 161, 0.08) 0%, rgba(25, 118, 210, 0.03) 100%)'
+              : 'transparent',
+            border: active ? '1px solid rgba(13, 71, 161, 0.12)' : '1px solid transparent',
+            boxShadow: active ? '0 6px 12px rgba(13,71,161,0.04)' : 'none',
+            '&:hover': {
+              background: active 
+                ? 'linear-gradient(135deg, rgba(13,71,161,0.10) 0%, rgba(25,118,210,0.04) 100%)'
+                : 'linear-gradient(135deg, rgba(25,118,210,0.04) 0%, rgba(25,118,210,0.02) 100%)',
+              transform: 'scale(1.03)',
+              border: '1px solid rgba(25, 118, 210, 0.12)'
+            }
           }}
         >
           {item.icon}
@@ -331,12 +632,21 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
         <ListItemText 
           primary={item.text} 
           primaryTypographyProps={{
-            fontWeight: active ? 600 : 'normal',
-            color: active ? 'text.primary' : 'text.secondary',
+            fontWeight: active ? 600 : 500,
+            color: active ? '#1e293b' : '#475569',
+            fontSize: isMobile ? '0.95rem' : '0.9rem',
+            letterSpacing: '0.3px',
           }} 
-          sx={{ opacity: open ? 1 : 0 }} 
+          sx={{ 
+            opacity: open || isMobile ? 1 : 0,
+            transition: 'opacity 0.2s ease',
+            '& .MuiTypography-root': {
+              whiteSpace: 'normal',
+              lineHeight: 1.2,
+            }
+          }} 
         />
-        {hasSubItems && open && (
+        {hasSubItems && (
           isSubmenuOpen ? <ExpandLess /> : <ExpandMore />
         )}
       </>
@@ -352,48 +662,68 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
           </ButtonComponent>
           <Collapse in={isSubmenuOpen} timeout="auto" unmountOnExit>
             <List component="div" disablePadding>
-              {item.text === 'Separação e Conferência'
-              ? item.subItems
-                  .filter((subItem: any) => {
-                    if (!user) return false;
-                    switch (user.tipo) {
-                      case 'SEPARADOR':
-                        return subItem.text === 'Separadores';
-                      case 'CONFERENTE':
-                        return subItem.text === 'Conferentes';
-                      case 'AUDITOR':
-                        return subItem.text === 'Auditores';
-                      case 'GERENTE':
-                        return subItem.text === 'Gerentes';
-                      default:
-                        return false;
-                    }
-                  })
-                  .map((subItem: any) => (
-                    <Link href={subItem.path} key={subItem.path} passHref>
-                      <SubMenuItemButton 
-                        className={isActive(subItem.path, true) ? 'active' : ''}
-                      >
-                        <ListItemIcon sx={{ minWidth: 0, mr: 2, justifyContent: 'center' }}>
-                          {subItem.icon}
-                        </ListItemIcon>
-                        <ListItemText 
-                          primary={subItem.text} 
-                          primaryTypographyProps={{
-                            fontSize: '0.9rem',
-                            color: isActive(subItem.path, true) ? 'primary.main' : 'text.secondary',
-                          }}
-                          sx={{ opacity: open ? 1 : 0 }} 
-                        />
-                      </SubMenuItemButton>
-                    </Link>
-                  ))
-              : item.subItems.map((subItem: any) => (
+              {item.subItems
+                .filter((subItem: any) => {
+                  if (!user) return false;
+                  
+                  // Se o subitem tem roles definidas, verifica permissão
+                  if (subItem.roles && Array.isArray(subItem.roles)) {
+                    return subItem.roles.includes(user.tipo);
+                  }
+                  
+                  // Lógica específica para 'Separação'
+                    if (item.text === 'Separação') {
+                    const userRole = user.tipo;
+                    if (userRole === 'ADMIN' || userRole === 'GERENTE') return true;
+
+                    const path = subItem.path.toLowerCase();
+                    const itemText = subItem.text.toLowerCase();
+
+                    if (userRole === 'SEPARADOR' && (path.includes('separadores') || itemText.includes('cadastrar separação'))) return true;
+                    if (userRole === 'CONFERENTE' && (path.includes('conferentes') || itemText.includes('confirmar separação') || itemText.includes('relatório de separação'))) return true;
+                    if (userRole === 'AUDITOR' && (path.includes('auditores') || itemText.includes('confirmar separação'))) return true;
+
+                    return false;
+                  }
+
+                  // CONFERENTE e SEPARADOR têm acesso restrito - só aos menus específicos
+                  if (user?.tipo === 'CONFERENTE' || user?.tipo === 'SEPARADOR') {
+                    // Permite acesso ao menu "Controle de Materiais" (para solicitar mercadorias)
+                    if (item.text === 'Controle de Materiais') return true;
+                    // Permite acesso ao menu "Separation Pro" (ranking e histórico)
+                    if (item.text === 'Separation Pro') return true;
+                    // Permite acesso ao menu "Checklist Recebimento" para que seus subitens apareçam
+                    if (item.text === 'Checklist Recebimento') return true;
+                    return false;
+                  }
+
+                  // Para outros menus sem roles, mostra tudo (apenas para ADMIN, GERENTE, USUARIO, etc.)
+                  return true;
+                })
+                .map((subItem: any) => (
                   <Link href={subItem.path} key={subItem.path} passHref>
-                    <SubMenuItemButton 
+                    <SubMenuItemButton
                       className={isActive(subItem.path, true) ? 'active' : ''}
                     >
-                      <ListItemIcon sx={{ minWidth: 0, mr: 2, justifyContent: 'center' }}>
+                      <ListItemIcon sx={{ 
+                        minWidth: 0, 
+                        mr: 2, 
+                        color: isActive(subItem.path, true) ? '#1976d2' : '#94a3b8',
+                        transition: 'all 0.3s ease',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: 32,
+                        height: 32,
+                        borderRadius: '8px',
+                        background: isActive(subItem.path, true) 
+                          ? 'rgba(25, 118, 210, 0.08)' 
+                          : 'transparent',
+                        '&:hover': {
+                          background: 'rgba(25, 118, 210, 0.06)',
+                          transform: 'scale(1.05)'
+                        }
+                      }}>
                         {subItem.icon}
                       </ListItemIcon>
                       <ListItemText 
@@ -401,8 +731,9 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
                         primaryTypographyProps={{
                           fontSize: '0.9rem',
                           color: isActive(subItem.path, true) ? 'primary.main' : 'text.secondary',
-                        }}
-                        sx={{ opacity: open ? 1 : 0 }} 
+                        }} 
+                        /* Garantir que em mobile (isMobile) o texto dos subitens apareça mesmo quando o drawer estiver 'fechado' */
+                        sx={{ opacity: open || isMobile ? 1 : 0 }}
                       />
                     </SubMenuItemButton>
                   </Link>
@@ -423,24 +754,36 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
   };
 
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh' }}>
-      <AppBar position="fixed" open={open} elevation={0} sx={{ bgcolor: '#ff9800', color: '#fff' }}>
+    <GlobalBackground>
+      <Box sx={{ display: 'flex', minHeight: '100vh' }}>
+      <AppBar position="fixed" open={!isMobile && open} elevation={0}>
         {/* Adicionado elevation={0} para remover a sombra padrão do AppBar */}
-        <Toolbar>
+        <Toolbar sx={{ minHeight: { xs: 56, sm: 64 } }}>
           <IconButton
             color="inherit"
             aria-label="open drawer"
             onClick={toggleDrawer}
             edge="start"
             sx={{
-              marginRight: 2,
-              color: 'text.primary',
+              marginRight: { xs: 1, sm: 2 },
+              color: 'white',
+              padding: { xs: '10px', sm: '8px' },
             }}
           >
-            <MenuIcon />
+            <MenuIcon sx={{ fontSize: { xs: '1.5rem', sm: '1.75rem' } }} />
           </IconButton>
           <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center' }}>
-            <Typography variant="h6" noWrap component="div" sx={{ color: 'text.primary' }}>
+            <Typography 
+              variant="h6" 
+              noWrap 
+              component="div" 
+              sx={{ 
+                color: 'white',
+                fontSize: { xs: '1rem', sm: '1.25rem' },
+                fontWeight: 600,
+                display: { xs: isMobile ? 'block' : 'none', sm: 'block' }
+              }}
+            >
               Controle de Carga
             </Typography>
           </Box>
@@ -453,8 +796,12 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
               aria-haspopup="true"
               aria-expanded={menuOpen ? 'true' : undefined}
               startIcon={
-                <Avatar sx={{ width: 32, height: 32, bgcolor: 'primary.main' }}>
-                  {user?.nome?.charAt(0).toUpperCase() || <PersonIcon />}
+                <Avatar sx={{ 
+                  width: 32, 
+                  height: 32, 
+                  bgcolor: user?.foto ? 'transparent' : 'primary.main' 
+                }} src={user?.foto || undefined}>
+                  {!user?.foto && (user?.nome?.charAt(0).toUpperCase() || <PersonIcon />)}
                 </Avatar>
               }
             >
@@ -528,60 +875,253 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
         </Toolbar>
       </AppBar>
       
-      <StyledDrawer 
-        variant="permanent" 
-        open={open}
-        sx={{
-          '& .MuiDrawer-paper': {
-            width: open ? drawerWidth : `calc(${theme.spacing(7)} + 1px)`,
-            transition: theme.transitions.create('width', {
-              easing: theme.transitions.easing.sharp,
-              duration: theme.transitions.duration.enteringScreen,
-            }),
-          },
-        }}
-      >
-        
-        <Box sx={{ overflow: 'auto', height: 'calc(100vh - 64px)', py: 1 }}>
-          <List>
-            {menuItems.map((item) => (
-              <ListItem key={item.text} disablePadding sx={{ display: 'block' }}>
-                {renderMenuItem(item)}
-              </ListItem>
-            ))}
-          </List>
-          
-          {/* Espaço para informações do usuário no rodapé */}
-          <Box sx={{ p: 2, mt: 'auto', borderTop: `1px solid ${theme.palette.divider}`, opacity: open ? 1 : 0 }}>
+      {/* Mobile Drawer */}
+      {isMobile ? (
+        <SwipeableDrawer
+          anchor="left"
+          open={mobileOpen}
+          onClose={handleDrawerClose}
+          onOpen={handleDrawerToggle}
+          ModalProps={{
+            keepMounted: true, // Better open performance on mobile.
+          }}
+          PaperProps={{
+            sx: {
+              width: '85%',
+              maxWidth: drawerWidth,
+              background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)',
+              borderRight: 'none',
+              boxShadow: '4px 0 20px rgba(0,0,0,0.1)',
+            },
+          }}
+        >
+          <DrawerHeader>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Avatar sx={{ width: 32, height: 32, bgcolor: 'primary.main' }}>
-                {user?.nome?.charAt(0).toUpperCase() || <PersonIcon fontSize="small" />}
-              </Avatar>
-              <Box>
-                <Typography variant="subtitle2" noWrap>{user?.nome || 'Usuário'}</Typography>
-                <Typography variant="caption" color="text.secondary" noWrap>
-                  {user?.tipo || 'Nível de Acesso'}
-                </Typography>
+              <Typography variant="h6" sx={{ 
+                fontWeight: 600, 
+                color: '#ffffff',
+                fontSize: '1.1rem',
+                whiteSpace: 'nowrap'
+              }}>
+                Controle de Carga
+              </Typography>
+            </Box>
+            <IconButton 
+              onClick={handleDrawerClose} 
+              sx={{ 
+                color: '#ffffff',
+                padding: '12px',
+                '& svg': {
+                  fontSize: '1.5rem'
+                }
+              }}
+            >
+              <ChevronLeftIcon />
+            </IconButton>
+          </DrawerHeader>
+          <Divider />
+          <Box sx={{ 
+            overflow: 'auto', 
+            height: 'calc(100vh - 64px)', 
+            py: 2,
+          }}>
+            <List>
+              {menuItems
+                .filter((item) => {
+                  // Filtrar itens administrativos se o usuário não for ADMIN ou GERENTE
+                  if (item.adminOnly && user?.tipo !== 'ADMIN' && user?.tipo !== 'GERENTE') {
+                    return false;
+                  }
+
+                  // CONFERENTE e SEPARADOR têm acesso apenas aos menus específicos
+                    if (user?.tipo === 'CONFERENTE' || user?.tipo === 'SEPARADOR') {
+                      // Permitir acesso também ao menu 'Checklist Recebimento' para todos os perfis
+                      const allowedMenus = [
+                        'Separação',
+                        'Controle de Materiais',
+                        'Separation Pro',
+                        'Checklist Recebimento',
+                        'Meu Perfil'
+                      ];
+                      return allowedMenus.includes(item.text);
+                    }
+
+                  return true;
+                })
+                .map((item) => (
+                  <ListItem key={item.text} disablePadding sx={{ display: 'block' }}>
+                    {renderMenuItem(item)}
+                  </ListItem>
+                ))}
+            </List>
+            
+            {/* Espaço para informações do usuário no rodapé */}
+            <Box sx={{ 
+              p: 2, 
+              mt: 'auto', 
+              borderTop: '1px solid rgba(25, 118, 210, 0.2)', 
+              background: 'linear-gradient(135deg, rgba(25, 118, 210, 0.05) 0%, rgba(66, 165, 245, 0.05) 100%)',
+              borderRadius: '12px 12px 0 0'
+            }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Avatar sx={{ 
+                  width: 36, 
+                  height: 36, 
+                  background: user?.foto ? 'transparent' : 'linear-gradient(135deg, #1976d2 0%, #1976d2 100%)',
+                  fontWeight: 600,
+                  fontSize: '1.1rem'
+                }} src={user?.foto || undefined}>
+                  {!user?.foto && (user?.nome?.charAt(0).toUpperCase() || <PersonIcon fontSize="small" />)}
+                </Avatar>
+                <Box>
+                  <Typography 
+                    variant="subtitle2" 
+                    noWrap
+                    sx={{
+                      fontWeight: 600,
+                      color: '#1e293b',
+                      fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif'
+                    }}
+                  >
+                    {user?.nome || 'Usuário'}
+                  </Typography>
+                  <Typography 
+                    variant="caption" 
+                    noWrap
+                    sx={{
+                      color: '#1976d2',
+                      fontWeight: 500
+                    }}
+                  >
+                    {user?.tipo || 'Nível de Acesso'}
+                  </Typography>
+                </Box>
               </Box>
             </Box>
           </Box>
-        </Box>
-      </StyledDrawer>
+        </SwipeableDrawer>
+      ) : (
+        /* Desktop Drawer */
+        <StyledDrawer 
+          variant="permanent" 
+          open={open}
+          sx={{
+            display: { xs: 'none', md: 'block' },
+            '& .MuiDrawer-paper': {
+              width: open ? drawerWidth : `calc(${theme.spacing(7)} + 1px)`,
+              transition: theme.transitions.create('width', {
+                easing: theme.transitions.easing.sharp,
+                duration: theme.transitions.duration.enteringScreen,
+              }),
+            },
+          }}
+        >
+          <Box sx={{ 
+            overflow: 'auto', 
+            height: 'calc(100vh - 64px)', 
+            py: 2,
+            background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)'
+          }}>
+            <List>
+              {menuItems
+                .filter((item) => {
+                  // Filtrar itens administrativos se o usuário não for ADMIN ou GERENTE
+                  if (item.adminOnly && user?.tipo !== 'ADMIN' && user?.tipo !== 'GERENTE') {
+                    return false;
+                  }
+
+                  // CONFERENTE e SEPARADOR têm acesso apenas aos menus específicos
+                  if (user?.tipo === 'CONFERENTE' || user?.tipo === 'SEPARADOR') {
+                    // Permitir acesso também ao menu 'Checklist Recebimento' para todos os perfis
+                    const allowedMenus = [
+                      'Separação',
+                      'Controle de Materiais',
+                      'Separation Pro',
+                      'Checklist Recebimento',
+                      'Meu Perfil'
+                    ];
+                    return allowedMenus.includes(item.text);
+                  }
+
+                  return true;
+                })
+                .map((item) => (
+                  <ListItem key={item.text} disablePadding sx={{ display: 'block' }}>
+                    {renderMenuItem(item)}
+                  </ListItem>
+                ))}
+            </List>
+            
+            {/* Espaço para informações do usuário no rodapé */}
+            <Box sx={{ 
+              p: 2,
+              mt: 'auto',
+              borderTop: '1px solid rgba(25, 118, 210, 0.2)',
+              /* Mostrar o bloco do usuário no rodapé também em mobile */
+              opacity: open || isMobile ? 1 : 0,
+              background: 'linear-gradient(135deg, rgba(25, 118, 210, 0.05) 0%, rgba(66, 165, 245, 0.05) 100%)',
+              borderRadius: '12px 12px 0 0'
+            }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Avatar sx={{ 
+                  width: 36, 
+                  height: 36, 
+                  background: user?.foto ? 'transparent' : 'linear-gradient(135deg, #1976d2 0%, #1976d2 100%)',
+                  fontWeight: 600,
+                  fontSize: '1.1rem'
+                }} src={user?.foto || undefined}>
+                  {!user?.foto && (user?.nome?.charAt(0).toUpperCase() || <PersonIcon fontSize="small" />)}
+                </Avatar>
+                <Box>
+                  <Typography 
+                    variant="subtitle2" 
+                    noWrap
+                    sx={{
+                      fontWeight: 600,
+                      color: '#1e293b',
+                      fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif'
+                    }}
+                  >
+                    {user?.nome || 'Usuário'}
+                  </Typography>
+                  <Typography 
+                    variant="caption" 
+                    noWrap
+                    sx={{
+                      color: '#1976d2',
+                      fontWeight: 500
+                    }}
+                  >
+                    {user?.tipo || 'Nível de Acesso'}
+                  </Typography>
+                </Box>
+              </Box>
+            </Box>
+          </Box>
+        </StyledDrawer>
+      )}
       
       <Box 
         component="main" 
         sx={{ 
           flexGrow: 1, 
-          p: 3, 
+          p: { xs: 1.5, sm: 2, md: 3 }, 
           width: '100%', 
-          mt: '64px',
-          backgroundColor: theme.palette.background.default,
-          minHeight: 'calc(100vh - 64px)'
+          mt: { xs: '56px', sm: '64px' },
+          ml: { xs: 0, md: !isMobile && open ? 0 : 0 },
+          background: 'transparent',
+          minHeight: { xs: 'calc(100vh - 56px)', sm: 'calc(100vh - 64px)' },
+          fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+          transition: theme.transitions.create(['margin'], {
+            easing: theme.transitions.easing.sharp,
+            duration: theme.transitions.duration.leavingScreen,
+          }),
         }}
       >
         {children}
       </Box>
     </Box>
+    </GlobalBackground>
   );
 };
 

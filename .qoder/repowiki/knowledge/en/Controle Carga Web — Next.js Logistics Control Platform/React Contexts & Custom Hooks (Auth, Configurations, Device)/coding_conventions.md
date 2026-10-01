@@ -1,0 +1,6 @@
+- Each context file pairs a `createContext` export with a `*Provider` component and a custom `useXxx` hook that throws when used outside its provider.
+- Async side effects in contexts use `updateAuthState`-style updater functions that merge partial state via `setState(prev => ({ ...prev, ...updates }))` to avoid stale closures.
+- Hooks return a consistent `{ data, loading, error }` shape (e.g., `useConfiguracoes`, `useDevicePermissions`) so consumers can uniformly render loading/error states.
+- Feature toggles based on device capability are computed once in `useEffect` and exposed as a typed object (see `DeviceInfo`, `DevicePermissions`).
+- Configuration values fetched from the API are coerced into their declared `tipo` (string/number/boolean/json) before being stored in the local state map.
+- Environment-aware behavior is gated by `typeof window === 'undefined'` checks or `process.env.NODE_ENV` to keep code safe for both SSR and client execution.

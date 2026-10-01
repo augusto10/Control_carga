@@ -20,22 +20,44 @@
     "jsx": "preserve",
     "baseUrl": "./",
     "paths": {
-      "@/*": ["./*"],
-      "@/contexts/*": ["contexts/*"],
-      "@/services/*": ["services/*"],
-      "@/types/*": ["types/*"],
-      "@/components/*": ["components/*"]
+      "@/*": [
+        "./*"
+      ],
+      "@/contexts/*": [
+        "contexts/*"
+      ],
+      "@/services/*": [
+        "services/*"
+      ],
+      "@/types/*": [
+        "types/*"
+      ],
+      "@/components/*": [
+        "components/*"
+      ],
+      "@/lib/*": [
+        "lib/*"
+      ]
     },
-    "types": ["node"],
-    "allowSyntheticDefaultImports": true
+    "types": [
+      "node"
+    ],
+    "allowSyntheticDefaultImports": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ]
   },
   "include": [
     "next-env.d.ts",
     "**/*.ts",
-    "**/*.tsx"
+    "**/*.tsx",
+    ".next/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "scripts/**/*"
   ],
   "ts-node": {
     "compilerOptions": {

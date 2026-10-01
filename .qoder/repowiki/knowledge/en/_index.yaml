@@ -1,0 +1,292 @@
+# 知识卡导出索引文件
+schema_version: 1
+locale: en-US
+branch: deploy/teste-automatico
+nodes_managed: true
+exported_at: "2026-09-16T13:09:40Z"
+modules:
+    "":
+        dir_name: Controle Carga Web — Next.js Logistics Control Platform
+        title: Controle Carga Web — Next.js Logistics Control Platform
+        scope:
+            - README.md
+            - .eslintrc.json
+            - .gitignore
+            - .vercelignore
+            - package.json
+            - next.config.js
+            - postcss.config.js
+            - tailwind.config.js
+            - tsconfig.json
+            - vercel.json
+            - netlify.toml
+            - windsurf_deployment.yaml
+            - .env.example
+            - .nvmrc
+            - ACAO_NECESSARIA.md
+            - AJUSTES_PALLETS_README.md
+            - APLICAR_MIGRACAO_MATERIAIS.md
+            - CHECKLIST_MELHORIAS.md
+            - CHECKLIST_VALIDACAO_MELHORIAS.md
+            - CORRECAO_ERRO_404_LOGIN.md
+            - CORRECAO_ERRO_JSON.md
+            - CORRECAO_ERRO_JSON_RELATORIO_VALIDADE.md
+            - CORRECAO_FILTROS_RELATORIOS.md
+            - CORRECAO_TEMPORARIA_APLICADA.md
+            - CORRECOES_CRITICAS_VERCEI.sql
+            - CORRECOES_PRODUCAO_EXISTENTE.sql
+            - CORRIGIR_VERCEL_URGENTE.md
+            - CORRIGIR_VLOG_TERCEIRIZADA.sql
+            - CriarControleContent_ref.tsx
+            - DEPLOY_BRANCH_FINAL.md
+            - DEPLOY_INSTRUCTIONS.md
+            - DEPLOY_README.md
+            - DEPLOY_SEGURO_PRODUCAO.md
+            - EXECUTAR_MIGRACAO_PRODUCAO.md
+            - EXECUTAR_MIGRATION_MANUAL.md
+            - EXECUTAR_NO_BANCO.sql
+            - EXECUTAR_VLOG.md
+            - FOTO_PERFIL_CORRECAO.md
+            - FOTO_PERFIL_README.md
+            - ICONES_SIDEBAR_MELHORADOS.md
+            - IMPLEMENTACAO_COMPLETA_VALIDADE.md
+            - IMPLEMENTACOES_MATERIAIS_PENDENTES.md
+            - INSTRUCOES_BANCO.md
+            - INSTRUCOES_CRIAR_CHECKLIST.md
+            - INSTRUCOES_PALLET_AJUSTE.md
+            - INTERFACE_PROFISSIONAL_COMPLETA.md
+            - MANUAL_SQL_PRODUCTION.sql
+            - MIGRACAO_SOLICITACOES_SEGURA.sql
+            - MIGRATION_TIPO_MOTORISTA.md
+            - PLANO_ACAO_URGENTE.md
+            - QZ_TRAY_ETIQUETAS.md
+            - RELATORIOS_AVANCADOS_IMPLEMENTADOS.md
+            - RESPONSIVE_GUIDE.md
+            - RESUMO_API_PAINEL.md
+            - RESUMO_BRANCH_CORRECAO.md
+            - SISTEMA_MATERIAIS.md
+            - SOLUCAO_SENHA_HASH.md
+            - STATUS_MIGRACAO_FINAL.md
+            - URGENTE-CORRECAO-PRODUCAO.md
+            - atualizar-relatorios-vlog.js
+            - build-production.js
+            - buscar-senha-usuario-simples.js
+            - buscar-senha-usuario.js
+            - buscar-usuario-banco.js
+            - check-admin-created.js
+            - check-checklist-table.js
+            - check-database.js
+            - check-pallet-table.js
+            - check-production.sql
+            - check-tables.js
+            - check-users.js
+            - check_columns.sql
+            - cleanup-test-files.ps1
+            - cleanup-test-files.sh
+            - corrigir-dados-vlog.js
+            - corrigir-relatorio-controle-carga.js
+            - corrigir-relatorios-vlog.js
+            - corrigir-senha-usuario.js
+            - create-checklist-table-only.js
+            - create-historico-table.js
+            - create-only-pallet-table.js
+            - create-pallet-simple.js
+            - create-pallet-table-safe.js
+            - create-table-direct.js
+            - create_historico_estoque.sql
+            - criar-pallet-dev.js
+            - criar-tabela-direto.js
+            - debug-auth.html
+            - debug-botao-excluir.js
+            - drop-transportadora-enum.sql
+            - drop_schema.sql
+            - env.example.txt
+            - et --hard HEAD
+            - executar-migracao-solicitacoes.js
+            - fix-admin-layout.ps1
+            - fix-all-prisma-imports.js
+            - fix-all-remaining-prisma.js
+            - fix-colors.ps1
+            - fix-hover-colors.ps1
+            - fix-pallet-ajuste.js
+            - fix-prisma-imports-v2.ps1
+            - fix-prisma-imports.js
+            - fix-prisma-imports.ps1
+            - fix-transportadora-conflict.sql
+            - fix-vercel-now.js
+            - force-create-checklist.js
+            - list-all-tables.js
+            - listar-usuarios.js
+            - middleware.ts
+            - next-env.d.ts
+            - package-lock.json
+            - prismaschema.prisma9
+            - resolver-ajustes-pallets.js
+            - reverter-materiais.sh
+            - sync-pallet-table.js
+            - test-api.ps1
+            - test-apuracoes.ps1
+            - tsconfig.etiquetas.json
+            - tsconfig.etiquetas.tsbuildinfo
+            - tsconfig.seed.json
+            - types.ts
+            - verificar-checklist.js
+            - verificar-colunas-solicitacao.js
+            - verificar-dados-vlog.js
+            - verificar-notas-admin.js
+            - verificar-permissoes-notas.js
+            - verificar-relatorios-vlog.js
+            - verificar-tabelas-materiais.js
+            - verificar-todos-vlog.js
+            - verify-db.js
+        source_files: []
+        children:
+            - components
+            - contexts_hooks
+            - lib
+            - pages_and_routes
+            - prisma_schema
+            - scripts_and_migrations
+            - services
+            - shared_types
+            - tests
+            - utils_and_styles
+        depends_on: []
+        related_to: []
+    components:
+        dir_name: React UI Components Library
+        title: React UI Components Library
+        scope:
+            - components/
+        source_files: []
+        children:
+            - components/shared_reusable
+        depends_on: []
+        related_to: []
+    components/shared_reusable:
+        dir_name: Shared Reusable UI Components
+        title: Shared Reusable UI Components
+        scope:
+            - components/AdicionarNotasContent.tsx
+            - components/AndroidCamera.tsx
+            - components/AndroidScanner.tsx
+            - components/AssinaturaSimples.tsx
+            - components/CriarControleContent.tsx
+            - components/GlobalBackground.tsx
+            - components/ImageCapture.tsx
+            - components/InputMask.tsx
+            - components/LeafletMap.tsx
+            - components/ListarControlesContent.tsx
+            - components/Map.tsx
+            - components/ModalAssinaturaDigitalPro.tsx
+            - components/ModalAssinaturaSimplesAlternativo.tsx
+            - components/ResponsiveContainer.tsx
+            - components/ResponsiveTable.tsx
+            - components/SignaturePadPro.tsx
+            - components/UserMenu.tsx
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: contexts_hooks
+            - path: shared_types
+    contexts_hooks:
+        dir_name: React Contexts & Custom Hooks (Auth, Configurations, Device)
+        title: React Contexts & Custom Hooks (Auth, Configurations, Device)
+        scope:
+            - contexts/
+            - hooks/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: components/shared_reusable
+    lib:
+        dir_name: Shared Business Logic & Infrastructure Library
+        title: Shared Business Logic & Infrastructure Library
+        scope:
+            - lib/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: pages_and_routes
+            - path: tests
+    pages_and_routes:
+        dir_name: Next.js Pages, Routes & API Endpoints
+        title: Next.js Pages, Routes & API Endpoints
+        scope:
+            - pages/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: lib
+            - path: services
+    prisma_schema:
+        dir_name: Prisma Database Schema & Migrations
+        title: Prisma Database Schema & Migrations
+        scope:
+            - prisma/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: scripts_and_migrations
+            - path: shared_types
+    scripts_and_migrations:
+        dir_name: Database Migration & Operational Scripts
+        title: Database Migration & Operational Scripts
+        scope:
+            - scripts/
+            - sql/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: prisma_schema
+    services:
+        dir_name: External API & Logistics Service Layer
+        title: External API & Logistics Service Layer
+        scope:
+            - services/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: pages_and_routes
+            - path: utils_and_styles
+    shared_types:
+        dir_name: Shared Domain Types & Global Store
+        title: Shared Domain Types & Global Store
+        scope:
+            - types/
+            - store/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: components/shared_reusable
+            - path: prisma_schema
+    tests:
+        dir_name: Unit & Integration Tests for Dashboard, Labels & Order Sync Logic
+        title: Unit & Integration Tests for Dashboard, Labels & Order Sync Logic
+        scope:
+            - tests/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: lib
+    utils_and_styles:
+        dir_name: Shared Utilities, Themes & Print Integration
+        title: Shared Utilities, Themes & Print Integration
+        scope:
+            - utils/
+            - styles/
+            - src/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to:
+            - path: services

@@ -1,0 +1,6 @@
+- Each external system is isolated in its own file exporting typed functions/classes; callers never touch raw fetch/axios directly but go through these wrappers.
+- Authentication tokens are cached in module-level variables with expiry timestamps and refreshed lazily (see `getSswToken`, `getExternalToken`, `APIExternaService.login`).
+- HTTP errors are normalized into thrown `Error` objects whose messages come from response body fields like `mensagem` / `message`, preserving the original status code context.
+- Environment-driven configuration is read at module top level from `process.env.*` with empty-string defaults, then validated by helper functions such as `requireConfig` before use.
+- Multi-source results are merged and normalized into a single shape — e.g. `sswTracking.ts` combines DANFE and portal payloads into `SswTrackingResult` and uses `pickString` to tolerate both lowercase and uppercase field names.
+- Browser-only features guard themselves with `typeof window === 'undefined'` checks (localStorage access in `geocoding.ts`, `qz-print.ts`) so the same files can be imported in server contexts.

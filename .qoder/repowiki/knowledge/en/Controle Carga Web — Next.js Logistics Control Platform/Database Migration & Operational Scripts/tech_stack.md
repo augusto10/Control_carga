@@ -1,0 +1,1 @@
+Node.js scripts using Prisma Client (`@prisma/client`) against PostgreSQL; TypeScript and JavaScript coexist; bcryptjs for password hashing; scripts are typically executed via `npx ts-node` or `node`.

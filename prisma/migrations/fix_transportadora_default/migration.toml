@@ -1,0 +1,14 @@
+# Migration metadata
+prismaVersion = "4.16.2"
+id = "fix_transportadora_default"
+name = "fix_transportadora_default"
+datamodel = """
+  model ControleCarga {
+    id             String       @id @default(uuid())
+    transportadora Transportadora @default(ACCERT)
+    # ... outros campos
+  }
+"""
+
+# Indica que esta é uma migração personalizada
+isCustomMigration = true

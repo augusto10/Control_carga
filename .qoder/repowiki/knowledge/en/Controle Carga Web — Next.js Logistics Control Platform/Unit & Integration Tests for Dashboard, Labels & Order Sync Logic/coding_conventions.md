@@ -1,0 +1,4 @@
+- Each test file imports only the production functions it needs via relative `../lib/*` or `@/...` aliases and asserts behavior with `assert.equal` / `assert.deepEqual` / `assert.match`.
+- Pure business logic is tested by constructing fixture objects inline and asserting return values directly, without any framework setup.
+- Integration-style tests isolate external dependencies by monkey-patching Prisma instance methods and `apiExternaService` functions rather than using dependency injection.
+- React hooks are tested by loading them through a custom `load()` helper that transpiles TS, runs code in a fresh VM context, and supplies minimal `useState`/`useRef`/`useCallback` shims plus a `Map`-backed `localStorage`.

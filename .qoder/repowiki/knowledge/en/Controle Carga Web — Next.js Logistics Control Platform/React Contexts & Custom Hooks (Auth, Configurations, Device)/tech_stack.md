@@ -1,0 +1,1 @@
+React + Next.js contexts; `js-cookie` for client-side cookies and `cookie`/`nookies` for server-side cookie parsing; MUI `useTheme`/`useMediaQuery` for responsive detection; `jsonwebtoken` imported for token handling; `@mui/material` theming drives responsive style values.

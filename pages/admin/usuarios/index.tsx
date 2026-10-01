@@ -1,41 +1,39 @@
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/router';
-import { SelectChangeEvent } from '@mui/material/Select';
-import {
-  Container,
-  Typography,
-  Paper,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Button,
-  IconButton,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  TextField,
-  MenuItem,
-  Select,
-  FormControl,
-  InputLabel,
-  FormControlLabel,
-  Switch,
-  Box,
-  CircularProgress,
-  Alert,
-  Snackbar,
-  Tooltip,
-  DialogContentText
-} from '@mui/material';
-import { Edit as EditIcon, Delete as DeleteIcon, Add as AddIcon } from '@mui/icons-material';
-import { useAuth } from '../../../contexts/AuthContext';
-import AdminRoute from '../../../components/admin/AdminRoute';
-import { TipoUsuario } from '@prisma/client';
+import Head from 'next/head';
+import { 
+  Users, 
+  UserPlus, 
+  Search, 
+  RefreshCw, 
+  Edit, 
+  Trash2, 
+  CheckCircle2, 
+  XCircle, 
+  Shield, 
+  Clock,
+  MoreVertical,
+  AlertCircle,
+  User,
+  ShieldAlert,
+  ShieldCheck,
+  Package,
+  FileCheck,
+  Eye
+} from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { AppLayout } from '@/components/layout/AppLayout';
+import { Card } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { Badge } from '@/components/ui/Badge';
+import { SearchInput } from '@/components/ui/SearchInput';
+import { Modal } from '@/components/ui/Modal';
+import { cn } from '@/utils/cn';
 import { api } from '@/services/api';
+import { TipoUsuario } from '@prisma/client';
+import AdminRoute from '@/components/admin/AdminRoute';
+import { Label } from '@/components/ui/Label';
+import { Input } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Select';
 
 interface Usuario {
   id: string;
@@ -47,28 +45,47 @@ interface Usuario {
   ultimoAcesso?: string | null;
   senha?: string;
   confirmarSenha?: string;
+  foto?: string | null;
 }
 
-function GerenciarUsuariosContent() {
-  const { user, isAuthenticated, logout } = useAuth();
-  const router = useRouter();
+export default function GerenciarUsuariosPage() {
+  const { user } = useAuth();
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [openDialog, setOpenDialog] = useState(false);
+  
+  // Modais
+  const [isFormModalOpen, setIsFormModalOpen] = useState(false);
+  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [currentUsuario, setCurrentUsuario] = useState<Partial<Usuario> | null>(null);
   const [isEditing, setIsEditing] = useState(false);
-  const [snackbar, setSnackbar] = useState<{ 
-    open: boolean; 
-    message: string; 
-    severity: 'success' | 'error' | 'warning' | 'info' 
-  }>({ 
-    open: false, 
-    message: '', 
-    severity: 'success' 
+  
+  // Confirmação
+  const [confirmConfig, setConfirmConfig] = useState<{
+    title: string;
+    message: string;
+    onConfirm: () => Promise<void>;
+    type: 'danger' | 'success';
+  }>({
+    title: '',
+    message: '',
+    onConfirm: async () => {},
+    type: 'danger'
   });
 
-  // Carregar usuários quando o componente for montado
+  // Toast
+  const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({ 
+    show: false, 
+    message: '', 
+    type: 'success' 
+  });
+
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ show: true, message, type });
+    setTimeout(() => setToast(prev => ({ ...prev, show: false })), 3000);
+  };
+
   useEffect(() => {
     carregarUsuarios();
   }, []);
@@ -76,12 +93,11 @@ function GerenciarUsuariosContent() {
   const carregarUsuarios = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/api/admin/usuarios');
+      const response = await api.get('/api/usuarios');
       setUsuarios(response.data);
-    } catch (error: unknown) {
+    } catch (error: any) {
       console.error('Erro ao carregar usuários:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Erro ao carregar usuários';
-      setError(`Erro ao carregar usuários: ${errorMessage}`);
+      setError('Não foi possível carregar a lista de usuários.');
     } finally {
       setLoading(false);
     }
@@ -91,13 +107,13 @@ function GerenciarUsuariosContent() {
     setCurrentUsuario({
       nome: '',
       email: '',
-      tipo: 'USUARIO',
+      tipo: 'USUARIO' as TipoUsuario,
       ativo: true,
       senha: '',
       confirmarSenha: ''
     });
     setIsEditing(false);
-    setOpenDialog(true);
+    setIsFormModalOpen(true);
   };
 
   const handleOpenEditarUsuario = (usuario: Usuario) => {
@@ -107,492 +123,442 @@ function GerenciarUsuariosContent() {
       confirmarSenha: ''
     });
     setIsEditing(true);
-    setOpenDialog(true);
+    setIsFormModalOpen(true);
   };
 
-  const handleCloseDialog = () => {
-    setOpenDialog(false);
+  const handleCloseFormModal = () => {
+    setIsFormModalOpen(false);
     setCurrentUsuario(null);
-  };
-
-  const handleInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | { name?: string; value: unknown }> | 
-    SelectChangeEvent<TipoUsuario>
-  ) => {
-    const { name, value } = e.target as { name: string; value: unknown };
-    setCurrentUsuario(prev => ({
-      ...prev!,
-      [name]: value
-    }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     if (!currentUsuario) return;
 
     try {
       setLoading(true);
-      
       if (isEditing) {
-        await api.put(`/api/admin/usuarios/${currentUsuario.id}`, currentUsuario);
-        setSnackbar({ open: true, message: 'Usuário atualizado com sucesso!', severity: 'success' });
+        await api.post('/api/admin/usuarios/edit', {
+          id: currentUsuario.id,
+          nome: currentUsuario.nome,
+          tipo: currentUsuario.tipo,
+          senha: currentUsuario.senha,
+          ativo: currentUsuario.ativo
+        });
+        showToast('Usuário atualizado com sucesso!');
       } else {
         await api.post('/api/admin/usuarios', currentUsuario);
-        setSnackbar({ open: true, message: 'Usuário criado com sucesso!', severity: 'success' });
+        showToast('Usuário criado com sucesso!');
       }
-      
-      handleCloseDialog();
+      handleCloseFormModal();
       await carregarUsuarios();
-    } catch (error: unknown) {
+    } catch (error: any) {
       console.error('Erro ao salvar usuário:', error);
-      const errorMessage = error && typeof error === 'object' && 'response' in error && 
-                         error.response && typeof error.response === 'object' && 
-                         'data' in error.response && 
-                         error.response.data && typeof error.response.data === 'object' &&
-                         'message' in error.response.data ?
-                         String(error.response.data.message) : 'Erro ao salvar usuário';
-      
-      setSnackbar({ 
-        open: true, 
-        message: errorMessage, 
-        severity: 'error' as const
-      });
+      showToast(error.response?.data?.message || 'Erro ao salvar usuário', 'error');
     } finally {
       setLoading(false);
     }
   };
 
-  const [confirmDialog, setConfirmDialog] = useState<{
-    open: boolean;
-    title: string;
-    content: string;
-    onConfirm: () => Promise<void>;
-  }>({
-    open: false,
-    title: '',
-    content: '',
-    onConfirm: async () => {}
-  });
-
-  const handleToggleStatus = (id: string, ativo: boolean) => {
-    setConfirmDialog({
-      open: true,
+  const handleToggleStatus = (usuario: Usuario) => {
+    const { id, ativo } = usuario;
+    setConfirmConfig({
       title: ativo ? 'Desativar Usuário' : 'Ativar Usuário',
-      content: ativo 
-        ? 'Tem certeza que deseja desativar este usuário? Ele não poderá mais acessar o sistema até que seja ativado novamente.'
-        : 'Tem certeza que deseja ativar este usuário? Ele terá acesso ao sistema de acordo com as permissões do seu perfil.',
+      message: ativo 
+        ? `Tem certeza que deseja desativar o usuário ${usuario.nome}? Ele não poderá mais acessar o sistema.`
+        : `Deseja ativar o acesso do usuário ${usuario.nome}?`,
+      type: ativo ? 'danger' : 'success',
       onConfirm: async () => {
         try {
           setLoading(true);
-          await api.patch(`/api/admin/usuarios/${id}/status`, { ativo: !ativo });
+          await api.post('/api/admin/usuarios/toggle-status', { id, ativo: !ativo });
           await carregarUsuarios();
-          setSnackbar({ 
-            open: true, 
-            message: `Usuário ${!ativo ? 'ativado' : 'desativado'} com sucesso!`, 
-            severity: 'success' 
-          });
-        } catch (error: unknown) {
-          console.error('Erro ao atualizar status do usuário:', error);
-          const errorMessage = error && typeof error === 'object' && 'response' in error && 
-                            error.response && typeof error.response === 'object' && 
-                            'data' in error.response && 
-                            error.response.data && typeof error.response.data === 'object' &&
-                            'message' in error.response.data ?
-                            String(error.response.data.message) : 'Erro ao atualizar status do usuário';
-          
-          setSnackbar({ 
-            open: true, 
-            message: errorMessage,
-            severity: 'error' as const
-          });
+          showToast(`Usuário ${!ativo ? 'ativado' : 'desativado'} com sucesso!`);
+        } catch (error: any) {
+          showToast('Erro ao atualizar status', 'error');
         } finally {
           setLoading(false);
-          setConfirmDialog(prev => ({ ...prev, open: false }));
+          setIsConfirmModalOpen(false);
         }
       }
     });
+    setIsConfirmModalOpen(true);
   };
 
-  const handleCloseConfirmDialog = () => {
-    setConfirmDialog(prev => ({ ...prev, open: false }));
+  const filteredUsuarios = usuarios.filter(u => 
+    u.nome.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    u.email.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const getTipoInfo = (tipo: TipoUsuario) => {
+    switch (tipo) {
+      case 'ADMIN': return { label: 'Administrador', variant: 'danger' as const, icon: ShieldAlert };
+      case 'GERENTE': return { label: 'Gerente', variant: 'warning' as const, icon: ShieldCheck };
+      case 'SEPARADOR': return { label: 'Separador', variant: 'info' as const, icon: Package };
+      case 'CONFERENTE': return { label: 'Conferente', variant: 'info' as const, icon: FileCheck };
+      case 'AUDITOR': return { label: 'Auditor', variant: 'neutral' as const, icon: Eye };
+      default: return { label: 'Usuário', variant: 'neutral' as const, icon: User };
+    }
   };
-
-  const handleCloseSnackbar = () => {
-    setSnackbar(prev => ({ ...prev, open: false }));
-  };
-
-  if (error) {
-    return (
-      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-        <Alert severity="error">{error}</Alert>
-      </Container>
-    );
-  }
-
-  if (loading && !openDialog) {
-    return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
-        <CircularProgress />
-      </Box>
-    );
-  }
 
   return (
-    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Box>
-          <Typography variant="h4" component="h1" gutterBottom>
-            Gerenciar Usuários
-          </Typography>
-          <Typography variant="body1" color="text.secondary">
-            Gerencie os usuários e suas permissões de acesso ao sistema
-          </Typography>
-        </Box>
-        <Button 
-          variant="contained" 
-          color="primary" 
-          startIcon={<AddIcon />}
-          onClick={handleOpenNovoUsuario}
-          sx={{ height: 'fit-content' }}
-        >
-          Novo Usuário
-        </Button>
-      </Box>
+    <AdminRoute>
+      <AppLayout 
+        title="Gestão de Usuários" 
+        subtitle="Administre as permissões e contas de acesso ao sistema"
+      >
+      <Head>
+        <title>Usuários | ControlCarga</title>
+      </Head>
 
-      <Paper sx={{ width: '100%', overflow: 'hidden', boxShadow: 3 }}>
-        <TableContainer sx={{ maxHeight: 600 }}>
-          <Table stickyHeader>
-            <TableHead>
-              <TableRow>
-                <TableCell sx={{ fontWeight: 'bold' }}>Nome</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>E-mail</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>Tipo</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>Status</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>Último Acesso</TableCell>
-                <TableCell align="right" sx={{ fontWeight: 'bold' }}>Ações</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {usuarios.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
-                    <Box display="flex" flexDirection="column" alignItems="center">
-                      <Typography variant="body1" color="text.secondary" gutterBottom>
-                        {loading ? 'Carregando usuários...' : 'Nenhum usuário encontrado'}
-                      </Typography>
-                      {!loading && (
-                        <Button 
-                          variant="outlined" 
-                          color="primary" 
-                          startIcon={<AddIcon />}
-                          onClick={handleOpenNovoUsuario}
-                          sx={{ mt: 1 }}
-                        >
-                          Adicionar Usuário
-                        </Button>
-                      )}
-                    </Box>
-                  </TableCell>
-                </TableRow>
-              ) : (
-                usuarios.map((usuario) => (
-                  <TableRow key={usuario.id}>
-                    <TableCell>{usuario.nome}</TableCell>
-                    <TableCell>{usuario.email}</TableCell>
-                    <TableCell>
-                      <Box 
-                        sx={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          px: 1.5,
-                          py: 0.5,
-                          borderRadius: 1,
-                          bgcolor: usuario.tipo === 'ADMIN' ? 'primary.light' : 
-                                    usuario.tipo === 'GERENTE' ? 'secondary.light' : 'grey.200',
-                          color: usuario.tipo === 'ADMIN' ? 'primary.contrastText' : 
-                                   usuario.tipo === 'GERENTE' ? 'secondary.contrastText' : 'text.primary',
-                          fontWeight: 'medium',
-                          fontSize: '0.75rem',
-                        }}
-                      >
-                        {usuario.tipo === 'ADMIN' ? 'Administrador' : 
-                         usuario.tipo === 'GERENTE' ? 'Gerente' : 'Usuário'}
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Box 
-                        sx={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          px: 1.5,
-                          py: 0.5,
-                          borderRadius: 1,
-                          bgcolor: usuario.ativo ? 'success.light' : 'error.light',
-                          color: 'white',
-                          fontWeight: 'medium',
-                          fontSize: '0.75rem',
-                        }}
-                      >
-                        {usuario.ativo ? 'Ativo' : 'Inativo'}
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      {usuario.ultimoAcesso 
-                        ? new Date(usuario.ultimoAcesso).toLocaleString() 
-                        : 'Nunca acessou'}
-                    </TableCell>
-                    <TableCell align="right">
-                      <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
-                        <Tooltip title="Editar usuário">
-                          <span>
-                            <IconButton 
+      <div className="space-y-6">
+        {/* Header Actions */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex-1 w-full md:max-w-md">
+            <SearchInput 
+              placeholder="Buscar por nome ou e-mail..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <div className="flex items-center gap-2 w-full md:w-auto">
+            <Button 
+              variant="secondary" 
+              iconLeft={<RefreshCw className={cn("w-4 h-4", loading && "animate-spin")} />}
+              onClick={carregarUsuarios}
+              disabled={loading}
+              className="flex-1 md:flex-none"
+            >
+              Atualizar
+            </Button>
+            <Button 
+              variant="primary" 
+              iconLeft={<UserPlus className="w-4 h-4" />}
+              onClick={handleOpenNovoUsuario}
+              className="flex-1 md:flex-none"
+            >
+              <span className="hidden sm:inline">Novo Usuário</span>
+              <span className="sm:hidden">Novo</span>
+            </Button>
+          </div>
+        </div>
+
+        {/* Tabela de Usuários */}
+        <Card noPadding>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200">
+                  <th className="px-4 py-4 font-semibold text-textMain">Usuário</th>
+                  <th className="px-4 py-4 font-semibold text-textMain hidden sm:table-cell">Perfil</th>
+                  <th className="px-4 py-4 font-semibold text-textMain hidden md:table-cell">Status</th>
+                  <th className="px-4 py-4 font-semibold text-textMain hidden lg:table-cell">Último Acesso</th>
+                  <th className="px-4 py-4 font-semibold text-textMain text-right">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {loading && usuarios.length === 0 ? (
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <tr key={i} className="animate-pulse">
+                      <td colSpan={5} className="px-4 py-4">
+                        <div className="h-10 bg-slate-100 rounded w-full"></div>
+                      </td>
+                    </tr>
+                  ))
+                ) : filteredUsuarios.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-12 text-center">
+                      <div className="flex flex-col items-center gap-2 text-textMuted">
+                        <Users className="w-10 h-10 opacity-20" />
+                        <p>Nenhum usuário encontrado.</p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  filteredUsuarios.map((usuario) => {
+                    const tipoInfo = getTipoInfo(usuario.tipo);
+                    const TipoIcon = tipoInfo.icon;
+                    
+                    return (
+                      <tr key={usuario.id} className="hover:bg-slate-50/50 transition-colors group">
+                        <td className="px-4 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm shrink-0">
+                              {usuario.foto ? (
+                                <img src={usuario.foto} alt={usuario.nome} className="w-full h-full rounded-full object-cover" />
+                              ) : (
+                                usuario.nome.charAt(0).toUpperCase()
+                              )}
+                            </div>
+                            <div className="flex flex-col min-w-0">
+                              <span className="font-semibold text-textMain truncate">{usuario.nome}</span>
+                              <span className="text-xs text-textMuted truncate">{usuario.email}</span>
+                              <div className="sm:hidden mt-1 flex gap-1">
+                                <Badge variant={tipoInfo.variant} size="sm" className="px-1.5 py-0">
+                                  {tipoInfo.label.split(' ')[0]}
+                                </Badge>
+                                {usuario.ativo ? (
+                                  <Badge variant="success" size="sm" className="px-1.5 py-0">Ativo</Badge>
+                                ) : (
+                                  <Badge variant="neutral" size="sm" className="px-1.5 py-0">Inativo</Badge>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-4 hidden sm:table-cell">
+                          <Badge variant={tipoInfo.variant} className="flex items-center gap-1.5 w-fit whitespace-nowrap">
+                            <TipoIcon className="w-3 h-3" />
+                            {tipoInfo.label}
+                          </Badge>
+                        </td>
+                        <td className="px-4 py-4 hidden md:table-cell">
+                          {usuario.ativo ? (
+                            <Badge variant="success" className="gap-1 whitespace-nowrap">
+                              <CheckCircle2 className="w-3 h-3" />
+                              Ativo
+                            </Badge>
+                          ) : (
+                            <Badge variant="neutral" className="gap-1 whitespace-nowrap">
+                              <XCircle className="w-3 h-3" />
+                              Inativo
+                            </Badge>
+                          )}
+                        </td>
+                        <td className="px-4 py-4 hidden lg:table-cell">
+                          <div className="flex flex-col text-xs whitespace-nowrap">
+                            <span className="text-textMain font-medium">
+                              {usuario.ultimoAcesso 
+                                ? new Date(usuario.ultimoAcesso).toLocaleDateString('pt-BR') 
+                                : 'Nunca acessou'}
+                            </span>
+                            {usuario.ultimoAcesso && (
+                              <span className="text-textMuted flex items-center gap-1">
+                                <Clock className="w-3 h-3" />
+                                {new Date(usuario.ultimoAcesso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-4 text-right">
+                          <div className="flex justify-end gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                            <Button 
+                              size="icon" 
+                              variant="ghost" 
                               onClick={() => handleOpenEditarUsuario(usuario)}
-                              color="primary"
                               disabled={usuario.id === user?.id}
-                              size="small"
-                              sx={{
-                                '&:hover': { backgroundColor: 'primary.light', color: 'white' },
-                              }}
+                              title="Editar Usuário"
                             >
-                              <EditIcon fontSize="small" />
-                            </IconButton>
-                          </span>
-                        </Tooltip>
-                        <Tooltip title={usuario.ativo ? 'Desativar usuário' : 'Ativar usuário'}>
-                          <span>
-                            <IconButton 
-                              onClick={() => handleToggleStatus(usuario.id, usuario.ativo)}
-                              color={usuario.ativo ? 'error' : 'success'}
+                              <Edit className="w-4 h-4 text-primary" />
+                            </Button>
+                            <Button 
+                              size="icon" 
+                              variant="ghost" 
+                              onClick={() => handleToggleStatus(usuario)}
                               disabled={usuario.id === user?.id}
-                              size="small"
-                              sx={{
-                                '&:hover': { 
-                                  backgroundColor: usuario.ativo ? 'error.light' : 'success.light', 
-                                  color: 'white' 
-                                },
-                              }}
+                              title={usuario.ativo ? "Desativar" : "Ativar"}
                             >
-                              {usuario.ativo ? 
-                                <DeleteIcon fontSize="small" /> : 
-                                <span style={{ fontSize: '0.8rem' }}>Ativar</span>
-                              }
-                            </IconButton>
-                          </span>
-                        </Tooltip>
-                      </Box>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </Paper>
+                              {usuario.ativo ? (
+                                <Trash2 className="w-4 h-4 text-rose-500" />
+                              ) : (
+                                <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                              )}
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      </div>
 
-      {/* Diálogo de formulário */}
-      <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
-        <form onSubmit={handleSubmit}>
-          <DialogTitle>{isEditing ? 'Editar Usuário' : 'Novo Usuário'}</DialogTitle>
-          <DialogContent>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 2 }}>
-              <TextField
-                label="Nome"
-                name="nome"
-                value={currentUsuario?.nome || ''}
-                onChange={handleInputChange}
-                required
-                fullWidth
-                margin="normal"
-              />
-              <TextField
-                label="E-mail"
-                name="email"
-                type="email"
-                value={currentUsuario?.email || ''}
-                onChange={handleInputChange}
-                required
-                fullWidth
-                margin="normal"
-                disabled={isEditing}
-              />
-              <FormControl fullWidth margin="normal">
-                <InputLabel id="tipo-usuario-label">Tipo de Usuário</InputLabel>
-                <Select
-                  labelId="tipo-usuario-label"
-                  name="tipo"
-                  value={currentUsuario?.tipo || 'USUARIO'}
-                  onChange={handleInputChange}
-                  label="Tipo de Usuário"
-                  required
-                >
-                  <MenuItem value="ADMIN">
-                    <Box>
-                      <Box fontWeight="medium">Administrador</Box>
-                      <Typography variant="caption" color="text.secondary" fontSize="0.75rem">
-                        Acesso total ao sistema
-                      </Typography>
-                    </Box>
-                  </MenuItem>
-                  <MenuItem value="GERENTE">
-                    <Box>
-                      <Box fontWeight="medium">Gerente</Box>
-                      <Typography variant="caption" color="text.secondary" fontSize="0.75rem">
-                        Acesso a relatórios e gestão de operações
-                      </Typography>
-                    </Box>
-                  </MenuItem>
-                  <MenuItem value="USUARIO">
-                    <Box>
-                      <Box fontWeight="medium">Usuário</Box>
-                      <Typography variant="caption" color="text.secondary" fontSize="0.75rem">
-                        Acesso básico ao sistema
-                      </Typography>
-                    </Box>
-                  </MenuItem>
-                  <MenuItem value="SEPARADOR">
-                    <Box>
-                      <Box fontWeight="medium">Separador</Box>
-                      <Typography variant="caption" color="text.secondary" fontSize="0.75rem">
-                        Acesso à área de Separação
-                      </Typography>
-                    </Box>
-                  </MenuItem>
-                  <MenuItem value="CONFERENTE">
-                    <Box>
-                      <Box fontWeight="medium">Conferente</Box>
-                      <Typography variant="caption" color="text.secondary" fontSize="0.75rem">
-                        Acesso à área de Conferência
-                      </Typography>
-                    </Box>
-                  </MenuItem>
-                  <MenuItem value="AUDITOR">
-                    <Box>
-                      <Box fontWeight="medium">Auditor</Box>
-                      <Typography variant="caption" color="text.secondary" fontSize="0.75rem">
-                        Acesso à área de Auditoria
-                      </Typography>
-                    </Box>
-                  </MenuItem>
-                </Select>
-              </FormControl>
-              <TextField
-                label={isEditing ? 'Nova Senha (deixe em branco para não alterar)' : 'Senha'}
-                name="senha"
-                type="password"
-                value={currentUsuario?.senha || ''}
-                onChange={handleInputChange}
-                fullWidth
-                margin="normal"
-                required={!isEditing}
-              />
-              <TextField
-                label="Confirmar Senha"
-                name="confirmarSenha"
-                type="password"
-                value={currentUsuario?.confirmarSenha || ''}
-                onChange={handleInputChange}
-                fullWidth
-                margin="normal"
-                required={!isEditing}
-              />
-              {!isEditing && currentUsuario?.senha && currentUsuario?.confirmarSenha && 
-                currentUsuario.senha !== currentUsuario.confirmarSenha && (
-                  <Alert severity="error">As senhas não coincidem</Alert>
-              )}
-              <FormControlLabel
-                control={
-                  <Switch
-                    name="ativo"
-                    checked={currentUsuario?.ativo || false}
-                    onChange={handleInputChange}
-                    color="primary"
+      {/* Modal de Formulário */}
+      <Modal
+        isOpen={isFormModalOpen}
+        onClose={handleCloseFormModal}
+        title={isEditing ? 'Editar Usuário' : 'Novo Usuário'}
+        size="md"
+      >
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 gap-4">
+              {/* Nome */}
+              <div className="space-y-1.5">
+                <Label>Nome Completo</Label>
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                  <Input 
+                    type="text"
+                    required
+                    className="pl-10"
+                    placeholder="Nome do usuário"
+                    value={currentUsuario?.nome || ''}
+                    onChange={(e) => setCurrentUsuario(prev => ({ ...prev!, nome: e.target.value }))}
                   />
-                }
-                label="Usuário ativo"
-              />
-            </Box>
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={handleCloseDialog} color="inherit">
+                </div>
+              </div>
+
+              {/* Email */}
+              <div className="space-y-1.5">
+                <Label>E-mail Corporativo</Label>
+                <div className="relative">
+                  <Package className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                  <Input 
+                    type="email"
+                    required
+                    disabled={isEditing}
+                    className="pl-10"
+                    placeholder="email@empresa.com"
+                    value={currentUsuario?.email || ''}
+                    onChange={(e) => setCurrentUsuario(prev => ({ ...prev!, email: e.target.value }))}
+                  />
+                </div>
+              </div>
+
+              {/* Perfil */}
+              <div className="space-y-1.5">
+                <Label>Perfil de Acesso</Label>
+                <div className="relative">
+                  <Shield className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                  <Select 
+                    className="pl-10"
+                    value={currentUsuario?.tipo || 'USUARIO'}
+                    onChange={(e) => setCurrentUsuario(prev => ({ ...prev!, tipo: e.target.value as TipoUsuario }))}
+                  >
+                    <option value="ADMIN">Administrador (Acesso Total)</option>
+                    <option value="GERENTE">Gerente (Gestão e Relatórios)</option>
+                    <option value="USUARIO">Usuário (Operacional Básico)</option>
+                    <option value="SEPARADOR">Separador (Área de Separação)</option>
+                    <option value="CONFERENTE">Conferente (Área de Conferência)</option>
+                    <option value="AUDITOR">Auditor (Área de Auditoria)</option>
+                  </Select>
+                </div>
+              </div>
+            </div>
+
+            {/* Senhas */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+              <div className="space-y-1.5">
+                <Label>
+                  {isEditing ? 'Nova Senha (opcional)' : 'Senha'}
+                </Label>
+                <div className="relative">
+                  <ShieldCheck className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                  <Input 
+                    type="password"
+                    required={!isEditing}
+                    className="pl-10"
+                    placeholder="••••••••"
+                    value={currentUsuario?.senha || ''}
+                    onChange={(e) => setCurrentUsuario(prev => ({ ...prev!, senha: e.target.value }))}
+                  />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Confirmar Senha</Label>
+                <div className="relative">
+                  <ShieldCheck className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                  <Input 
+                    type="password"
+                    required={!isEditing}
+                    className="pl-10"
+                    placeholder="••••••••"
+                    value={currentUsuario?.confirmarSenha || ''}
+                    onChange={(e) => setCurrentUsuario(prev => ({ ...prev!, confirmarSenha: e.target.value }))}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {currentUsuario?.senha && currentUsuario?.confirmarSenha && 
+             currentUsuario.senha !== currentUsuario.confirmarSenha && (
+              <div className="flex items-center gap-2 text-rose-600 bg-rose-50 p-3 rounded-xl border border-rose-100 animate-in fade-in zoom-in-95">
+                <AlertCircle className="w-4 h-4" />
+                <span className="text-xs font-medium">As senhas não coincidem</span>
+              </div>
+            )}
+
+            <label htmlFor="user-active" className="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-200 transition-all hover:bg-slate-100/50 cursor-pointer">
+              <div className="relative inline-flex items-center">
+                <input 
+                  type="checkbox"
+                  id="user-active"
+                  className="sr-only peer"
+                  checked={currentUsuario?.ativo || false}
+                  onChange={(e) => setCurrentUsuario(prev => ({ ...prev!, ativo: e.target.checked }))}
+                />
+                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-sm font-bold text-slate-700">Usuário Ativo</span>
+                <span className="text-[10px] text-slate-500 uppercase tracking-wider font-medium">Define se o usuário pode acessar o sistema</span>
+              </div>
+            </label>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-6 border-t border-slate-100">
+            <Button variant="ghost" onClick={handleCloseFormModal} type="button">
               Cancelar
             </Button>
             <Button 
+              variant="primary" 
               type="submit" 
-              color="primary" 
-              variant="contained"
+              loading={loading}
               disabled={
-                loading || 
                 !currentUsuario?.nome || 
                 !currentUsuario?.email || 
                 (!isEditing && (!currentUsuario?.senha || currentUsuario.senha !== currentUsuario.confirmarSenha))
               }
             >
-              {loading ? <CircularProgress size={24} /> : 'Salvar'}
+              {isEditing ? 'Salvar Alterações' : 'Criar Usuário'}
             </Button>
-          </DialogActions>
+          </div>
         </form>
-      </Dialog>
+      </Modal>
 
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={6000}
-        onClose={handleCloseSnackbar}
-        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      {/* Modal de Confirmação */}
+      <Modal
+        isOpen={isConfirmModalOpen}
+        onClose={() => setIsConfirmModalOpen(false)}
+        title={confirmConfig.title}
+        size="sm"
       >
-        <Alert 
-          onClose={handleCloseSnackbar} 
-          severity={snackbar.severity} 
-          sx={{ width: '100%' }}
-        >
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
+        <div className="space-y-6">
+          <p className="text-sm text-textMuted leading-relaxed">
+            {confirmConfig.message}
+          </p>
+          <div className="flex justify-end gap-3">
+            <Button variant="ghost" onClick={() => setIsConfirmModalOpen(false)}>
+              Voltar
+            </Button>
+            <Button 
+              variant={confirmConfig.type === 'danger' ? 'danger' : 'primary'}
+              onClick={confirmConfig.onConfirm}
+              loading={loading}
+            >
+              Confirmar
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
-      {/* Diálogo de Confirmação */}
-      <Dialog
-        open={confirmDialog.open}
-        onClose={handleCloseConfirmDialog}
-        aria-labelledby="alert-dialog-title"
-        aria-describedby="alert-dialog-description"
-      >
-        <DialogTitle id="alert-dialog-title">
-          {confirmDialog.title}
-        </DialogTitle>
-        <DialogContent>
-          <DialogContentText id="alert-dialog-description">
-            {confirmDialog.content}
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button 
-            onClick={handleCloseConfirmDialog} 
-            color="inherit"
-            disabled={loading}
-          >
-            Cancelar
-          </Button>
-          <Button 
-            onClick={confirmDialog.onConfirm} 
-            color={confirmDialog.title.includes('Desativar') ? 'error' : 'primary'}
-            variant="contained"
-            autoFocus
-            disabled={loading}
-          >
-            {loading ? <CircularProgress size={24} /> : 'Confirmar'}
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </Container>
+      {/* Toast Notification */}
+      {toast.show && (
+        <div className={cn(
+          "fixed bottom-6 left-1/2 -translate-x-1/2 md:left-auto md:translate-x-0 md:right-6 z-[100] px-6 py-3 rounded-xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-bottom-10 md:slide-in-from-right-10 w-[calc(100%-2rem)] max-w-[400px] md:w-auto",
+          toast.type === 'success' ? "bg-emerald-600 text-white" : "bg-rose-600 text-white"
+        )}>
+          {toast.type === 'success' ? <CheckCircle2 className="w-5 h-5" /> : <XCircle className="w-5 h-5" />}
+          <span className="font-medium">{toast.message}</span>
+        </div>
+      )}
+      </AppLayout>
+    </AdminRoute>
   );
 }
 
-const GerenciarUsuarios = () => {
-  return (
-    <AdminRoute>
-      <GerenciarUsuariosContent />
-    </AdminRoute>
-  );
-};
-
-export default GerenciarUsuarios;
+(GerenciarUsuariosPage as any).usesAppLayout = true;

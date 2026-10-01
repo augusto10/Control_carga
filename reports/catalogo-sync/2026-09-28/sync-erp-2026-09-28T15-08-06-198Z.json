@@ -1,0 +1,5075 @@
+{
+  "generatedAt": "2026-09-28T15:08:06.198Z",
+  "baseUrl": "http://ec2-15-229-152-29.sa-east-1.compute.amazonaws.com",
+  "companyId": "1",
+  "summary": {
+    "listed": 13679,
+    "added": 0,
+    "changed": 456,
+    "unchanged": 0,
+    "removalCandidates": 3,
+    "failed": 0
+  },
+  "added": [],
+  "changed": [
+    {
+      "id": "36379",
+      "name": "ABRAC NYLON 4.8 X 380MM PCT C/ 50UN PT",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "12399",
+      "name": "ADAPT FEMEA ENGATE RAPIDO ROSCA 3/4\" RED 1/2\"",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "37536",
+      "name": "ADAPT SOLD C/ ANEL P/ CAIXA D'AGUA 25MM X 3/4\"",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "37803",
+      "name": "ADAPT SOLD CURTO 20MM X 1/2\"",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "36035",
+      "name": "ADESIVO DE CONTATO EXTRA FORTE CASCOLA 14KG",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "36031",
+      "name": "ADESIVO DE CONTATO EXTRA FORTE CASCOLA 30G",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "36039",
+      "name": "ADESIVO DE CONTATO TRADICIONAL CASCOLA 2.8KG",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "36040",
+      "name": "ADESIVO DE CONTATO TRADICIONAL CASCOLA 14KG",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "36036",
+      "name": "ADESIVO DE CONTATO TRADICIONAL CASCOLA 195G",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "36030",
+      "name": "ADESIVO DE MONTAGEM PL600 CASCOLA 375G BEGE",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "36028",
+      "name": "ADESIVO NAO MAIS PREGOS CASCOLA 85G BRANCO",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "36616",
+      "name": "AGUARRAS PREMIUM 5L",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "37223",
+      "name": "ALAVANCA MACICA LISA 7/8\" X 180CM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "36388",
+      "name": "ALICATE BOMBA D'AGUA 12\"",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "136",
+      "name": "ANEL VEDACAO VASO SANITARIO C/ GUIA",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "36205",
+      "name": "ANTENA DIGITAL LOG 28 ELEMENTOS",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "32037",
+      "name": "ARAME FARPADO RL C/ 250M",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "32040",
+      "name": "ARAME GALVANIZADO N°18 1.24MM RL C/ 1KG",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "37883",
+      "name": "ARAME RECOZIDO LISO N° 12 2.77MM RL C/ 1KG",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "37881",
+      "name": "ARAME RECOZIDO LISO N° 18 1.24MM RL C/ 1KG",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "18399",
+      "name": "ARCO DE SERRA ECONOMICO 12\"",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "9740",
+      "name": "ARCO DE SERRA METAL K140 12\"",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38682",
+      "name": "ARMARIO PLAST 37 X 30 X 9CM BR",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "29945",
+      "name": "ASSENTO PLAST ALMOF CLASSICO BR",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-28T11:44:45"
+        }
+      ]
+    },
+    {
+      "id": "38643",
+      "name": "ASSENTO PLAST LOFT BR",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "38169",
+      "name": "BALDE METAL 10L GALVANIZADO",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "37554",
+      "name": "BARONECRYL PAREDE 18KG",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "38372",
+      "name": "BARRA DE APOIO ALUM RETA 60CM CR",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "36526",
+      "name": "BATEDOR MISTURADOR ARGAMASSA P/ FURAD 40CM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "36527",
+      "name": "BATEDOR MISTURADOR ARGAMASSA P/ FURAD 60CM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38040",
+      "name": "BICO METAL P/ TORN JARD 3/4 X 1/2\" PCT C/ 12UN",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "37306",
+      "name": "BLOCO ESPUMA 21 X 12 X 6CM AM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38239",
+      "name": "BOMBA PERIFERICA 1/2 HP 220V",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-27T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "37999",
+      "name": "BOTAO FRANCES ABS PCT C/ 100UN CR",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "20787",
+      "name": "BOTINA SEG IMBISEG NOBUCK N° 40 MARROM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "20788",
+      "name": "BOTINA SEG IMBISEG NOBUCK N° 41 MARROM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38201",
+      "name": "BOTINA SEG PLUS BIDEN C/ BICO PVC N° 40",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38202",
+      "name": "BOTINA SEG PLUS BIDEN C/ BICO PVC N° 41",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38203",
+      "name": "BOTINA SEG PLUS BIDEN C/ BICO PVC N° 42",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38206",
+      "name": "BOTINA SEG PLUS BIDEN C/ BICO PVC N° 45",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "38175",
+      "name": "BOTINA SEG SUL MONO S/ BICO N° 40",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38176",
+      "name": "BOTINA SEG SUL MONO S/ BICO N° 41",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38177",
+      "name": "BOTINA SEG SUL MONO S/ BICO N° 42",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38442",
+      "name": "BRACO ALUM CHUVEIRO 30CM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "3652",
+      "name": "BRACO ALUM CHUVEIRO 40CM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "37058",
+      "name": "BRACO PLAST CHUVEIRO 30CM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "35882",
+      "name": "BROCA ACO RAPIDO 1/4\"",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "35876",
+      "name": "BROCA ACO RAPIDO 1/8\"",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "35344",
+      "name": "BROCA ACO RAPIDO 2.50MM 3/32\"",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "35334",
+      "name": "BROCA ACO RAPIDO 3.00MM 1/8\"",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "35335",
+      "name": "BROCA ACO RAPIDO 3.50MM 9/64\"",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "35336",
+      "name": "BROCA ACO RAPIDO 4.00MM 5/32\"",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "35341",
+      "name": "BROCA ACO RAPIDO 4.50MM 11/64\"",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "35878",
+      "name": "BROCA ACO RAPIDO 5/32\"",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "35337",
+      "name": "BROCA ACO RAPIDO 8.00MM 5/16\"",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "35877",
+      "name": "BROCA ACO RAPIDO 9/64\"",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "35355",
+      "name": "BROCA CONCRETO SDS PLUS  6.0 X 160MM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "38320",
+      "name": "BROCA CONCRETO SDS PLUS 10.0 X 210MM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "35885",
+      "name": "BROCA MADEIRA CHATA 1/2\"",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "35887",
+      "name": "BROCA MADEIRA CHATA 3/4\"",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "35884",
+      "name": "BROCA MADEIRA CHATA 3/8\"",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "35889",
+      "name": "BROCA PARA CONCRETO  8.0MM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "35890",
+      "name": "BROCA PARA CONCRETO 10.0MM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "770",
+      "name": "BROXA PLAST RETANG 180 X 60MM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "28511",
+      "name": "BUCHA PLAST C/ ABA N° 08 PCT C/ 1000UN",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "28512",
+      "name": "BUCHA PLAST C/ ABA N°10 PCT C/ 500UN",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "38085",
+      "name": "BUCHA RED METAL 3/4 X 1/2\" CR",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "37809",
+      "name": "BUCHA RED SOLD CURTA 25 X 20MM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "36287",
+      "name": "CABO COAXIAL RG06 67% RL C/100M BR",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "35134",
+      "name": "CABO FLEXIVEL  1.5MM BRANCO RL C/ 100M",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "31682",
+      "name": "CABO FLEXIVEL  2.5MM AMARELO RL C/ 100M",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "31683",
+      "name": "CABO FLEXIVEL  2.5MM AZUL RL C/ 100M",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "31684",
+      "name": "CABO FLEXIVEL  2.5MM BRANCO RL C/ 100M",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "31688",
+      "name": "CABO FLEXIVEL  2.5MM PRETO RL C/ 100M",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "31691",
+      "name": "CABO FLEXIVEL  2.5MM VERMELHO RL C/ 100M",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "35139",
+      "name": "CABO FLEXIVEL  4.0MM AZUL RL C/ 100M",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "35140",
+      "name": "CABO FLEXIVEL  4.0MM PRETO RL C/ 100M",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "30045",
+      "name": "CABO MAD P/ PICARETA 90CM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "35243",
+      "name": "CABO PP 2 X 1.5MM RL C/ 100M",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "36283",
+      "name": "CABO REDE 4P CAT5E CX C/ 305M AZUL",
+      "changes": [
+        {
+          "field": "Código de barras",
+          "before": "",
+          "after": "7899278925817"
+        },
+        {
+          "field": "codigoBarrasCaixaFechada",
+          "before": "7899278925817",
+          "after": ""
+        },
+        {
+          "field": "Quantidade caixa",
+          "before": "1",
+          "after": ""
+        },
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "29814",
+      "name": "CABO USB | USB TIPO C 1.5M NYLON",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "29815",
+      "name": "CABO USB TIPO C | USB TIPO C 1M",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "37944",
+      "name": "CADEADO BICICLETA SEGREDO 65CM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38668",
+      "name": "CADEADO KING TETRA PORTA DE ACO",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "21828",
+      "name": "CADEADO LATAO 25MM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "818",
+      "name": "CADEADO LATAO 25MM BLISTER",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "30098",
+      "name": "CADEADO LATAO 30MM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "29055",
+      "name": "CADEADO LATAO 35MM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "29056",
+      "name": "CADEADO LATAO 40MM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "30099",
+      "name": "CADEADO LATAO 50MM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "21829",
+      "name": "CADEADO LATAO 60MM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38667",
+      "name": "CADEADO TRAVA LATERAL TETRA PORTA DE ACO",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "23005",
+      "name": "CADEADO ZAMAC 20MM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "23007",
+      "name": "CADEADO ZAMAC 30MM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "23009",
+      "name": "CADEADO ZAMAC 40MM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "30963",
+      "name": "CAIXA CAESB P/ 1 E 2 HIDROMETROS NTS 303",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "1589",
+      "name": "CAIXA D'AGUA 1.000L C/ TPA",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "37175",
+      "name": "CAIXA DESCARGA 9L BR",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "1609",
+      "name": "CAIXA DESCARGA 9L BR",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "24487",
+      "name": "CAIXA FERRAMENTAS ACO MASTER 3 GAVETAS",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "31166",
+      "name": "CAIXA FERRAMENTAS ACO MASTER 5 GAVETAS",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "25848",
+      "name": "CAIXA FERRAMENTAS PLAST TATICA 18.3\" VD",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "37025",
+      "name": "CAIXA LUZ PVC OCTOG FMD 4 X 4 PT",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "22703",
+      "name": "CAIXA MASSA PLAST 20L PT",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "28283",
+      "name": "CAIXA PASSAGEM E INSPECAO ESGOTO 4.5L",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "35208",
+      "name": "CAIXA SANEAGO P/ 1 E 2 HIDROMETROS NTS 303",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "22920",
+      "name": "CAIXA SIF RED BR 250 X 150 X 50MM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "29789",
+      "name": "CAMARA DE AR 3.25 X 8\"",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "36304",
+      "name": "CANALETA PVC ADES C/ DIV 20 X 10 X 2000MM BR",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "23290",
+      "name": "CANTONEIRA ALUM L 3/4\" BRANCA 3M",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "37746",
+      "name": "CAP ESG 100MM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "37815",
+      "name": "CAP SOLD 20MM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "37880",
+      "name": "CARRINHO CARGA 180KG AZ",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "37140",
+      "name": "CARRINHO DE MAO CONSTRUTOR 60L GALVANIZADO",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "37267",
+      "name": "CARRINHO DE MAO METALFORTE 60L CINZA",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "37350",
+      "name": "CAVADEIRA ART C/ CABO MAD 125CM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "36431",
+      "name": "CHAVE CANHAO  8MM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "36433",
+      "name": "CHAVE CANHAO 10MM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "36434",
+      "name": "CHAVE CANHAO 11MM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "36435",
+      "name": "CHAVE CANHAO 13MM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "36437",
+      "name": "CHAVE COMBINADA 10MM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "36438",
+      "name": "CHAVE COMBINADA 11MM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "22456",
+      "name": "CHAVE COMBINADA 11MM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "22458",
+      "name": "CHAVE COMBINADA 13MM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "36439",
+      "name": "CHAVE COMBINADA 13MM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "37397",
+      "name": "CHAVE DE IMPACTO 21V C/ MALETA",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "36539",
+      "name": "CHAVE FENDA 1/4 X 6\"",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "36462",
+      "name": "CHAVE TESTE 140MM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "36567",
+      "name": "CHAVE TESTE DIGITAL 12 - 250V",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "1617",
+      "name": "CILINDRO P/ FECHADURA STAM 52MM EXT CR",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "36640",
+      "name": "CJ ARIA 1 INT SIMPL 1 TOM 2P+T 10A BR",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "36650",
+      "name": "CJ ARIA 1 INT SIMPL 2 TOM 2P+T 10A BR",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "36630",
+      "name": "CJ ARIA 1 INT SIMPL VERT BR",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "36632",
+      "name": "CJ ARIA 1 TOM 2P+T 10A BR",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "36644",
+      "name": "CJ ARIA 2 INT SIMP 1 TOM 2P+T 10A BR",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "27899",
+      "name": "CJ EVIDENCE 1 TOM 2P+T 20A BR",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "37183",
+      "name": "CJ EVIDENCE 2 TOM 2P+T 20A BR",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "35648",
+      "name": "CLIMATIZADOR 16L 130W BR/CZ",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "36042",
+      "name": "COLA BRANCA EXTRA CASCOREZ CASCOLA 1KG",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "1641",
+      "name": "COLA BRANCA EXTRA CASCOREZ CASCOLA 500G",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "36278",
+      "name": "COLA BRANCA SECAGEM RAPIDA CASCOREZ CASCOLA 1KG",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "36047",
+      "name": "COLA BRANCA UNIVERSAL CASCOREZ CASCOLA 1KG",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "36046",
+      "name": "COLA BRANCA UNIVERSAL CASCOREZ CASCOLA 500G",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "37965",
+      "name": "COLHER PEDREIRO GAVILAN RETA  8\"",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "22131",
+      "name": "COLHER PEDREIRO REDONDA 10\"",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "18936",
+      "name": "COLUNA P/ LAVAT GARDENIA BRANCA",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "37135",
+      "name": "CORANTE LIQUIDO AFFACOR TX AMARELO 50ML",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "36908",
+      "name": "CUNHA NIVELAMENTO SLIM PCT C/ 100UN",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "35366",
+      "name": "DESCARBONIZANTE CAR 80 300ML",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "37672",
+      "name": "DESEMP ACO DENTADA CABO PLAST 24 X 10CM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "37673",
+      "name": "DESEMP ACO LISA CABO PLAST 24 X 10CM",
+      "changes": [
+        {
+          "field": "codigoBarrasCaixaFechada",
+          "before": "",
+          "after": "17897488057875"
+        },
+        {
+          "field": "Quantidade caixa",
+          "before": "",
+          "after": "6"
+        },
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "22136",
+      "name": "DESEMP PLAST ESTRIADA 15 X 26CM PT",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "22137",
+      "name": "DESEMP PLAST ESTRIADA 17 X 30CM PT",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-08-13T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "37240",
+      "name": "DESENGRIPANTE PEG & UZE 250ML",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "37690",
+      "name": "DESENGRIPANTE WD-40 FLEXTOP 500ML",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "30066",
+      "name": "DISCO CORTE INOX 4.1/2\" X 1.0MM X 7/8\"",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "38567",
+      "name": "DISCO CORTE INOX 7\" X 1.6MM X 7/8\"",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38568",
+      "name": "DISCO CORTE INOX 9\" X 1.9MM X 7/8\"",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "36626",
+      "name": "DISCO CORTE INOX 14\" X 3.0MM X 1\"",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "23685",
+      "name": "DISCO CORTE PREMIUM 7\" X 1.6MM X 7/8\"",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "35165",
+      "name": "DISCO DIAM CONTINUO 105 X 20MM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38229",
+      "name": "DISCO DIAM PORCEL TURBO 110 X 20MM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "35166",
+      "name": "DISCO DIAM SEGM 105 X 20MM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38583",
+      "name": "DISCO FLAP 4.1/2\" GR 040",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38584",
+      "name": "DISCO FLAP 4.1/2\" GR 060",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38585",
+      "name": "DISCO FLAP 4.1/2\" GR 080",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "38601",
+      "name": "DISCO WIDEA MADEIRA  4.3/8\" 24D",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "35072",
+      "name": "DISJ DIN UNIPOLAR SHB1 40A CURVA C",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "35073",
+      "name": "DISJ DIN UNIPOLAR SHB1 50A CURVA C",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38497",
+      "name": "DISJ DIN UNIPOLAR TDJ3 20A CURVA C",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38498",
+      "name": "DISJ DIN UNIPOLAR TDJ3 25A CURVA C",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "35096",
+      "name": "DISJ NEMA TRIPOLAR ASM3 50A CURVA B",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "35084",
+      "name": "DISPOSITIVO DPS PROT SURTO 20KA",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "15353",
+      "name": "DOBR FERRADURA N° 2",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-12T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38492",
+      "name": "DOBR GONZO ABA RETA 5/8\"",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "2792",
+      "name": "DUCHA BELLA DUCHA 4T ULTRA 6800W BR",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "31038",
+      "name": "DUCHA FAMINHO 4T 6800W BR",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "36021",
+      "name": "DUREPOXI LOCTITE 50G CX C/ 12UN",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "36022",
+      "name": "DUREPOXI LOCTITE 100G CX C/ 12UN",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "36023",
+      "name": "DUREPOXI LOCTITE 250G",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "36026",
+      "name": "DUREPOXI LOCTITE LIQUIDO 16G",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "38319",
+      "name": "ELETRODO E308L INOX 2.50MM CX C/ 2KG CZ",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "37278",
+      "name": "ELETRODO E6013 2.50MM CX C/ 2KG AZ",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "38749",
+      "name": "ELETRODUTO CORRUG 32MM RL C/ 25M LJ",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "38234",
+      "name": "ELETRODUTO CORRUG 32MM RL C/ 50M AZ",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "30538",
+      "name": "ENGATE FLEX PVC 1/2\" X  40CM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "30539",
+      "name": "ENGATE FLEX PVC 1/2\" X  50CM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "30540",
+      "name": "ENGATE FLEX PVC 1/2\" X  60CM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "37227",
+      "name": "ENXADA LARGA 2.5 C/ CABO MAD 150CM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38103",
+      "name": "ESCADA ALUM DOMESTICA 7 DEG",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "31821",
+      "name": "ESMERILHADEIRA ANGULAR MME  4.1/2\" 750W",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "37017",
+      "name": "ESPACADOR NIVELADOR ECO 1.0MM PCT C/ 50UN",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "37016",
+      "name": "ESPACADOR NIVELADOR ECO 2.0MM PCT C/ 50UN",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38401",
+      "name": "ESPUMA EXPANSIVA USO GERAL 300ML 190G",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "38400",
+      "name": "ESPUMA EXPANSIVA USO GERAL 500ML 320G",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "36479",
+      "name": "ESTILETE 9MM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "36478",
+      "name": "ESTILETE MULTIUSO 18MM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "36480",
+      "name": "ESTILETE PROFISSIONAL 25MM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "37717",
+      "name": "EXAUSTOR BANHEIRO EMB 100MM BR",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "36349",
+      "name": "EXTENSAO 2P CABO PARALELO  3M BR",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "3266",
+      "name": "FECHADURA 803/03 EXT CR",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "22962",
+      "name": "FECHADURA FANO 803/33 EXT CR",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "3224",
+      "name": "FECHADURA POPLINE 03001.0711.01 EXT CR",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "28959",
+      "name": "FECHADURA SOBREPOR TETRA 1701/100 EXT PT",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "17689",
+      "name": "FITA AUTOADESIVA MULTIUSO 10CM RL C/ 10M",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "18653",
+      "name": "FITA AUTOADESIVA MULTIUSO 30CM RL C/ 10M",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "36953",
+      "name": "FITA AUTOADESIVA VEDATUDO 10CM RL C/ 10M",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "36954",
+      "name": "FITA AUTOADESIVA VEDATUDO 20CM RL C/ 10M",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "36952",
+      "name": "FITA AUTOADESIVA VEDATUDO 30CM RL C/ 10M",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "30265",
+      "name": "FITA CREPE USO GERAL 423 24MM X 50M BR",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "30264",
+      "name": "FITA CREPE USO GERAL 423 48MM X 50M BR",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "37072",
+      "name": "FITA DUPLA FACE 12MM X 2M",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "37073",
+      "name": "FITA DUPLA FACE 12MM X 20M",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "36482",
+      "name": "FITA ISOLANTE 19MM X  5M",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "36484",
+      "name": "FITA ISOLANTE 19MM X 20M",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "37375",
+      "name": "FITA ISOLANTE AUTOFUSAO SCOTCH 19MM X  2M",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "37383",
+      "name": "FITA ISOLANTE IMPERIAL 18MM X  5M",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "37381",
+      "name": "FITA ISOLANTE IMPERIAL 18MM X 20M",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "12532",
+      "name": "FITA SILVER TAPE PRATA 800/S 45MM X 5M",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "36485",
+      "name": "FITA VEDA ROSCA 18MM X 10M",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38141",
+      "name": "FITA ZEBRADA P/ DEMARCACAO 70MM X 200M",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "37464",
+      "name": "FIXA FIO CIRCULAR  8.0MM BR PCT C/ 50UN",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "37465",
+      "name": "FIXA FIO CIRCULAR 10.0MM BR PCT C/ 50UN",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "31818",
+      "name": "FURAD IMPACTO 500W - 1/2\"",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "37396",
+      "name": "FURAD PARAFUSAD 12V",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "37399",
+      "name": "FURAD PARAFUSAD 21V C/ MALETA",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "37501",
+      "name": "GARFO PINTURA GAIOLA 23CM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "1403",
+      "name": "GARFO PINTURA GAIOLA 23CM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "37500",
+      "name": "GARFO PINTURA PRESSAO 23CM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38139",
+      "name": "GARRAFAO TERMICO 5L AZ",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "35020",
+      "name": "GESSO RAPIDO 1KG",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38375",
+      "name": "GRAMPO P/ CERCA 1\" X 9 BWG PCT C/ 1KG",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "35372",
+      "name": "GRAXA BRANCA DE LITIO SPRAY 300ML",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "27347",
+      "name": "GRELHA INOX CLICK QUAD 15 X 15CM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "28635",
+      "name": "GRELHA INOX QUAD 10 X 10CM C/ FECHO",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "28636",
+      "name": "GRELHA INOX QUAD 15 X 15CM C/ FECHO",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38295",
+      "name": "HASTE TELHA COMPL PESC 1/4\" X  8.5CM PCT C/ 100UN",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "38296",
+      "name": "HASTE TELHA COMPL PESC 1/4\" X 12CM PCT C/ 100UN",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38294",
+      "name": "HASTE TELHA COMPL RETA 1/4\" X 40CM PCT C/ 100UN",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "33958",
+      "name": "INVERSORA DE SOLDA 100A 220V",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38420",
+      "name": "INVERSORA DE SOLDA 160A 220V",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "21068",
+      "name": "JOELHO ESG 90°  40MM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "21069",
+      "name": "JOELHO ESG 90°  50MM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "37531",
+      "name": "JOELHO ESG 90° 100MM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "37831",
+      "name": "JOELHO SOLD 90° 20MM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "20960",
+      "name": "JOELHO SOLD 90° 25MM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "37543",
+      "name": "JOELHO SOLD 90° 25MM X 1/2\" LATAO",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "20963",
+      "name": "JOELHO SOLD 90° 50MM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "37970",
+      "name": "JOGO DE BITS FENDA SIMPLES 25MM C/ 10UN",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "37969",
+      "name": "JOGO DE BITS FENDA SIMPLES 50MM C/ 5UN",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "36516",
+      "name": "JOGO LAMINAS ESTILETE 18MM C/ 10 PCS",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "36517",
+      "name": "JOGO LAMINAS ESTILETE 25MM C/ 10 PCS",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "36536",
+      "name": "JOGO SERRAS COPO C/ 11 PCS",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "36560",
+      "name": "JOGO SOQUETE MAGNETICO 6 - 13MM C/ 5UN",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "36324",
+      "name": "KIT BANHEIRO ALUM STANDER 5 PCS CR",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "36592",
+      "name": "KIT COMPL CX ACOPL AC SUP DUPLO BR",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "37282",
+      "name": "KIT COMPL CX ACOPL AC SUP SIMPL BR",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "36593",
+      "name": "KIT COMPL CX ACOPL AC SUP SIMPL BR",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "37693",
+      "name": "KIT COMPL CX ACOPL AC SUP SIMPL CR",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "31846",
+      "name": "KIT VEDACAO PLAN CERAMICA 2.1/2\" PCT C/ 20UN",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "36518",
+      "name": "LAMINA SERRA MANUAL ACO 24D",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "36519",
+      "name": "LAMINA SERRA MANUAL BIMETAL 24D",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38662",
+      "name": "LAMP LED ECO   9W 6500K",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "18934",
+      "name": "LAVAT P/ COLUNA GARDENIA BRANCO",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "18935",
+      "name": "LAVAT SUSPENSO GARDENIA BRANCO",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38268",
+      "name": "LIGACAO FLEX P/ GAS 1/2\" (F) X 1/2\" (F) 1.20M",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38269",
+      "name": "LIGACAO FLEX P/ GAS 1/2\" (F) X 1/2\" (F) 1.50M",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38271",
+      "name": "LIGACAO FLEX P/ GAS 1/2\" (M) X 1/2\" (F) 1.50M",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38274",
+      "name": "LIGACAO FLEX P/ GAS 3/8\" (ESP) X 1/2\" (F) 1.20M",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38275",
+      "name": "LIGACAO FLEX P/ GAS 3/8\" (ESP) X 1/2\" (F) 1.50M",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38272",
+      "name": "LIGACAO FLEX P/ GAS 3/8\" (ESP) X 3/8\" (ESP) 1.20M",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38273",
+      "name": "LIGACAO FLEX P/ GAS 3/8\" (ESP) X 3/8\" (ESP) 1.50M",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38788",
+      "name": "LIMPA CONTATO PEG & UZE 250ML",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38719",
+      "name": "LIXEIRA INOX PEDAL  3L",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "37102",
+      "name": "LONA PRETA 4 X 110M 15KG 37.5MC",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "37106",
+      "name": "LONA PRETA 6 X 60M 15KG 50MC",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "37109",
+      "name": "LONA PRETA 8 X 60M 30KG 75MC",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "37679",
+      "name": "LUMINARIA TARTARUGA PLAST PT",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "37783",
+      "name": "LUVA ESG CORRER 100MM C/ ANEL",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "31539",
+      "name": "LUVA ESG SIMPL  40MM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "21091",
+      "name": "LUVA ESG SIMPL 100MM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "36994",
+      "name": "LUVA RASPA PUNHO MEDIO 15CM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "20974",
+      "name": "LUVA SOLD 20MM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "20975",
+      "name": "LUVA SOLD 25MM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "37839",
+      "name": "LUVA SOLD 50MM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "4582",
+      "name": "LUVA TRICOTADA TATEX PRETA TAM \"G\"",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "30180",
+      "name": "LUVA VAQUETA TOTAL TAM 10",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "36520",
+      "name": "MACARICO PORTATIL GAS MANUAL",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "36984",
+      "name": "MANG DUPLAFLEX RECAPADA 3/4\" X 2.0MM RL C/ 50M AZ",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "4804",
+      "name": "MANG ENTRADA MAQ LAVAR 1.40M CRISTAL",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "36306",
+      "name": "MANG NIVEL 5/16'' X 1.5MM RL C/ 50M CRISTAL",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "30543",
+      "name": "MANG NIVEL 5/16\" X 1.0MM RL C/ 50M CRISTAL",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "4982",
+      "name": "MANG SAIDA MAQ LAVAR 1.40M CZ",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "38262",
+      "name": "MARRETA OITAVADA C/ CABO 5.0KG",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38408",
+      "name": "MARTELO ROMPEDOR MMR 800W 3KG",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "37625",
+      "name": "MASSA ACRILICA 25KG",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38449",
+      "name": "MASSA CORRIDA PVA 20KG",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-27T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "35898",
+      "name": "MULTIMETRO DIGITAL",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "22168",
+      "name": "NIVEL ALUM S/ PINTURA 14''",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "28905",
+      "name": "OCULOS PROTECAO JAMAICA AZUL ESPELHADO",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "28904",
+      "name": "OCULOS PROTECAO JAMAICA CINZA ESPELHADO",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "22398",
+      "name": "OCULOS PROTECAO LINCE CINZA",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "37319",
+      "name": "OCULOS PROTECAO RJ INCOLOR",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "37321",
+      "name": "OCULOS PROTECAO WAVE INCOLOR",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "22506",
+      "name": "PA DE BICO 3 C/ CABO MAD 120CM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "37231",
+      "name": "PA DE BICO N° 3 CABO Y PLAST",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "35512",
+      "name": "PAINEL LED PLAY EMB QUAD 24W 6500K BR",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "28590",
+      "name": "PALHA DE ACO N° 0 FINA 22G",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "28591",
+      "name": "PALHA DE ACO N° 1 MEDIA 22G",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "28592",
+      "name": "PALHA DE ACO N° 2 GROSSA 22G",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "30294",
+      "name": "PAPELAO ONDULADO 120CM RL C/ 30M",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "36700",
+      "name": "PARAF AUTO BROC SEXT 12 5.5MM X 5\" CX C/ 100UN",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "37065",
+      "name": "PARAF BARRA ROSQUEADA POL 1/4\" X 1M",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "37067",
+      "name": "PARAF BARRA ROSQUEADA POL 3/8\" X 1M",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "37068",
+      "name": "PARAF BARRA ROSQUEADA POL 5/16\" X 1M",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38756",
+      "name": "PARAF FLANGEADO BROCA 4.2 X 16MM CX C/ 500UN",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38427",
+      "name": "PARAF SEXT SOBERBA 1/4\" X 50MM CX C/ 200UN",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38428",
+      "name": "PARAF SEXT SOBERBA 1/4\" X 60MM CX C/ 200UN",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38429",
+      "name": "PARAF SEXT SOBERBA 1/4\" X 70MM CX C/ 100UN",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38032",
+      "name": "PARAF VASO LATONADO LUXO B10 PCT C/ 2UN",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "24704",
+      "name": "PENEIRA ARO PVC FEIJAO 55CM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "30036",
+      "name": "PICARETA ALVIAO 4 C/ CABO MAD 90CM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38058",
+      "name": "PINO ENGATE RAPIDO ZAMAC P/ AR ROSCA MACHO 1/4\"",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "36424",
+      "name": "PISTOLA APLICADORA SILICONE 9\"",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38244",
+      "name": "PISTOLA PINTURA 400W",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "38256",
+      "name": "PISTOLA PINTURA AR DIRETO PPV 90",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38286",
+      "name": "PITAO S/ BUCHA N°10 PCT C/ 100UN",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "36677",
+      "name": "PLACA ARIA 4 X 2 CEGA BR",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "36683",
+      "name": "PLACA ARIA 4 X 4 CEGA BR",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "29790",
+      "name": "PNEU CARRINHO DE MAO 3.25 X 8\" S/ CAMARA",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38277",
+      "name": "PREGO ACO GALVANIZADO 12 X 12 C/C PCT C/ 60G",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "37698",
+      "name": "PREGO ACO POLIDO 12 X 12 C/C PCT C/ 1KG",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "24608",
+      "name": "PRUMO ACO PAREDE 400G",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "18611",
+      "name": "PRUMO ACO PAREDE 500G",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-18T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "36823",
+      "name": "PULVERIZADOR AGRICOLA COSTAL 20L",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "37080",
+      "name": "PULVERIZADOR BOMBA 350ML",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "37027",
+      "name": "QUADRO DIST EMB 6/8 DISJ S/ BAR BR",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "30111",
+      "name": "RALO FERRO 20 X 20CM C/ ARO",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "36422",
+      "name": "REBITADOR MANUAL ALAVANCA 17\"",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "23748",
+      "name": "REG ESF PVC SOLD 25MM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "30188",
+      "name": "REG ESF PVC SOLD 50MM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "24531",
+      "name": "REG PRESSAO SOLD 25MM S/ CANOPLA MR",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "37341",
+      "name": "REGUA PEDREIRO ALUM BI-TUBULAR PT 2.0M +/- 460G",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "37342",
+      "name": "REGUA PEDREIRO ALUM BI-TUBULAR PT 3.0M +/- 600G",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "37347",
+      "name": "REGUA PEDREIRO ALUM FRISADA VM 3.0M +/- 1320G",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38209",
+      "name": "REJUNTE RESINADO 1KG BEGE",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38207",
+      "name": "REJUNTE RESINADO 1KG BRANCO",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38218",
+      "name": "REJUNTE RESINADO 1KG CINZA PLATINA",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38213",
+      "name": "REJUNTE RESINADO 1KG GRAFITE",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "36335",
+      "name": "RESIST BELLA DUCHA 6800W 220V",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "36330",
+      "name": "RESIST MAXI DUCHA 4500W 220V",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "31608",
+      "name": "RODA COMPLETA S/ CAMARA FLEX BORDER 320 UNIVERSAL",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "7810",
+      "name": "RODEL P/ CORTADOR PISO  80MM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "32203",
+      "name": "RODIZIO ACO PORTAL CANAL U 2\" C/ CAIXA",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38482",
+      "name": "RODIZIO ACO PORTAO CANAL U 2.1/2\" C/ CAIXA",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38486",
+      "name": "RODIZIO ACO PORTAO CANAL U 2.1/2\" C/ PARAF",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "35925",
+      "name": "RODIZIO SILICONE MESA GIR S/ FREIO 35MM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "35923",
+      "name": "RODIZIO SILICONE MESA GIR S/ FREIO 50MM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "19507",
+      "name": "ROLO PINTURA ESPUMA  9CM C/ GARFO",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "28915",
+      "name": "ROLO PINTURA ESPUMA POLIESTER  5CM C/ GARFO",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "28916",
+      "name": "ROLO PINTURA ESPUMA POLIESTER  9CM C/ GARFO",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "23836",
+      "name": "ROLO PINTURA LA ANTIGOTA  5CM C/ GARFO",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "7838",
+      "name": "ROLO PINTURA LA ANTIGOTA 23CM S/ GARFO",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "19482",
+      "name": "ROLO PINTURA LA ANTIRRESPINGO 23CM S/ GARFO",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "28918",
+      "name": "ROLO PINTURA LA CARNEIRO 5CM C/ GARFO",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "28926",
+      "name": "ROLO PINTURA RESPINGO ZERO 23CM S/ GARFO",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38522",
+      "name": "SELANTE PU 40 400G CINZA",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "38397",
+      "name": "SELANTE PU 40 BRASFIX 360G BRANCO",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38399",
+      "name": "SELANTE PU 40 BRASFIX 360G CINZA",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "36052",
+      "name": "SELANTE PU 40 CASCOLA 380G BRANCO",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38789",
+      "name": "SELANTE PU 40 FLEX 360G BRANCO",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "38790",
+      "name": "SELANTE PU 40 FLEX 360G CINZA",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "38791",
+      "name": "SELANTE PU 40 FLEX 360G PRETO",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "28818",
+      "name": "SENSOR PRESENCA SOB PAREDE 360°",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "36828",
+      "name": "SERRA COPO DIAMANTADA C/ HASTE 25MM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "36833",
+      "name": "SERRA COPO DIAMANTADA C/ HASTE 50MM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "25696",
+      "name": "SERROTE GESSO CABO PLAST 6\"",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "30534",
+      "name": "SIFAO SANF UNIV DUPL 70CM BR",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "30531",
+      "name": "SIFAO SANF UNIV SIMPL 70CM BR",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "36935",
+      "name": "SILICONE ACETICO 240G INCOLOR",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "38697",
+      "name": "SILICONE BANHEIRO E COZINHA CASCOLA  50G BRANCO",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "35369",
+      "name": "SILICONE SPRAY 300ML LAVANDA",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "37322",
+      "name": "SOLDA ESTANHO EM FIO TUBO 25G",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "35349",
+      "name": "SOQUETE PLAST E-27 C/ RABICHO PT",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "36016",
+      "name": "SUPER BONDER LOCTITE MEGA 20G CX C/ 8UN",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "28837",
+      "name": "SUPORTE TV FIXO UNIVERSAL 15 - 84\"",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "28321",
+      "name": "TALHADEIRA CHATA 1/4 X 10\" AZUL",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-08-12T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "8389",
+      "name": "TAMPAO FERRO T-33 ARTICULADO PESADO",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "19673",
+      "name": "TAMPAO FERRO T-33 SIMPL LEVE",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "20775",
+      "name": "TAMPAO PVC FIXO 41 X 46CM T-33",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38674",
+      "name": "TAPA FURO LUVA SOLD 25MM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "37847",
+      "name": "TE SOLD 20MM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "20999",
+      "name": "TE SOLD 25MM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "37547",
+      "name": "TE SOLD 25MM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "30409",
+      "name": "TELHA PVC COLONIAL 230 X 86CM CONCRETO",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "31837",
+      "name": "TELHA PVC PLAN 241 X 88CM CERAMICA",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "31839",
+      "name": "TELHA PVC PLAN 241 X 88CM CONCRETO",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "36561",
+      "name": "TESOURA CHAPA AVIACAO 10\"",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "37568",
+      "name": "THINNER 010 5L",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "37567",
+      "name": "THINNER 010 900ML",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "37664",
+      "name": "TINTA ACRIL ESSENCIAL FO 16L BRANCO",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38463",
+      "name": "TINTA ESM DUPLA FUNCAO  3.6L BRANCO",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38462",
+      "name": "TINTA ESM DUPLA FUNCAO 3.6L PRETO",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "32022",
+      "name": "TINTA ESM SINT 3.6L AREIA",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "37620",
+      "name": "TINTA ESM SINT 3.6L BRANCO FOSCO",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "37055",
+      "name": "TINTA SPRAY AT PEG & UZE 300ML ALUMINIO",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "37054",
+      "name": "TINTA SPRAY AT PEG & UZE 300ML BRANCO FOSCO",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "37052",
+      "name": "TINTA SPRAY AT PEG & UZE 300ML PRETO FOSCO",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38784",
+      "name": "TINTA SPRAY MET PEG & UZE 300ML CROMADA",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "38785",
+      "name": "TINTA SPRAY MET PEG & UZE 300ML DOURADA",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38786",
+      "name": "TINTA SPRAY MET PEG & UZE 300ML OURO",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38787",
+      "name": "TINTA SPRAY MET PEG & UZE 300ML PRATA",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "38770",
+      "name": "TINTA SPRAY UG PEG & UZE 300ML AMARELO",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38772",
+      "name": "TINTA SPRAY UG PEG & UZE 300ML AZUL ESCURO",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38778",
+      "name": "TINTA SPRAY UG PEG & UZE 300ML BEGE",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "36884",
+      "name": "TINTA SPRAY UG PEG & UZE 300ML BRANCO BRILHANTE",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "36885",
+      "name": "TINTA SPRAY UG PEG & UZE 300ML BRANCO FOSCO",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38774",
+      "name": "TINTA SPRAY UG PEG & UZE 300ML CINZA CLARO",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38775",
+      "name": "TINTA SPRAY UG PEG & UZE 300ML CINZA ESCURO",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38776",
+      "name": "TINTA SPRAY UG PEG & UZE 300ML CINZA MEDIO",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "38777",
+      "name": "TINTA SPRAY UG PEG & UZE 300ML CINZA PRIMER",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "36882",
+      "name": "TINTA SPRAY UG PEG & UZE 300ML PRETO BRILHANTE",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "36883",
+      "name": "TINTA SPRAY UG PEG & UZE 300ML PRETO FOSCO",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "38779",
+      "name": "TINTA SPRAY UG PEG & UZE 300ML ROSA",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38780",
+      "name": "TINTA SPRAY UG PEG & UZE 300ML VERDE CLARO",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38781",
+      "name": "TINTA SPRAY UG PEG & UZE 300ML VERDE ESCURO",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38782",
+      "name": "TINTA SPRAY UG PEG & UZE 300ML VERMELHO",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38071",
+      "name": "TINTA SPRAY USO GERAL 400ML BRANCO BRILHANTE",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "38072",
+      "name": "TINTA SPRAY USO GERAL 400ML BRANCO FOSCO",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38069",
+      "name": "TINTA SPRAY USO GERAL 400ML PRETO BRILHANTE",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "38070",
+      "name": "TINTA SPRAY USO GERAL 400ML PRETO FOSCO",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "38114",
+      "name": "TOMADA BARRA HERCULES QUINTUPLA 2P+T 10/20A BR",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38110",
+      "name": "TOMADA BARRA HERCULES TRIPLA 2P+T 10/20A BR",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "36408",
+      "name": "TORN ABS COZ PRD MARUJA BM BR",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "36417",
+      "name": "TORN ABS TANQUE E MAQ LAVAR MARUJA BR",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "35698",
+      "name": "TORN BOIA CX D'AGUA HASTE ABS 1/2 E 3/4\" AZ",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "30070",
+      "name": "TRENA BOLSO 13MM X 3M",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "30068",
+      "name": "TRENA BOLSO 19MM X 5M",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "30069",
+      "name": "TRENA BOLSO 25MM X  8M",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "30067",
+      "name": "TRENA BOLSO 25MM X 10M",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "35902",
+      "name": "TRENA EMBORRACHADA 25MM X 7.5M",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "35904",
+      "name": "TRENA HOBBY 13MM X 3M",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "37152",
+      "name": "TRINCHA CERDAS BRANCAS CABO AZUL 1.1/2\"",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "37154",
+      "name": "TRINCHA CERDAS BRANCAS CABO AZUL 2.1/2\"",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "37153",
+      "name": "TRINCHA CERDAS BRANCAS CABO AZUL 2\"",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "37155",
+      "name": "TRINCHA CERDAS BRANCAS CABO AZUL 3\"",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "37162",
+      "name": "TRINCHA CERDAS GRIS CABO VERMELHO 2.1/2\"",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "37163",
+      "name": "TRINCHA CERDAS GRIS CABO VERMELHO 3\"",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-26T00:18:45"
+        }
+      ]
+    },
+    {
+      "id": "9178",
+      "name": "TUBO DESCIDA CAIXA DESCARGA 150CM",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "21031",
+      "name": "TUBO ESG  50MM BR C/ 6M",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "37519",
+      "name": "TUBO SOLD 25MM BR C/ 6M",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "37696",
+      "name": "VALVULA PIA AMER INOX 3.1/2\" CR",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "36293",
+      "name": "VASSOURA JARD METAL ARAME REG C/ CABO 22D",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "38794",
+      "name": "VEDA CALHA PRO 400G CINZA",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "36327",
+      "name": "VENTILADOR DE MESA 30CM PT",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    },
+    {
+      "id": "24699",
+      "name": "ZARCAO FUNDO SERRALHEIRO  5L GRAFITE",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-09-25T19:56:29.510Z",
+          "after": "2026-09-25T00:18:46"
+        }
+      ]
+    }
+  ],
+  "removalCandidates": [
+    {
+      "id": "1191",
+      "name": "BASE ZINCADA P/ GLOBO",
+      "reason": "produto novo em grupo bloqueado para novas entradas"
+    },
+    {
+      "id": "1024",
+      "name": "CABECOTE DE ALUMINIO (001) 1\"",
+      "reason": "produto novo em grupo bloqueado para novas entradas"
+    },
+    {
+      "id": "1025",
+      "name": "CABECOTE DE ALUMINIO (002) 1.1/4\"",
+      "reason": "produto novo em grupo bloqueado para novas entradas"
+    }
+  ],
+  "failed": []
+}

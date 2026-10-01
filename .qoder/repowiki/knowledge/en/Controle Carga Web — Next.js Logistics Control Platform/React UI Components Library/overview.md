@@ -1,0 +1,1 @@
+Organizes the application's React components into feature-scoped subdirectories (admin, dashboard, labels, layout) and shared primitives (ui, plus top-level device/hardware integrations).

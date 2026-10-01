@@ -1,9 +1,8 @@
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import CircularProgress from '@mui/material/CircularProgress';
-import Box from '@mui/material/Box';
 import { USER_TYPES } from '../../types/auth-types';
+import { RefreshCw } from 'lucide-react';
 
 interface AdminRouteProps {
   children: React.ReactNode;
@@ -25,11 +24,11 @@ export default function AdminRoute({ children }: AdminRouteProps) {
       return;
     }
 
-    // Se está autenticado, verifica se é administrador
+    // Se está autenticado, verifica se é administrador ou gerente
     if (user) {
-      const isAdmin = user.tipo === USER_TYPES.ADMIN;
-      if (!isAdmin) {
-        console.log('[AdminRoute] Acesso negado: usuário não é administrador');
+      const isAuthorized = user.tipo === USER_TYPES.ADMIN || user.tipo === USER_TYPES.GERENTE;
+      if (!isAuthorized) {
+        console.log('[AdminRoute] Acesso negado: usuário não é administrador ou gerente');
         router.push('/acesso-negado');
         return;
       }
@@ -42,19 +41,15 @@ export default function AdminRoute({ children }: AdminRouteProps) {
   // Mostra um loader enquanto verifica a autenticação
   if (isLoading || isChecking) {
     return (
-      <Box 
-        display="flex" 
-        justifyContent="center" 
-        alignItems="center" 
-        minHeight="100vh"
-      >
-        <CircularProgress />
-      </Box>
+      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 gap-4">
+        <RefreshCw className="w-10 h-10 text-primary animate-spin opacity-20" />
+        <p className="text-slate-400 font-medium animate-pulse">Verificando permissões...</p>
+      </div>
     );
   }
 
-  // Se o usuário está autenticado e é administrador, renderiza os filhos
-  if (isAuthenticated && user?.tipo === USER_TYPES.ADMIN) {
+  // Se o usuário está autenticado e é administrador ou gerente, renderiza os filhos
+  if (isAuthenticated && (user?.tipo === USER_TYPES.ADMIN || user?.tipo === USER_TYPES.GERENTE)) {
     return <>{children}</>;
   }
 

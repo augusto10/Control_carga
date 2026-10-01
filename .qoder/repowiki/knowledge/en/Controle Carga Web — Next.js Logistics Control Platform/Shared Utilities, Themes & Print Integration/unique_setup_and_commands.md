@@ -1,0 +1,1 @@
+`node utils/logo-generator.js` must be run after placing `public/templates/logo oficial.png` to regenerate `public/templates/LOGO_OFICIAL.GRF` at 92×40 px monochrome; ZPL printing via `utils/printer.js` requires a Windows printer named in the call because it shells out to `copy /b \\localhost\<printer>`.

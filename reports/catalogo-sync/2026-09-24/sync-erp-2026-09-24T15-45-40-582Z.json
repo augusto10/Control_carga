@@ -1,0 +1,33 @@
+{
+  "generatedAt": "2026-09-24T15:45:40.582Z",
+  "baseUrl": "http://ec2-15-229-152-29.sa-east-1.compute.amazonaws.com",
+  "companyId": "1",
+  "summary": {
+    "listed": 13678,
+    "added": 0,
+    "changed": 0,
+    "unchanged": 0,
+    "removalCandidates": 3,
+    "failed": 0
+  },
+  "added": [],
+  "changed": [],
+  "removalCandidates": [
+    {
+      "id": "1191",
+      "name": "BASE ZINCADA P/ GLOBO",
+      "reason": "produto novo em grupo bloqueado para novas entradas"
+    },
+    {
+      "id": "1024",
+      "name": "CABECOTE DE ALUMINIO (001) 1\"",
+      "reason": "produto novo em grupo bloqueado para novas entradas"
+    },
+    {
+      "id": "1025",
+      "name": "CABECOTE DE ALUMINIO (002) 1.1/4\"",
+      "reason": "produto novo em grupo bloqueado para novas entradas"
+    }
+  ],
+  "failed": []
+}

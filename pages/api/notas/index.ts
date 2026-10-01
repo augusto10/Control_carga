@@ -1,75 +1,86 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import prisma from '../../../lib/prisma';
+import prisma from '@/lib/prisma';
 
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse
-) {
-  if (req.method === 'GET') {
-    try {
-      const { start, end } = req.query;
-      let where = {} as any;
-      if (start || end) {
-        where.dataCriacao = {};
-        if (start) {
-          where.dataCriacao.gte = new Date(`${start}T00:00:00`);
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== 'GET') {
+    return res.status(405).json({ message: 'Method not allowed' });
+  }
+
+  try {
+    const start = req.query.start as string | undefined;
+    const end = req.query.end as string | undefined;
+    const numeroNota = req.query.numeroNota as string | undefined;
+    const codigo = req.query.codigo as string | undefined;
+
+    console.log('[API Notas] Parâmetros recebidos:', { start, end, numeroNota, codigo });
+
+    const where: any = {};
+
+    if (start && end) {
+      try {
+        // Garante que start e end sejam strings simples
+        const s = Array.isArray(start) ? start[0] : start;
+        const e = Array.isArray(end) ? end[0] : end;
+
+        const startDate = new Date(`${s}T00:00:00.000Z`);
+        const endDate = new Date(`${e}T23:59:59.999Z`);
+        
+        if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
+          where.dataCriacao = {
+            gte: startDate,
+            lte: endDate,
+          };
+        } else {
+          console.warn('[API Notas] Datas inválidas:', { s, e });
         }
-        if (end) {
-          where.dataCriacao.lte = new Date(`${end}T23:59:59`);
-        }
+      } catch (dateError) {
+        console.error('[API Notas] Erro ao processar datas:', dateError);
       }
-      const notas = await prisma.notaFiscal.findMany({ 
-        where,
-        include: {
-          controle: {
-            select: {
-              id: true,
-              numeroManifesto: true,
-              motorista: true,
-              responsavel: true,
-              transportadora: true,
-              dataCriacao: true
-            }
+    }
+
+    if (numeroNota) {
+      const n = Array.isArray(numeroNota) ? numeroNota[0] : numeroNota;
+      where.numeroNota = {
+        contains: String(n),
+        mode: 'insensitive',
+      };
+    }
+
+    if (codigo) {
+      const c = Array.isArray(codigo) ? codigo[0] : codigo;
+      where.codigo = {
+        contains: String(c),
+        mode: 'insensitive',
+      };
+    }
+
+    console.log('[API Notas] Filtro where:', JSON.stringify(where));
+
+    const notas = await prisma.notaFiscal.findMany({
+      where,
+      include: {
+        controle: {
+          select: {
+            id: true,
+            dataCriacao: true
           }
         },
-        orderBy: {
-          dataCriacao: 'desc'
+        usuario: {
+          select: {
+            id: true,
+            nome: true,
+            email: true
+          }
         }
-      });
-      
-      // Adiciona cabeçalhos para evitar cache
-      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-      res.setHeader('Pragma', 'no-cache');
-      res.setHeader('Expires', '0');
-      
-      res.status(200).json(notas);
-    } catch (error) {
-      console.error('Erro ao listar notas:', error);
-      res.status(500).json({ error: 'Erro ao listar notas' });
-    }
-  } else if (req.method === 'POST') {
-    try {
-      const { codigo, numeroNota, volumes } = req.body;
-      
-      if (!codigo || !numeroNota || !volumes) {
-        return res.status(400).json({ error: 'Código, número da nota e volumes são obrigatórios' });
-      }
-      
-      const nota = await prisma.notaFiscal.create({
-        data: {
-          codigo,
-          numeroNota,
-          volumes: volumes.toString() // Garantindo que volumes seja uma string
-        }
-      });
-      
-      res.status(200).json(nota);
-    } catch (error) {
-      console.error('Erro ao criar nota:', error);
-      res.status(500).json({ error: 'Erro ao salvar nota fiscal' });
-    }
-  } else {
-    res.setHeader('Allow', ['GET', 'POST']);
-    res.status(405).end(`Method ${req.method} Not Allowed`);
+      },
+      orderBy: {
+        dataCriacao: 'desc',
+      },
+    });
+
+    return res.status(200).json(notas);
+  } catch (error) {
+    console.error('Erro ao buscar notas:', error);
+    return res.status(500).json({ message: 'Erro interno do servidor' });
   }
 }

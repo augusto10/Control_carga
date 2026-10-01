@@ -9,6 +9,7 @@ export interface AuthRequest extends NextApiRequest {
     id: string;
     email: string;
     tipo: string;
+    nome: string;
   };
 }
 
@@ -49,7 +50,8 @@ export const withAuth = (handler: NextApiHandler, allowedRoles: string[] = ['ADM
           id: true,
           email: true,
           tipo: true,
-          ativo: true
+          ativo: true,
+          nome: true
         },
       });
 
@@ -67,6 +69,7 @@ export const withAuth = (handler: NextApiHandler, allowedRoles: string[] = ['ADM
         id: user.id,
         email: user.email,
         tipo: user.tipo,
+        nome: user.nome,
       };
 
       return handler(req, res);

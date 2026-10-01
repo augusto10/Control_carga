@@ -1,0 +1,1 @@
+React with TypeScript (.tsx); shared UI primitives are built on a common design-system surface (Badge, Button, Card, Input, Modal, Select, StatCard) reused across admin, dashboard, and labels features.

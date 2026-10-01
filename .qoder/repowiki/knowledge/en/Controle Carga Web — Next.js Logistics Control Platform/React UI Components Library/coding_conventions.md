@@ -1,0 +1,3 @@
+- Feature-specific components live in dedicated subdirectories (`admin/`, `dashboard/`, `labels/`) while generic primitives are colocated in `ui/`.
+- Cross-cutting device integrations (Android camera, scanner, signature pad, map) are exposed as single-file components at the `components/` root rather than inside a feature folder.
+- Route guards and layout wrappers (`ProtectedRoute`, `AdminRoute`, `Layout`, `AppLayout`) are provided as reusable higher-order components consumed by pages.

@@ -1,0 +1,1 @@
+MUI `createTheme` for component-level styling; Tailwind v4 via `@import "tailwindcss"` with a custom config; `clsx` + `tailwind-merge` for conditional class merging; `sharp` for image-to-ZBR bitmap conversion; `pdf-lib` for PDF label generation; `pdf-to-printer` for OS print enumeration; Windows-native `wmic`/PowerShell/COPY commands for ZPL dispatch.

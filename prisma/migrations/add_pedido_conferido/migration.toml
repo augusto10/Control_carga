@@ -1,0 +1,35 @@
+# Migration metadata
+prismaVersion = "4.16.2"
+id = "add_pedido_conferido"
+name = "add_pedido_conferido"
+datamodel = """
+  model PedidoConferido {
+    id                String   @id @default(uuid())
+    dataCriacao       DateTime @default(now())
+    pedidoId          String   @unique
+    pedido            Pedido   @relation(fields: [pedidoId], references: [id])
+    conferenteId      String
+    conferente        Usuario  @relation("PedidosConferidos", fields: [conferenteId], references: [id])
+    pedido100         Boolean
+    inconsistencia    Boolean
+    motivosInconsistencia String[]
+    observacoes       String?
+  }
+
+  model Pedido {
+    id          String         @id @default(uuid())
+    numeroPedido String
+    dataCriacao DateTime       @default(now())
+    controleId  String?
+    controle    ControleCarga? @relation(fields: [controleId], references: [id])
+    conferido   PedidoConferido?
+  }
+
+  model Usuario {
+    // ... outros campos
+    pedidosConferidos PedidoConferido[] @relation("PedidosConferidos")
+  }
+"""
+
+# Indica que esta é uma migração personalizada
+isCustomMigration = true

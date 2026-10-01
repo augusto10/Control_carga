@@ -1,136 +1,120 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { Prisma, PrismaClient } from '@prisma/client';
-import { gerarProximoNumeroManifesto } from '../../../lib/gerarNumeroManifesto';
-
-const prisma = new PrismaClient();
-
-type Transportadora = 'ACERT' | 'EXPRESSO_GOIAS'; // Removido ACCERT que não é mais usado
+import prisma from '@/lib/prisma';
+import { Transportadora } from '@prisma/client';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  switch (req.method) {
-    case 'GET': {
-      try {
-        const controles = await prisma.controleCarga.findMany({
-          orderBy: { dataCriacao: 'desc' },
-          include: {
-            notas: true,
-          },
-        });
-        
-        // Adiciona cabeçalhos para evitar cache
-        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-        res.setHeader('Pragma', 'no-cache');
-        res.setHeader('Expires', '0');
-        
-        res.status(200).json(controles);
-      } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Erro ao listar controles' });
+  if (req.method === 'GET') {
+    try {
+      const { start, end, transportadora, notaFiscal, motorista, responsavel, limit } = req.query;
+
+      const where: any = {};
+
+      if (start && end) {
+        where.dataCriacao = {
+          gte: new Date(`${start}T00:00:00.000Z`),
+          lte: new Date(`${end}T23:59:59.999Z`),
+        };
       }
-      break;
-    }
-    case 'POST': {
-      try {
-        const { motorista, responsavel, cpfMotorista = 'PENDENTE', transportadora, qtdPallets, observacao, numeroManifesto, notasIds } = req.body;
 
-        // Validar campos obrigatórios
-        const camposObrigatorios = [];
-        if (!motorista?.trim()) camposObrigatorios.push('motorista');
-        if (!responsavel?.trim()) camposObrigatorios.push('responsavel');
-        
-        // CPF do motorista é opcional, se não for fornecido, usamos 'PENDENTE'
-        const cpfMotoristaFormatado = cpfMotorista?.trim() || 'PENDENTE';
+      if (transportadora && transportadora !== 'all') {
+        where.transportadora = transportadora as Transportadora;
+      }
 
-        if (camposObrigatorios.length > 0) {
-          return res.status(400).json({ 
-            error: 'Campos obrigatórios não fornecidos',
-            requiredFields: camposObrigatorios
-          });
-        }
-
-        // Validar se as notas existem e estão disponíveis
-        if (notasIds && notasIds.length > 0) {
-          const notasExistentes = await prisma.notaFiscal.findMany({
-            where: {
-              id: { in: notasIds },
-              OR: [
-                { controleId: { not: null } },
-              ]
+      if (notaFiscal) {
+        where.notas = {
+          some: {
+            numeroNota: {
+              contains: String(notaFiscal),
+              mode: 'insensitive',
             },
-            select: { id: true }
-          });
-
-          if (notasExistentes.length > 0) {
-            return res.status(400).json({
-              error: 'Uma ou mais notas já estão vinculadas a outro controle',
-              notasIndisponiveis: notasExistentes.map(n => n.id)
-            });
-          }
-        }
-
-        // Garantir que a transportadora tenha um valor válido
-        const transportadoraValida = (transportadora === 'ACERT' || transportadora === 'EXPRESSO_GOIAS') 
-          ? transportadora 
-          : 'ACERT';
-          
-        // Gera o próximo número de manifesto automaticamente
-        const numeroManifestoFinal = numeroManifesto || await gerarProximoNumeroManifesto(transportadoraValida);
-        
-        // Criar o controle com os dados fornecidos
-        const controle = await prisma.controleCarga.create({
-          data: {
-            motorista: motorista.trim(),
-            cpfMotorista: cpfMotorista ? cpfMotorista.replace(/[\D]/g, '') : 'PENDENTE',
-            responsavel: responsavel.trim(),
-            transportadora: transportadoraValida as Transportadora,
-            numeroManifesto: numeroManifestoFinal,
-            qtdPallets: qtdPallets ? Number(qtdPallets) : 0,
-            observacao: observacao ? observacao.trim() : null,
-            finalizado: false,
-            // Vincula as notas diretamente na criação
-            ...(notasIds && notasIds.length > 0 && {
-              notas: {
-                connect: notasIds.map((id: string) => ({ id }))
-              }
-            })
           },
-          include: {
-            notas: true
-          }
-        });
-        
-        res.status(201).json(controle);
-      } catch (error: any) {
-        console.error('Erro ao criar controle:', error);
-        
-        // Se for um erro de validação do Prisma
-        if (error.code === 'P2002') {
-          // Erro de violação de chave única
-          const field = error.meta?.target?.[0] || 'campo';
-          return res.status(400).json({
-            error: `Já existe um registro com este ${field}`,
-            field,
-            code: 'DUPLICATE_ENTRY'
-          });
-        }
-        
-        // Outros erros do Prisma
-        if (error.code?.startsWith('P2')) {
-          return res.status(400).json({
-            error: 'Erro de validação',
-            details: error.message
-          });
-        }
-        
-        res.status(500).json({ 
-          error: 'Erro ao criar controle',
-          details: process.env.NODE_ENV === 'development' ? error.message : undefined
-        });
+        };
       }
-      break;
+
+      if (motorista) {
+        where.motorista = {
+          contains: String(motorista),
+          mode: 'insensitive',
+        };
+      }
+
+      if (responsavel) {
+        where.responsavel = {
+          contains: String(responsavel),
+          mode: 'insensitive',
+        };
+      }
+
+      const controles = await prisma.controleCarga.findMany({
+        where,
+        include: {
+          notas: true,
+        },
+        orderBy: {
+          dataCriacao: 'desc',
+        },
+        take: limit ? Number(limit) : undefined,
+      });
+
+      return res.status(200).json(controles);
+    } catch (error) {
+      console.error('Erro ao buscar controles:', error);
+      return res.status(500).json({ message: 'Erro interno do servidor' });
     }
-    default:
-      res.setHeader('Allow', ['GET', 'POST']);
-      res.status(405).end(`Method ${req.method} Not Allowed`);
+  } else if (req.method === 'POST') {
+    try {
+      const {
+        motorista,
+        responsavel,
+        transportadora,
+        numeroManifesto,
+        qtdPallets,
+        observacao,
+        cpfMotorista,
+        placaVeiculo,
+        qtdPalletsLevados,
+        qtdPalletsDevolvidos,
+        freteInformado,
+        valorFrete,
+        notasIds
+      } = req.body;
+
+      // Geração de número sequencial se não fornecido
+      let numeroFinal = numeroManifesto;
+      if (!numeroFinal) {
+        const count = await prisma.controleCarga.count();
+        numeroFinal = (count + 1).toString();
+      }
+
+      const controle = await prisma.controleCarga.create({
+        data: {
+          motorista,
+          responsavel,
+          transportadora: transportadora as Transportadora,
+          numeroManifesto: numeroFinal,
+          qtdPallets: Number(qtdPallets) || 0,
+          observacao,
+          cpfMotorista,
+          placaVeiculo,
+          qtdPalletsLevados: Number(qtdPalletsLevados) || 0,
+          qtdPalletsDevolvidos: Number(qtdPalletsDevolvidos) || 0,
+          freteInformado: Boolean(freteInformado),
+          valorFrete: valorFrete !== undefined && valorFrete !== null && valorFrete !== '' ? Number(valorFrete) : null,
+          notas: notasIds && Array.isArray(notasIds) && notasIds.length > 0 ? {
+            connect: notasIds.map((id: string) => ({ id }))
+          } : undefined
+        },
+        include: {
+          notas: true
+        }
+      });
+
+      return res.status(201).json(controle);
+    } catch (error) {
+      console.error('Erro ao criar controle:', error);
+      return res.status(500).json({ message: 'Erro ao criar controle' });
+    }
+  } else {
+    return res.status(405).json({ message: 'Method not allowed' });
   }
 }

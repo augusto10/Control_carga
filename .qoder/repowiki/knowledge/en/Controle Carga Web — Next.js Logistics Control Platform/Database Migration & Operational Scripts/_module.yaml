@@ -1,0 +1,10 @@
+schema_version: 1
+module_path: scripts_and_migrations
+title: Database Migration & Operational Scripts
+scope:
+    - scripts/
+    - sql/
+source_files: []
+depends_on: []
+related_to:
+    - path: prisma_schema

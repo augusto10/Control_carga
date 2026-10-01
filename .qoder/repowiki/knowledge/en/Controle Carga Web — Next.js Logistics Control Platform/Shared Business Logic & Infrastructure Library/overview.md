@@ -1,0 +1,1 @@
+Server-side shared library providing authentication, Prisma client, external API caching, logistics dashboard synchronization, label/ZPL generation, and ERP automation helpers used across Next.js API routes.

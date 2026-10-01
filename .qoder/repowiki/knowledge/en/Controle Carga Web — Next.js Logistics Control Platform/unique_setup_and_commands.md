@@ -1,0 +1,1 @@
+`npm run build` triggers `prisma generate` before `next build`; `npm run dev` starts the development server; `npm run test:labels` runs label tests via ts-node with path aliases; production deployments rely on `postinstall: prisma generate` to ensure the Prisma client exists at runtime.

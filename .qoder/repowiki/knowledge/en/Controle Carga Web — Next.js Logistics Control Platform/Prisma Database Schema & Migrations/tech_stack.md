@@ -1,0 +1,1 @@
+Prisma ORM with PostgreSQL backend, TypeScript + CommonJS dual client access, bcryptjs for password hashing in seeds, and Prisma migration tooling for version-controlled DDL changes.

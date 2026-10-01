@@ -1,0 +1,1 @@
+Next.js pages router with TypeScript; authentication via bcryptjs + jsonwebtoken + Prisma; UI via MUI Material + Tailwind CSS classes; notifications via notistack; animations via framer-motion; maps via Leaflet; icons via lucide-react.

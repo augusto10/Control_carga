@@ -1,6 +1,23 @@
 import axios, { AxiosInstance } from 'axios';
 import Cookies from 'js-cookie';
 
+function resolveApiBaseUrl(): string {
+  let baseURL = process.env.NEXT_PUBLIC_API_URL || '';
+
+  if (typeof window !== 'undefined') {
+    const normalized = baseURL.trim().toLowerCase();
+    if (!normalized || normalized.includes('localhost') || normalized.includes('127.0.0.1')) {
+      return '';
+    }
+  }
+
+  if (baseURL.endsWith('/api')) {
+    baseURL = baseURL.slice(0, -4);
+  }
+
+  return baseURL.endsWith('/') ? baseURL.slice(0, -1) : baseURL;
+}
+
 // Cria uma instância do Axios com configurações padrão
 const createApi = (): AxiosInstance => {
   // Remove a barra final da URL base, se existir
@@ -12,10 +29,11 @@ const createApi = (): AxiosInstance => {
   const cleanBaseURL = baseURL.endsWith('/') ? baseURL.slice(0, -1) : baseURL;
   
   const instance = axios.create({
-    baseURL: cleanBaseURL,
+    baseURL: resolveApiBaseUrl(),
     headers: {
       'Content-Type': 'application/json',
     },
+    withCredentials: true, // Importante: enviar cookies automaticamente
   });
 
   // Adiciona o token JWT às requisições
@@ -55,6 +73,19 @@ const createApi = (): AxiosInstance => {
 
 // Cria e exporta a instância da API
 const api = createApi();
+
+// Funções auxiliares para exclusão usando POST (workaround para erro 405)
+export const deleteControle = async (id: string) => {
+  return api.post('/api/controles/delete', { id });
+};
+
+export const deleteMotorista = async (id: string) => {
+  return api.post('/api/motoristas/delete', { id });
+};
+
+export const deleteNota = async (id: string) => {
+  return api.post('/api/notas/delete', { id });
+};
 
 export { api };
 export default api;

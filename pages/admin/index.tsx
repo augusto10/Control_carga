@@ -1,33 +1,24 @@
 import { useState, useEffect } from 'react';
 import { 
-  Grid, 
-  Paper, 
-  Typography, 
-  Box, 
-  Card, 
-  CardContent, 
-  CardHeader, 
-  Avatar, 
-  IconButton, 
-  List, 
-  ListItem, 
-  ListItemAvatar, 
-  ListItemText,
-  Divider,
-  LinearProgress,
-  useTheme
-} from '@mui/material';
-import { 
-  People as PeopleIcon, 
-  Assignment as AssignmentIcon, 
-  CheckCircle as CheckCircleIcon, 
-  Pending as PendingIcon,
-  Warning as WarningIcon,
-  Refresh as RefreshIcon
-} from '@mui/icons-material';
-import AdminLayout from '../../components/admin/AdminLayout';
-import AdminRoute from '../../components/admin/AdminRoute';
-import { api } from '../../services/api';
+  Users, 
+  ClipboardList, 
+  CheckCircle2, 
+  Clock, 
+  RefreshCw, 
+  TrendingUp, 
+  ChevronRight,
+  Calendar,
+  UserPlus,
+  Activity,
+  AlertCircle
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { AppLayout } from '@/components/layout/AppLayout';
+import AdminRoute from '@/components/admin/AdminRoute';
+import { cn } from '@/utils/cn';
+import { Card } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { StatCard } from '@/components/ui/StatCard';
 
 interface DashboardStats {
   totalUsuarios: number;
@@ -35,6 +26,8 @@ interface DashboardStats {
   totalControles: number;
   controlesFinalizados: number;
   controlesPendentes: number;
+  pedidosHoje: number;
+  pedidosMes: number;
   ultimosUsuarios: Array<{
     id: string;
     nome: string;
@@ -43,16 +36,46 @@ interface DashboardStats {
   }>;
 }
 
+interface ExternalHealth {
+  status: string;
+  api_online: boolean;
+  credentials_configured: boolean;
+  database_connected: boolean;
+  details?: string;
+}
+
 function AdminDashboardContent() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [health, setHealth] = useState<ExternalHealth | null>(null);
   const [loading, setLoading] = useState(true);
-  const theme = useTheme();
+  const [loadingHealth, setLoadingHealth] = useState(false);
 
   const loadStats = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/api/admin/dashboard');
-      setStats(response.data);
+      
+      const resumoRes = await fetch('/api/admin/dashboard-resumo', { credentials: 'include' });
+      if (!resumoRes.ok) {
+        throw new Error(`Falha ao carregar dashboard (${resumoRes.status})`);
+      }
+
+      const resumo = await resumoRes.json();
+
+      const statsData: DashboardStats = {
+        totalUsuarios: Number(resumo.totalUsuarios || 0),
+        usuariosAtivos: Number(resumo.usuariosAtivos || 0),
+        totalControles: Number(resumo.totalControles || 0),
+        controlesFinalizados: Math.max(
+          Number(resumo.totalControles || 0) - Number(resumo.controlesPendentes || 0),
+          0
+        ),
+        controlesPendentes: Number(resumo.controlesPendentes || 0),
+        pedidosHoje: Number(resumo.pedidosHoje || 0),
+        pedidosMes: Number(resumo.pedidosMes || 0),
+        ultimosUsuarios: Array.isArray(resumo.ultimosUsuarios) ? resumo.ultimosUsuarios : []
+      };
+
+      setStats(statsData);
     } catch (error) {
       console.error('Erro ao carregar estatísticas:', error);
     } finally {
@@ -60,159 +83,267 @@ function AdminDashboardContent() {
     }
   };
 
+  const loadHealth = async () => {
+    try {
+      setLoadingHealth(true);
+      const res = await fetch('/api/admin/health-externo');
+      if (res.ok) {
+        setHealth(await res.json());
+      }
+    } catch (error) {
+      console.error('Erro ao carregar saúde da API:', error);
+    } finally {
+      setLoadingHealth(false);
+    }
+  };
+
   useEffect(() => {
     loadStats();
+    loadHealth();
+    const interval = setInterval(() => {
+      loadStats();
+      loadHealth();
+    }, 3 * 60 * 1000);
+    return () => clearInterval(interval);
   }, []);
 
-  const StatCard = ({ 
-    title, 
-    value, 
-    icon, 
-    color = 'primary',
-    loading: isLoading 
-  }: { 
-    title: string; 
-    value: string | number; 
-    icon: React.ReactNode;
-    color?: 'primary' | 'secondary' | 'error' | 'info' | 'success' | 'warning';
-    loading?: boolean;
-  }) => (
-    <Card>
-      <CardContent>
-        {isLoading ? (
-          <Box sx={{ width: '100%' }}>
-            <LinearProgress />
-          </Box>
-        ) : (
-          <>
-            <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-              <Typography color="textSecondary" gutterBottom>
-                {title}
-              </Typography>
-              <Avatar 
-                sx={{ 
-                  backgroundColor: `${color}.light`, 
-                  color: `${color}.contrastText`,
-                  width: 48,
-                  height: 48
-                }}
-              >
-                {icon}
-              </Avatar>
-            </Box>
-            <Typography variant="h4" component="div">
-              {value}
-            </Typography>
-          </>
-        )}
-      </CardContent>
-    </Card>
-  );
-
   return (
-    <AdminLayout title="Visão Geral">
-      <Grid container spacing={3}>
-        {/* Cards de Estatísticas */}
-        <Grid item xs={12} sm={6} md={3}>
+    <AppLayout 
+      title="Painel Administrativo" 
+      subtitle="Visão geral e indicadores do sistema"
+    >
+      <div className="space-y-6 md:space-y-8 max-w-[1600px] mx-auto px-4 sm:px-0">
+        {/* Stats Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 md:gap-6">
           <StatCard 
             title="Total de Usuários" 
             value={stats?.totalUsuarios || 0} 
-            icon={<PeopleIcon />}
-            color="primary"
+            icon={Users}
+            color="blue"
             loading={loading}
+            delay={0.1}
           />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
           <StatCard 
             title="Usuários Ativos" 
             value={stats?.usuariosAtivos || 0} 
-            icon={<CheckCircleIcon />}
-            color="success"
+            icon={CheckCircle2}
+            color="green"
             loading={loading}
+            delay={0.2}
           />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
           <StatCard 
             title="Controles Totais" 
             value={stats?.totalControles || 0} 
-            icon={<AssignmentIcon />}
-            color="info"
+            icon={ClipboardList}
+            color="indigo"
             loading={loading}
+            delay={0.3}
           />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
           <StatCard 
             title="Controles Pendentes" 
             value={stats?.controlesPendentes || 0} 
-            icon={<PendingIcon />}
-            color="warning"
+            icon={Clock}
+            color="orange"
             loading={loading}
+            delay={0.4}
           />
-        </Grid>
+          <StatCard 
+            title="Pedidos de Hoje" 
+            value={stats?.pedidosHoje || 0} 
+            icon={CheckCircle2}
+            color="cyan"
+            loading={loading}
+            delay={0.5}
+          />
+          <StatCard 
+            title="Pedidos do Mês" 
+            value={stats?.pedidosMes || 0} 
+            icon={Calendar}
+            color="blue"
+            loading={loading}
+            delay={0.6}
+          />
+        </div>
 
-        {/* Últimos Usuários */}
-        <Grid item xs={12} md={6}>
-          <Paper>
-            <Box p={2} display="flex" justifyContent="space-between" alignItems="center">
-              <Typography variant="h6">Últimos Usuários</Typography>
-              <IconButton size="small" onClick={loadStats} disabled={loading}>
-                <RefreshIcon />
-              </IconButton>
-            </Box>
-            <Divider />
-            {loading ? (
-              <Box p={2}>
-                <LinearProgress />
-              </Box>
-            ) : (
-              <List>
-                {stats?.ultimosUsuarios.length ? (
-                  stats.ultimosUsuarios.map((usuario) => (
-                    <div key={usuario.id}>
-                      <ListItem>
-                        <ListItemAvatar>
-                          <Avatar>
-                            {usuario.nome.charAt(0).toUpperCase()}
-                          </Avatar>
-                        </ListItemAvatar>
-                        <ListItemText
-                          primary={usuario.nome}
-                          secondary={`Último acesso: ${
-                            usuario.ultimoAcesso 
-                              ? new Date(usuario.ultimoAcesso).toLocaleString() 
-                              : 'Nunca acessou'
-                          }`}
-                        />
-                      </ListItem>
-                      <Divider variant="inset" component="li" />
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          {/* Últimos Usuários */}
+          <motion.div 
+            className="lg:col-span-7"
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.5 }}
+          >
+            <Card className="overflow-hidden h-full">
+              <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-600 rounded-lg text-white">
+                    <UserPlus size={18} />
+                  </div>
+                  <h2 className="text-lg font-bold text-slate-800">Últimos Usuários</h2>
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={loadStats} 
+                  disabled={loading}
+                  className="bg-white"
+                >
+                  <RefreshCw size={14} className={cn("mr-2", loading && "animate-spin")} />
+                  Atualizar
+                </Button>
+              </div>
+              
+              <div className="max-h-[450px] overflow-auto">
+                {loading ? (
+                  <div className="p-8 text-center space-y-4">
+                    <div className="flex justify-center">
+                      <RefreshCw size={32} className="text-blue-500 animate-spin" />
                     </div>
-                  ))
+                    <p className="text-slate-500 font-medium">Carregando usuários...</p>
+                  </div>
                 ) : (
-                  <Box p={2} textAlign="center">
-                    <Typography color="textSecondary">Nenhum usuário encontrado</Typography>
-                  </Box>
+                  <div className="divide-y divide-slate-50">
+                    <AnimatePresence>
+                      {stats?.ultimosUsuarios.length ? (
+                        stats.ultimosUsuarios.map((usuario, index) => (
+                          <motion.div
+                            key={usuario.id}
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.1 * index }}
+                            className="p-4 hover:bg-slate-50 transition-colors flex items-center justify-between group"
+                          >
+                            <div className="flex items-center gap-4">
+                              <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-lg border border-blue-100">
+                                {usuario.nome.charAt(0).toUpperCase()}
+                              </div>
+                              <div className="space-y-0.5">
+                                <h4 className="font-bold text-slate-800 group-hover:text-blue-600 transition-colors">
+                                  {usuario.nome}
+                                </h4>
+                                <div className="flex items-center gap-1.5 text-slate-400">
+                                  <Clock size={12} />
+                                  <span className="text-xs">
+                                    {usuario.ultimoAcesso 
+                                      ? `Acesso em ${new Date(usuario.ultimoAcesso).toLocaleString()}` 
+                                      : 'Sem acessos registrados'}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                            <button className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all md:opacity-0 md:group-hover:opacity-100 opacity-100">
+                              <ChevronRight size={18} />
+                            </button>
+                          </motion.div>
+                        ))
+                      ) : (
+                        <div className="p-16 text-center space-y-4">
+                          <div className="flex justify-center opacity-20">
+                            <Users size={64} />
+                          </div>
+                          <p className="text-slate-400 font-medium">Nenhum usuário encontrado</p>
+                        </div>
+                      )}
+                    </AnimatePresence>
+                  </div>
                 )}
-              </List>
-            )}
-          </Paper>
-        </Grid>
+              </div>
+            </Card>
+          </motion.div>
 
-        {/* Atividades Recentes */}
-        <Grid item xs={12} md={6}>
-          <Paper>
-            <Box p={2}>
-              <Typography variant="h6">Atividades Recentes</Typography>
-            </Box>
-            <Divider />
-            <Box p={2}>
-              <Typography color="textSecondary" align="center" sx={{ my: 4 }}>
-                Em breve: Atividades recentes do sistema
-              </Typography>
-            </Box>
-          </Paper>
-        </Grid>
-      </Grid>
-    </AdminLayout>
+          {/* Atividades Recentes */}
+          <motion.div 
+            className="lg:col-span-5"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.6 }}
+          >
+            <Card className="h-full overflow-hidden flex flex-col">
+              <div className="p-6 border-b border-slate-100 bg-slate-50/50">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-indigo-600 rounded-lg text-white">
+                    <Activity size={18} />
+                  </div>
+                  <h2 className="text-lg font-bold text-slate-800">Atividades do Sistema</h2>
+                </div>
+              </div>
+              <div className="flex-1 flex flex-col items-center justify-center p-8 text-center space-y-4 bg-white">
+                <div className="w-20 h-20 rounded-full bg-slate-50 flex items-center justify-center border border-slate-100">
+                  <Clock size={32} className="text-slate-300" />
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-xl font-bold text-slate-700">Em Breve</h3>
+                  <p className="text-slate-500 text-sm max-w-[280px] leading-relaxed">
+                    O registro detalhado de atividades e logs do sistema será exibido aqui em uma atualização futura.
+                  </p>
+                </div>
+                <div className="pt-4 w-full">
+                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 text-left">
+                    <div className="flex items-center justify-between mb-4">
+                      <h4 className="text-sm font-bold text-slate-700">Integração Externa</h4>
+                      {loadingHealth ? (
+                        <RefreshCw size={14} className="animate-spin text-blue-500" />
+                      ) : (
+                        <div className={cn(
+                          "w-2 h-2 rounded-full",
+                          health?.api_online ? "bg-green-500 animate-pulse" : "bg-red-500"
+                        )} />
+                      )}
+                    </div>
+
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-slate-500">Servidor API:</span>
+                        <span className={cn(
+                          "font-bold",
+                          health?.api_online ? "text-green-600" : "text-red-600"
+                        )}>
+                          {health?.api_online ? 'ONLINE' : 'OFFLINE'}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-slate-500">Credenciais:</span>
+                        <span className={cn(
+                          "font-bold",
+                          health?.credentials_configured ? "text-green-600" : "text-amber-600"
+                        )}>
+                          {health?.credentials_configured ? 'CONFIGURADAS' : 'AUSENTES'}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-slate-500">Banco de Dados:</span>
+                        <span className={cn(
+                          "font-bold",
+                          health?.database_connected ? "text-green-600" : "text-red-600"
+                        )}>
+                          {health?.database_connected ? 'CONECTADO' : 'DESCONECTADO'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {!health?.credentials_configured && (
+                      <div className="mt-4 p-3 rounded-xl bg-amber-50 border border-amber-100 flex gap-2">
+                        <AlertCircle size={14} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                        <p className="text-[10px] text-amber-700 leading-tight">
+                          Configure <strong>API_EXTERNA_USERNAME</strong> e <strong>API_EXTERNA_PASSWORD</strong> no arquivo .env para ativar a sincronização.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="pt-6">
+                  <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-50 text-amber-700 rounded-full text-[10px] font-bold uppercase tracking-wider border border-amber-100">
+                    <AlertCircle size={12} />
+                    Funcionalidade em desenvolvimento
+                  </div>
+                </div>
+              </div>
+            </Card>
+          </motion.div>
+        </div>
+      </div>
+    </AppLayout>
   );
 }
 
@@ -223,3 +354,5 @@ export default function AdminDashboard() {
     </AdminRoute>
   );
 }
+
+(AdminDashboard as any).usesAppLayout = true;

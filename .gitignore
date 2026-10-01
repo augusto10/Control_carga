@@ -20,10 +20,38 @@ node_modules/
 # Build
 dist/
 out/
+tsconfig.tsbuildinfo
 
 # Testes
 coverage/
+test-*.js
+test-*.ts
+*test*.js
+*test*.ts
+!tests/pedido-pendencias.test.ts
+!tests/pedido-cards.test.ts
+create-test-*.js
+scripts/teste-*.ts
+scripts/test-*.js
+scripts/test-*.ts
+components/*Test*.tsx
+pages/teste-*.tsx
+prisma/test-*.sql
+
+# Exceções para integração API externa
+!services/api-externa*.ts
+!services/api-externa*.js
 
 # Outros
 *.swp
 *.swo
+.vercel
+.kilo/
+.kilocode/
+data/
+!src/data/
+!src/data/products-maxima.json
+!src/data/products-maxima-meta.json
+nul
+map-api.js
+scripts/output*.json
