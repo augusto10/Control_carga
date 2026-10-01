@@ -3,7 +3,7 @@ import { apiExternaService } from '@/services/api-externa';
 import { getPedidosDashboard } from '@/lib/dashboard-external-cache';
 import { montarDashboardPorSnapshot } from '@/lib/logistica-snapshot';
 import { codigoAdmDoProduto } from '@/lib/pedido-pendencias';
-import { getLabelProductAdmById } from '@/lib/label-products-catalog';
+import { getLabelProductAdmById, getLabelProductBrandById } from '@/lib/label-products-catalog';
 import { buscarPrazoDaRota, type RotaPrazoEntrega } from '@/lib/rota-prazo-entrega';
 import prisma from '@/lib/prisma';
 
@@ -14,6 +14,8 @@ const DASHBOARD_STALE_TTL_MS = 60 * 60_000;
 const DASHBOARD_EXTERNAL_TIMEOUT_MS = 15_000;
 const DASHBOARD_ENRICH_CONCURRENCY = 20;
 const MAX_LOGISTICA_LOOKUPS_PER_REQUEST = 40;
+const MAX_ROUTE_ADDRESS_LOOKUPS_PER_REQUEST = 200;
+const ROUTE_ADDRESS_LOOKUP_CONCURRENCY = 8;
 const DASHBOARD_ADDRESS_CACHE_TTL_MS = 10 * 60_000;
 const dashboardAddressCache = new Map<number, {
   expiresAt: number;
@@ -64,6 +66,7 @@ type DashboardPedidoItem = {
   produtosPendentes: {
     produtoId: number | null;
     codigo: string | null;
+    marca: string | null;
     nome: string;
     quantidade: number;
   }[];
@@ -116,8 +119,12 @@ const aplicarPrazosDaTabelaDeRotas = async (dashboard: DashboardResponse): Promi
     'ALERTAS_NAO_ENTREGUES',
   ]);
   const pedidosPorId = new Map<number, DashboardPedidoItem>();
-  dashboard.indicadores
-    .filter((indicador) => statusComPrazoDeRota.has(indicador.codigo))
+  const indicadoresComPrazo = dashboard.indicadores.filter((indicador) => statusComPrazoDeRota.has(indicador.codigo));
+  const indicadoresPrioritarios = [
+    ...indicadoresComPrazo.filter((indicador) => indicador.codigo === 'ALERTAS_NAO_ENTREGUES'),
+    ...indicadoresComPrazo.filter((indicador) => indicador.codigo !== 'ALERTAS_NAO_ENTREGUES'),
+  ];
+  indicadoresPrioritarios
     .flatMap((indicador) => indicador.pedidos)
     .forEach((pedido) => {
       const atual = pedidosPorId.get(pedido.pedidoId);
@@ -144,23 +151,53 @@ const aplicarPrazosDaTabelaDeRotas = async (dashboard: DashboardResponse): Promi
   const pedidosSemRota = pedidosComPrazoDeRota
     .filter((pedido) => !buscarPrazoDaRota({ ...pedido, ...enderecosConsultados.get(pedido.pedidoId) }, rotas))
     .filter((pedido) => !enderecosConsultados.has(pedido.pedidoId))
-    .slice(0, MAX_LOGISTICA_LOOKUPS_PER_REQUEST);
+    .slice(0, MAX_ROUTE_ADDRESS_LOOKUPS_PER_REQUEST);
   const username = process.env.API_EXTERNA_USERNAME;
   const password = process.env.API_EXTERNA_PASSWORD;
 
   if (rotas.length && username && password && pedidosSemRota.length) {
-    const resultados = await mapWithConcurrency(pedidosSemRota, 4, async (pedido) => {
+    const resultados = await mapWithConcurrency(pedidosSemRota, ROUTE_ADDRESS_LOOKUP_CONCURRENCY, async (pedido) => {
       try {
-        const detalhe = await apiExternaService.buscarPedidoPorId(String(pedido.pedidoId), username, password);
+        const [detalhe, logistica] = await Promise.all([
+          apiExternaService.buscarPedidoPorId(String(pedido.pedidoId), username, password),
+          getPedidoLogisticaCached(pedido.pedidoId, username, password),
+        ]);
         const dados = ((detalhe as Record<string, unknown> | null)?.pedido ||
           (detalhe as Record<string, unknown> | null)?.data ||
           detalhe || {}) as Record<string, unknown>;
+        const pedidoLogistica = (logistica?.pedido || {}) as Record<string, unknown>;
+        const notaLogistica = Array.isArray(logistica?.notas_fiscais) ? logistica.notas_fiscais[0] || {} : {};
 
         return {
           pedidoId: pedido.pedidoId,
-          bairro: pickString(dados.BAIRRO_ENTREGA_NOME, dados.NOME_BAIRRO_NOTA, dados.BAIRRO, dados.bairro),
-          cidade: pickString(dados.CIDADE_ENTREGA_NOME, dados.NOME_CIDADE, dados.CIDADE, dados.cidade),
-          uf: pickString(dados.UF_ENTREGA, dados.ESTADO_DESTINO, dados.UF, dados.uf),
+          bairro: pickString(
+            dados.BAIRRO_ENTREGA_NOME,
+            dados.NOME_BAIRRO_NOTA,
+            dados.BAIRRO,
+            dados.bairro,
+            pedidoLogistica.BAIRRO_ENTREGA_NOME,
+            pedidoLogistica.BAIRRO_CADASTRO_NOME,
+            notaLogistica.NOME_BAIRRO_NOTA
+          ),
+          cidade: pickString(
+            dados.CIDADE_ENTREGA_NOME,
+            dados.NOME_CIDADE,
+            dados.CIDADE,
+            dados.cidade,
+            pedidoLogistica.CIDADE_ENTREGA_NOME,
+            pedidoLogistica.CIDADE_CADASTRO_NOME,
+            notaLogistica.NOME_CIDADE
+          ),
+          uf: pickString(
+            dados.UF_ENTREGA,
+            dados.ESTADO_DESTINO,
+            dados.UF,
+            dados.uf,
+            pedidoLogistica.UF_ENTREGA,
+            pedidoLogistica.ESTADO_ENTREGA_ID,
+            pedidoLogistica.UF_CADASTRO,
+            notaLogistica.ESTADO_DESTINO
+          ),
         };
       } catch {
         return { pedidoId: pedido.pedidoId, bairro: null, cidade: null, uf: null };
@@ -199,7 +236,7 @@ const aplicarPrazosDaTabelaDeRotas = async (dashboard: DashboardResponse): Promi
 const STATUS_META: Record<StatusCode, Omit<DashboardStatusItem, 'total' | 'pedidos'>> = {
   PEDIDO_NOVO: {
     codigo: 'PEDIDO_NOVO',
-    titulo: 'PEDIDOS PARA SEPARAÇÃO',
+    titulo: 'PEDIDOS NOVOS AGUARDANDO SEPARAÇÃO',
     descricao: 'Status da separacao de pendencias: ABERTO',
     statusSeparacao: 'ABERTO',
   },
@@ -253,7 +290,7 @@ const STATUS_META: Record<StatusCode, Omit<DashboardStatusItem, 'total' | 'pedid
   },
   ALERTAS_NAO_ENTREGUES: {
     codigo: 'ALERTAS_NAO_ENTREGUES',
-    titulo: 'ALERTAS: NÃO ENTREGUES',
+    titulo: 'NÃO FORAM ENTREGUES',
     descricao: 'Pedidos embarcados no controle mas ainda não entregues recebidos em dias anteriores',
     statusSeparacao: 'ALERTA_NAO_ENTREGUE',
   },
@@ -816,7 +853,7 @@ const getProdutosPendentes = (logistica: Record<string, any> | null, statusSepar
 };
 
 const agruparProdutosPendentes = (itens: Record<string, any>[]) => {
-  const agrupados = new Map<string, { produtoId: number | null; codigo: string | null; nome: string; quantidade: number }>();
+  const agrupados = new Map<string, { produtoId: number | null; codigo: string | null; marca: string | null; nome: string; quantidade: number }>();
 
   for (const item of itens as Record<string, any>[]) {
     const quantidade =
@@ -832,11 +869,12 @@ const agruparProdutosPendentes = (itens: Record<string, any>[]) => {
 
     const produtoId = toNumber(item.PRODUTO_ID);
     const codigo = getLabelProductAdmById(produtoId) || codigoAdmDoProduto(item) || toStringValue(item.CODIGO_ORIGINAL) || toStringValue(item.CODIGO_BARRAS);
+    const marca = getLabelProductBrandById(produtoId);
     const nome = toStringValue(item.PRODUTO_NOME) || 'Produto nao informado';
     const chave = String(produtoId ?? codigo ?? nome);
     const atual = agrupados.get(chave);
     if (atual) atual.quantidade += quantidade;
-    else agrupados.set(chave, { produtoId, codigo, nome, quantidade });
+    else agrupados.set(chave, { produtoId, codigo, marca, nome, quantidade });
   }
 
   return Array.from(agrupados.values()).sort((a, b) => a.nome.localeCompare(b.nome));
@@ -1312,11 +1350,6 @@ export default async function handler(
         continue;
       }
 
-      const notaConfirmada =
-        deriveDashboardStatus(notaExterna, (notaExterna.status_logistico || {}) as Record<string, unknown>, {}) ===
-        'PEDIDO_EMBARCADO';
-      if (!notaConfirmada) continue;
-
       if (dashboardPedidoIds.has(pedidoId)) {
         pedidosEmbarcadosPorNota.add(pedidoId);
       }
@@ -1412,11 +1445,14 @@ export default async function handler(
             return null;
           }
 
-          if (!isPedidoPermitidoNoDashboard(pedido, logistica, !tipoEntregaLista && !tipoEntregaInicial)) {
+          const possuiPendencia = isPedidoComPendencias(pedido, logistica);
+          if (
+            !isPedidoPermitidoNoDashboard(pedido, logistica, !tipoEntregaLista && !tipoEntregaInicial) &&
+            !possuiPendencia
+          ) {
             return null;
           }
 
-          const possuiPendencia = isPedidoComPendencias(pedido, logistica);
           const statusCodigo = statusCodigoBase;
           const statusSeparacaoAtual = STATUS_META[statusCodigo].statusSeparacao;
           let referenciaNota = notaPorPedido.get(pedidoId) || null;
@@ -1522,7 +1558,17 @@ export default async function handler(
           };
 
           const elegivelParaAlerta = isPedidoParaAlerta(pedido, logistica);
-          const alertaStatus = elegivelParaAlerta
+          const separacaoConferidaSemManifesto =
+            statusCodigo === 'PEDIDO_SEPARADO' &&
+            hasStatusSeparacao(pedido, 'G') &&
+            !embarcadoNoControle;
+          const statusApiPedido = toStringValue(statusLogistico.codigo)?.toUpperCase();
+          const statusSeparacaoExplicito = hasStatusSeparacao(pedido, 'E') || hasStatusSeparacao(pedido, 'G');
+          const statusEmbarcadoSemManifesto =
+            statusApiPedido === 'PEDIDO_EMBARCADO' &&
+            !embarcadoNoControle &&
+            !statusSeparacaoExplicito;
+          const alertaStatus = elegivelParaAlerta && !separacaoConferidaSemManifesto && !statusEmbarcadoSemManifesto
             ? deriveAlertaStatus(statusCodigo, possuiPendencia, embarcadoNoControle)
             : null;
 
@@ -1569,18 +1615,7 @@ export default async function handler(
 
     const pendenciaPorPedido = new Map<number, DashboardPedidoItem>();
     for (const entry of [...entradasPendenciasGlobais, ...entradasValidas]) {
-      if (
-        !entry.possuiPendencia ||
-        !isPedidoPermitidoNoDashboard(
-          {
-            tipo_entrega: entry.item.tipoEntrega,
-            TIPO_ENTREGA: entry.item.tipoEntrega,
-          },
-          undefined
-        )
-      ) {
-        continue;
-      }
+      if (!entry.possuiPendencia) continue;
       if (!pendenciaPorPedido.has(entry.item.pedidoId)) {
         pendenciaPorPedido.set(entry.item.pedidoId, {
           ...entry.item,
@@ -1624,7 +1659,7 @@ export default async function handler(
       ...embarcadosLocaisEntries,
       ...alertaEntries,
     ].filter((entry) =>
-      isPedidoPermitidoNoDashboard(
+      entry.statusCodigo === 'PENDENCIAS' || isPedidoPermitidoNoDashboard(
         {
           tipo_entrega: entry.item.tipoEntrega,
           TIPO_ENTREGA: entry.item.tipoEntrega,

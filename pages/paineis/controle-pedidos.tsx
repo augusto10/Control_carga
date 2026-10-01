@@ -1,4 +1,5 @@
 import { useCurrentDashboard } from '@/hooks/useCurrentDashboard';
+import { prazoDaRotaForaDoPrazo } from '@/lib/rota-prazo-entrega';
 import { useCallback, useEffect, useState, useRef } from 'react';
 import { Loader2 } from 'lucide-react';
 import { ExpedicaoCards } from '@/components/dashboard/ExpedicaoCards';
@@ -33,8 +34,11 @@ type DashboardItem = {
     chaveNfe?: string | null;
     numeroNota?: string | null;
     transportadoraNome?: string | null;
+    dataHoraRecebimento?: string | null;
+    dataHoraControle?: string | null;
+    prazoEntregaRota?: string | null;
     totalItensPendentes: number;
-    produtosPendentes?: Array<{ nome: string; quantidade: number }>;
+    produtosPendentes?: Array<{ produtoId?: number | null; codigo?: string | null; nome: string; quantidade: number }>;
   }>;
 };
 
@@ -107,7 +111,7 @@ const getDashboardQueries = () => {
 const PAINEL_AUTO_REFRESH_INTERVAL_MS = 3 * 60_000;
 const DASHBOARD_LOCAL_CACHE_KEY = 'dashboard-logistica-cache-v11';
 // Os alertas precisam iniciar sem a lista salva antes da validacao direta no ERP.
-const DASHBOARD_ALERTAS_LOCAL_CACHE_KEY = 'dashboard-logistica-alertas-cache-v14';
+const DASHBOARD_ALERTAS_LOCAL_CACHE_KEY = 'dashboard-logistica-alertas-cache-v16';
 
 const isDashboardFallbackVazio = (data: DashboardResponse) =>
   Boolean(data.warning) &&
@@ -245,17 +249,27 @@ export default function ControlePedidosPainel() {
   const getTotal = (codigo: StatusCode) =>
     dashboard.indicadores.find((item) => item.codigo === codigo)?.total || 0;
   const stageCards = [
-    { codigo: 'PEDIDO_NOVO' as StatusCode, titulo: 'PEDIDOS NOVOS', icon: Package },
+    { codigo: 'PEDIDO_NOVO' as StatusCode, titulo: 'PEDIDOS NOVOS AGUARDANDO SEPARAÇÃO', icon: Package },
     { codigo: 'PEDIDO_EM_SEPARACAO' as StatusCode, titulo: 'PEDIDOS EM SEPARAÇÃO', icon: ClipboardList },
     { codigo: 'PEDIDO_SEPARADO' as StatusCode, titulo: 'PEDIDOS SEPARADOS AGUARDANDO CONFERÊNCIA', icon: PackageCheck },
     { codigo: 'PEDIDO_EMBARCADO' as StatusCode, titulo: 'PEDIDOS CONFERIDOS', icon: UserCheck },
     { codigo: 'PEDIDOS_EMBARCADOS' as StatusCode, titulo: 'PEDIDOS EMBARCADOS', icon: PackageCheck },
   ];
+  const filtrarPrazoEntrega = (codigo: StatusCode, pedidos: NonNullable<DashboardItem['pedidos']>) =>
+    codigo === 'ALERTAS_NAO_ENTREGUES'
+      ? pedidos.filter((pedido) => prazoDaRotaForaDoPrazo({
+          dataBase: pedido.dataHoraControle || pedido.dataHoraRecebimento,
+          prazo: pedido.prazoEntregaRota,
+        }))
+      : pedidos;
   const getTotalAlerta = (codigo: StatusCode) =>
-    getPedidosEntrega(dashboardAlertas.indicadores.find((item) => item.codigo === codigo)).length;
+    filtrarPrazoEntrega(
+      codigo,
+      getPedidosEntrega(dashboardAlertas.indicadores.find((item) => item.codigo === codigo))
+    ).length;
   const pedidosAlertas = dashboardAlertas.indicadores
     .filter((item) => item.codigo.startsWith('ALERTAS_'))
-    .flatMap((item) => getPedidosEntrega(item));
+    .flatMap((item) => filtrarPrazoEntrega(item.codigo, getPedidosEntrega(item)));
   const totalPedidosAlertas = new Set(pedidosAlertas.map((pedido) => pedido.pedidoId)).size;
   const pendenciasAlertasItem = dashboardAlertas.indicadores.find(
     (item) => item.codigo === 'PENDENCIAS'
