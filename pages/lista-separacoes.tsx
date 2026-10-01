@@ -13,6 +13,7 @@ type PedidoStatus = {
   nomeFantasia?: string | null;
   localNome?: string | null;
   statusCodigo?: string;
+  statusSeparacao?: string | null;
   statusDescricao?: string;
   dataHoraRecebimento?: string | null;
   previsaoEntrega?: string | null;
@@ -130,7 +131,10 @@ function ListaSeparacoesContent() {
         (item) => item.codigo === 'PEDIDO_NOVO'
       );
 
-      setPedidos(indicadorPedidosNovos?.pedidos || []);
+      setPedidos((indicadorPedidosNovos?.pedidos || []).filter((pedido) =>
+        pedido.statusCodigo === 'PEDIDO_NOVO' &&
+        String(pedido.statusSeparacao || '').trim().toUpperCase() === 'ABERTO'
+      ));
     } catch (error: any) {
       setErro(error?.message || 'Falha ao carregar pedidos novos.');
     } finally {
