@@ -5,5 +5,7 @@
 [build.environment]
   NEXT_PUBLIC_API_URL = "https://api.controle-carga.com"
 
-[redirects]
-  /api/* 200
+[[redirects]]
+  from = "/api/*"
+  to = "/api/:splat"
+  status = 200
