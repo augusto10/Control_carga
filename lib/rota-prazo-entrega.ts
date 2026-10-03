@@ -29,6 +29,45 @@ const localDaRota = (codigo: string) => normalizar(codigo)
 const rotaContidaNoDestino = (destino: string, local: string) =>
   Boolean(destino && local && ` ${destino} `.includes(` ${local} `));
 
+const parseDataLocal = (valor?: string | Date | null) => {
+  if (!valor) return null;
+  if (valor instanceof Date) {
+    return Number.isNaN(valor.getTime())
+      ? null
+      : new Date(valor.getFullYear(), valor.getMonth(), valor.getDate());
+  }
+
+  const texto = String(valor).trim();
+  const iso = texto.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  const compacta = texto.match(/^(\d{4})(\d{2})(\d{2})/);
+  const partes = iso || compacta;
+  if (partes) {
+    const data = new Date(Number(partes[1]), Number(partes[2]) - 1, Number(partes[3]));
+    return Number.isNaN(data.getTime()) ? null : data;
+  }
+
+  const data = new Date(texto);
+  return Number.isNaN(data.getTime())
+    ? null
+    : new Date(data.getFullYear(), data.getMonth(), data.getDate());
+};
+
+export function prazoDaRotaForaDoPrazo(input: {
+  dataBase?: string | Date | null;
+  prazo?: string | null;
+  hoje?: Date;
+}): boolean {
+  const prazo = String(input.prazo || '').trim().toUpperCase();
+  const prazoDias = prazo.match(/^D\+(\d+)$/);
+  const dataBase = parseDataLocal(input.dataBase);
+  const dataLimite = prazoDias && dataBase
+    ? new Date(dataBase.getFullYear(), dataBase.getMonth(), dataBase.getDate() + Number(prazoDias[1]))
+    : parseDataLocal(prazo);
+  const hoje = parseDataLocal(input.hoje || new Date());
+
+  return Boolean(dataLimite && hoje && dataLimite.getTime() < hoje.getTime());
+}
+
 export function buscarPrazoDaRota(
   destino: DestinoPedido,
   rotas: RotaPrazoEntrega[]

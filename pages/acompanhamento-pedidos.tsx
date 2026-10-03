@@ -3,7 +3,7 @@ import { resumirPedidosPorStatus } from '@/lib/pedido-resumo-status';
 import { PedidoInformacoes } from '@/components/dashboard/PedidoInformacoes';
 import { ResumoStatusPedidos } from '@/components/dashboard/ResumoStatusPedidos';
 import { saldoPendente, codigoAdmDoProduto } from '@/lib/pedido-pendencias';
-import { getLabelProductAdmById } from '@/lib/label-products-catalog';
+import { getLabelProductAdmById, getLabelProductBrandById } from '@/lib/label-products-catalog';
 import { dadosPedido } from '@/lib/pedido-apresentacao';
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useRouter } from 'next/router';
@@ -221,7 +221,7 @@ const STATUS_DEFAULTS: Record<
   Pick<DashboardStatusItem, 'titulo' | 'descricao' | 'statusSeparacao'>
 > = {
   PEDIDO_NOVO: {
-    titulo: 'PEDIDOS PARA SEPARAÇÃO',
+    titulo: 'PEDIDOS NOVOS AGUARDANDO SEPARAÇÃO',
     descricao: 'Status da separacao de pendencias: ABERTO',
     statusSeparacao: 'ABERTO',
   },
@@ -266,7 +266,7 @@ const STATUS_DEFAULTS: Record<
     statusSeparacao: 'ALERTA_NAO_EMBARCADO',
   },
   ALERTAS_NAO_ENTREGUES: {
-    titulo: 'ATRASADOS: NÃO ENTREGUES',
+    titulo: 'NÃO FORAM ENTREGUES',
     descricao: 'Pedidos embarcados mas sem confirmação de entrega',
     statusSeparacao: 'ALERTA_NAO_ENTREGUE',
   },
@@ -838,7 +838,7 @@ function Home() {
     {
       id: 'PEDIDO_NOVO_CARD',
       codigo: 'PEDIDO_NOVO' as StatusCode,
-      titulo: 'PEDIDOS NOVOS',
+      titulo: 'PEDIDOS NOVOS AGUARDANDO SEPARAÇÃO',
       descricao: 'Pedidos recebidos e prontos para iniciar a separacao.',
       color: 'from-[#3d8df0] via-[#2472d8] to-[#1b5cb6]',
       icon: Package,
@@ -1166,7 +1166,11 @@ function Home() {
                             </div>
 
                             <p className="mt-2 text-[11px] text-slate-500">Recebimento: <strong>{formatDateTime(pedido.dataHoraRecebimento)}</strong></p>
-                            <PedidoInformacoes pedido={pedido} carregarDetalhe={fetchPedidoDetalhe} />
+                            <PedidoInformacoes
+                              pedido={pedido}
+                              carregarDetalhe={fetchPedidoDetalhe}
+                              ocultarNomeSeparador={pedido.statusCodigo === 'ALERTAS_NAO_SEPARADOS'}
+                            />
                             <div className="mt-3 flex items-center justify-end gap-1 text-xs font-medium text-primary">
                               Ver detalhes <ClipboardList className="h-3.5 w-3.5" />
                             </div>
@@ -1181,8 +1185,15 @@ function Home() {
                                         key={`${pedido.pedidoId}-${produto.produtoId ?? produto.codigo ?? produto.nome}`}
                                         className="flex items-center justify-between gap-3"
                                       >
-                                        <span className="truncate">
-                                          {produto.codigo ? `${produto.codigo} - ` : ''}{produto.nome}
+                                        <span className="min-w-0">
+                                          <span className="block truncate">
+                                            {produto.codigo ? `${produto.codigo} - ` : ''}{produto.nome}
+                                          </span>
+                                          {getLabelProductBrandById(produto.produtoId) && (
+                                            <span className="block text-[10px] text-amber-700">
+                                              Marca: {getLabelProductBrandById(produto.produtoId)}
+                                            </span>
+                                          )}
                                         </span>
                                         <strong className="shrink-0">Qtd. {produto.quantidade}</strong>
                                       </div>
@@ -1776,7 +1787,7 @@ function Home() {
                     { titulo: 'PEDIDOS NÃO SEPARADOS', pedidos: listaPedidos.pedidos.filter((pedido) => pedido.statusCodigo === 'ALERTAS_NAO_SEPARADOS') },
                     { titulo: 'PEDIDOS SEPARADOS E NÃO CONFERIDOS', pedidos: listaPedidos.pedidos.filter((pedido) => pedido.statusCodigo === 'ALERTAS_NAO_CONFERIDOS') },
                     { titulo: 'PEDIDOS NÃO EMBARCADOS', pedidos: listaPedidos.pedidos.filter((pedido) => pedido.statusCodigo === 'ALERTAS_NAO_EMBARCADOS') },
-                    { titulo: 'PEDIDOS NÃO ENTREGUES', pedidos: listaPedidos.pedidos.filter((pedido) => pedido.statusCodigo === 'ALERTAS_NAO_ENTREGUES') },
+                    { titulo: 'NÃO FORAM ENTREGUES', pedidos: listaPedidos.pedidos.filter((pedido) => pedido.statusCodigo === 'ALERTAS_NAO_ENTREGUES') },
                   ] : [{ titulo: '', pedidos: listaPedidos.pedidos }]).map((grupo) => (
                     <div key={grupo.titulo}>
                       {grupo.titulo && <h4 className="bg-slate-100 px-4 py-3 text-sm font-bold text-slate-800">{grupo.pedidos.length > 0 ? `${grupo.pedidos.length} ` : ''}{grupo.titulo}</h4>}
@@ -1821,7 +1832,11 @@ function Home() {
 
                         </div>
 
-                        <PedidoInformacoes pedido={pedido} carregarDetalhe={fetchPedidoDetalhe} />
+                        <PedidoInformacoes
+                          pedido={pedido}
+                          carregarDetalhe={fetchPedidoDetalhe}
+                          ocultarNomeSeparador={pedido.statusCodigo === 'ALERTAS_NAO_SEPARADOS'}
+                        />
 
                         {ehPendencia && pedido.produtosPendentes.length > 0 && (
                           <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">
@@ -1834,8 +1849,15 @@ function Home() {
                                   key={`lista-pendencia-${pedido.pedidoId}-${produto.produtoId ?? produto.codigo ?? produto.nome}`}
                                   className="flex items-start justify-between gap-3"
                                 >
-                                  <span className="min-w-0 truncate">
-                                    {produto.codigo ? `${produto.codigo} - ` : ''}{produto.nome}
+                                  <span className="min-w-0">
+                                    <span className="block truncate">
+                                      {produto.codigo ? `${produto.codigo} - ` : ''}{produto.nome}
+                                    </span>
+                                    {getLabelProductBrandById(produto.produtoId) && (
+                                      <span className="block text-[10px] text-amber-800">
+                                        Marca: {getLabelProductBrandById(produto.produtoId)}
+                                      </span>
+                                    )}
                                   </span>
                                   <strong className="shrink-0">Qtd. {produto.quantidade}</strong>
                                 </div>

@@ -971,9 +971,16 @@ async function findExistingImage(imageDir, order) {
 
 async function writeJsonFileAtomic(filePath, value) {
   const temporaryPath = `${filePath}.${process.pid}.${Date.now()}.${Math.random().toString(16).slice(2)}.tmp`;
-  await fs.writeFile(temporaryPath, `${JSON.stringify(value, null, 2)}\n`);
-  await fs.copyFile(temporaryPath, filePath);
-  await fs.rm(temporaryPath, { force: true });
+  const serialized = `${JSON.stringify(value, null, 2)}\n`;
+  await fs.writeFile(temporaryPath, serialized);
+  try {
+    await fs.rename(temporaryPath, filePath);
+  } catch (error) {
+    const code = error && typeof error === 'object' ? error.code : null;
+    if (process.platform !== 'win32' || !['EPERM', 'EACCES', 'UNKNOWN'].includes(code)) throw error;
+    await fs.writeFile(filePath, serialized);
+    await fs.rm(temporaryPath, { force: true });
+  }
 }
 
 async function writeTextFileAtomic(filePath, value) {

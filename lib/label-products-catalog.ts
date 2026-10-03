@@ -55,6 +55,9 @@ export function getLabelProductsCatalogInfo() {
 
 /** Map de id (=PRODUTO_ID do ERP) para codigoAdm, para lookup rápido nos itens de pedido. */
 const admById = new Map<string, string>(products.map((p) => [String(p.id), p.codigoAdm]));
+const brandById = new Map<string, string>(
+  products.flatMap((product) => product.marca ? [[String(product.id), product.marca] as const] : [])
+);
 
 /**
  * Retorna o Código ADM do produto dado seu ID (PRODUTO_ID do ERP).
@@ -63,4 +66,9 @@ const admById = new Map<string, string>(products.map((p) => [String(p.id), p.cod
 export function getLabelProductAdmById(produtoId: string | number | null | undefined): string | null {
   if (produtoId === null || produtoId === undefined) return null;
   return admById.get(String(produtoId)) ?? null;
+}
+
+export function getLabelProductBrandById(produtoId: string | number | null | undefined): string | null {
+  if (produtoId === null || produtoId === undefined) return null;
+  return brandById.get(String(produtoId)) ?? null;
 }
