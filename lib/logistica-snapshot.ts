@@ -1,7 +1,7 @@
 import { buscarEmbarquesAtuais } from '@/lib/pedido-embarques-atuais';
 import { dadosPedido } from '@/lib/pedido-apresentacao';
 import { saldoPendente, itensComSaldoPendente, pedidoTemDevolucao, pedidoTemEntregaGerada, codigoAdmDoProduto } from '@/lib/pedido-pendencias';
-import { getLabelProductAdmById } from '@/lib/label-products-catalog';
+import { getLabelProductAdmById, getLabelProductBrandById } from '@/lib/label-products-catalog';
 import type { Prisma } from '@prisma/client';
 import prisma from '@/lib/prisma';
 import { apiExternaService } from '@/services/api-externa';
@@ -52,6 +52,7 @@ type DashboardPedidoItem = {
   produtosPendentes: {
     produtoId: number | null;
     codigo: string | null;
+    marca: string | null;
     nome: string;
     quantidade: number;
   }[];
@@ -60,7 +61,7 @@ type DashboardPedidoItem = {
 const STATUS_META: Record<StatusCode, { codigo: StatusCode; titulo: string; descricao: string; statusSeparacao: string }> = {
   PEDIDO_NOVO: {
     codigo: 'PEDIDO_NOVO',
-    titulo: 'PEDIDOS PARA SEPARACAO',
+    titulo: 'PEDIDOS NOVOS AGUARDANDO SEPARAÇÃO',
     descricao: 'Status da separacao de pendencias: ABERTO',
     statusSeparacao: 'ABERTO',
   },
@@ -114,7 +115,7 @@ const STATUS_META: Record<StatusCode, { codigo: StatusCode; titulo: string; desc
   },
   ALERTAS_NAO_ENTREGUES: {
     codigo: 'ALERTAS_NAO_ENTREGUES',
-    titulo: 'PEDIDOS ATRASADOS: NÃO ENTREGUES',
+    titulo: 'NÃO FORAM ENTREGUES',
     descricao: 'Pedidos embarcados aguardando confirmação de entrega',
     statusSeparacao: 'ALERTA_NAO_ENTREGUE',
   },
@@ -345,7 +346,7 @@ const hasStatusSeparacao = (pedido: Record<string, unknown>, status: string) => 
 };
 
 const agruparProdutosPendentes = (itens: Record<string, any>[]) => {
-  const agrupados = new Map<string, { produtoId: number | null; codigo: string | null; nome: string; quantidade: number }>();
+  const agrupados = new Map<string, { produtoId: number | null; codigo: string | null; marca: string | null; nome: string; quantidade: number }>();
 
   for (const item of itens) {
     const quantidade = saldoPendente(item);
@@ -353,11 +354,12 @@ const agruparProdutosPendentes = (itens: Record<string, any>[]) => {
 
     const produtoId = toNumber(item.PRODUTO_ID ?? item.produto_id);
     const codigo = getLabelProductAdmById(produtoId) || codigoAdmDoProduto(item) || (produtoId ? String(produtoId) : null);
+    const marca = getLabelProductBrandById(produtoId);
     const nome = toStringValue(item.PRODUTO_NOME) || 'Produto nao informado';
     const chave = String(produtoId ?? codigo ?? nome);
     const atual = agrupados.get(chave);
     if (atual) atual.quantidade += quantidade;
-    else agrupados.set(chave, { produtoId, codigo, nome, quantidade });
+    else agrupados.set(chave, { produtoId, codigo, marca, nome, quantidade });
   }
 
   return Array.from(agrupados.values()).sort((a, b) => a.nome.localeCompare(b.nome));
@@ -442,7 +444,10 @@ const isPedidoComPendencias = (pedido: Record<string, unknown>, logistica: Recor
     ultimoStatusSeparacao === 'PENDENCIA' ||
     statusSeparacoes.includes('PENDENCIA');
 
-  return possuiIndicadorDePendencia && possuiSeparacaoEfetivada && pedidoTemEntregaGerada(pedido, logistica);
+  const tipoEntrega = getTipoEntregaPrincipal(pedido, logistica);
+  const ehRetirada = ['ATO', 'NDF', 'RDL', 'RLR'].includes(String(tipoEntrega || '').toUpperCase()) ||
+    isRetiradaConfirmada(pedido) || contemTipoRetirada(pedido) || contemTipoRetirada(logistica);
+  return possuiIndicadorDePendencia && possuiSeparacaoEfetivada && (ehRetirada || pedidoTemEntregaGerada(pedido, logistica));
 };
 
 const isPedidoEntregue = (logistica: Record<string, any> | null) => {
@@ -737,7 +742,10 @@ export async function sincronizarLogisticaSnapshot(options: {
         pedido = { ...pedido, tipo_entrega: tipoEntregaLista, TIPO_ENTREGA: tipoEntregaLista };
       }
 
-      if (!isPedidoPermitidoNoDashboard(pedido, logistica, pedido.__origemDashboardLogistica === true)) return null;
+      if (
+        !isPedidoPermitidoNoDashboard(pedido, logistica, pedido.__origemDashboardLogistica === true) &&
+        !isPedidoComPendencias(pedido, logistica)
+      ) return null;
 
       const statusLogistico = ((pedido.status_logistico || {}) as Record<string, unknown>) || {};
       const statusCodigoBase = deriveDashboardStatus(pedido, statusLogistico, logistica);
@@ -969,7 +977,7 @@ export async function montarDashboardPorSnapshot(
     const ehRetirada = ['ATO', 'NDF', 'RDL', 'RLR'].includes(tipoEntrega) || isRetiradaConfirmada(rawPedido) || contemTipoRetirada(rawPedido);
     const ehEntrega = ['ENT', 'EPG'].includes(tipoEntrega);
     if (ehRetirada) totalRetirados += 1;
-    if (!ehEntrega) continue;
+    if (!ehEntrega && !ehRetirada) continue;
 
     const statusBase = STATUS_ORDER.includes(snapshot.statusCodigo as StatusCode)
       ? (snapshot.statusCodigo as StatusCode)
@@ -983,7 +991,10 @@ export async function montarDashboardPorSnapshot(
     const possuiProdutosFaltandoApi = possuiProdutosFaltandoNoConsolidado(rawPedido);
     // A flag do ERP basta para o card aparecer: se o detalhe nao trouxe itens,
     // mostramos a quantidade do consolidado em vez de esconder a pendencia.
-    const possuiPendencia = possuiProdutosFaltandoApi && snapshot.possuiPendencia === true;
+    const possuiPendencia = possuiProdutosFaltandoApi && (
+      snapshot.possuiPendencia === true ||
+      (ehRetirada && isPedidoComPendencias(rawPedido, snapshot.rawLogistica))
+    );
     const produtosPendentes = possuiPendencia && Array.isArray(snapshot.produtosPendentes)
       ? snapshot.produtosPendentes
       : [];
@@ -1017,19 +1028,21 @@ export async function montarDashboardPorSnapshot(
       produtosPendentes,
     };
 
-    if (embarcadoNoControle) {
-      entries.push({
-        statusCodigo: 'PEDIDOS_EMBARCADOS',
-        item: {
-          ...itemBase,
+    if (ehEntrega) {
+      if (embarcadoNoControle) {
+        entries.push({
           statusCodigo: 'PEDIDOS_EMBARCADOS',
-          statusDescricao: STATUS_META.PEDIDOS_EMBARCADOS.titulo,
-          statusSeparacao: STATUS_META.PEDIDOS_EMBARCADOS.statusSeparacao,
-          situacaoAtual: STATUS_META.PEDIDOS_EMBARCADOS.titulo,
-        },
-      });
-    } else {
-      entries.push({ statusCodigo: statusBase, item: itemBase });
+          item: {
+            ...itemBase,
+            statusCodigo: 'PEDIDOS_EMBARCADOS',
+            statusDescricao: STATUS_META.PEDIDOS_EMBARCADOS.titulo,
+            statusSeparacao: STATUS_META.PEDIDOS_EMBARCADOS.statusSeparacao,
+            situacaoAtual: STATUS_META.PEDIDOS_EMBARCADOS.titulo,
+          },
+        });
+      } else {
+        entries.push({ statusCodigo: statusBase, item: itemBase });
+      }
     }
 
     if (possuiPendencia) {
@@ -1045,9 +1058,21 @@ export async function montarDashboardPorSnapshot(
       });
     }
 
-    const alertaStatus = isPedidoParaAlerta(snapshot.dataHoraRecebimento, snapshot.rawPedido, snapshot.rawLogistica)
+    const alertaStatusBase = ehEntrega && isPedidoParaAlerta(snapshot.dataHoraRecebimento, snapshot.rawPedido, snapshot.rawLogistica)
       ? deriveAlertaStatus(statusBase, possuiPendencia, embarcadoNoControle)
       : null;
+    const conferenciaGSemManifesto =
+      alertaStatusBase === 'ALERTAS_NAO_CONFERIDOS' &&
+      hasStatusSeparacao(snapshot.rawPedido, 'G') &&
+      !embarcadoNoControle;
+    const statusApiEmbarcadoSemManifesto =
+      snapshot.statusLogisticoCodigo?.toUpperCase() === 'PEDIDO_EMBARCADO' &&
+      !embarcadoNoControle &&
+      !hasStatusSeparacao(snapshot.rawPedido, 'E') &&
+      !hasStatusSeparacao(snapshot.rawPedido, 'G');
+    const alertaStatus = conferenciaGSemManifesto || statusApiEmbarcadoSemManifesto
+      ? null
+      : alertaStatusBase;
     if (alertaStatus) {
       entries.push({
         statusCodigo: alertaStatus,

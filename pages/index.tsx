@@ -3,7 +3,7 @@ import { resumirPedidosPorStatus } from '@/lib/pedido-resumo-status';
 import { PedidoInformacoes } from '@/components/dashboard/PedidoInformacoes';
 import { ResumoStatusPedidos } from '@/components/dashboard/ResumoStatusPedidos';
 import { saldoPendente, itensComSaldoPendente, codigoAdmDoProduto } from '@/lib/pedido-pendencias';
-import { getLabelProductAdmById } from '@/lib/label-products-catalog';
+import { getLabelProductAdmById, getLabelProductBrandById } from '@/lib/label-products-catalog';
 import { dadosPedido } from '@/lib/pedido-apresentacao';
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useRouter } from 'next/router';
@@ -73,6 +73,7 @@ interface DashboardPedidoItem {
   produtosPendentes: {
     produtoId: number | null;
     codigo: string | null;
+    marca?: string | null;
     nome: string;
     quantidade: number;
   }[];
@@ -252,7 +253,7 @@ const STATUS_DEFAULTS: Record<
   Pick<DashboardStatusItem, 'titulo' | 'descricao' | 'statusSeparacao'>
 > = {
   PEDIDO_NOVO: {
-    titulo: 'PEDIDOS PARA SEPARAÇÃO',
+    titulo: 'PEDIDOS NOVOS AGUARDANDO SEPARAÇÃO',
     descricao: 'Status da separacao de pendencias: ABERTO',
     statusSeparacao: 'ABERTO',
   },
@@ -297,7 +298,7 @@ const STATUS_DEFAULTS: Record<
     statusSeparacao: 'ALERTA_NAO_EMBARCADO',
   },
   ALERTAS_NAO_ENTREGUES: {
-    titulo: 'PEDIDOS ATRASADOS: NÃO ENTREGUES',
+    titulo: 'NÃO FORAM ENTREGUES',
     descricao: 'Pedidos embarcados mas sem confirmação de entrega',
     statusSeparacao: 'ALERTA_NAO_ENTREGUE',
   },
@@ -311,9 +312,9 @@ const EMPTY_RESUMO_HOJE: ResumoHojeData = {
 };
 const DASHBOARD_LOCAL_CACHE_KEY = 'dashboard-logistica-cache-v11';
 // Descarta alertas gravados antes da validacao atual no ERP.
-const DASHBOARD_ALERTAS_LOCAL_CACHE_KEY = 'dashboard-logistica-alertas-cache-v14';
+const DASHBOARD_ALERTAS_LOCAL_CACHE_KEY = 'dashboard-logistica-alertas-cache-v16';
 const DASHBOARD_AUTO_REFRESH_INTERVAL_MS = 3 * 60_000;
-const SSW_RESULT_CACHE_TTL_MS = 2 * 60_000;
+const SSW_RESULT_CACHE_TTL_MS = 30 * 60_000;
 const SSW_BACKGROUND_CONCURRENCY = 4;
 const DASHBOARD_LEGACY_CACHE_KEYS = [
   'dashboard-logistica-cache-v3',
@@ -588,7 +589,7 @@ function Home() {
         if (item.codigo !== 'ALERTAS_NAO_ENTREGUES') return item;
         const pedidos = candidatos.filter((pedido) => {
           const resultado = resultadoRecente(pedido);
-          return resultado !== null && !resultado.entregue;
+          return Boolean(resultado && !resultado.entregue);
         });
         return { ...item, pedidos, total: pedidos.length };
       }),
@@ -958,6 +959,7 @@ function Home() {
   };
 
   const abrirListaPedidos = (item: DashboardStatusItem) => {
+    setPrazosRotaConsultados(new Set());
     setListaPedidos({
       codigo: item.codigo,
       titulo: item.titulo,
@@ -968,6 +970,7 @@ function Home() {
 
   const fecharListaPedidos = () => {
     setListaPedidos(null);
+    setPrazosRotaConsultados(new Set());
   };
 
   const fetchPedidoDetalhe = useCallback(async (
@@ -1114,12 +1117,23 @@ function Home() {
   }, [fetchPedidoDetalhe]);
 
   const atualizarPrazoDaLista = useCallback((pedidoId: number, prazoEntregaRota: string | null) => {
-    setListaPedidos((atual) => atual ? {
-      ...atual,
-      pedidos: atual.pedidos.map((pedido) => pedido.pedidoId === pedidoId
-        ? { ...pedido, prazoEntregaRota }
-        : pedido),
-    } : atual);
+    setListaPedidos((atual) => {
+      if (!atual) return atual;
+      const pedido = atual.pedidos.find((item) => item.pedidoId === pedidoId);
+      if (!pedido) return atual;
+
+      const pedidoAtualizado = { ...pedido, prazoEntregaRota };
+      const prazo = calcularPrazoEntregaInfo({
+        dataBase: pedido.dataHoraControle || pedido.dataHoraRecebimento,
+        prazo: prazoEntregaRota,
+      });
+      const somenteAtrasados = atual.codigo === 'ALERTAS_NAO_ENTREGUES';
+      const pedidos = somenteAtrasados && !prazo.foraDoPrazo
+        ? atual.pedidos.filter((item) => item.pedidoId !== pedidoId)
+        : atual.pedidos.map((item) => item.pedidoId === pedidoId ? pedidoAtualizado : item);
+
+      return { ...atual, pedidos };
+    });
     setPrazosRotaConsultados((atuais) => new Set(atuais).add(pedidoId));
   }, []);
 
@@ -1145,6 +1159,7 @@ function Home() {
         return {
           produtoId: typeof item.PRODUTO_ID === 'number' ? item.PRODUTO_ID : null,
           codigo: getLabelProductAdmById(item.PRODUTO_ID) || codigoAdmDoProduto(item) || formatText(item.CODIGO_ORIGINAL, formatText(item.CODIGO_BARRAS, '')),
+          marca: getLabelProductBrandById(item.PRODUTO_ID),
           nome: formatText(item.PRODUTO_NOME, 'Produto nao informado'),
           quantidade: saldo,
         };
@@ -1178,14 +1193,18 @@ function Home() {
     [indicadoresAlertasOrdenados]
   );
   const alertasNaoEntregues = useMemo(
-    () => indicadoresAlertasOrdenados.find((item) => item.codigo === 'ALERTAS_NAO_ENTREGUES')?.pedidos || [],
+    () => (indicadoresAlertasOrdenados.find((item) => item.codigo === 'ALERTAS_NAO_ENTREGUES')?.pedidos || [])
+      .filter((pedido) => calcularPrazoEntregaInfo({
+        dataBase: pedido.dataHoraControle || pedido.dataHoraRecebimento,
+        prazo: pedido.prazoEntregaRota || null,
+      }).foraDoPrazo),
     [indicadoresAlertasOrdenados]
   );
   const cardsHome = useMemo(() => ([
     {
       id: 'PEDIDO_NOVO_CARD',
       codigo: 'PEDIDO_NOVO' as StatusCode,
-      titulo: 'PEDIDOS NOVOS',
+      titulo: 'PEDIDOS NOVOS AGUARDANDO SEPARAÇÃO',
       descricao: 'Pedidos recebidos e prontos para iniciar a separacao.',
       color: 'from-[#3d8df0] via-[#2472d8] to-[#1b5cb6]',
       icon: Package,
@@ -1414,7 +1433,7 @@ function Home() {
               }),
               onNaoEntregueClick: () => abrirListaPedidos({
                 codigo: 'ALERTAS_NAO_ENTREGUES',
-                titulo: 'PEDIDOS NÃO ENTREGUES',
+                titulo: 'NÃO FORAM ENTREGUES',
                 descricao: '',
                 statusSeparacao: 'ALERTAS',
                 total: alertasNaoEntregues.length,
@@ -1685,8 +1704,15 @@ function Home() {
                                         key={`${pedido.pedidoId}-${produto.produtoId ?? produto.codigo ?? produto.nome}`}
                                         className="flex items-center justify-between gap-3"
                                       >
-                                        <span className="truncate">
-                                          {produto.codigo ? `${produto.codigo} - ` : ''}{produto.nome}
+                                        <span className="min-w-0">
+                                          <span className="block truncate">
+                                            {produto.codigo ? `${produto.codigo} - ` : ''}{produto.nome}
+                                          </span>
+                                          {(produto.marca || getLabelProductBrandById(produto.produtoId)) && (
+                                            <span className="block text-[10px] text-amber-700">
+                                              Marca: {produto.marca || getLabelProductBrandById(produto.produtoId)}
+                                            </span>
+                                          )}
                                         </span>
                                         <strong className="shrink-0">Qtd. {produto.quantidade}</strong>
                                       </div>
@@ -1894,8 +1920,15 @@ function Home() {
                                 key={`pendencia-card-${pedido.pedidoId}-${produto.produtoId ?? produto.codigo ?? produto.nome}`}
                                 className="flex items-start justify-between gap-3 text-xs text-red-900"
                               >
-                                <span className="min-w-0 truncate font-medium">
-                                  {produto.codigo ? `${produto.codigo} - ` : ''}{produto.nome}
+                                <span className="min-w-0 font-medium">
+                                  <span className="block truncate">
+                                    {produto.codigo ? `${produto.codigo} - ` : ''}{produto.nome}
+                                  </span>
+                                  {(produto.marca || getLabelProductBrandById(produto.produtoId)) && (
+                                    <span className="block text-[10px] font-normal text-red-700">
+                                      Marca: {produto.marca || getLabelProductBrandById(produto.produtoId)}
+                                    </span>
+                                  )}
                                 </span>
                                 <strong className="shrink-0 rounded-full bg-red-700 px-2 py-0.5 text-[10px] text-white">
                                   Qtd. {produto.quantidade}
@@ -2282,6 +2315,11 @@ function Home() {
                                 {produto.codigo ? `${produto.codigo} - ` : ''}
                                 {produto.nome}
                               </p>
+                              {(produto.marca || getLabelProductBrandById(produto.produtoId)) && (
+                                <p className="mt-1 text-xs font-medium text-red-700">
+                                  Marca: {produto.marca || getLabelProductBrandById(produto.produtoId)}
+                                </p>
+                              )}
                             </div>
                             <strong
                               className={cn(
@@ -2335,7 +2373,7 @@ function Home() {
                     { titulo: 'PEDIDOS NÃO SEPARADOS', pedidos: listaPedidos.pedidos.filter((pedido) => pedido.statusCodigo === 'ALERTAS_NAO_SEPARADOS') },
                     { titulo: 'PEDIDOS SEPARADOS E NÃO CONFERIDOS', pedidos: listaPedidos.pedidos.filter((pedido) => pedido.statusCodigo === 'ALERTAS_NAO_CONFERIDOS') },
                     { titulo: 'PEDIDOS CONFERIDOS E NÃO EMBARCADOS', pedidos: listaPedidos.pedidos.filter((pedido) => pedido.statusCodigo === 'ALERTAS_NAO_EMBARCADOS') },
-                    { titulo: 'PEDIDOS NÃO ENTREGUES', pedidos: listaPedidos.pedidos.filter((pedido) => pedido.statusCodigo === 'ALERTAS_NAO_ENTREGUES') },
+                    { titulo: 'NÃO FORAM ENTREGUES', pedidos: listaPedidos.pedidos.filter((pedido) => pedido.statusCodigo === 'ALERTAS_NAO_ENTREGUES') },
                   ] : [{ titulo: '', pedidos: listaPedidos.pedidos }]).map((grupo) => (
                     <div key={grupo.titulo}>
                       {grupo.titulo && <h4 className="bg-slate-100 px-4 py-3 text-sm font-bold text-slate-800">{grupo.pedidos.length > 0 ? `${grupo.pedidos.length} ` : ''}{grupo.titulo}</h4>}
@@ -2407,6 +2445,7 @@ function Home() {
                           pedido={pedido}
                           carregarDetalhe={fetchPedidoDetalhe}
                           onPrazoEntregaResolvido={atualizarPrazoDaLista}
+                          ocultarNomeSeparador={pedido.statusCodigo === 'ALERTAS_NAO_SEPARADOS'}
                         />
 
                         {ehPendencia && pedido.produtosPendentes.length > 0 && (
@@ -2420,8 +2459,15 @@ function Home() {
                                   key={`lista-pendencia-${pedido.pedidoId}-${produto.produtoId ?? produto.codigo ?? produto.nome}`}
                                   className="flex items-start justify-between gap-3"
                                 >
-                                  <span className="min-w-0 truncate">
-                                    {produto.codigo ? `${produto.codigo} - ` : ''}{produto.nome}
+                                  <span className="min-w-0">
+                                    <span className="block truncate">
+                                      {produto.codigo ? `${produto.codigo} - ` : ''}{produto.nome}
+                                    </span>
+                                    {(produto.marca || getLabelProductBrandById(produto.produtoId)) && (
+                                      <span className="block text-[10px] text-amber-700">
+                                        Marca: {produto.marca || getLabelProductBrandById(produto.produtoId)}
+                                      </span>
+                                    )}
                                   </span>
                                   <strong className="shrink-0">Qtd. {produto.quantidade}</strong>
                                 </div>

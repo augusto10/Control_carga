@@ -33,10 +33,12 @@ export function PedidoInformacoes({
   pedido,
   carregarDetalhe,
   onPrazoEntregaResolvido,
+  ocultarNomeSeparador = false,
 }: {
   pedido: Pedido;
   carregarDetalhe: CarregarDetalhe;
   onPrazoEntregaResolvido?: (pedidoId: number, prazoEntregaRota: string | null) => void;
+  ocultarNomeSeparador?: boolean;
 }) {
   const elemento = useRef<HTMLDivElement>(null);
   const [informacoes, setInformacoes] = useState<Informacoes | null>(null);
@@ -79,16 +81,14 @@ export function PedidoInformacoes({
     return () => { cancelado = true; observador?.disconnect(); };
   }, [pedido.pedidoId, carregarDetalhe, onPrazoEntregaResolvido]);
 
-  const ausente = situacao === 'carregando' ? 'Carregando...' : situacao === 'erro' ? 'Indisponível' : 'Não informado';
+  const ausente = situacao === 'carregando' ? 'Carregando...' : 'Não informado';
   const valor = (campo: keyof Informacoes) => informacoes?.[campo] || pedido[campo] || (campo === 'conferenteNome' ? pedido.usuarioConfirmacaoNome : null) || ausente;
-  const emSeparacao = pedido.statusCodigo === 'PEDIDO_EM_SEPARACAO' ||
-    pedido.statusOperacionalCodigo === 'PEDIDO_EM_SEPARACAO';
 
   return (
     <div ref={elemento} className="mt-2 grid gap-1 text-xs text-slate-600">
       <p>Cidade / UF: <strong>{valor('cidade')} / {valor('uf')}</strong></p>
       <p>Bairro: <strong>{valor('bairro')}</strong></p>
-      {!emSeparacao && <p>Separador: <strong>{valor('separadorNome')}</strong></p>}
+      <p>Separador: <strong>{ocultarNomeSeparador ? 'Não informado' : valor('separadorNome')}</strong></p>
       <p>Conferente: <strong>{valor('conferenteNome')}</strong></p>
     </div>
   );

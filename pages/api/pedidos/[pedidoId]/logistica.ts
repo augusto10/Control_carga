@@ -6,6 +6,7 @@ import { fetchMergedTracking } from '@/services/sswTracking';
 import { buscarPrazoDaRota, type RotaPrazoEntrega } from '@/lib/rota-prazo-entrega';
 
 const PEDIDO_LOGISTICA_CACHE_TTL_MS = 60_000;
+const SSW_TRACKING_CACHE_TTL_MS = 30 * 60_000;
 
 type PedidoLogisticaResponse = {
   pedido: Record<string, any>;
@@ -201,7 +202,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           dominio: occurrence.dominio || null,
         })),
       };
-      sswOnlyCache.set(sswCacheKey, { expiresAt: Date.now() + 60_000, payload });
+      sswOnlyCache.set(sswCacheKey, { expiresAt: Date.now() + SSW_TRACKING_CACHE_TTL_MS, payload });
       return res.status(200).json({ ssw: payload });
     } catch {
       return res.status(200).json({ ssw: {

@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 import { LucideIcon, AlertCircle, Loader2, Siren, ShieldAlert } from 'lucide-react';
 import { cn } from '@/utils/cn';
+import { getLabelProductBrandById } from '@/lib/label-products-catalog';
 
 interface StageCardItem {
   key: string;
@@ -37,6 +38,7 @@ interface PendenciasSummary {
     produtosPendentes?: Array<{
       produtoId?: number | null;
       codigo?: string | null;
+      marca?: string | null;
       nome: string;
       quantidade: number;
     }>;
@@ -162,7 +164,10 @@ export function ExpedicaoCards({
             backgroundColor: '#991b1b',
             backgroundImage: 'linear-gradient(135deg, #450a0a 0%, #b91c1c 52%, #4c0519 100%)',
           }}
-          className="group relative min-h-[180px] overflow-hidden rounded-[18px] bg-gradient-to-br from-red-950 via-red-800 to-rose-950 p-4 text-left text-white shadow-[0_10px_24px_rgba(239,68,68,0.3)] transition hover:-translate-y-1 hover:shadow-[0_16px_34px_rgba(239,68,68,0.45)]"
+          className={cn(
+            'group relative min-h-[180px] overflow-hidden rounded-[18px] bg-gradient-to-br from-red-950 via-red-800 to-rose-950 p-4 text-left text-white shadow-[0_10px_24px_rgba(239,68,68,0.3)] transition hover:-translate-y-1 hover:shadow-[0_16px_34px_rgba(239,68,68,0.45)]',
+            wideLayout && 'h-[calc(100vh-430px)] min-h-[320px]'
+          )}
         >
           <div className="absolute bottom-6 right-6 opacity-[0.09] transition group-hover:opacity-[0.14]">
             <AlertCircle className="h-20 w-20" strokeWidth={1.2} />
@@ -208,7 +213,7 @@ export function ExpedicaoCards({
               </button>
               <button type="button" onClick={(event) => { event.stopPropagation(); alertas.onNaoEntregueClick?.(); }} className="grid w-full grid-cols-[1fr_auto] items-center gap-3 rounded-md text-left transition hover:bg-white/10">
                 <span className="uppercase">
-                  Pedidos não entregues:
+                  Não foram entregues:
                   {alertas.naoEntregueConsultando && (
                     <span className="ml-1 inline-flex items-center gap-1 text-[10px] font-normal normal-case text-rose-200">
                       <Loader2 className="h-3 w-3 animate-spin" /> verificando SSW
@@ -236,7 +241,10 @@ export function ExpedicaoCards({
             backgroundColor: '#7f1d1d',
             backgroundImage: 'linear-gradient(135deg, #450a0a 0%, #991b1b 52%, #4c0519 100%)',
           }}
-          className="group relative min-h-[180px] overflow-hidden rounded-[18px] bg-gradient-to-br from-red-950 via-red-900 to-rose-950 p-4 text-left text-white shadow-[0_10px_24px_rgba(239,68,68,0.3)] transition hover:-translate-y-1 hover:shadow-[0_16px_34px_rgba(239,68,68,0.45)]"
+          className={cn(
+            'group relative min-h-[180px] overflow-hidden rounded-[18px] bg-gradient-to-br from-red-950 via-red-900 to-rose-950 p-4 text-left text-white shadow-[0_10px_24px_rgba(239,68,68,0.3)] transition hover:-translate-y-1 hover:shadow-[0_16px_34px_rgba(239,68,68,0.45)]',
+            wideLayout && 'h-[calc(100vh-430px)] min-h-[320px]'
+          )}
         >
           <div className="absolute bottom-6 right-6 opacity-[0.09] transition group-hover:opacity-[0.14]">
             <ShieldAlert className="h-20 w-20" strokeWidth={1.2} />
@@ -267,7 +275,10 @@ export function ExpedicaoCards({
               </div>
             </div>
 
-            <div className="relative mt-3 h-[145px] min-h-[145px] overflow-hidden pr-1 text-[10px] sm:text-[11px]">
+            <div className={cn(
+              'relative mt-3 h-[145px] min-h-[145px] overflow-hidden pr-1 text-[10px] sm:text-[11px]',
+              wideLayout && 'min-h-0 flex-1'
+            )}>
               {loadingSecondary ? (
                 <div className="flex items-center gap-2 font-bold">
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -278,7 +289,7 @@ export function ExpedicaoCards({
                   className="flex flex-col gap-1.5"
                   animate={pendencias.pedidos.length > 2 ? { y: ['0%', '-50%'] } : undefined}
                   transition={pendencias.pedidos.length > 2 ? {
-                    duration: Math.max(10, pendencias.pedidos.length * 3.5),
+                    duration: Math.max(20, pendencias.pedidos.length * 7),
                     ease: 'linear',
                     repeat: Infinity,
                   } : undefined}
@@ -289,7 +300,14 @@ export function ExpedicaoCards({
                       <div className="mt-1 space-y-0.5 font-semibold">
                         {pedido.produtosPendentes?.length ? pedido.produtosPendentes.map((produto, pIdx) => (
                           <div key={`p-${pedido.pedidoId}-${idx}-${pIdx}`} className="grid grid-cols-[1fr_auto] gap-2">
-                            <span className="truncate">{produto.codigo ? `${produto.codigo} - ` : ''}{produto.nome}</span>
+                            <div className="min-w-0">
+                              <span className="block truncate">{produto.codigo ? `${produto.codigo} - ` : ''}{produto.nome}</span>
+                              {(produto.marca || (produto.produtoId ? getLabelProductBrandById(produto.produtoId) : null)) && (
+                                <span className="block truncate text-[9px] font-medium text-amber-100">
+                                  Marca: {produto.marca || getLabelProductBrandById(produto.produtoId)}
+                                </span>
+                              )}
+                            </div>
                             <strong className="text-red-300">Qtd. {produto.quantidade}</strong>
                           </div>
                         )) : (
