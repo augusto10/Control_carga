@@ -5,7 +5,7 @@ export interface CriarControleDTO {
   cpfMotorista: string;
   transportadora: 'ACCERT' | 'EXPRESSO_GOIAS' | 'TERCEIRIZADA' | 'DETAFRA_TRANSPORTES' | 'RETIRA_VENDEDOR' | 'RETIRA_CLIENTE' | 'VLOG' | 'ZANUELO_TRANSPORTE_LOGISTICA';
   responsavel: string;
-  observacao: string | null;
+  observacao?: string;
   qtdPallets: number;
   freteInformado?: boolean;
   valorFrete?: number | null;
@@ -20,7 +20,7 @@ export interface ControleCarga {
   transportadora: 'ACCERT' | 'EXPRESSO_GOIAS' | 'TERCEIRIZADA' | 'DETAFRA_TRANSPORTES' | 'RETIRA_VENDEDOR' | 'RETIRA_CLIENTE' | 'VLOG' | 'ZANUELO_TRANSPORTE_LOGISTICA';
   numeroManifesto: string | null;
   qtdPallets: number;
-  observacao: string | null;
+  observacao?: string;
   finalizado: boolean;
   cpfMotorista: string;
   freteInformado?: boolean;
