@@ -88,7 +88,14 @@ export function PedidoInformacoes({
     <div ref={elemento} className="mt-2 grid gap-1 text-xs text-slate-600">
       <p>Cidade / UF: <strong>{valor('cidade')} / {valor('uf')}</strong></p>
       <p>Bairro: <strong>{valor('bairro')}</strong></p>
-      <p>Separador: <strong>{ocultarNomeSeparador ? 'Não informado' : valor('separadorNome')}</strong></p>
+      <p>
+        Separador:{' '}
+        <strong>
+          {ocultarNomeSeparador || pedido.statusCodigo === 'PEDIDO_EM_SEPARACAO'
+            ? 'Não informado'
+            : valor('separadorNome')}
+        </strong>
+      </p>
       <p>Conferente: <strong>{valor('conferenteNome')}</strong></p>
     </div>
   );

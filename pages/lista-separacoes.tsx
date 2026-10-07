@@ -196,6 +196,11 @@ function ListaSeparacoesContent() {
       return;
     }
 
+    if (itens.length > 1) {
+      setErro('Selecione somente um pedido por vez para emitir a lista de separacao.');
+      return;
+    }
+
     const confirmou = window.confirm(
       `Deseja imprimir a lista de separacao de ${itens.length} pedido(s)? A emissao sera realizada automaticamente no ERP.`
     );
@@ -417,7 +422,7 @@ function ListaSeparacoesContent() {
           <div className="space-y-1 text-sm text-amber-900">
             <p className="font-semibold">Automacao local do ERP</p>
             <p>
-              Ao imprimir, os pedidos selecionados sao emitidos automaticamente no ERP antes da
+              Selecione um pedido por vez. Ao imprimir, ele sera emitido automaticamente no ERP antes da
               abertura da lista de separacao.
             </p>
             <p>

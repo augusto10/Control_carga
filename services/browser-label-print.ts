@@ -938,9 +938,10 @@ export async function printProductLabelsInBrowser(
           }
 
           .label-a4-vertical-double-large {
+            position: relative;
             width: 135mm;
             height: 190mm;
-            border: 0.6mm solid #172033;
+            border: 0.6mm solid transparent;
             border-radius: 3mm;
             overflow: hidden;
             display: flex;
@@ -948,6 +949,16 @@ export async function printProductLabelsInBrowser(
             justify-content: space-between;
             font-family: "Arial Narrow", "Roboto Condensed", Arial, sans-serif;
             box-sizing: border-box;
+          }
+
+          .label-a4-vertical-double-large::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            z-index: 10;
+            border: 0.6mm solid #172033;
+            border-radius: inherit;
+            pointer-events: none;
           }
 
           .product-image-vertical-double-large {
@@ -964,6 +975,16 @@ export async function printProductLabelsInBrowser(
             overflow: hidden;
             box-sizing: border-box;
             background: #ffffff;
+          }
+
+          .label-a4-vertical-double-large > .product-image-vertical-double-large,
+          .label-a4-vertical-double-large > .product-copy-vertical-double-large,
+          .label-a4-vertical-double-large > .barcode-large-vertical-double-large {
+            width: 100%;
+            min-width: 0;
+            margin-right: 0;
+            margin-left: 0;
+            align-self: stretch;
           }
 
           .product-image-vertical-double-large img {
@@ -990,6 +1011,15 @@ export async function printProductLabelsInBrowser(
             flex-direction: column;
             box-sizing: border-box;
             overflow: hidden;
+          }
+
+          .product-copy-vertical-double-large > .adm-large-vertical-double-large,
+          .product-copy-vertical-double-large > .identity-vertical-double-large,
+          .product-copy-vertical-double-large > .description-vertical-double-large {
+            width: 100%;
+            min-width: 0;
+            max-width: none;
+            align-self: stretch;
           }
 
           .adm-large-vertical-double-large,
