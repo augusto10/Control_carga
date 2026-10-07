@@ -10,6 +10,7 @@ const COMPANY_LOGO_IMAGE = "/brand/logo-esplendor.png";
 const REQUIRE_PRODUCT_PHOTO = false;
 const DEFAULT_REPORT_DIR = "reports/catalogo-sync";
 const EXCLUDED_CATALOG_PRODUCT_IDS = new Set(["35501", "35358", "28603", "30989", "28290"]);
+const CATALOG_PRICE_EXEMPT_PRODUCT_IDS = new Set(["38716"]);
 const EXCLUDED_CATALOG_GROUP_NAMES = new Set(["BRITAS", "UNIFICACAO/3"]);
 const BLOCK_NEW_PRODUCTS_FROM_GROUP_NAMES = new Set(["ACESSORIOS"]);
 const ALLOWED_NEW_ACCESSORY_PRODUCT_IDS = new Set([
@@ -320,6 +321,9 @@ function averagePriceFromStock(stock) {
 }
 
 function hasRequiredCatalogPrices(detail, companyId) {
+  const productId = productIdFrom(getProductRecord(detail)) ?? productIdFrom(detail);
+  if (productId && CATALOG_PRICE_EXEMPT_PRODUCT_IDS.has(productId)) return true;
+
   const stock = stockRecordForCompany(detail, companyId);
   const conceptualPrice = conceptualPriceFromStock(stock);
   const averagePrice = averagePriceFromStock(stock);

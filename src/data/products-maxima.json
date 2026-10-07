@@ -45110,6 +45110,30 @@
     "syncListSignature": "38684|2026-10-07T14:58:44|2026-10-07T14:58:44|S|S|FITA CREPE PINTURA IMOBILIARIA 527S 24MM X 50M AZ|FITA CREPE PINTURA IMOBILIARIA 527S 24MM X 50M AZ|RL|7896193235151|00409104668|FITAS ADESIVAS|ADERE|60|27896193235155|1|1|1|1|12.17||6.8763|1|S|1"
   },
   {
+    "id": "38716",
+    "slug": "fita-crepe-pintura-imobiliaria-527s-48mm-x-50m-az-38716",
+    "codigoAdm": "38716",
+    "nomeVenda": "FITA CREPE PINTURA IMOBILIARIA 527S 48MM X 50M AZ",
+    "unidadeVenda": "RL",
+    "multiploVenda": 1,
+    "quantidadeCaixa": null,
+    "codigoBarrasCaixaFechada": null,
+    "marca": "ADERE",
+    "codigoOriginal": "00409200144",
+    "codigoBarras": "7896193234956",
+    "grupo": "FITAS ADESIVAS",
+    "subgrupo": null,
+    "caracteristicas": "Fita Crepe Azul 527 - Pintura imobiliária\r\n\r\nA Fita Crepe Azul 527 ADERE é uma fita adesiva premium ideal para quem procura o melhor acabamento na pintura imobiliária. Seu dorso de papel crepado tratado garante maior resistência, possibilitando a sua utilização em diversas superfícies sem deixar resíduos após a remoção.\r\n\r\n- Cor Azul, para melhor identificação após aplicada\r\n- Fácil desenrolamento garantindo alta performance no mascaramento\r\n- Remoção Limpa, sem deixar resíduos\r\n- Excelente desempenho em curvas e contornos do mascaramento\r\n- Não delamina a pintura\r\n- Indicada para ambientes internos ou externos\r\n- Ideal para superfícies expostas a intempéries\r\n- Até 28 dias aplicada\r\n- Resistência a líquidos e umidade",
+    "imagens": [
+      "/products/erp/38716/0.jpg"
+    ],
+    "imagemPrincipal": "/products/erp/38716/0.jpg",
+    "ativo": true,
+    "updatedAt": "2026-10-07T14:58:07",
+    "syncSignature": "38716|2026-10-07T14:58:07|2026-10-07T14:58:07|S|S|7896193234956|FITAS ADESIVAS|ADERE|37.35|1|1|1:S:0:0:2026-08-28T12:16:45|1:1:1:2026-08-28T12:16:48|Fita Crepe Azul 527 - Pintura imobiliária\r\n\r\nA Fita Crepe Azul 527 ADERE é uma fita adesiva premium ideal para quem procura o melhor acabamento na pintura imobiliária. Seu dorso de papel crepado tratado garante maior resistência, possibilitando a sua utilização em diversas superfícies sem deixar resíduos após a remoção.\r\n\r\n- Cor Azul, para melhor identificação após aplicada\r\n- Fácil desenrolamento garantindo alta performance no mascaramento\r\n- Remoção Limpa, sem deixar resíduos\r\n- Excelente desempenho em curvas e contornos do mascaramento\r\n- Não delamina a pintura\r\n- Indicada para ambientes internos ou externos\r\n- Ideal para superfícies expostas a intempéries\r\n- Até 28 dias aplicada\r\n- Resistência a líquidos e umidade|0:2026-10-07T14:58:07:61770",
+    "syncListSignature": null
+  },
+  {
     "id": "30263",
     "slug": "fita-crepe-uso-geral-423-18mm-x-50m-br-30263",
     "codigoAdm": "30263",
