@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { shouldPreferStoredDashboard } from '../lib/dashboard-freshness';
+import { isDashboardSnapshotFresh, shouldPreferStoredDashboard } from '../lib/dashboard-freshness';
 
 const current = {
   generatedAt: '2024-01-10T10:00:00.000Z',
@@ -27,4 +27,7 @@ const newerStored = {
 
 assert.equal(shouldPreferStoredDashboard(current, incoming, stored), false);
 assert.equal(shouldPreferStoredDashboard(current, incoming, newerStored), true);
-console.log('Freshness precedence: 2 verificacoes passaram.');
+assert.equal(isDashboardSnapshotFresh('2024-01-10T11:55:00.000Z', 10 * 60_000, Date.parse('2024-01-10T12:00:00.000Z')), true);
+assert.equal(isDashboardSnapshotFresh('2024-01-10T11:40:00.000Z', 10 * 60_000, Date.parse('2024-01-10T12:00:00.000Z')), false);
+assert.equal(isDashboardSnapshotFresh(null, 10 * 60_000, Date.parse('2024-01-10T12:00:00.000Z')), false);
+console.log('Freshness e validade do snapshot: 5 verificacoes passaram.');

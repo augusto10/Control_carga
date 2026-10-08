@@ -1,4 +1,6 @@
 import { buscarEmbarquesAtuais } from '@/lib/pedido-embarques-atuais';
+import { obterStatusPrincipalDoPedido } from '@/lib/dashboard-order-status';
+import { isDashboardSnapshotFresh } from '@/lib/dashboard-freshness';
 import { dadosPedido } from '@/lib/pedido-apresentacao';
 import { saldoPendente, itensComSaldoPendente, pedidoTemDevolucao, pedidoTemEntregaGerada, codigoAdmDoProduto } from '@/lib/pedido-pendencias';
 import { getLabelProductAdmById, getLabelProductBrandById } from '@/lib/label-products-catalog';
@@ -32,6 +34,8 @@ type PeriodoSnapshot = {
 type DashboardPedidoItem = {
   statusOperacionalCodigo?: string;
   pedidoId: number;
+  numeroNota?: string | null;
+  chaveNfe?: string | null;
   tipoEntrega: string | null;
   clienteNome: string;
   nomeFantasia: string | null;
@@ -450,16 +454,8 @@ const isPedidoComPendencias = (pedido: Record<string, unknown>, logistica: Recor
   return possuiIndicadorDePendencia && possuiSeparacaoEfetivada && (ehRetirada || pedidoTemEntregaGerada(pedido, logistica));
 };
 
-const isPedidoEntregue = (logistica: Record<string, any> | null) => {
-  const entregas = Array.isArray(logistica?.entregas) ? logistica.entregas : [];
-  return entregas.some((entrega: Record<string, any>) =>
-    ['S', 'SIM', 'TRUE', '1'].includes(String(entrega.ENTREGUE ?? entrega.entregue ?? '').trim().toUpperCase()) ||
-    Boolean(entrega.BAIXA_ENTREGA_ID ?? entrega.baixa_entrega_id ?? entrega.DATA_HORA_BAIXA ?? entrega.data_hora_baixa)
-  );
-};
-
 const isPedidoParaAlerta = (dataHoraRecebimento: Date | null, pedido: Record<string, unknown> | null, logistica: Record<string, any> | null) => {
-  if (isPedidoEntregue(logistica) || isSeparacaoCancelada(pedido, logistica)) return false;
+  if (isSeparacaoCancelada(pedido, logistica)) return false;
   if (!dataHoraRecebimento) return true;
 
   const partes = new Intl.DateTimeFormat('en-CA', {
@@ -645,7 +641,7 @@ export async function sincronizarLogisticaSnapshot(options: {
       ),
       getControleInfoPorNotasLocais(),
       apiExternaService
-        .listarNotasFiscaisCompletas({ limit: 100, offset: 0 }, options.username, options.password, 6_000)
+        .listarNotasFiscaisCompletas({ limit: 500, offset: 0 }, options.username, options.password, 6_000)
         .catch(() => null),
       apiExternaService
         .listarPedidos(
@@ -925,8 +921,9 @@ export async function montarDashboardPorSnapshot(
     }
 
     if (options.exigirSincronizacaoRecenteMs && sync?.ultimaSincronizacao) {
-      const idade = Date.now() - new Date(sync.ultimaSincronizacao).getTime();
-      if (idade > options.exigirSincronizacaoRecenteMs) return null;
+      if (!isDashboardSnapshotFresh(sync.ultimaSincronizacao, options.exigirSincronizacaoRecenteMs)) {
+        return null;
+      }
     } else if (options.exigirSincronizacaoRecenteMs && !sync) {
       return null;
     }
@@ -985,8 +982,8 @@ export async function montarDashboardPorSnapshot(
     if (!statusBase) continue;
 
     const controleAtual = embarques.porPedido.get(snapshot.pedidoId);
-    const embarcadoNoControle =
-      statusBase === 'PEDIDO_EMBARCADO' && Boolean(controleAtual || snapshot.embarcadoNoControle);
+    const embarcadoNoControle = Boolean(controleAtual || snapshot.embarcadoNoControle);
+    const statusPrincipal = obterStatusPrincipalDoPedido(statusBase, embarcadoNoControle);
     const numeroManifesto = controleAtual?.numeroManifesto || snapshot.numeroManifesto;
     const possuiProdutosFaltandoApi = possuiProdutosFaltandoNoConsolidado(rawPedido);
     // A flag do ERP basta para o card aparecer: se o detalhe nao trouxe itens,
@@ -1003,6 +1000,8 @@ export async function montarDashboardPorSnapshot(
       pedidoId: snapshot.pedidoId,
       statusOperacionalCodigo: embarcadoNoControle ? 'PEDIDOS_EMBARCADOS' : statusBase,
       tipoEntrega: snapshot.tipoEntrega,
+      numeroNota: snapshot.numeroNota || null,
+      chaveNfe: snapshot.chaveNfe || null,
       clienteNome: snapshot.clienteNome || 'Cliente nao informado',
       nomeFantasia: snapshot.nomeFantasia,
       valorPedido: snapshot.valorPedido,
@@ -1029,7 +1028,7 @@ export async function montarDashboardPorSnapshot(
     };
 
     if (ehEntrega) {
-      if (embarcadoNoControle) {
+      if (statusPrincipal === 'PEDIDOS_EMBARCADOS') {
         entries.push({
           statusCodigo: 'PEDIDOS_EMBARCADOS',
           item: {

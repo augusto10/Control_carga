@@ -3,6 +3,19 @@ export type DatedDashboard = {
   filtros?: { dataInicio?: string | null; dataFim?: string | null };
 };
 
+export function isDashboardSnapshotFresh(
+  sincronizadoEm: Date | string | null | undefined,
+  maxAgeMs: number,
+  now = Date.now()
+): boolean {
+  if (!sincronizadoEm || maxAgeMs <= 0) return false;
+  const timestamp = sincronizadoEm instanceof Date
+    ? sincronizadoEm.getTime()
+    : Date.parse(sincronizadoEm);
+  const age = now - timestamp;
+  return Number.isFinite(timestamp) && age >= 0 && age <= maxAgeMs;
+}
+
 export function shouldPreferStoredDashboard(
   current: DatedDashboard | null,
   incoming: DatedDashboard,

@@ -1,4 +1,5 @@
 import { useCurrentDashboard } from '@/hooks/useCurrentDashboard';
+import { removerPedidosEntreguesPelaSsw } from '@/lib/dashboard-ssw-alerts';
 import { resumirPedidosPorStatus } from '@/lib/pedido-resumo-status';
 import { PedidoInformacoes } from '@/components/dashboard/PedidoInformacoes';
 import { ResumoStatusPedidos } from '@/components/dashboard/ResumoStatusPedidos';
@@ -574,7 +575,20 @@ function Home() {
   useEffect(() => () => { dashboardRequestId.current += 1; }, []);
 
   const consultarAlertasSswEmSegundoPlano = useCallback((data: DashboardLogisticaData) => {
-    const candidatos = data.indicadores.find((item) => item.codigo === 'ALERTAS_NAO_ENTREGUES')?.pedidos || [];
+    const codigosAlertaSsw = ['ALERTAS_NAO_EMBARCADOS', 'ALERTAS_NAO_ENTREGUES'];
+    const candidatosPorChave = new Map<string, {
+      pedido: DashboardPedidoItem;
+      codigosAlerta: Set<string>;
+    }>();
+    data.indicadores
+      .filter((item) => codigosAlertaSsw.includes(item.codigo))
+      .forEach((item) => item.pedidos.forEach((pedido) => {
+        const chave = `${pedido.pedidoId}:${String(pedido.chaveNfe || '').replace(/\D/g, '')}:${String(pedido.numeroNota || '').trim()}`;
+        const atual = candidatosPorChave.get(chave) || { pedido, codigosAlerta: new Set<string>() };
+        atual.codigosAlerta.add(item.codigo);
+        candidatosPorChave.set(chave, atual);
+      }));
+    const candidatos = [...candidatosPorChave.values()];
     const agora = Date.now();
     const chaveDoPedido = (pedido: DashboardPedidoItem) =>
       `${pedido.pedidoId}:${String(pedido.chaveNfe || '').replace(/\D/g, '')}:${String(pedido.numeroNota || '').trim()}`;
@@ -585,9 +599,15 @@ function Home() {
 
     const dadosValidados = {
       ...data,
-      indicadores: data.indicadores.map((item) => {
+      indicadores: removerPedidosEntreguesPelaSsw(
+        data.indicadores,
+        new Set(candidatos
+          .map(({ pedido }) => pedido)
+          .filter((pedido) => resultadoRecente(pedido)?.entregue)
+          .map((pedido) => pedido.pedidoId))
+      ).map((item) => {
         if (item.codigo !== 'ALERTAS_NAO_ENTREGUES') return item;
-        const pedidos = candidatos.filter((pedido) => {
+        const pedidos = item.pedidos.filter((pedido) => {
           const resultado = resultadoRecente(pedido);
           return Boolean(resultado && !resultado.entregue);
         });
@@ -596,7 +616,7 @@ function Home() {
     };
     setDashboardAlertas(dadosValidados);
 
-    const fila = candidatos.filter((pedido) => {
+    const fila = candidatos.filter(({ pedido }) => {
       if (resultadoRecente(pedido) || sswConsultasAtivasRef.current.has(chaveDoPedido(pedido))) return false;
       sswConsultasAtivasRef.current.add(chaveDoPedido(pedido));
       return true;
@@ -607,7 +627,7 @@ function Home() {
     let proximo = 0;
     const worker = async () => {
       while (proximo < fila.length) {
-        const pedido = fila[proximo++];
+        const { pedido, codigosAlerta } = fila[proximo++];
         const cacheKey = chaveDoPedido(pedido);
         const params = new URLSearchParams({ sswOnly: '1' });
         if (pedido.chaveNfe) params.set('chaveNfe', pedido.chaveNfe);
@@ -629,10 +649,13 @@ function Home() {
         sswResultadosRef.current.set(cacheKey, { entregue, consultadoEm: Date.now() });
         setDashboardAlertas((atual) => {
           if (!atual) return atual;
+          const indicadoresFiltrados = entregue
+            ? removerPedidosEntreguesPelaSsw(atual.indicadores, new Set([pedido.pedidoId]))
+            : atual.indicadores;
           return {
             ...atual,
-            indicadores: atual.indicadores.map((item) => {
-              if (item.codigo !== 'ALERTAS_NAO_ENTREGUES') return item;
+            indicadores: indicadoresFiltrados.map((item) => {
+              if (!codigosAlerta.has(item.codigo)) return item;
               const pedidos = item.pedidos.filter((candidato) => candidato.pedidoId !== pedido.pedidoId);
               if (!entregue) pedidos.push(pedido);
               pedidos.sort((a, b) => b.pedidoId - a.pedidoId);

@@ -174,6 +174,7 @@ export function LabelPreview({ produto, quantidade, labelType = 'UNITARIA' }: La
                 bgcolor: '#fff',
                 color: '#111',
                 display: 'grid',
+                gridTemplateColumns: 'minmax(0, 1fr)',
                 gridTemplateRows: isA4ProductLandscape ? '135fr 65fr' : '74fr 36fr',
               }}
             >

@@ -478,6 +478,7 @@ export async function printProductLabelsInBrowser(
             border-radius: 3mm;
             overflow: hidden;
             display: grid;
+            grid-template-columns: minmax(0, 1fr);
             grid-template-rows: 135fr 65fr;
             font-family: "Arial Narrow", "Roboto Condensed", Arial, sans-serif;
           }
@@ -503,8 +504,10 @@ export async function printProductLabelsInBrowser(
           .label-a4-landscape .product-copy > .identity,
           .label-a4-landscape .product-copy > .description {
             justify-self: stretch;
-            width: auto;
+            width: 100%;
+            min-width: 0;
             margin: 0;
+            box-sizing: border-box;
           }
 
           .label-a4-landscape .adm-large {

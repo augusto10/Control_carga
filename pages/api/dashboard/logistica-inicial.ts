@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { apiExternaService } from '@/services/api-externa';
 import { getPedidosDashboard } from '@/lib/dashboard-external-cache';
 import { montarDashboardPorSnapshot } from '@/lib/logistica-snapshot';
+import { obterStatusPrincipalDoPedido } from '@/lib/dashboard-order-status';
 import { codigoAdmDoProduto } from '@/lib/pedido-pendencias';
 import { getLabelProductAdmById, getLabelProductBrandById } from '@/lib/label-products-catalog';
 import { buscarPrazoDaRota, type RotaPrazoEntrega } from '@/lib/rota-prazo-entrega';
@@ -11,6 +12,7 @@ const DASHBOARD_PREVISAO_FINAL = '2050-12-31';
 const DEFAULT_CACHE_KEY = 'sem-inicio:sem-fim';
 const DASHBOARD_CACHE_TTL_MS = 3 * 60_000;
 const DASHBOARD_STALE_TTL_MS = 60 * 60_000;
+const DASHBOARD_SNAPSHOT_MAX_AGE_MS = 15 * 60_000;
 const DASHBOARD_EXTERNAL_TIMEOUT_MS = 15_000;
 const DASHBOARD_ENRICH_CONCURRENCY = 20;
 const MAX_LOGISTICA_LOOKUPS_PER_REQUEST = 40;
@@ -697,19 +699,6 @@ const shouldOcultarPedidoNoCardSeparado = (
 // Helper: verifica se o pedido deve aparecer nos alertas.
 // Pedidos de dias anteriores entram sempre.
 // Pedidos recebidos no dia atual ainda nao entram como atrasados.
-const isPedidoEntregue = (pedido: Record<string, unknown>, logistica: Record<string, any> | null) => {
-  const entregas = [
-    ...(Array.isArray(logistica?.entregas) ? logistica.entregas : []),
-    ...(Array.isArray((pedido.logistica as Record<string, any> | undefined)?.entregas)
-      ? (pedido.logistica as Record<string, any>).entregas
-      : []),
-  ];
-  return entregas.some((entrega: Record<string, any>) =>
-    ['S', 'SIM', 'TRUE', '1'].includes(String(entrega.ENTREGUE ?? entrega.entregue ?? '').trim().toUpperCase()) ||
-    Boolean(entrega.BAIXA_ENTREGA_ID ?? entrega.baixa_entrega_id ?? entrega.DATA_HORA_BAIXA ?? entrega.data_hora_baixa)
-  );
-};
-
 const isSeparacaoCancelada = (pedido: Record<string, unknown>, logistica: Record<string, any> | null) => {
   const separacoes = Array.isArray(logistica?.separacoes) ? logistica.separacoes : [];
   const statusPedido = [
@@ -726,7 +715,7 @@ const isSeparacaoCancelada = (pedido: Record<string, unknown>, logistica: Record
 };
 
 const isPedidoParaAlerta = (pedido: Record<string, unknown>, logistica: Record<string, any> | null): boolean => {
-  if (isPedidoEntregue(pedido, logistica) || isSeparacaoCancelada(pedido, logistica)) return false;
+  if (isSeparacaoCancelada(pedido, logistica)) return false;
   const dataHoraRecebimento = getPedidoDataHoraRecebimento(pedido);
   if (!dataHoraRecebimento) return true; // Se não tem data, considera para alerta
 
@@ -1065,15 +1054,18 @@ export default async function handler(
 
   if (!forceRefresh) {
     // A tabela local e a fonte preferencial; a API externa alimenta o snapshot.
-    const snapshotLocal = await montarDashboardPorSnapshot(periodoFiltro);
+    const snapshotLocal = await montarDashboardPorSnapshot(periodoFiltro, {
+      exigirSincronizacaoRecenteMs: DASHBOARD_SNAPSHOT_MAX_AGE_MS,
+    });
     if (snapshotLocal) {
       const payload = await aplicarPrazosDaTabelaDeRotas(snapshotLocal);
       setCacheByPeriodo(periodoFiltro.cacheKey, payload);
       return res.status(200).json(payload);
     }
 
-    // Mesmo sem snapshot recente, aproveitamos o cache em memoria antes da API.
-    if (cacheAtual && cacheAtual.staleAt > Date.now()) {
+    // Cache expirado nao deve impedir a consulta de status atualizados no ERP.
+    // O cache stale continua disponivel como fallback se a API falhar.
+    if (cacheAtual && cacheAtual.expiresAt > Date.now()) {
       const payload = await aplicarPrazosDaTabelaDeRotas(cacheAtual.payload);
       return res.status(200).json({
         ...payload,
@@ -1485,7 +1477,6 @@ export default async function handler(
           }
 
           const embarcadoNoControle =
-            statusCodigoBase === 'PEDIDO_EMBARCADO' &&
             (pedidosEmbarcadosPorNota.has(pedidoId) || isNotaEmControle(referenciaNota));
           const controleInfo = getControleInfoByReferencia(referenciaNota);
           const produtosPendentes = possuiPendencia ? getProdutosPendentes(logistica, 'PENDENCIA') : [];
@@ -1652,7 +1643,9 @@ export default async function handler(
 
     const allEntries = [
       ...entradasValidas
-        .filter((entry) => !(entry.statusCodigo === 'PEDIDO_EMBARCADO' && entry.embarcadoNoControle))
+        .filter((entry) =>
+          obterStatusPrincipalDoPedido(entry.statusCodigo, entry.embarcadoNoControle) !== 'PEDIDOS_EMBARCADOS'
+        )
         .map((e) => ({ statusCodigo: e.statusCodigo, item: e.item })),
       ...pendenciaEntries,
       ...embarcadosEntries,
