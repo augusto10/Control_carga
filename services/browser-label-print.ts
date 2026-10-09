@@ -462,7 +462,15 @@ export async function printProductLabelsInBrowser(
             width: 100%;
             min-width: 0;
             margin: 0;
+          }
+
+          .label-a4-horizontal-triple .product-copy > .adm-large {
             text-align: center;
+          }
+
+          .label-a4-horizontal-triple .identity,
+          .label-a4-horizontal-triple .description {
+            text-align: left;
           }
 
           .label-a4-horizontal-triple .barcode-large {
@@ -493,7 +501,7 @@ export async function printProductLabelsInBrowser(
           }
 
           .label-a4-horizontal-triple .identity {
-            align-items: center;
+            align-items: flex-start;
           }
 
           .label-a4-horizontal-triple .barcode-large {

@@ -205,11 +205,11 @@ export function LabelPreview({ produto, quantidade, labelType = 'UNITARIA' }: La
                       CODIGO ADM: {formatProductAdm(produto.codigoAdm)}
                     </Typography>
                   </Box>
-                  <Box sx={{ width: '100%', minWidth: 0, px: 1.4, py: 0.25, display: 'flex', flexDirection: 'column', alignItems: isA4ProductVerticalTriple ? 'center' : 'stretch', justifyContent: 'center', borderBottom: '2px solid #172033', gap: 0.15 }}>
-                      <Typography noWrap sx={{ fontSize: isA4ProductLandscape ? 'clamp(18px, 3vw, 30px)' : 'clamp(14px, 2.3vw, 22px)', lineHeight: 1.05 }}>
+                  <Box sx={{ width: '100%', minWidth: 0, px: 1.4, py: 0.25, display: 'flex', flexDirection: 'column', alignItems: isA4ProductVerticalTriple ? 'flex-start' : 'stretch', justifyContent: 'center', borderBottom: '2px solid #172033', gap: 0.15 }}>
+                      <Typography noWrap sx={{ fontSize: isA4ProductLandscape ? 'clamp(18px, 3vw, 30px)' : 'clamp(14px, 2.3vw, 22px)', lineHeight: 1.05, textAlign: isA4ProductVerticalTriple ? 'left' : 'inherit' }}>
                       <strong>MARCA:</strong> {produto.marca || 'SEM MARCA'}
                     </Typography>
-                      <Typography noWrap sx={{ fontSize: isA4ProductLandscape ? 'clamp(18px, 3vw, 30px)' : 'clamp(14px, 2.3vw, 22px)', lineHeight: 1.05 }}>
+                      <Typography noWrap sx={{ fontSize: isA4ProductLandscape ? 'clamp(18px, 3vw, 30px)' : 'clamp(14px, 2.3vw, 22px)', lineHeight: 1.05, textAlign: isA4ProductVerticalTriple ? 'left' : 'inherit' }}>
                       <strong>CODIGO ORIGINAL:</strong> {produto.codigoOriginal || '-'}
                     </Typography>
                   </Box>
