@@ -352,7 +352,7 @@ export async function printProductLabelsInBrowser(
             display: grid;
             grid-template-columns: ${isA4Product ? '180mm' : isA4ProductLandscape ? '287mm' : isA4ProductVertical ? '200mm' : isA4ProductVerticalDouble ? 'repeat(3, 80mm)' : isA4ProductVerticalLargeDouble ? 'repeat(2, 135mm)' : isA4ProductVerticalTriple ? '150mm' : isClosedBox ? 'repeat(2, 100mm)' : 'repeat(3, 66mm)'};
             grid-template-rows: ${isA4Product ? 'repeat(2, 110mm)' : isA4ProductLandscape ? '200mm' : isA4ProductVertical ? '287mm' : isA4ProductVerticalDouble ? '140mm' : isA4ProductVerticalLargeDouble ? '190mm' : isA4ProductVerticalTriple ? 'repeat(3, 60mm)' : 'none'};
-            gap: ${isA4Product ? '40mm 0' : isA4ProductLandscape || isA4ProductVertical ? '0' : isA4ProductVerticalDouble ? '12mm' : isA4ProductVerticalLargeDouble ? '15mm' : isA4ProductVerticalTriple ? '8mm 0' : '4mm'};
+            gap: ${isA4Product ? '40mm 0' : isA4ProductLandscape || isA4ProductVertical ? '0' : isA4ProductVerticalDouble ? '12mm' : isA4ProductVerticalLargeDouble ? '15mm' : isA4ProductVerticalTriple ? '14mm 0' : '4mm'};
             justify-content: center;
             align-content: ${isA4ProductVertical || isA4ProductVerticalDouble || isA4ProductVerticalLargeDouble || isA4ProductVerticalTriple ? 'center' : 'start'};
             width: ${isLandscapeA4 ? '297mm' : isBrowserA4Product ? '210mm' : 'auto'};
@@ -426,28 +426,60 @@ export async function printProductLabelsInBrowser(
             border-radius: 3mm;
             overflow: hidden;
             display: grid;
-            grid-template-rows: 74fr 36fr;
+            grid-template-columns: minmax(0, 1fr);
+            grid-template-rows: minmax(0, 74fr) minmax(0, 36fr);
             font-family: "Arial Narrow", "Roboto Condensed", Arial, sans-serif;
           }
 
           .label-a4-horizontal-triple .product-details {
+            grid-column: 1;
+            grid-row: 1;
+            display: grid;
             grid-template-columns: 32mm minmax(0, 1fr);
+            width: 100%;
+            min-width: 0;
+            align-self: stretch;
+          }
+
+          .label-a4-horizontal-triple .product-image {
+            width: 32mm;
+            min-width: 0;
+            justify-self: stretch;
+            align-self: stretch;
           }
 
           .label-a4-horizontal-triple .product-copy {
+            width: 100%;
+            min-width: 0;
+            justify-self: stretch;
             grid-template-rows: 12mm 15mm 1fr;
+            align-self: stretch;
           }
 
           .label-a4-horizontal-triple .product-copy > .adm-large,
           .label-a4-horizontal-triple .product-copy > .identity,
           .label-a4-horizontal-triple .product-copy > .description {
-            width: auto;
+            width: 100%;
+            min-width: 0;
             margin: 0;
+            text-align: center;
+          }
+
+          .label-a4-horizontal-triple .barcode-large {
+            grid-column: 1;
+            grid-row: 2;
+            width: 100%;
+            min-width: 0;
+            justify-self: stretch;
+            align-self: stretch;
+            align-items: center;
+            box-sizing: border-box;
           }
 
           .label-a4-horizontal-triple .adm-large {
             font-size: 16pt;
             padding: 0.8mm 2mm;
+            justify-content: center;
           }
 
           .label-a4-horizontal-triple .meta-line,
@@ -460,11 +492,17 @@ export async function printProductLabelsInBrowser(
             padding: 0.8mm 2mm;
           }
 
+          .label-a4-horizontal-triple .identity {
+            align-items: center;
+          }
+
           .label-a4-horizontal-triple .barcode-large {
-            padding: 0.8mm 24mm 0.4mm;
+            padding: 0.8mm 5mm 0.4mm;
           }
 
           .label-a4-horizontal-triple .barcode-large svg {
+            display: block;
+            margin-inline: auto;
             max-width: 120mm;
             max-height: 10mm;
           }
