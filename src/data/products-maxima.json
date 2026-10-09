@@ -56869,6 +56869,30 @@
     "syncListSignature": "38704|2026-09-29T12:04:30|2026-08-24T11:43:48|S|S|LIXA MASSA E MADEIRA GR 060 PCT C/ 25 UN|LIXA MASSA E MADEIRA GR 060 PCT C/ 25 UN|PCT|17891265024449|FLM60|ABRASIVOS E LIXAS|STARRETT|||1|1|1|1|24.97||12.1081|1|S|1"
   },
   {
+    "id": "38705",
+    "slug": "lixa-massa-e-madeira-gr-080-pct-c-25-un-38705",
+    "codigoAdm": "38705",
+    "nomeVenda": "LIXA MASSA E MADEIRA GR 080 PCT C/ 25 UN",
+    "unidadeVenda": "PCT",
+    "multiploVenda": 1,
+    "quantidadeCaixa": null,
+    "codigoBarrasCaixaFechada": null,
+    "marca": "STARRETT",
+    "codigoOriginal": "FLM80",
+    "codigoBarras": "17891265024456",
+    "grupo": "ABRASIVOS E LIXAS",
+    "subgrupo": null,
+    "caracteristicas": "Com a qualidade Starrett que o mercado conhece, a lixa oferece um acabamento perfeito para aplicação em superfícies, com grande flexibilidade e alta resistência a rasgos. Qualidade no desbaste e acabamento, garantindo o resultado que você precisa!\r\n\r\n- Flexíveis, com alta resistência ao rasgamento;\r\n- Folhas com medida de 225 x 275mm;\r\n- Aplicação recomendada para preparação e nivelamento de superfícies.\r\n- Bom rendimento nas operações de desbaste e nivelamento de superfícies, sejam elas secas ou úmidas;\r\n- Proporcionam um excelente acabamento nas superfícies;\r\n- Menor empastamento;\r\n- Não encanoa.\r\n- Flexibilidade e resistência;\r\n- Formato de folhas que facilita a utilização manual ou em lixadeiras orbitais;\r\n- Perfeita para ser utilizada em superfícies planas e contornos.",
+    "imagens": [
+      "/products/erp/38705/0.jpg"
+    ],
+    "imagemPrincipal": "/products/erp/38705/0.jpg",
+    "ativo": true,
+    "updatedAt": "2026-08-24T11:45:42",
+    "syncSignature": "38705|2026-08-24T11:45:42|2026-08-24T11:43:54|S|S|17891265024456|ABRASIVOS E LIXAS|STARRETT|20.41|1|1|1:S:0:0:2026-08-24T11:45:43|1:1:1:2026-08-24T11:45:46|Com a qualidade Starrett que o mercado conhece, a lixa oferece um acabamento perfeito para aplicação em superfícies, com grande flexibilidade e alta resistência a rasgos. Qualidade no desbaste e acabamento, garantindo o resultado que você precisa!\r\n\r\n- Flexíveis, com alta resistência ao rasgamento;\r\n- Folhas com medida de 225 x 275mm;\r\n- Aplicação recomendada para preparação e nivelamento de superfícies.\r\n- Bom rendimento nas operações de desbaste e nivelamento de superfícies, sejam elas secas ou úmidas;\r\n- Proporcionam um excelente acabamento nas superfícies;\r\n- Menor empastamento;\r\n- Não encanoa.\r\n- Flexibilidade e resistência;\r\n- Formato de folhas que facilita a utilização manual ou em lixadeiras orbitais;\r\n- Perfeita para ser utilizada em superfícies planas e contornos.|0:2026-08-24T11:43:54:8440",
+    "syncListSignature": null
+  },
+  {
     "id": "31725",
     "slug": "lixa-massa-e-madeira-gr-100-pct-c-25-un-31725",
     "codigoAdm": "31725",
