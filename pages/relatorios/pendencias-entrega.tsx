@@ -87,6 +87,14 @@ function compactText(...values: Array<string | null | undefined>): string {
     .join(' | ');
 }
 
+function isThirdPartyCarrier(value: string | null): boolean {
+  return String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .includes('terceiriz');
+}
+
 export default function PendenciasEntregaPage() {
   const hoje = new Date();
   const dataFimPadrao = format(hoje, 'yyyy-MM-dd');
@@ -252,7 +260,16 @@ export default function PendenciasEntregaPage() {
                         </TableCell>
                         <TableCell>{item.cliente}</TableCell>
                         <TableCell>{item.clienteId || '-'}</TableCell>
-                        <TableCell>{item.statusAtual}</TableCell>
+                        <TableCell>
+                          <Stack spacing={0.75}>
+                            {isThirdPartyCarrier(item.transportadora) && (
+                              <Alert severity="warning" sx={{ py: 0 }}>
+                                Aguardando confirmação de entrega
+                              </Alert>
+                            )}
+                            <Typography variant="body2">{item.statusAtual}</Typography>
+                          </Stack>
+                        </TableCell>
                         <TableCell>{formatDateTime(item.dataHoraRecebimento)}</TableCell>
                         <TableCell>{item.transportadora || '-'}</TableCell>
                         <TableCell>{item.numeroNota || '-'}</TableCell>

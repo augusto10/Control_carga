@@ -7,6 +7,7 @@ import { buscarPrazoDaRota, type RotaPrazoEntrega } from '@/lib/rota-prazo-entre
 
 const PEDIDO_LOGISTICA_CACHE_TTL_MS = 60_000;
 const SSW_TRACKING_CACHE_TTL_MS = 30 * 60_000;
+const SSW_TRACKING_CACHE_VERSION = 'all-occurrences-v2';
 
 type PedidoLogisticaResponse = {
   pedido: Record<string, any>;
@@ -174,7 +175,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       } });
     }
 
-    const sswCacheKey = `${chaveNfe}:${numeroNotaInformado || ''}:${transportadoraInformada || ''}`;
+    const sswCacheKey = `${SSW_TRACKING_CACHE_VERSION}:${chaveNfe}:${numeroNotaInformado || ''}:${transportadoraInformada || ''}`;
     const cachedSsw = sswOnlyCache.get(sswCacheKey);
     if (cachedSsw && cachedSsw.expiresAt > Date.now()) {
       return res.status(200).json({ ssw: cachedSsw.payload });

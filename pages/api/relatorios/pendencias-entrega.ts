@@ -1,7 +1,11 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 import { apiExternaService } from '@/services/api-externa';
-import { fetchMergedTracking, type SswTrackingOccurrence } from '@/services/sswTracking';
+import {
+  fetchMergedTracking,
+  isSswOccurrenceDelivered,
+  type SswTrackingOccurrence,
+} from '@/services/sswTracking';
 
 type DeliveryConfirmationInfo = {
   controleId: string;
@@ -179,13 +183,8 @@ function getOccurrenceText(event: SswTrackingOccurrence): string {
   );
 }
 
-function isDeliveredOccurrence(event: SswTrackingOccurrence): boolean {
-  const text = getOccurrenceText(event);
-  return /\b(entregue|entrega realizada|entrega efetuada|entrega concluida|entrega confirmada|recebido pelo destinatario|baixado)\b/.test(text);
-}
-
 function getDeliveryIssue(event: SswTrackingOccurrence): { message: string; date: string | null } | null {
-  if (isDeliveredOccurrence(event)) return null;
+  if (isSswOccurrenceDelivered(event)) return null;
 
   const text = getOccurrenceText(event);
   const hasProblem = /cancelad|avaria|nao entreg|devolu|recus|destinatario ausente|ausencia do destinatario|cliente (ausente|fechado)|endereco (nao |incorret|inexistent)|nao localiz|tentativa.*(sem sucesso|frustrad)|insucesso|impossivel.*entreg|extravio|sinistro|roubo|furto|mercadoria (retida|faltante)|pendencia|restricao.*entreg|aguardando (orientacao|instrucao)|mudou-se|problema/.test(
@@ -406,7 +405,7 @@ export default async function handler(
               source: null,
             };
 
-        if (tracking.delivered) return null;
+        if (tracking.delivered || tracking.occurrences.some(isSswOccurrenceDelivered)) return null;
 
         const ultimaOcorrencia = tracking.occurrences.length > 0
           ? tracking.occurrences[tracking.occurrences.length - 1]
