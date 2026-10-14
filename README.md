@@ -4,6 +4,8 @@
 
 A busca de etiquetas por marca usa o snapshot local em `src/data/products-maxima.json` e as fotos em `public/products/erp`. Assim, a consulta da tela nao depende da disponibilidade da API do ERP.
 
+Os produtos ERP 38731, 38724, 38725, 38735 e 38734 sao excecoes a validacao de precos para continuarem disponiveis para etiquetas; permanecem sujeitos aos demais criterios de sincronizacao.
+
 O workflow `.github/workflows/sync-label-products.yml` executa a sincronizacao incremental a cada tres dias e tambem pode ser iniciado manualmente pelo GitHub Actions. Configure no repositorio os secrets `ERP_API_USERNAME` e `ERP_API_PASSWORD`; a variavel opcional `ERP_API_URL` permite trocar o endereco padrao da API.
 
 Para atualizar localmente:
