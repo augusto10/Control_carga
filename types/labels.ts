@@ -2,6 +2,7 @@ export type BarcodeFormat = 'EAN13' | 'EAN8' | 'CODE128' | 'UNSUPPORTED';
 export type LabelType =
   | 'UNITARIA'
   | 'CAIXA_FECHADA'
+  | 'PRODUTO_100X60'
   | 'A4_PRODUTO'
   | 'A4_PRODUTO_LANDSCAPE'
   | 'A4_PRODUTO_VERTICAL'

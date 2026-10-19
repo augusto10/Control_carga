@@ -357,6 +357,7 @@ export default function CriarEtiquetasPage() {
                   >
                     <MenuItem value="UNITARIA">Produto (3 por linha)</MenuItem>
                     <MenuItem value="CAIXA_FECHADA">Caixa fechada 100 x 60 mm</MenuItem>
+                    <MenuItem value="PRODUTO_100X60">Produto 100 x 60 mm</MenuItem>
                     <MenuItem value="A4_PRODUTO">Produto 18 x 11 cm (2 por A4)</MenuItem>
                     <MenuItem value="A4_PRODUTO_LANDSCAPE">Produto grande A4 paisagem (1 por A4)</MenuItem>
                     <MenuItem value="A4_PRODUTO_VERTICAL">Produto vertical 20 x 28,7 cm (1 por A4)</MenuItem>

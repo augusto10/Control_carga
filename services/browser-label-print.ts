@@ -95,6 +95,7 @@ function buildProductLabelMarkup(
   barcodeValue: string,
   variant: 'a4-horizontal' | 'a4-landscape' | 'a4-horizontal-triple' | 'a4-vertical' | 'a4-vertical-double' | 'a4-vertical-double-large' | 'a4-vertical-triple' | 'small',
   isClosedBox: boolean,
+  isProduct100x60: boolean,
   imageMap?: Map<string, string>,
 ) {
   const imageUrl = (produto.imagemUrl && imageMap?.get(produto.imagemUrl))
@@ -161,7 +162,7 @@ function buildProductLabelMarkup(
   }
 
   return `
-    <article class="label">
+    <article class="label${isProduct100x60 ? ' label-product-wide' : ''}">
       <div class="title">${escapeHtml(produto.nome)}</div>
       <div class="brand">${escapeHtml(produto.marca || 'Sem marca')}</div>
       ${isClosedBox ? `<div class="box-info">CAIXA FECHADA - ${produto.quantidadeCaixaFechada || '-'} UN</div>` : ''}
@@ -185,6 +186,7 @@ export async function printProductLabelsInBrowser(
   if (typeof window === 'undefined') return;
 
   const isClosedBox = labelType === 'CAIXA_FECHADA';
+  const isProduct100x60 = labelType === 'PRODUTO_100X60';
   const isA4Product = labelType === 'A4_PRODUTO';
   const isA4ProductLandscape = labelType === 'A4_PRODUTO_LANDSCAPE';
   const isA4ProductVertical = labelType === 'A4_PRODUTO_VERTICAL';
@@ -243,6 +245,7 @@ export async function printProductLabelsInBrowser(
       barcodeValue,
       variant,
       isClosedBox,
+      isProduct100x60,
       imageMap,
     );
 
@@ -350,7 +353,7 @@ export async function printProductLabelsInBrowser(
 
           .sheet {
             display: grid;
-            grid-template-columns: ${isA4Product ? '180mm' : isA4ProductLandscape ? '287mm' : isA4ProductVertical ? '200mm' : isA4ProductVerticalDouble ? 'repeat(3, 80mm)' : isA4ProductVerticalLargeDouble ? 'repeat(2, 135mm)' : isA4ProductVerticalTriple ? '150mm' : isClosedBox ? 'repeat(2, 100mm)' : 'repeat(3, 66mm)'};
+            grid-template-columns: ${isA4Product ? '180mm' : isA4ProductLandscape ? '287mm' : isA4ProductVertical ? '200mm' : isA4ProductVerticalDouble ? 'repeat(3, 80mm)' : isA4ProductVerticalLargeDouble ? 'repeat(2, 135mm)' : isA4ProductVerticalTriple ? '150mm' : isClosedBox || isProduct100x60 ? 'repeat(2, 100mm)' : 'repeat(3, 66mm)'};
             grid-template-rows: ${isA4Product ? 'repeat(2, 110mm)' : isA4ProductLandscape ? '200mm' : isA4ProductVertical ? '287mm' : isA4ProductVerticalDouble ? '140mm' : isA4ProductVerticalLargeDouble ? '190mm' : isA4ProductVerticalTriple ? 'repeat(3, 60mm)' : 'none'};
             gap: ${isA4Product ? '40mm 0' : isA4ProductLandscape || isA4ProductVertical ? '0' : isA4ProductVerticalDouble ? '12mm' : isA4ProductVerticalLargeDouble ? '15mm' : isA4ProductVerticalTriple ? '14mm 0' : '4mm'};
             justify-content: center;
@@ -364,8 +367,8 @@ export async function printProductLabelsInBrowser(
           }
 
           .label {
-            width: ${isA4Product ? '180mm' : isA4ProductLandscape ? '287mm' : isA4ProductVertical ? '200mm' : isA4ProductVerticalDouble ? '80mm' : isA4ProductVerticalLargeDouble ? '135mm' : isA4ProductVerticalTriple ? '150mm' : isClosedBox ? '100mm' : '66mm'};
-            height: ${isA4Product ? '110mm' : isA4ProductLandscape ? '200mm' : isA4ProductVertical ? '287mm' : isA4ProductVerticalDouble ? '140mm' : isA4ProductVerticalLargeDouble ? '190mm' : isA4ProductVerticalTriple ? '60mm' : isClosedBox ? '60mm' : '44mm'};
+            width: ${isA4Product ? '180mm' : isA4ProductLandscape ? '287mm' : isA4ProductVertical ? '200mm' : isA4ProductVerticalDouble ? '80mm' : isA4ProductVerticalLargeDouble ? '135mm' : isA4ProductVerticalTriple ? '150mm' : isClosedBox || isProduct100x60 ? '100mm' : '66mm'};
+            height: ${isA4Product ? '110mm' : isA4ProductLandscape ? '200mm' : isA4ProductVertical ? '287mm' : isA4ProductVerticalDouble ? '140mm' : isA4ProductVerticalLargeDouble ? '190mm' : isA4ProductVerticalTriple ? '60mm' : isClosedBox || isProduct100x60 ? '60mm' : '44mm'};
             border: 1px solid #94a3b8;
             padding: ${isBrowserA4Product ? '0' : '3mm'};
             display: flex;
@@ -380,6 +383,19 @@ export async function printProductLabelsInBrowser(
             font-weight: 700;
             text-align: center;
             line-height: 1.2;
+          }
+
+          .label-product-wide .title {
+            font-size: 14px;
+          }
+
+          .label-product-wide .brand,
+          .label-product-wide .adm {
+            font-size: 12px;
+          }
+
+          .label-product-wide .barcode svg {
+            max-width: 72mm;
           }
 
           .brand,

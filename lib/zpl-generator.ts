@@ -146,6 +146,31 @@ function buildClosedBoxPage(produto: ProdutoEtiqueta) {
   return commands.join('\n');
 }
 
+function buildProduct100x60Page(produto: ProdutoEtiqueta) {
+  const analysis = analyzeBarcode(produto.codigoBarras);
+  if (!analysis.isValid || analysis.type === 'UNSUPPORTED') {
+    throw new Error(analysis.reason || 'Codigo de barras do produto invalido.');
+  }
+
+  const commands = [
+    `~SD${PRINT_DARKNESS}`,
+    '^XA',
+    `^PW${PAGE_WIDTH}`,
+    `^LL${BOX_LABEL_HEIGHT}`,
+    '^LH0,0',
+  ];
+  const titleLines = splitText(produto.nome, 42, 2);
+
+  titleLines.forEach((line, index) => {
+    commands.push(`^FO50,${25 + (index * 38)}^FB700,1,0,C,0^A0N,34,34^FD${line}^FS`);
+  });
+  commands.push(`^FO75,108^FB650,1,0,C,0^A0N,27,27^FD${sanitizeZpl(produto.marca || 'SEM MARCA')}^FS`);
+  commands.push(buildBarcodeField(analysis.normalizedValue, analysis.type, 0, 155, 150, PAGE_WIDTH));
+  commands.push(`^FO50,415^FB700,1,0,C,0^A0N,26,26^FDADM ${sanitizeZpl(produto.codigoAdm)}^FS`);
+  commands.push('^PQ1,0,1,Y', '^XZ');
+  return commands.join('\n');
+}
+
 export function generateZplLabels(
   produto: ProdutoEtiqueta,
   quantidade: number,
@@ -164,6 +189,10 @@ export function generateZplLabels(
 
   if (labelType === 'CAIXA_FECHADA') {
     return Array.from({ length: quantidade }, () => buildClosedBoxPage(produto)).join('\n');
+  }
+
+  if (labelType === 'PRODUTO_100X60') {
+    return Array.from({ length: quantidade }, () => buildProduct100x60Page(produto)).join('\n');
   }
 
   return buildUnitPages(produto, quantidade).join('\n');

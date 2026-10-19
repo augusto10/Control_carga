@@ -43,6 +43,7 @@ const LABEL_OPTIONS: Array<{ value: LabelType; label: string }> = [
   { value: 'A4_PRODUTO_VERTICAL_TRIPLA', label: 'Produto 15 x 6 cm (3 por A4)' },
   { value: 'UNITARIA', label: 'Produto (3 por linha)' },
   { value: 'CAIXA_FECHADA', label: 'Caixa fechada 100 x 60 mm' },
+  { value: 'PRODUTO_100X60', label: 'Produto 100 x 60 mm' },
 ];
 const PRODUCTS_BATCH_SIZE = 40;
 

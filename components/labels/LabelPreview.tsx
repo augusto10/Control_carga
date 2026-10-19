@@ -120,6 +120,7 @@ function ProductVerticalPreview({
 export function LabelPreview({ produto, quantidade, labelType = 'UNITARIA' }: LabelPreviewProps) {
   const theme = useTheme();
   const isClosedBox = labelType === 'CAIXA_FECHADA';
+  const isProduct100x60 = labelType === 'PRODUTO_100X60';
   const isA4Product = labelType === 'A4_PRODUTO';
   const isA4ProductLandscape = labelType === 'A4_PRODUTO_LANDSCAPE';
   const isA4ProductVertical = labelType === 'A4_PRODUTO_VERTICAL';
@@ -153,7 +154,7 @@ export function LabelPreview({ produto, quantidade, labelType = 'UNITARIA' }: La
           display: 'grid',
           gridTemplateColumns: isA4Product || isA4ProductLandscape || isA4ProductVertical || isA4ProductVerticalDouble || isA4ProductVerticalLargeDouble || isA4ProductVerticalTriple
             ? '1fr'
-            : isClosedBox
+            : isClosedBox || isProduct100x60
               ? { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' }
               : { xs: '1fr', md: 'repeat(3, minmax(0, 1fr))' },
           gap: isA4ProductVerticalTriple ? 4 : 2,
@@ -260,7 +261,7 @@ export function LabelPreview({ produto, quantidade, labelType = 'UNITARIA' }: La
             <Box
               key={index}
               sx={{
-                aspectRatio: isClosedBox ? '100 / 60' : '33 / 22',
+                aspectRatio: isClosedBox || isProduct100x60 ? '100 / 60' : '33 / 22',
                 borderRadius: 2,
                 p: 1.5,
                 background: `linear-gradient(180deg, ${alpha('#ffffff', 0.95)} 0%, ${alpha(theme.palette.grey[100], 0.95)} 100%)`,
@@ -287,7 +288,7 @@ export function LabelPreview({ produto, quantidade, labelType = 'UNITARIA' }: La
               <Box sx={{ px: 1 }}>
                 <Box
                   sx={{
-                    height: isClosedBox ? 64 : 38,
+                    height: isClosedBox || isProduct100x60 ? 64 : 38,
                     borderRadius: 1,
                     backgroundImage:
                       'repeating-linear-gradient(90deg, #000000 0 2px, transparent 2px 4px, #000000 4px 5px, transparent 5px 7px)',
