@@ -29,7 +29,7 @@ import { useSnackbar } from 'notistack';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { AppLayout } from '@/components/layout/AppLayout';
 import api from '@/lib/api';
-import { analyzeBarcode } from '@/lib/barcode-validation';
+import { analyzeBarcodeWithAdmFallback } from '@/lib/barcode-validation';
 import { printProductLabelsInBrowser } from '@/services/browser-label-print';
 import type { LabelType, ProdutoEtiqueta, ProdutosPorMarcaResponse } from '@/types/labels';
 import { USER_TYPES } from '@/types/auth-types';
@@ -293,8 +293,9 @@ export default function EtiquetasPorMarcaPage() {
                       <TableBody>
                         {visibleProducts.map((produto) => {
                           const selected = selecionados.has(produto.produtoId);
-                          const barcode = labelType === 'CAIXA_FECHADA' ? produto.codigoBarrasCaixaFechada : produto.codigoBarras;
-                          const hasBarcodeValido = analyzeBarcode(barcode).isValid;
+                          const barcodeValue = labelType === 'CAIXA_FECHADA' ? produto.codigoBarrasCaixaFechada : produto.codigoBarras;
+                          const barcode = analyzeBarcodeWithAdmFallback(barcodeValue, produto.codigoAdm);
+                          const hasBarcodeValido = barcode.isValid;
                           return (
                             <TableRow key={produto.produtoId} hover selected={selected}>
                               <TableCell padding="checkbox">
@@ -316,7 +317,7 @@ export default function EtiquetasPorMarcaPage() {
                               </TableCell>
                               <TableCell>{produto.marca || '-'}</TableCell>
                               <TableCell>{produto.codigoAdm}</TableCell>
-                              <TableCell>{barcode || '-'}</TableCell>
+                              <TableCell>{barcode.normalizedValue || '-'}</TableCell>
                               <TableCell align="center">
                                 {hasBarcodeValido ? (
                                   <Typography variant="caption" fontWeight={800} color="success.main">
@@ -324,7 +325,7 @@ export default function EtiquetasPorMarcaPage() {
                                   </Typography>
                                 ) : (
                                   <Typography variant="caption" fontWeight={800} color="warning.main">
-                                    Sem código de barras
+                                    {barcodeValue?.trim() ? 'Código de barras inválido' : 'Usará código ADM'}
                                   </Typography>
                                 )}
                               </TableCell>

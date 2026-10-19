@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { analyzeBarcode, isValidEan13, isValidEan8 } from '@/lib/barcode-validation';
+import { analyzeBarcode, analyzeBarcodeWithAdmFallback, isValidEan13, isValidEan8 } from '@/lib/barcode-validation';
 import { generateZplLabels } from '@/lib/zpl-generator';
 import { formatProductAdm } from '@/lib/product-label';
 import { mapSantriProductToEtiqueta } from '@/services/santri-products';
@@ -60,6 +60,12 @@ assert.equal(isValidEan8('55123457'), true);
 assert.equal(analyzeBarcode('ABCD-1234').type, 'CODE128');
 assert.equal(analyzeBarcode('').isValid, false);
 assert.equal(analyzeBarcode('1234567890123').isValid, false);
+assert.deepEqual(analyzeBarcodeWithAdmFallback(null, '100879'), {
+  isValid: true,
+  type: 'CODE128',
+  normalizedValue: '100879',
+});
+assert.equal(analyzeBarcodeWithAdmFallback('1234567890123', '100879').isValid, false);
 
 const zpl1 = generateZplLabels(produto, 1);
 const zpl2 = generateZplLabels(produto, 2);
@@ -87,6 +93,11 @@ assert.match(product100x60Zpl, /0087946736552/);
 assert.match(product100x60Zpl, /BASE REG GAVETA 3\/4/);
 assert.match(product100x60Zpl, /VERSALLI/);
 assert.doesNotMatch(product100x60Zpl, /CAIXA FECHADA/);
+const productWithoutBarcode = { ...produto, codigoBarras: null, codigoBarrasCaixaFechada: null };
+assert.match(generateZplLabels(productWithoutBarcode, 1), /\^BCN/);
+assert.match(generateZplLabels(productWithoutBarcode, 1), /\^FD100879\^FS/);
+assert.match(generateZplLabels(productWithoutBarcode, 1, 'PRODUTO_100X60'), /\^FD100879\^FS/);
+assert.match(generateZplLabels(productWithoutBarcode, 1, 'CAIXA_FECHADA'), /\^FD100879\^FS/);
 assert.match(
   generateZplLabels({ ...produto, nome: 'PRODUTO COM NOME MUITO GRANDE PARA TESTE DE QUEBRA CONTROLADA NA ETIQUETA' }, 1),
   /…|\^FDPRODUTO COM NOME/

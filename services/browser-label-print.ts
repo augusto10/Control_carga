@@ -1,5 +1,5 @@
 import JsBarcode from 'jsbarcode';
-import { analyzeBarcode } from '@/lib/barcode-validation';
+import { analyzeBarcodeWithAdmFallback } from '@/lib/barcode-validation';
 import { formatProductAdm } from '@/lib/product-label';
 import { formatarNomeTransportadora } from '@/lib/etiquetas-transporte';
 import { LabelType, ProdutoEtiqueta } from '@/types/labels';
@@ -206,9 +206,8 @@ export async function printProductLabelsInBrowser(
 
   const labelItems = produtos.flatMap((produto) => {
     const selectedBarcode = isClosedBox ? produto.codigoBarrasCaixaFechada : produto.codigoBarras;
-    const barcode = analyzeBarcode(selectedBarcode);
+    const barcode = analyzeBarcodeWithAdmFallback(selectedBarcode, produto.codigoAdm);
 
-    // Produtos sem código de barras válido: gerar etiqueta sem barcode
     const barcodeSvg = (barcode.isValid && barcode.type !== 'UNSUPPORTED')
       ? buildBarcodeSvg(
           barcode.normalizedValue,
@@ -222,7 +221,7 @@ export async function printProductLabelsInBrowser(
               }
             : undefined,
         )
-      : '<span style="font-size:10px;color:#b45309;font-weight:700;">SEM CÓDIGO DE BARRAS</span>';
+      : '<span style="font-size:10px;color:#b45309;font-weight:700;">CÓDIGO INDISPONÍVEL</span>';
     const barcodeValue = (barcode.isValid && barcode.type !== 'UNSUPPORTED') ? barcode.normalizedValue : '';
 
     const variant = isA4Product

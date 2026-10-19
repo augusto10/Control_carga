@@ -1,4 +1,4 @@
-import { analyzeBarcode } from '@/lib/barcode-validation';
+import { analyzeBarcodeWithAdmFallback } from '@/lib/barcode-validation';
 import { LabelType, ProdutoEtiqueta } from '@/types/labels';
 
 const UNIT_LABEL_WIDTH = 264;
@@ -76,7 +76,7 @@ function getBarcode(produto: ProdutoEtiqueta, labelType: LabelType) {
 }
 
 function buildUnitLabel(produto: ProdutoEtiqueta, x: number) {
-  const analysis = analyzeBarcode(produto.codigoBarras);
+  const analysis = analyzeBarcodeWithAdmFallback(produto.codigoBarras, produto.codigoAdm);
   if (!analysis.isValid || analysis.type === 'UNSUPPORTED') {
     throw new Error(analysis.reason || 'Codigo de barras invalido.');
   }
@@ -121,7 +121,7 @@ function buildUnitPages(produto: ProdutoEtiqueta, quantidade: number) {
 }
 
 function buildClosedBoxPage(produto: ProdutoEtiqueta) {
-  const analysis = analyzeBarcode(produto.codigoBarrasCaixaFechada);
+  const analysis = analyzeBarcodeWithAdmFallback(produto.codigoBarrasCaixaFechada, produto.codigoAdm);
   if (!analysis.isValid || analysis.type === 'UNSUPPORTED') {
     throw new Error(analysis.reason || 'Codigo de barras da caixa fechada invalido.');
   }
@@ -147,7 +147,7 @@ function buildClosedBoxPage(produto: ProdutoEtiqueta) {
 }
 
 function buildProduct100x60Page(produto: ProdutoEtiqueta) {
-  const analysis = analyzeBarcode(produto.codigoBarras);
+  const analysis = analyzeBarcodeWithAdmFallback(produto.codigoBarras, produto.codigoAdm);
   if (!analysis.isValid || analysis.type === 'UNSUPPORTED') {
     throw new Error(analysis.reason || 'Codigo de barras do produto invalido.');
   }
@@ -180,11 +180,9 @@ export function generateZplLabels(
     throw new Error('Quantidade de etiquetas invalida.');
   }
 
-  const selectedBarcode = getBarcode(produto, labelType);
-  if (!selectedBarcode) {
-    throw new Error(labelType === 'CAIXA_FECHADA'
-      ? 'Este produto nao possui codigo de barras de caixa fechada.'
-      : 'Este produto nao possui codigo de barras cadastrado.');
+  const barcode = analyzeBarcodeWithAdmFallback(getBarcode(produto, labelType), produto.codigoAdm);
+  if (!barcode.isValid || barcode.type === 'UNSUPPORTED') {
+    throw new Error(barcode.reason || 'Codigo do produto invalido.');
   }
 
   if (labelType === 'CAIXA_FECHADA') {

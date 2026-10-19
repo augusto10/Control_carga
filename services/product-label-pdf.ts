@@ -1,7 +1,7 @@
 import JsBarcode from 'jsbarcode';
 import type { PDFFont, PDFPage } from 'pdf-lib';
 import type { ProdutoEtiqueta } from '@/types/labels';
-import { analyzeBarcode } from '@/lib/barcode-validation';
+import { analyzeBarcodeWithAdmFallback } from '@/lib/barcode-validation';
 import { formatProductAdm } from '@/lib/product-label';
 
 const MM = 72 / 25.4;
@@ -100,7 +100,7 @@ async function loadProductImagePng(url: string | null) {
 
 async function createProductLabelsPdfBlob(produto: ProdutoEtiqueta, quantidade: number) {
   const total = Math.max(1, Math.floor(quantidade));
-  const barcode = analyzeBarcode(produto.codigoBarras);
+  const barcode = analyzeBarcodeWithAdmFallback(produto.codigoBarras, produto.codigoAdm);
   if (!barcode.isValid || barcode.type === 'UNSUPPORTED') {
     throw new Error(barcode.reason || 'Codigo de barras invalido.');
   }
@@ -237,7 +237,7 @@ async function createMultiProductLabelsPdfBlob(produtos: ProdutoEtiqueta[]) {
   const border = 0.6 * MM;
 
   for (const produto of produtos) {
-    const barcode = analyzeBarcode(produto.codigoBarras);
+    const barcode = analyzeBarcodeWithAdmFallback(produto.codigoBarras, produto.codigoAdm);
     if (!barcode.isValid || barcode.type === 'UNSUPPORTED') {
       throw new Error(`${produto.nome}: ${barcode.reason || 'Codigo de barras invalido.'}`);
     }

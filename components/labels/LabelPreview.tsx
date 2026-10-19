@@ -1,5 +1,5 @@
 import { Box, Stack, Typography, alpha, useTheme } from '@mui/material';
-import { analyzeBarcode } from '@/lib/barcode-validation';
+import { analyzeBarcodeWithAdmFallback } from '@/lib/barcode-validation';
 import { formatProductAdm } from '@/lib/product-label';
 import { LabelType, ProdutoEtiqueta } from '@/types/labels';
 
@@ -127,8 +127,9 @@ export function LabelPreview({ produto, quantidade, labelType = 'UNITARIA' }: La
   const isA4ProductVerticalDouble = labelType === 'A4_PRODUTO_VERTICAL_DUPLA';
   const isA4ProductVerticalLargeDouble = labelType === 'A4_PRODUTO_VERTICAL_GRANDE_DUPLA';
   const isA4ProductVerticalTriple = labelType === 'A4_PRODUTO_VERTICAL_TRIPLA';
-  const selectedBarcode = isClosedBox ? produto.codigoBarrasCaixaFechada : produto.codigoBarras;
-  const barcode = analyzeBarcode(selectedBarcode);
+  const barcodeValue = isClosedBox ? produto.codigoBarrasCaixaFechada : produto.codigoBarras;
+  const barcode = analyzeBarcodeWithAdmFallback(barcodeValue, produto.codigoAdm);
+  const selectedBarcode = barcode.isValid ? barcode.normalizedValue : '';
   const total = Math.max(1, quantidade);
 
   return (
