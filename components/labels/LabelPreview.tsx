@@ -130,6 +130,7 @@ export function LabelPreview({ produto, quantidade, labelType = 'UNITARIA' }: La
   const barcodeValue = isClosedBox ? produto.codigoBarrasCaixaFechada : produto.codigoBarras;
   const barcode = analyzeBarcodeWithAdmFallback(barcodeValue, produto.codigoAdm);
   const selectedBarcode = barcode.isValid ? barcode.normalizedValue : '';
+  const usesAdmFallback = !String(barcodeValue ?? '').trim() && barcode.isValid;
   const total = Math.max(1, quantidade);
 
   return (
@@ -300,9 +301,16 @@ export function LabelPreview({ produto, quantidade, labelType = 'UNITARIA' }: La
                   {selectedBarcode || 'Sem codigo'}
                 </Typography>
               </Box>
-              <Typography variant="caption" display="block" textAlign="center" color="text.secondary">
-                ADM {produto.codigoAdm}
-              </Typography>
+              <Box>
+                <Typography variant="caption" display="block" textAlign="center" color="text.secondary">
+                  ADM {produto.codigoAdm}
+                </Typography>
+                {usesAdmFallback && (
+                  <Typography variant="caption" display="block" textAlign="center" color="text.secondary">
+                    CÓDIGO ORIGINAL {produto.codigoOriginal || '-'}
+                  </Typography>
+                )}
+              </Box>
             </Box>
           )
         ))}

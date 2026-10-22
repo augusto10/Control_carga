@@ -96,6 +96,7 @@ function buildProductLabelMarkup(
   variant: 'a4-horizontal' | 'a4-landscape' | 'a4-horizontal-triple' | 'a4-vertical' | 'a4-vertical-double' | 'a4-vertical-double-large' | 'a4-vertical-triple' | 'small',
   isClosedBox: boolean,
   isProduct100x60: boolean,
+  usesAdmFallback: boolean,
   imageMap?: Map<string, string>,
 ) {
   const imageUrl = (produto.imagemUrl && imageMap?.get(produto.imagemUrl))
@@ -166,8 +167,9 @@ function buildProductLabelMarkup(
       <div class="title">${escapeHtml(produto.nome)}</div>
       <div class="brand">${escapeHtml(produto.marca || 'Sem marca')}</div>
       ${isClosedBox ? `<div class="box-info">CAIXA FECHADA - ${produto.quantidadeCaixaFechada || '-'} UN</div>` : ''}
-      <div class="barcode">${barcodeSvg}</div>
+      <div class="barcode${usesAdmFallback ? ' barcode-adm-fallback' : ''}">${barcodeSvg}</div>
       <div class="adm">ADM ${escapeHtml(produto.codigoAdm)}</div>
+      ${usesAdmFallback ? `<div class="adm-original">CÓDIGO ORIGINAL ${escapeHtml(produto.codigoOriginal || '-')}</div>` : ''}
     </article>
   `;
 }
@@ -207,6 +209,7 @@ export async function printProductLabelsInBrowser(
   const labelItems = produtos.flatMap((produto) => {
     const selectedBarcode = isClosedBox ? produto.codigoBarrasCaixaFechada : produto.codigoBarras;
     const barcode = analyzeBarcodeWithAdmFallback(selectedBarcode, produto.codigoAdm);
+    const usesAdmFallback = !String(selectedBarcode ?? '').trim() && barcode.isValid;
 
     const barcodeSvg = (barcode.isValid && barcode.type !== 'UNSUPPORTED')
       ? buildBarcodeSvg(
@@ -245,6 +248,7 @@ export async function printProductLabelsInBrowser(
       variant,
       isClosedBox,
       isProduct100x60,
+      usesAdmFallback,
       imageMap,
     );
 
@@ -389,7 +393,8 @@ export async function printProductLabelsInBrowser(
           }
 
           .label-product-wide .brand,
-          .label-product-wide .adm {
+          .label-product-wide .adm,
+          .label-product-wide .adm-original {
             font-size: 12px;
           }
 
@@ -425,6 +430,16 @@ export async function printProductLabelsInBrowser(
             width: 100%;
             max-width: 54mm;
             height: auto;
+          }
+
+          .barcode-adm-fallback svg {
+            width: auto;
+            max-width: 100%;
+          }
+
+          .adm-original {
+            font-size: 8px;
+            text-align: center;
           }
 
           .label-a4 {

@@ -94,10 +94,17 @@ assert.match(product100x60Zpl, /BASE REG GAVETA 3\/4/);
 assert.match(product100x60Zpl, /VERSALLI/);
 assert.doesNotMatch(product100x60Zpl, /CAIXA FECHADA/);
 const productWithoutBarcode = { ...produto, codigoBarras: null, codigoBarrasCaixaFechada: null };
-assert.match(generateZplLabels(productWithoutBarcode, 1), /\^BCN/);
-assert.match(generateZplLabels(productWithoutBarcode, 1), /\^FD100879\^FS/);
-assert.match(generateZplLabels(productWithoutBarcode, 1, 'PRODUTO_100X60'), /\^FD100879\^FS/);
-assert.match(generateZplLabels(productWithoutBarcode, 1, 'CAIXA_FECHADA'), /\^FD100879\^FS/);
+const fallbackUnitLabel = generateZplLabels(productWithoutBarcode, 1);
+assert.match(fallbackUnitLabel, /\^FO64,78\^BY2,2,30\^BCN/);
+assert.match(fallbackUnitLabel, /\^FD100879\^FS/);
+assert.match(fallbackUnitLabel, /\^FO0,137\^FB264,1,0,C,0\^A0N,10,10\^FDADM 100879\^FS/);
+assert.match(fallbackUnitLabel, /\^FO0,153\^FB264,1,0,C,0\^A0N,8,8\^FDCODIGO ORIGINAL BASE-REG-34\^FS/);
+const fallbackWideLabel = generateZplLabels(productWithoutBarcode, 1, 'PRODUTO_100X60');
+assert.match(fallbackWideLabel, /\^FO298,155\^BY3,2,150\^BCN/);
+assert.match(fallbackWideLabel, /\^FDCODIGO ORIGINAL BASE-REG-34\^FS/);
+const fallbackClosedBoxLabel = generateZplLabels(productWithoutBarcode, 1, 'CAIXA_FECHADA');
+assert.match(fallbackClosedBoxLabel, /\^FO298,205\^BY3,2,120\^BCN/);
+assert.match(fallbackClosedBoxLabel, /\^FDCODIGO ORIGINAL BASE-REG-34\^FS/);
 assert.match(
   generateZplLabels({ ...produto, nome: 'PRODUTO COM NOME MUITO GRANDE PARA TESTE DE QUEBRA CONTROLADA NA ETIQUETA' }, 1),
   /…|\^FDPRODUTO COM NOME/
