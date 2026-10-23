@@ -12,8 +12,26 @@
   .card-shadow {
     @apply shadow-soft border border-slate-200/60;
   }
-  
+
   .glass {
     @apply bg-white/80 backdrop-blur-md border border-white/20;
   }
+}
+
+@keyframes separacao-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.separacao-marquee {
+  animation: separacao-marquee 30s linear infinite;
+}
+
+.separacao-marquee:hover,
+.separacao-marquee:active {
+  animation-play-state: paused;
 }

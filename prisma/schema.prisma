@@ -93,6 +93,28 @@ model Usuario {
   historicoImpressaoEtiquetas LabelPrintHistory[]
   checklistsRecebimento ChecklistRecebimento[] // Checklists de recebimento criados
   roteirizacoes       Roteirizacao[]         // Roteirizações criadas
+  pedidosEmSeparacao  Pedidos[]              // Separações atribuídas ao separador
+}
+
+enum StatusPedidoSeparacao {
+  EM_SEPARACAO
+  FINALIZADO
+  CANCELADO
+}
+
+model Pedidos {
+  id             String                @id @default(uuid())
+  pedidoId       Int                   // ID do pedido no ERP (= PedidoLogisticaSnapshot.pedidoId)
+  usuarioId      String                // Separador responsável (usuário logado que associou)
+  usuario        Usuario               @relation(fields: [usuarioId], references: [id])
+  status         StatusPedidoSeparacao @default(EM_SEPARACAO)
+  jobId          String?               // Job criado no banco de automação
+  dataAssociacao DateTime              @default(now())
+  dataFim        DateTime?
+
+  @@index([status, dataAssociacao])
+  @@index([usuarioId, status])
+  @@index([pedidoId])
 }
 
 model AuditoriaAcesso {
