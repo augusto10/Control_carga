@@ -1,0 +1,74 @@
+// =============================================================================
+// BANCO DE AUTOMAÇÃO (separado do banco principal do Controle de Carga)
+// -----------------------------------------------------------------------------
+// Este schema aponta EXCLUSIVAMENTE para AUTOMATION_DATABASE_URL e gera um
+// Prisma Client próprio em `generated/prisma-automation`.
+//
+// IMPORTANTE:
+// - NÃO executar `prisma migrate` neste schema sem confirmar que
+//   AUTOMATION_DATABASE_URL aponta para o banco de automação correto.
+// - As migrations ficam isoladas em `prisma/automation/migrations` e jamais
+//   devem ser misturadas com `prisma/migrations` (banco principal).
+// - O schema principal (`prisma/schema.prisma`) e o client padrão
+//   (`@prisma/client`) NÃO são afetados por este arquivo.
+// =============================================================================
+
+generator client {
+  provider      = "prisma-client-js"
+  output        = "../../generated/prisma-automation"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+  engineType    = "library"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("AUTOMATION_DATABASE_URL")
+}
+
+/// Estados possíveis de um job de automação
+enum JobStatus {
+  QUEUED
+  RUNNING
+  SUCCESS
+  FAILED
+  CANCELLED
+}
+
+/// Instalação autorizada do Agent Windows
+model Agent {
+  id              String    @id @default(uuid())
+  agentCode       String    @unique
+  name            String
+  tokenHash       String    @unique
+  isEnabled       Boolean   @default(true)
+  lastHeartbeatAt DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  jobs            Job[]
+
+  @@index([isEnabled])
+  @@map("agents")
+}
+
+/// Tarefa solicitada para execução no ERP por um agent
+model Job {
+  id              String    @id @default(uuid())
+  type            String
+  status          JobStatus @default(QUEUED)
+  payload         Json
+  result          Json?
+  errorMessage    String?
+  agentId         String?
+  agent           Agent?    @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  attempts        Int       @default(0)
+  createdAt       DateTime  @default(now())
+  startedAt       DateTime?
+  lastHeartbeatAt DateTime?
+  finishedAt      DateTime?
+
+  // Fila: consulta mais frequente é "próximo job QUEUED, mais antigo primeiro"
+  @@index([status, createdAt])
+  @@index([agentId])
+  @@index([type])
+  @@map("jobs")
+}

@@ -121,7 +121,7 @@ const STATUS_META: Record<StatusCode, { codigo: StatusCode; titulo: string; desc
   },
 };
 
-const toNumber = (value: unknown): number | null => {
+export const toNumber = (value: unknown): number | null => {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
   if (typeof value === 'string') {
     const parsed = Number(value.replace(',', '.'));
@@ -130,7 +130,7 @@ const toNumber = (value: unknown): number | null => {
   return null;
 };
 
-const toStringValue = (value: unknown): string | null => {
+export const toStringValue = (value: unknown): string | null => {
   if (typeof value === 'string') {
     const trimmed = value.trim();
     return trimmed || null;
@@ -155,7 +155,7 @@ const normalizeNumeroNota = (value: string | null | undefined) => {
   return digits.replace(/^0+/, '') || '0';
 };
 
-const parsePedidoDate = (value: unknown): Date | null => {
+export const parsePedidoDate = (value: unknown): Date | null => {
   if (!value) return null;
   if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
 
@@ -178,7 +178,7 @@ const dateOnly = (value: Date | null) =>
 
 const toIso = (value: Date | null | undefined) => value?.toISOString?.() || null;
 
-const getPedidoId = (pedido: Record<string, unknown>) =>
+export const getPedidoId = (pedido: Record<string, unknown>) =>
   toNumber(
     pedido.pedido_id ??
       pedido.ORCAMENTO_ID ??
@@ -192,7 +192,7 @@ const getPedidoId = (pedido: Record<string, unknown>) =>
 
 // O endpoint consolidado pode devolver os dados do pedido dentro de `pedido`.
 // Normalizamos antes de salvar para nunca perder o tipo de entrega no filtro.
-const normalizarPedidoConsolidado = (entrada: Record<string, unknown>) => {
+export const normalizarPedidoConsolidado = (entrada: Record<string, unknown>) => {
   const pedidoInterno = entrada.pedido && typeof entrada.pedido === 'object'
     ? (entrada.pedido as Record<string, unknown>)
     : {};
@@ -286,7 +286,7 @@ const contemTipoRetirada = (valor: unknown, visitados = new Set<unknown>()): boo
   return Object.values(registro).some((item) => contemTipoRetirada(item, visitados));
 };
 
-const isPedidoPermitidoNoDashboard = (
+export const isPedidoPermitidoNoDashboard = (
   pedido: Record<string, unknown>,
   logistica?: Record<string, any> | null,
   permitirTipoAusente = false
@@ -297,7 +297,7 @@ const isPedidoPermitidoNoDashboard = (
   return tipos.some((tipo) => ['ENT', 'EPG'].includes(tipo)) || (permitirTipoAusente && tipos.length === 0);
 };
 
-const getTipoEntregaPrincipal = (pedido: Record<string, unknown>, logistica?: Record<string, any> | null) =>
+export const getTipoEntregaPrincipal = (pedido: Record<string, unknown>, logistica?: Record<string, any> | null) =>
   getTiposEntrega(pedido, logistica)[0] || null;
 
 const getStatusSeparacoes = (pedido: Record<string, unknown>) =>
@@ -306,7 +306,7 @@ const getStatusSeparacoes = (pedido: Record<string, unknown>) =>
     .map((item) => item.trim().toUpperCase())
     .filter(Boolean);
 
-const deriveDashboardStatus = (
+export const deriveDashboardStatus = (
   pedido: Record<string, unknown>,
   statusLogistico: Record<string, unknown>,
   logistica: Record<string, any> | null
@@ -399,7 +399,7 @@ const isSeparacaoCancelada = (pedido: Record<string, unknown> | null, logistica:
   );
 };
 
-const isPedidoComPendencias = (pedido: Record<string, unknown>, logistica: Record<string, any> | null) => {
+export const isPedidoComPendencias = (pedido: Record<string, unknown>, logistica: Record<string, any> | null) => {
   if (pedidoTemDevolucao(pedido, logistica) || isSeparacaoCancelada(pedido, logistica)) return false;
 
   const statusLogisticoCodigo = toStringValue(

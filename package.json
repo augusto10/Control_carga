@@ -4,9 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && next build",
+    "build": "prisma generate && prisma generate --schema prisma/automation/schema.prisma && next build",
     "start": "next start",
-    "postinstall": "prisma generate",
+    "postinstall": "prisma generate && prisma generate --schema prisma/automation/schema.prisma",
     "lint": "next lint --fix || node -e \"process.exit(0)\"",
     "type-check": "tsc --noEmit || node -e \"process.exit(0)\"",
     "test:labels": "ts-node -r tsconfig-paths/register tests/labels.test.ts",
@@ -15,7 +15,10 @@
     "migration:logistica-snapshot": "node scripts/aplicar-logistica-snapshot-migration.js",
     "correcao-temporaria": "ts-node scripts/aplicar-correcao-temporaria.ts",
     "reverter-correcao-temporaria": "ts-node scripts/aplicar-correcao-temporaria.ts reverter",
-    "migration-producao": "ts-node scripts/executar-migration-producao.ts"
+    "migration-producao": "ts-node scripts/executar-migration-producao.ts",
+    "prisma:automation:generate": "prisma generate --schema prisma/automation/schema.prisma",
+    "prisma:automation:migrate": "prisma migrate deploy --schema prisma/automation/schema.prisma",
+    "prisma:automation:migrate:dev": "prisma migrate dev --schema prisma/automation/schema.prisma"
   },
   "engines": {
     "node": "22.x"
