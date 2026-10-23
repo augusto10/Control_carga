@@ -1,5 +1,8 @@
 import { useCurrentDashboard } from '@/hooks/useCurrentDashboard';
-import { removerPedidosEntreguesPelaSsw } from '@/lib/dashboard-ssw-alerts';
+import {
+  removerPedidosEmbarcadosPelaSsw,
+  removerPedidosEntreguesPelaSsw,
+} from '@/lib/dashboard-ssw-alerts';
 import { resumirPedidosPorStatus } from '@/lib/pedido-resumo-status';
 import { PedidoInformacoes } from '@/components/dashboard/PedidoInformacoes';
 import { ResumoStatusPedidos } from '@/components/dashboard/ResumoStatusPedidos';
@@ -550,7 +553,9 @@ function Home() {
   const dashboardRef = useRef<DashboardLogisticaData | null>(null);
   const acaoFiltroPendenteRef = useRef<'apply' | 'clear' | null>(null);
   const lastDashboardSyncRef = useRef(0);
-  const sswResultadosRef = useRef(new Map<string, { entregue: boolean; consultadoEm: number }>());
+  const sswResultadosRef = useRef(
+    new Map<string, { embarcado: boolean; entregue: boolean; consultadoEm: number }>()
+  );
   const sswConsultasAtivasRef = useRef(new Set<string>());
   const [sswConsultasPendentes, setSswConsultasPendentes] = useState(0);
 
@@ -599,11 +604,17 @@ function Home() {
 
     const dadosValidados = {
       ...data,
-      indicadores: removerPedidosEntreguesPelaSsw(
-        data.indicadores,
+      indicadores: removerPedidosEmbarcadosPelaSsw(
+        removerPedidosEntreguesPelaSsw(
+          data.indicadores,
+          new Set(candidatos
+            .map(({ pedido }) => pedido)
+            .filter((pedido) => resultadoRecente(pedido)?.entregue)
+            .map((pedido) => pedido.pedidoId))
+        ),
         new Set(candidatos
           .map(({ pedido }) => pedido)
-          .filter((pedido) => resultadoRecente(pedido)?.entregue)
+          .filter((pedido) => resultadoRecente(pedido)?.embarcado)
           .map((pedido) => pedido.pedidoId))
       ).map((item) => {
         if (item.codigo !== 'ALERTAS_NAO_ENTREGUES') return item;
@@ -634,6 +645,7 @@ function Home() {
         if (pedido.numeroNota) params.set('numeroNota', pedido.numeroNota);
         if (pedido.transportadoraNome) params.set('transportadora', pedido.transportadoraNome);
 
+        let embarcado = false;
         let entregue = false;
         try {
           const response = await fetch(`/api/pedidos/${pedido.pedidoId}/logistica?${params.toString()}`, {
@@ -641,23 +653,31 @@ function Home() {
             cache: 'no-store',
           });
           const payload = await response.json().catch(() => null);
+          embarcado = response.ok && payload?.ssw?.found === true;
           entregue = response.ok && payload?.ssw?.delivered === true;
         } catch {
+          embarcado = false;
           entregue = false;
         }
 
-        sswResultadosRef.current.set(cacheKey, { entregue, consultadoEm: Date.now() });
+        sswResultadosRef.current.set(cacheKey, { embarcado, entregue, consultadoEm: Date.now() });
         setDashboardAlertas((atual) => {
           if (!atual) return atual;
-          const indicadoresFiltrados = entregue
-            ? removerPedidosEntreguesPelaSsw(atual.indicadores, new Set([pedido.pedidoId]))
-            : atual.indicadores;
+          const indicadoresFiltrados = removerPedidosEmbarcadosPelaSsw(
+            entregue
+              ? removerPedidosEntreguesPelaSsw(atual.indicadores, new Set([pedido.pedidoId]))
+              : atual.indicadores,
+            embarcado ? new Set([pedido.pedidoId]) : new Set()
+          );
           return {
             ...atual,
             indicadores: indicadoresFiltrados.map((item) => {
               if (!codigosAlerta.has(item.codigo)) return item;
               const pedidos = item.pedidos.filter((candidato) => candidato.pedidoId !== pedido.pedidoId);
-              if (!entregue) pedidos.push(pedido);
+              const permaneceNoAlerta = item.codigo === 'ALERTAS_NAO_EMBARCADOS'
+                ? !embarcado
+                : !entregue;
+              if (permaneceNoAlerta) pedidos.push(pedido);
               pedidos.sort((a, b) => b.pedidoId - a.pedidoId);
               return { ...item, pedidos, total: pedidos.length };
             }),
