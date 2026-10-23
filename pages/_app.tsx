@@ -58,17 +58,14 @@ import { AuthProvider } from '../contexts/AuthContext';
 import { ConfiguracaoProvider } from '../contexts/ConfiguracaoContext';
 import ProtectedRoute from '../components/ProtectedRoute';
 import { AppLayout } from '../components/layout/AppLayout';
-
-// Lista de rotas públicas que não requerem autenticação
-// '/separacao' é o totem de separação: as APIs se protegem por x-totem-token
-const publicRoutes = ['/login', '/esqueci-senha', '/cadastro', '/separacao'];
+import { PUBLIC_ROUTES } from '../lib/public-routes';
 
 // Removendo o estado loading e o GlobalLoader
 // O carregamento agora será gerenciado pelos contextos
 function MyApp({ Component, pageProps }: AppProps) {
   const [mounted, setMounted] = useState(false);
   const router = useRouter();
-  const isPublicRoute = publicRoutes.includes(router.pathname);
+  const isPublicRoute = PUBLIC_ROUTES.includes(router.pathname);
   const isMobileSnack = useMediaQuery('(max-width:600px)', { noSsr: true });
   const anchorOrigin = isMobileSnack
     ? ({ vertical: 'bottom', horizontal: 'center' } as const)
