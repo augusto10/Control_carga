@@ -18,16 +18,12 @@ import { cn } from '@/utils/cn';
 
 const POLLING_MS = 20_000;
 
-// Página pública (totem): as APIs de separação aceitam este token no lugar
-// da sessão JWT. Ver `withTotemOrAuth`.
+// Página pública (totem): as APIs de separação autenticam pelo cookie
+// httpOnly `totem_auth`, emitido uma única vez por GET /api/totem/auth?k=
+// (pareamento do tablet). Ver `withTotemOrAuth`. Cookies same-origin são
+// enviados automaticamente pelo fetch — não há token no bundle.
 const fetchTotem = (url: string, init?: RequestInit) =>
-  fetch(url, {
-    ...init,
-    headers: {
-      ...(init?.headers ?? {}),
-      'x-totem-token': process.env.NEXT_PUBLIC_TOTEM_TOKEN ?? '',
-    },
-  });
+  fetch(url, { ...init, credentials: 'same-origin' });
 
 type PedidoFila = {
   pedidoId: number;
@@ -132,6 +128,12 @@ function SeparacaoContent() {
         fetchTotem('/api/separacao/fila'),
         fetchTotem('/api/separacao/ativas'),
       ]);
+      if (resFila.status === 401 || resAtivas.status === 401) {
+        throw new Error(
+          'Totem não autorizado. Abra o link de pareamento (/api/totem/auth?k=…) neste tablet para liberar o acesso.'
+        );
+      }
+
       const [dataFila, dataAtivas] = await Promise.all([
         resFila.json(),
         resAtivas.json(),
