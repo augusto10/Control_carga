@@ -45,6 +45,13 @@ export default async function handler(
         ? [req.body.pedidoId]
         : [];
 
+    if (pedidoIds.length !== 1) {
+      return res.status(400).json({
+        success: false,
+        message: 'Informe exatamente um pedido por execucao da automacao.',
+      });
+    }
+
     const result = await emitirListaSeparacaoNoErp({ pedidoIds });
 
     if (!result.ok) {

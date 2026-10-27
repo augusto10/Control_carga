@@ -1,0 +1,24 @@
+{
+  "generatedAt": "2026-10-07T19:27:50.406Z",
+  "baseUrl": "http://ec2-15-229-152-29.sa-east-1.compute.amazonaws.com",
+  "companyId": "1",
+  "summary": {
+    "listed": 0,
+    "added": 1,
+    "changed": 0,
+    "unchanged": 0,
+    "removalCandidates": 0,
+    "failed": 0
+  },
+  "added": [
+    {
+      "id": "38716",
+      "name": "FITA CREPE PINTURA IMOBILIARIA 527S 48MM X 50M AZ",
+      "brand": "ADERE",
+      "group": "FITAS ADESIVAS"
+    }
+  ],
+  "changed": [],
+  "removalCandidates": [],
+  "failed": []
+}

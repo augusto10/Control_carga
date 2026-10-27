@@ -1,5 +1,5 @@
 import JsBarcode from 'jsbarcode';
-import { analyzeBarcode } from '@/lib/barcode-validation';
+import { analyzeBarcodeWithAdmFallback } from '@/lib/barcode-validation';
 import { formatProductAdm } from '@/lib/product-label';
 import { formatarNomeTransportadora } from '@/lib/etiquetas-transporte';
 import { LabelType, ProdutoEtiqueta } from '@/types/labels';
@@ -95,6 +95,8 @@ function buildProductLabelMarkup(
   barcodeValue: string,
   variant: 'a4-horizontal' | 'a4-landscape' | 'a4-horizontal-triple' | 'a4-vertical' | 'a4-vertical-double' | 'a4-vertical-double-large' | 'a4-vertical-triple' | 'small',
   isClosedBox: boolean,
+  isProduct100x60: boolean,
+  usesAdmFallback: boolean,
   imageMap?: Map<string, string>,
 ) {
   const imageUrl = (produto.imagemUrl && imageMap?.get(produto.imagemUrl))
@@ -161,12 +163,13 @@ function buildProductLabelMarkup(
   }
 
   return `
-    <article class="label">
+    <article class="label${isProduct100x60 ? ' label-product-wide' : ''}">
       <div class="title">${escapeHtml(produto.nome)}</div>
       <div class="brand">${escapeHtml(produto.marca || 'Sem marca')}</div>
       ${isClosedBox ? `<div class="box-info">CAIXA FECHADA - ${produto.quantidadeCaixaFechada || '-'} UN</div>` : ''}
-      <div class="barcode">${barcodeSvg}</div>
+      <div class="barcode${usesAdmFallback ? ' barcode-adm-fallback' : ''}">${barcodeSvg}</div>
       <div class="adm">ADM ${escapeHtml(produto.codigoAdm)}</div>
+      ${usesAdmFallback ? `<div class="adm-original">CÓDIGO ORIGINAL ${escapeHtml(produto.codigoOriginal || '-')}</div>` : ''}
     </article>
   `;
 }
@@ -185,6 +188,7 @@ export async function printProductLabelsInBrowser(
   if (typeof window === 'undefined') return;
 
   const isClosedBox = labelType === 'CAIXA_FECHADA';
+  const isProduct100x60 = labelType === 'PRODUTO_100X60';
   const isA4Product = labelType === 'A4_PRODUTO';
   const isA4ProductLandscape = labelType === 'A4_PRODUTO_LANDSCAPE';
   const isA4ProductVertical = labelType === 'A4_PRODUTO_VERTICAL';
@@ -204,9 +208,9 @@ export async function printProductLabelsInBrowser(
 
   const labelItems = produtos.flatMap((produto) => {
     const selectedBarcode = isClosedBox ? produto.codigoBarrasCaixaFechada : produto.codigoBarras;
-    const barcode = analyzeBarcode(selectedBarcode);
+    const barcode = analyzeBarcodeWithAdmFallback(selectedBarcode, produto.codigoAdm);
+    const usesAdmFallback = !String(selectedBarcode ?? '').trim() && barcode.isValid;
 
-    // Produtos sem código de barras válido: gerar etiqueta sem barcode
     const barcodeSvg = (barcode.isValid && barcode.type !== 'UNSUPPORTED')
       ? buildBarcodeSvg(
           barcode.normalizedValue,
@@ -220,7 +224,7 @@ export async function printProductLabelsInBrowser(
               }
             : undefined,
         )
-      : '<span style="font-size:10px;color:#b45309;font-weight:700;">SEM CÓDIGO DE BARRAS</span>';
+      : '<span style="font-size:10px;color:#b45309;font-weight:700;">CÓDIGO INDISPONÍVEL</span>';
     const barcodeValue = (barcode.isValid && barcode.type !== 'UNSUPPORTED') ? barcode.normalizedValue : '';
 
     const variant = isA4Product
@@ -243,6 +247,8 @@ export async function printProductLabelsInBrowser(
       barcodeValue,
       variant,
       isClosedBox,
+      isProduct100x60,
+      usesAdmFallback,
       imageMap,
     );
 
@@ -350,9 +356,9 @@ export async function printProductLabelsInBrowser(
 
           .sheet {
             display: grid;
-            grid-template-columns: ${isA4Product ? '180mm' : isA4ProductLandscape ? '287mm' : isA4ProductVertical ? '200mm' : isA4ProductVerticalDouble ? 'repeat(3, 80mm)' : isA4ProductVerticalLargeDouble ? 'repeat(2, 135mm)' : isA4ProductVerticalTriple ? '150mm' : isClosedBox ? 'repeat(2, 100mm)' : 'repeat(3, 66mm)'};
+            grid-template-columns: ${isA4Product ? '180mm' : isA4ProductLandscape ? '287mm' : isA4ProductVertical ? '200mm' : isA4ProductVerticalDouble ? 'repeat(3, 80mm)' : isA4ProductVerticalLargeDouble ? 'repeat(2, 135mm)' : isA4ProductVerticalTriple ? '150mm' : isClosedBox || isProduct100x60 ? 'repeat(2, 100mm)' : 'repeat(3, 66mm)'};
             grid-template-rows: ${isA4Product ? 'repeat(2, 110mm)' : isA4ProductLandscape ? '200mm' : isA4ProductVertical ? '287mm' : isA4ProductVerticalDouble ? '140mm' : isA4ProductVerticalLargeDouble ? '190mm' : isA4ProductVerticalTriple ? 'repeat(3, 60mm)' : 'none'};
-            gap: ${isA4Product ? '40mm 0' : isA4ProductLandscape || isA4ProductVertical ? '0' : isA4ProductVerticalDouble ? '12mm' : isA4ProductVerticalLargeDouble ? '15mm' : isA4ProductVerticalTriple ? '8mm 0' : '4mm'};
+            gap: ${isA4Product ? '40mm 0' : isA4ProductLandscape || isA4ProductVertical ? '0' : isA4ProductVerticalDouble ? '12mm' : isA4ProductVerticalLargeDouble ? '15mm' : isA4ProductVerticalTriple ? '14mm 0' : '4mm'};
             justify-content: center;
             align-content: ${isA4ProductVertical || isA4ProductVerticalDouble || isA4ProductVerticalLargeDouble || isA4ProductVerticalTriple ? 'center' : 'start'};
             width: ${isLandscapeA4 ? '297mm' : isBrowserA4Product ? '210mm' : 'auto'};
@@ -364,8 +370,8 @@ export async function printProductLabelsInBrowser(
           }
 
           .label {
-            width: ${isA4Product ? '180mm' : isA4ProductLandscape ? '287mm' : isA4ProductVertical ? '200mm' : isA4ProductVerticalDouble ? '80mm' : isA4ProductVerticalLargeDouble ? '135mm' : isA4ProductVerticalTriple ? '150mm' : isClosedBox ? '100mm' : '66mm'};
-            height: ${isA4Product ? '110mm' : isA4ProductLandscape ? '200mm' : isA4ProductVertical ? '287mm' : isA4ProductVerticalDouble ? '140mm' : isA4ProductVerticalLargeDouble ? '190mm' : isA4ProductVerticalTriple ? '60mm' : isClosedBox ? '60mm' : '44mm'};
+            width: ${isA4Product ? '180mm' : isA4ProductLandscape ? '287mm' : isA4ProductVertical ? '200mm' : isA4ProductVerticalDouble ? '80mm' : isA4ProductVerticalLargeDouble ? '135mm' : isA4ProductVerticalTriple ? '150mm' : isClosedBox || isProduct100x60 ? '100mm' : '66mm'};
+            height: ${isA4Product ? '110mm' : isA4ProductLandscape ? '200mm' : isA4ProductVertical ? '287mm' : isA4ProductVerticalDouble ? '140mm' : isA4ProductVerticalLargeDouble ? '190mm' : isA4ProductVerticalTriple ? '60mm' : isClosedBox || isProduct100x60 ? '60mm' : '44mm'};
             border: 1px solid #94a3b8;
             padding: ${isBrowserA4Product ? '0' : '3mm'};
             display: flex;
@@ -380,6 +386,20 @@ export async function printProductLabelsInBrowser(
             font-weight: 700;
             text-align: center;
             line-height: 1.2;
+          }
+
+          .label-product-wide .title {
+            font-size: 14px;
+          }
+
+          .label-product-wide .brand,
+          .label-product-wide .adm,
+          .label-product-wide .adm-original {
+            font-size: 12px;
+          }
+
+          .label-product-wide .barcode svg {
+            max-width: 72mm;
           }
 
           .brand,
@@ -412,6 +432,16 @@ export async function printProductLabelsInBrowser(
             height: auto;
           }
 
+          .barcode-adm-fallback svg {
+            width: auto;
+            max-width: 100%;
+          }
+
+          .adm-original {
+            font-size: 8px;
+            text-align: center;
+          }
+
           .label-a4 {
             border: 0.6mm solid #172033;
             border-radius: 3mm;
@@ -426,28 +456,68 @@ export async function printProductLabelsInBrowser(
             border-radius: 3mm;
             overflow: hidden;
             display: grid;
-            grid-template-rows: 74fr 36fr;
+            grid-template-columns: minmax(0, 1fr);
+            grid-template-rows: minmax(0, 74fr) minmax(0, 36fr);
             font-family: "Arial Narrow", "Roboto Condensed", Arial, sans-serif;
           }
 
           .label-a4-horizontal-triple .product-details {
+            grid-column: 1;
+            grid-row: 1;
+            display: grid;
             grid-template-columns: 32mm minmax(0, 1fr);
+            width: 100%;
+            min-width: 0;
+            align-self: stretch;
+          }
+
+          .label-a4-horizontal-triple .product-image {
+            width: 32mm;
+            min-width: 0;
+            justify-self: stretch;
+            align-self: stretch;
           }
 
           .label-a4-horizontal-triple .product-copy {
+            width: 100%;
+            min-width: 0;
+            justify-self: stretch;
             grid-template-rows: 12mm 15mm 1fr;
+            align-self: stretch;
           }
 
           .label-a4-horizontal-triple .product-copy > .adm-large,
           .label-a4-horizontal-triple .product-copy > .identity,
           .label-a4-horizontal-triple .product-copy > .description {
-            width: auto;
+            width: 100%;
+            min-width: 0;
             margin: 0;
+          }
+
+          .label-a4-horizontal-triple .product-copy > .adm-large {
+            text-align: center;
+          }
+
+          .label-a4-horizontal-triple .identity,
+          .label-a4-horizontal-triple .description {
+            text-align: left;
+          }
+
+          .label-a4-horizontal-triple .barcode-large {
+            grid-column: 1;
+            grid-row: 2;
+            width: 100%;
+            min-width: 0;
+            justify-self: stretch;
+            align-self: stretch;
+            align-items: center;
+            box-sizing: border-box;
           }
 
           .label-a4-horizontal-triple .adm-large {
             font-size: 16pt;
             padding: 0.8mm 2mm;
+            justify-content: center;
           }
 
           .label-a4-horizontal-triple .meta-line,
@@ -460,11 +530,17 @@ export async function printProductLabelsInBrowser(
             padding: 0.8mm 2mm;
           }
 
+          .label-a4-horizontal-triple .identity {
+            align-items: flex-start;
+          }
+
           .label-a4-horizontal-triple .barcode-large {
-            padding: 0.8mm 24mm 0.4mm;
+            padding: 0.8mm 5mm 0.4mm;
           }
 
           .label-a4-horizontal-triple .barcode-large svg {
+            display: block;
+            margin-inline: auto;
             max-width: 120mm;
             max-height: 10mm;
           }
@@ -478,6 +554,7 @@ export async function printProductLabelsInBrowser(
             border-radius: 3mm;
             overflow: hidden;
             display: grid;
+            grid-template-columns: minmax(0, 1fr);
             grid-template-rows: 135fr 65fr;
             font-family: "Arial Narrow", "Roboto Condensed", Arial, sans-serif;
           }
@@ -503,8 +580,10 @@ export async function printProductLabelsInBrowser(
           .label-a4-landscape .product-copy > .identity,
           .label-a4-landscape .product-copy > .description {
             justify-self: stretch;
-            width: auto;
+            width: 100%;
+            min-width: 0;
             margin: 0;
+            box-sizing: border-box;
           }
 
           .label-a4-landscape .adm-large {
@@ -938,9 +1017,10 @@ export async function printProductLabelsInBrowser(
           }
 
           .label-a4-vertical-double-large {
+            position: relative;
             width: 135mm;
             height: 190mm;
-            border: 0.6mm solid #172033;
+            border: 0.6mm solid transparent;
             border-radius: 3mm;
             overflow: hidden;
             display: flex;
@@ -948,6 +1028,16 @@ export async function printProductLabelsInBrowser(
             justify-content: space-between;
             font-family: "Arial Narrow", "Roboto Condensed", Arial, sans-serif;
             box-sizing: border-box;
+          }
+
+          .label-a4-vertical-double-large::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            z-index: 10;
+            border: 0.6mm solid #172033;
+            border-radius: inherit;
+            pointer-events: none;
           }
 
           .product-image-vertical-double-large {
@@ -964,6 +1054,16 @@ export async function printProductLabelsInBrowser(
             overflow: hidden;
             box-sizing: border-box;
             background: #ffffff;
+          }
+
+          .label-a4-vertical-double-large > .product-image-vertical-double-large,
+          .label-a4-vertical-double-large > .product-copy-vertical-double-large,
+          .label-a4-vertical-double-large > .barcode-large-vertical-double-large {
+            width: 100%;
+            min-width: 0;
+            margin-right: 0;
+            margin-left: 0;
+            align-self: stretch;
           }
 
           .product-image-vertical-double-large img {
@@ -990,6 +1090,15 @@ export async function printProductLabelsInBrowser(
             flex-direction: column;
             box-sizing: border-box;
             overflow: hidden;
+          }
+
+          .product-copy-vertical-double-large > .adm-large-vertical-double-large,
+          .product-copy-vertical-double-large > .identity-vertical-double-large,
+          .product-copy-vertical-double-large > .description-vertical-double-large {
+            width: 100%;
+            min-width: 0;
+            max-width: none;
+            align-self: stretch;
           }
 
           .adm-large-vertical-double-large,

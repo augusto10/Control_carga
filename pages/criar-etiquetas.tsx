@@ -30,7 +30,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { LabelPreview } from '@/components/labels/LabelPreview';
 import { PrinterSelector } from '@/components/labels/PrinterSelector';
 import api from '@/lib/api';
-import { analyzeBarcode } from '@/lib/barcode-validation';
+import { analyzeBarcodeWithAdmFallback } from '@/lib/barcode-validation';
 import { generateZplLabels } from '@/lib/zpl-generator';
 import { printLabelsInBrowser } from '@/services/browser-label-print';
 import {
@@ -85,7 +85,10 @@ export default function CriarEtiquetasPage() {
   const selectedBarcode = labelType === 'CAIXA_FECHADA'
     ? produto?.codigoBarrasCaixaFechada
     : produto?.codigoBarras;
-  const barcodeInfo = useMemo(() => analyzeBarcode(selectedBarcode), [selectedBarcode]);
+  const barcodeInfo = useMemo(
+    () => analyzeBarcodeWithAdmFallback(selectedBarcode, produto?.codigoAdm),
+    [produto?.codigoAdm, selectedBarcode],
+  );
   const printerIsCompatible = useMemo(() => (printer ? isZplCompatiblePrinter(printer) : false), [printer]);
   const usesBrowserA4Layout =
     labelType === 'A4_PRODUTO'
@@ -357,6 +360,7 @@ export default function CriarEtiquetasPage() {
                   >
                     <MenuItem value="UNITARIA">Produto (3 por linha)</MenuItem>
                     <MenuItem value="CAIXA_FECHADA">Caixa fechada 100 x 60 mm</MenuItem>
+                    <MenuItem value="PRODUTO_100X60">Produto 100 x 60 mm</MenuItem>
                     <MenuItem value="A4_PRODUTO">Produto 18 x 11 cm (2 por A4)</MenuItem>
                     <MenuItem value="A4_PRODUTO_LANDSCAPE">Produto grande A4 paisagem (1 por A4)</MenuItem>
                     <MenuItem value="A4_PRODUTO_VERTICAL">Produto vertical 20 x 28,7 cm (1 por A4)</MenuItem>
@@ -428,7 +432,10 @@ export default function CriarEtiquetasPage() {
                         <Typography><strong>Marca:</strong> {produto.marca || 'Sem marca'}</Typography>
                         <Typography><strong>Codigo ADM:</strong> {produto.codigoAdm}</Typography>
                         <Typography><strong>Codigo original:</strong> {produto.codigoOriginal || 'Nao informado'}</Typography>
-                        <Typography><strong>Codigo de barras:</strong> {produto.codigoBarras || 'Nao informado'}</Typography>
+                        <Typography>
+                          <strong>Codigo usado na etiqueta:</strong> {barcodeInfo.normalizedValue || 'Nao informado'}
+                          {!selectedBarcode?.trim() && barcodeInfo.isValid ? ' (codigo ADM)' : ''}
+                        </Typography>
                         <Typography><strong>Codigo da caixa fechada:</strong> {produto.codigoBarrasCaixaFechada || 'Nao informado'}</Typography>
                         <Typography><strong>Unidades por caixa:</strong> {produto.quantidadeCaixaFechada || 'Nao informado'}</Typography>
                         <Typography><strong>Tipo identificado:</strong> {barcodeInfo.type}</Typography>
@@ -442,6 +449,11 @@ export default function CriarEtiquetasPage() {
                           {labelType === 'CAIXA_FECHADA' && !produto.codigoBarrasCaixaFechada
                             ? 'Este produto nao possui codigo auxiliar de caixa fechada na API.'
                             : barcodeInfo.reason || 'Codigo de barras invalido.'}
+                        </Alert>
+                      )}
+                      {!selectedBarcode?.trim() && barcodeInfo.isValid && (
+                        <Alert severity="info">
+                          Este modelo não possui código de barras cadastrado. A etiqueta usará o código ADM {produto.codigoAdm} como CODE128.
                         </Alert>
                       )}
 

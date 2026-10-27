@@ -7,7 +7,7 @@ import re
 import subprocess
 import sys
 import time
-from datetime import datetime
+import unicodedata
 from pathlib import Path
 from typing import Optional, Tuple
 
@@ -18,18 +18,6 @@ ACTIVE_UI_WINDOW = None
 
 
 COORD_CONFIG_STEPS = [
-    ("ERP_COORD_CAMPO_CODIGO", "campo Codigo do login"),
-    ("ERP_COORD_CAMPO_SENHA", "campo Senha do login"),
-    ("ERP_COORD_CAMPO_EMPRESA", "campo Empresa"),
-    ("ERP_COORD_MENU_ESTOQUE", "menu Estoque"),
-    ("ERP_COORD_MENU_CONTROLE_SEPARACAO", "menu Controle de Separacao"),
-    ("ERP_COORD_CAMPO_LOCAL_PRODUTO", "campo Local de Produto"),
-    ("ERP_COORD_RETIRADA_LOJAS_REDE", "campo Retirada lojas Rede"),
-    ("ERP_COORD_CAMPO_PREVISAO_INICIAL", "campo Previsao Inicial"),
-    ("ERP_COORD_CAMPO_PREVISAO_FINAL", "campo Previsao Final"),
-    ("ERP_COORD_CAMPO_ORDENACAO", "campo Ordenacao"),
-    ("ERP_COORD_BOTAO_PROCESSAR", "botao Processar"),
-    ("ERP_COORD_ABA_AGUARDANDO_SEPARACAO", "aba Aguardando Separacao"),
     ("ERP_COORD_CAMPO_PESQUISA_PEDIDO", "campo de pesquisa do pedido, se existir"),
     ("ERP_COORD_GRADE_PEDIDOS", "grade/linha de pedidos"),
     ("ERP_COORD_BOTAO_MARCAR_SIM", "botao Marcar como Sim"),
@@ -149,7 +137,7 @@ def get_ui_window():
         return ACTIVE_UI_WINDOW
 
     Desktop = load_pywinauto()
-    title_hint = env_str("ERP_WINDOW_TITLE", "Santri ADM")
+    title_hint = env_str("ERP_WINDOW_TITLE") or "Santri ADM"
     desktop = Desktop(backend="uia")
     window = desktop.window(title_re=f".*{re.escape(title_hint)}.*")
     if not window.exists(timeout=2):
@@ -435,7 +423,6 @@ def ensure_erp_configuration():
         "ERP_EXECUTABLE_PATH": env_str("ERP_EXECUTABLE_PATH"),
         "ERP_CODIGO": env_str("ERP_CODIGO", env_str("ERP_USUARIO")),
         "ERP_SENHA": env_str("ERP_SENHA"),
-        "ERP_COORD_BOTAO_PROCESSAR": env_str("ERP_COORD_BOTAO_PROCESSAR"),
         "ERP_COORD_GRADE_PEDIDOS": env_str("ERP_COORD_GRADE_PEDIDOS"),
         "ERP_COORD_BOTAO_MARCAR_SIM": env_str("ERP_COORD_BOTAO_MARCAR_SIM"),
         "ERP_COORD_BOTAO_SEPARAR": env_str("ERP_COORD_BOTAO_SEPARAR"),
@@ -488,32 +475,56 @@ def start_erp():
     )
 
 
+def activate_erp_window():
+    global ACTIVE_ERP_WINDOW
+    gw = load_window_tools()
+    title_hint = env_str("ERP_WINDOW_TITLE") or "Santri ADM - ESPLENDOR"
+    if not gw:
+        raise RuntimeError("pygetwindow nao esta disponivel para localizar a janela do ERP.")
+
+    windows = gw.getWindowsWithTitle(title_hint)
+    if not windows:
+        raise RuntimeError(
+            f"Nao encontrei a janela do ERP com titulo contendo {title_hint!r}."
+        )
+
+    window = windows[0]
+    if window.isMinimized:
+        window.restore()
+    window.activate()
+    wait_seconds("foco da janela do ERP", 0.5)
+    if not window.isActive:
+        raise RuntimeError(f"Nao foi possivel ativar a janela do ERP: {window.title}")
+    ACTIVE_ERP_WINDOW = window
+    return window
+
+
 def focus_erp_window(pyautogui):
     global ACTIVE_ERP_WINDOW
     gw = load_window_tools()
-    title_hint = env_str("ERP_WINDOW_TITLE")
+    title_hint = env_str("ERP_WINDOW_TITLE") or "Santri ADM - ESPLENDOR"
     wait_seconds("janela do ERP abrir", env_float("ERP_STARTUP_WAIT_SECONDS", 8.0))
 
-    if gw and title_hint:
-        windows = gw.getWindowsWithTitle(title_hint)
-        if windows:
-            window = windows[0]
-            try:
-                window.restore()
-            except Exception:
-                pass
-            try:
-                window.activate()
-                ACTIVE_ERP_WINDOW = window
-                wait_seconds("foco da janela", 1.0)
-                return
-            except Exception:
-                pass
+    if not gw:
+        raise RuntimeError("pygetwindow nao esta disponivel para localizar a janela do ERP.")
 
-    activate_coord = parse_coord("ERP_COORD_JANELA_PRINCIPAL")
-    if activate_coord:
-        click_coord(pyautogui, activate_coord, "janela principal ERP")
-        wait_seconds("foco manual da janela", 0.8)
+    login_windows = gw.getWindowsWithTitle("Login do Sistema")
+    erp_windows = gw.getWindowsWithTitle(title_hint)
+    windows = login_windows or erp_windows
+    if not windows:
+        raise RuntimeError(
+            f"Nao encontrei a janela do ERP nem a tela de login contendo {title_hint!r}."
+        )
+
+    window = windows[0]
+    if window.isMinimized:
+        window.restore()
+    window.activate()
+    wait_seconds("foco da janela", 1.0)
+    if not window.isActive:
+        raise RuntimeError(f"Nao foi possivel ativar a janela do ERP: {window.title}")
+    if not login_windows:
+        ACTIVE_ERP_WINDOW = window
 
 
 def fazer_login_no_erp(pyautogui):
@@ -551,54 +562,83 @@ def fazer_login_no_erp(pyautogui):
 
 
 def abrir_tela_controle_separacao(pyautogui):
-    emit_log("Abrindo Estoque > Controle de Separacao...")
-    if not (use_hybrid_driver() and ui_click_named("Estoque", "MenuItem", "menu Estoque")):
-        click_coord(pyautogui, require_coord("ERP_COORD_MENU_ESTOQUE"), "menu Estoque")
-    wait_seconds("abertura do menu Estoque", 0.8)
-    if not (use_hybrid_driver() and ui_click_named("Controle de Separação", "MenuItem", "menu Controle de Separacao")):
-        click_coord(
-            pyautogui,
-            require_coord("ERP_COORD_MENU_CONTROLE_SEPARACAO"),
-            "menu Controle de Separacao",
-        )
+    activate_erp_window()
+    emit_log("Abrindo Controle de Separacao com Alt+S, 10 setas para baixo e Enter...")
+    pyautogui.hotkey("alt", "s")
+    wait_seconds("abertura do menu Estoque", 0.5)
+    for _ in range(10):
+        pyautogui.press("down")
+        time.sleep(0.15)
+    pyautogui.press("enter")
     wait_seconds(
         "carregamento da tela Controle de Separacao",
         env_float("ERP_SEPARACAO_SCREEN_WAIT_SECONDS", 4.0),
     )
+    window = get_ui_window()
+    child_windows = window.descendants(control_type="Window")
+    if not any("Controle de Separa" in child.window_text() for child in child_windows):
+        raise RuntimeError("A tela Controle de Separacao nao foi aberta pelo atalho do ERP.")
 
 
-def preparar_filtros(pyautogui):
-    hoje = datetime.now()
-    ano_erp = hoje.year + int(env_str("ERP_ANO_OFFSET", "1"))
-    data_inicio = hoje.replace(year=ano_erp, day=1).strftime("%d/%m/%Y")
-    data_final = hoje.replace(year=ano_erp).strftime("%d/%m/%Y")
-    local_produto = env_str("ERP_LOCAL_PRODUTO", "1,2,3,5")
-    retirada_lojas_rede = env_str("ERP_RETIRADA_LOJAS_REDE", "NAO")
+def selecionar_aba_erp(titulo: str):
+    window = get_ui_window()
+    tab = next(
+        (
+            item
+            for item in window.descendants(control_type="TabItem")
+            if item.window_text().strip().casefold() == titulo.casefold()
+        ),
+        None,
+    )
+    if tab is None:
+        raise RuntimeError(f"A aba {titulo!r} nao foi encontrada na janela do ERP.")
+    tab.click_input()
+    wait_seconds(f"selecao da aba {titulo}", 0.3)
 
-    emit_log("Preenchendo filtros da tela de separacao...")
-    if use_hybrid_driver() and ui_click_named("Filtros", "TabItem", "aba Filtros"):
-        local_done = ui_set_filter_by_class("Edit", "TEdit", int(env_str("ERP_UI_LOCAL_INDEX", "0")), local_produto, "Local de Produto")
-        initial_done = ui_set_filter_by_class("Edit", "TEditData", int(env_str("ERP_UI_DATA_INICIAL_INDEX", "0")), data_inicio, "Previsao Inicial")
-        final_done = ui_set_filter_by_class("Edit", "TEditData", int(env_str("ERP_UI_DATA_FINAL_INDEX", "1")), data_final, "Previsao Final")
-        retirada_done = ui_set_filter_by_class("ComboBox", "TXComboBox", int(env_str("ERP_UI_RETIRADA_INDEX", "0")), retirada_lojas_rede, "Retirada lojas Rede")
-        ordenacao_done = ui_set_filter_by_class("ComboBox", "TXComboBox", int(env_str("ERP_UI_ORDENACAO_INDEX", "1")), env_str("ERP_ORDENACAO", "PEDIDO"), "Ordenacao")
-    else:
-        local_done = initial_done = final_done = retirada_done = ordenacao_done = False
 
-    if not local_done:
-        fill_field(pyautogui, require_coord("ERP_COORD_CAMPO_LOCAL_PRODUTO"), "campo Local de Produto", local_produto)
-    if not retirada_done:
-        fill_field(pyautogui, require_coord("ERP_COORD_RETIRADA_LOJAS_REDE"), "filtro Retirada lojas Rede", retirada_lojas_rede, press_enter=True)
-    if not initial_done:
-        fill_field(pyautogui, require_coord("ERP_COORD_CAMPO_PREVISAO_INICIAL"), "campo Previsao Inicial", data_inicio)
-    if not final_done:
-        fill_field(pyautogui, require_coord("ERP_COORD_CAMPO_PREVISAO_FINAL"), "campo Previsao Final", data_final)
-    if not ordenacao_done:
-        fill_field(pyautogui, require_coord("ERP_COORD_CAMPO_ORDENACAO"), "campo Ordenacao", env_str("ERP_ORDENACAO", "PEDIDO"), press_enter=True)
-    click_coord(pyautogui, require_coord("ERP_COORD_BOTAO_PROCESSAR"), "botao Processar")
+def erp_indica_sem_dados() -> bool:
+    window = get_ui_window()
+    visible_text = "\n".join(
+        text
+        for text in (control.window_text() for control in window.descendants())
+        if text.strip()
+    )
+    normalized_text = unicodedata.normalize("NFD", visible_text)
+    normalized_text = "".join(
+        character
+        for character in normalized_text
+        if unicodedata.category(character) != "Mn"
+    ).casefold()
+    return "nenhum dado foi encontrado" in normalized_text
+
+
+def preparar_filtros(pyautogui, pedidos):
+    if len(pedidos) != 1:
+        raise RuntimeError("A automacao do ERP aceita um pedido por execucao.")
+
+    activate_erp_window()
+    selecionar_aba_erp("Filtros")
+    emit_log("Acessando o campo Pedido com 17 pressionamentos de Tab...")
+    for _ in range(17):
+        pyautogui.press("tab")
+        time.sleep(0.08)
+
+    pedido = pedidos[0]
+    emit_log(f"Informando pedido {pedido} e processando os filtros com Alt+P...")
+    pyautogui.hotkey("ctrl", "a")
+    pyautogui.press("delete")
+    pyautogui.write(pedido, interval=0.15)
+    pyautogui.press("enter")
+    wait_seconds("confirmacao do pedido", 0.5)
+    pyautogui.hotkey("alt", "p")
     wait_seconds("processamento dos filtros", env_float("ERP_PROCESSAR_WAIT_SECONDS", 6.0))
-    if not (use_hybrid_driver() and ui_click_named("Aguardando separação", "TabItem", "aba Aguardando Separacao")):
-        click_coord(pyautogui, require_coord("ERP_COORD_ABA_AGUARDANDO_SEPARACAO"), "aba Aguardando Separacao")
+
+    if erp_indica_sem_dados():
+        pyautogui.press("enter")
+        wait_seconds("fechamento do aviso sem resultados", 0.5)
+        raise RuntimeError(f"O ERP nao encontrou dados para o pedido {pedido}.")
+
+    selecionar_aba_erp("Aguardando separação")
     wait_seconds("carregamento da aba Aguardando Separacao", 2.0)
 
 
@@ -656,13 +696,15 @@ def main():
         raise RuntimeError("Informe --pedidos-json ou use --capture-mouse.")
 
     pedidos = normalize_pedidos(args.pedidos_json)
+    if len(pedidos) != 1:
+        raise RuntimeError("A automacao do ERP aceita um pedido por execucao.")
     ensure_erp_configuration()
 
     start_erp()
     focus_erp_window(pyautogui)
     fazer_login_no_erp(pyautogui)
     abrir_tela_controle_separacao(pyautogui)
-    preparar_filtros(pyautogui)
+    preparar_filtros(pyautogui, pedidos)
     emitir_lista_para_pedidos(pyautogui, pedidos)
 
     print(

@@ -1,5 +1,5 @@
 import { Box, Stack, Typography, alpha, useTheme } from '@mui/material';
-import { analyzeBarcode } from '@/lib/barcode-validation';
+import { analyzeBarcodeWithAdmFallback } from '@/lib/barcode-validation';
 import { formatProductAdm } from '@/lib/product-label';
 import { LabelType, ProdutoEtiqueta } from '@/types/labels';
 
@@ -120,14 +120,17 @@ function ProductVerticalPreview({
 export function LabelPreview({ produto, quantidade, labelType = 'UNITARIA' }: LabelPreviewProps) {
   const theme = useTheme();
   const isClosedBox = labelType === 'CAIXA_FECHADA';
+  const isProduct100x60 = labelType === 'PRODUTO_100X60';
   const isA4Product = labelType === 'A4_PRODUTO';
   const isA4ProductLandscape = labelType === 'A4_PRODUTO_LANDSCAPE';
   const isA4ProductVertical = labelType === 'A4_PRODUTO_VERTICAL';
   const isA4ProductVerticalDouble = labelType === 'A4_PRODUTO_VERTICAL_DUPLA';
   const isA4ProductVerticalLargeDouble = labelType === 'A4_PRODUTO_VERTICAL_GRANDE_DUPLA';
   const isA4ProductVerticalTriple = labelType === 'A4_PRODUTO_VERTICAL_TRIPLA';
-  const selectedBarcode = isClosedBox ? produto.codigoBarrasCaixaFechada : produto.codigoBarras;
-  const barcode = analyzeBarcode(selectedBarcode);
+  const barcodeValue = isClosedBox ? produto.codigoBarrasCaixaFechada : produto.codigoBarras;
+  const barcode = analyzeBarcodeWithAdmFallback(barcodeValue, produto.codigoAdm);
+  const selectedBarcode = barcode.isValid ? barcode.normalizedValue : '';
+  const usesAdmFallback = !String(barcodeValue ?? '').trim() && barcode.isValid;
   const total = Math.max(1, quantidade);
 
   return (
@@ -153,10 +156,10 @@ export function LabelPreview({ produto, quantidade, labelType = 'UNITARIA' }: La
           display: 'grid',
           gridTemplateColumns: isA4Product || isA4ProductLandscape || isA4ProductVertical || isA4ProductVerticalDouble || isA4ProductVerticalLargeDouble || isA4ProductVerticalTriple
             ? '1fr'
-            : isClosedBox
+            : isClosedBox || isProduct100x60
               ? { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' }
               : { xs: '1fr', md: 'repeat(3, minmax(0, 1fr))' },
-          gap: 2,
+          gap: isA4ProductVerticalTriple ? 4 : 2,
         }}
       >
         {Array.from({ length: total }).map((_, index) => (
@@ -174,10 +177,11 @@ export function LabelPreview({ produto, quantidade, labelType = 'UNITARIA' }: La
                 bgcolor: '#fff',
                 color: '#111',
                 display: 'grid',
+                gridTemplateColumns: 'minmax(0, 1fr)',
                 gridTemplateRows: isA4ProductLandscape ? '135fr 65fr' : '74fr 36fr',
               }}
             >
-              <Box sx={{ display: 'grid', gridTemplateColumns: '31% minmax(0, 69%)', width: '100%', minWidth: 0, minHeight: 0 }}>
+              <Box sx={{ display: 'grid', gridTemplateColumns: isA4ProductVerticalTriple ? '21.3% minmax(0, 1fr)' : '31% minmax(0, 69%)', width: '100%', minWidth: 0, minHeight: 0 }}>
                 <Box
                   sx={{
                     borderRight: '2px solid #172033',
@@ -199,21 +203,21 @@ export function LabelPreview({ produto, quantidade, labelType = 'UNITARIA' }: La
                   )}
                 </Box>
                 <Box sx={{ display: 'grid', gridTemplateRows: isA4ProductLandscape ? '36fr 48fr 51fr' : '19fr 25fr 30fr', width: '100%', minWidth: 0, boxSizing: 'border-box' }}>
-                  <Box sx={{ width: '100%', minWidth: 0, px: 1.4, display: 'flex', alignItems: 'center', borderBottom: '2px solid #172033' }}>
+                  <Box sx={{ width: '100%', minWidth: 0, px: 1.4, display: 'flex', alignItems: 'center', justifyContent: isA4ProductVerticalTriple ? 'center' : 'flex-start', borderBottom: '2px solid #172033', textAlign: isA4ProductVerticalTriple ? 'center' : 'left' }}>
                     <Typography sx={{ color: '#07559b', fontWeight: 950, fontSize: isA4ProductLandscape ? 'clamp(24px, 4vw, 42px)' : 'clamp(17px, 3.2vw, 28px)', lineHeight: 1 }}>
                       CODIGO ADM: {formatProductAdm(produto.codigoAdm)}
                     </Typography>
                   </Box>
-                  <Box sx={{ width: '100%', minWidth: 0, px: 1.4, py: 0.25, display: 'flex', flexDirection: 'column', justifyContent: 'center', borderBottom: '2px solid #172033', gap: 0.15 }}>
-                      <Typography noWrap sx={{ fontSize: isA4ProductLandscape ? 'clamp(18px, 3vw, 30px)' : 'clamp(14px, 2.3vw, 22px)', lineHeight: 1.05 }}>
+                  <Box sx={{ width: '100%', minWidth: 0, px: 1.4, py: 0.25, display: 'flex', flexDirection: 'column', alignItems: isA4ProductVerticalTriple ? 'flex-start' : 'stretch', justifyContent: 'center', borderBottom: '2px solid #172033', gap: 0.15 }}>
+                      <Typography noWrap sx={{ fontSize: isA4ProductLandscape ? 'clamp(18px, 3vw, 30px)' : 'clamp(14px, 2.3vw, 22px)', lineHeight: 1.05, textAlign: isA4ProductVerticalTriple ? 'left' : 'inherit' }}>
                       <strong>MARCA:</strong> {produto.marca || 'SEM MARCA'}
                     </Typography>
-                      <Typography noWrap sx={{ fontSize: isA4ProductLandscape ? 'clamp(18px, 3vw, 30px)' : 'clamp(14px, 2.3vw, 22px)', lineHeight: 1.05 }}>
+                      <Typography noWrap sx={{ fontSize: isA4ProductLandscape ? 'clamp(18px, 3vw, 30px)' : 'clamp(14px, 2.3vw, 22px)', lineHeight: 1.05, textAlign: isA4ProductVerticalTriple ? 'left' : 'inherit' }}>
                       <strong>CODIGO ORIGINAL:</strong> {produto.codigoOriginal || '-'}
                     </Typography>
                   </Box>
                   <Box sx={{ width: '100%', minWidth: 0, px: 1.4, py: 0.25, overflow: 'hidden' }}>
-                    <Typography sx={{ fontSize: isA4ProductLandscape ? 'clamp(18px, 3vw, 30px)' : 'clamp(14px, 2.3vw, 22px)', lineHeight: 1.1 }}>
+                    <Typography sx={{ fontSize: isA4ProductLandscape ? 'clamp(18px, 3vw, 30px)' : 'clamp(14px, 2.3vw, 22px)', lineHeight: 1.1, textAlign: isA4ProductVerticalTriple ? 'center' : 'left' }}>
                       <strong>DESCRICAO:</strong> {produto.nome}
                     </Typography>
                   </Box>
@@ -259,7 +263,7 @@ export function LabelPreview({ produto, quantidade, labelType = 'UNITARIA' }: La
             <Box
               key={index}
               sx={{
-                aspectRatio: isClosedBox ? '100 / 60' : '33 / 22',
+                aspectRatio: isClosedBox || isProduct100x60 ? '100 / 60' : '33 / 22',
                 borderRadius: 2,
                 p: 1.5,
                 background: `linear-gradient(180deg, ${alpha('#ffffff', 0.95)} 0%, ${alpha(theme.palette.grey[100], 0.95)} 100%)`,
@@ -286,7 +290,7 @@ export function LabelPreview({ produto, quantidade, labelType = 'UNITARIA' }: La
               <Box sx={{ px: 1 }}>
                 <Box
                   sx={{
-                    height: isClosedBox ? 64 : 38,
+                    height: isClosedBox || isProduct100x60 ? 64 : 38,
                     borderRadius: 1,
                     backgroundImage:
                       'repeating-linear-gradient(90deg, #000000 0 2px, transparent 2px 4px, #000000 4px 5px, transparent 5px 7px)',
@@ -297,9 +301,16 @@ export function LabelPreview({ produto, quantidade, labelType = 'UNITARIA' }: La
                   {selectedBarcode || 'Sem codigo'}
                 </Typography>
               </Box>
-              <Typography variant="caption" display="block" textAlign="center" color="text.secondary">
-                ADM {produto.codigoAdm}
-              </Typography>
+              <Box>
+                <Typography variant="caption" display="block" textAlign="center" color="text.secondary">
+                  ADM {produto.codigoAdm}
+                </Typography>
+                {usesAdmFallback && (
+                  <Typography variant="caption" display="block" textAlign="center" color="text.secondary">
+                    CÓDIGO ORIGINAL {produto.codigoOriginal || '-'}
+                  </Typography>
+                )}
+              </Box>
             </Box>
           )
         ))}

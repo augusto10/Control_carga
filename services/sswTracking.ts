@@ -35,6 +35,25 @@ export type SswTrackingResult = {
   source: 'trackingdanfe' | 'ssw_portal' | 'trackingdanfe+ssw_portal' | null;
 };
 
+export function isSswOccurrenceDelivered(event: SswTrackingOccurrence): boolean {
+  return isSswDeliveryConfirmed(
+    [
+      event.ocorrencia,
+      event.descricao,
+      event.tipo,
+      event.ocorrenciaSsw,
+      event.detalhe,
+      event.documentos,
+    ]
+      .filter(Boolean)
+      .join(' ')
+  );
+}
+
+export function hasSswDeliveredOccurrence(occurrences: SswTrackingOccurrence[]): boolean {
+  return occurrences.some(isSswOccurrenceDelivered);
+}
+
 type PortalTrackingPayload = {
   success?: boolean;
   message?: string;
@@ -72,7 +91,7 @@ function normalizeFreeText(value: string | null | undefined): string {
 export function isSswDeliveryConfirmed(value: string | null | undefined): boolean {
   const normalized = normalizeFreeText(value);
   if (/\bnao\b.{0,24}\b(entregue|entrega|realizada|efetuada|concluida|baixado)\b/.test(normalized)) return false;
-  return /\b(entregue|entrega realizada|entrega efetuada|entrega concluida|recebido pelo destinatario|baixado)\b/.test(normalized);
+  return /\b(entregue|entrega realizada|entrega efetuada|entrega concluida|entrega confirmada|recebido pelo destinatario|baixado)\b/.test(normalized);
 }
 
 export function hasPortalCredentials(): boolean {
@@ -340,16 +359,13 @@ function parseTracking(
     }`
   );
 
-  const delivered = isSswDeliveryConfirmed(normalized);
+  const normalizedOccurrences = events.map(normalizeOccurrence);
+  const delivered = isSswDeliveryConfirmed(normalized) || hasSswDeliveredOccurrence(normalizedOccurrences);
 
   const deliveredEvent = delivered
     ? [...events]
         .reverse()
-        .find((event) =>
-          normalizeFreeText(
-            `${pickString(event.ocorrencia, event.OCORRENCIA, event.descricao, event.DESCRICAO) || ''}`
-          ).match(/entregue|entrega realizada|mercadoria entregue|recebido pelo destinatario|baixado/)
-        ) || latestEvent
+        .find((event) => isSswOccurrenceDelivered(normalizeOccurrence(event))) || latestEvent
     : null;
 
   const deliveredAt =
@@ -379,7 +395,7 @@ function parseTracking(
     deliveredAt,
     receiverName,
     photoUrl,
-    occurrences: events.map(normalizeOccurrence),
+    occurrences: normalizedOccurrences,
     source,
   };
 }
@@ -478,4 +494,3 @@ export async function fetchMergedTracking(input: {
 
   return parseTracking(payload, source);
 }
-

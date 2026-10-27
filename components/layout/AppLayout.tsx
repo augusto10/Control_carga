@@ -62,6 +62,7 @@ export function AppLayout({
     'Checklist Recebimento',
     'Controle de Materiais',
     'Pedidos Entregas',
+    'Lista de Separações',
   ]);
 
   const menuItems = [

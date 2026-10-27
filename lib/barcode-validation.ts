@@ -86,3 +86,22 @@ export function analyzeBarcode(value: string | null | undefined): BarcodeAnalysi
     normalizedValue,
   };
 }
+
+export function analyzeBarcodeWithAdmFallback(
+  value: string | null | undefined,
+  codigoAdm: string | null | undefined,
+): BarcodeAnalysis {
+  const barcode = String(value ?? '').trim();
+  if (barcode) return analyzeBarcode(barcode);
+
+  const fallbackCode = String(codigoAdm ?? '').trim();
+  if (!fallbackCode || !/^[\x20-\x7E]+$/.test(fallbackCode) || /[\^~]/.test(fallbackCode)) {
+    return analyzeBarcode('');
+  }
+
+  return {
+    isValid: true,
+    type: 'CODE128',
+    normalizedValue: fallbackCode,
+  };
+}
