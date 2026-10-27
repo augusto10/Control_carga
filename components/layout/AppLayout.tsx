@@ -8,20 +8,18 @@ import {
   Truck, 
   Users, 
   Settings, 
-  Menu, 
-  X, 
+  Menu,
   ChevronLeft,
   ChevronRight,
   ChevronDown,
   Bell,
-  Search,
   LogOut,
   User,
   ClipboardList,
-  AlertTriangle,
   History,
   Map,
-  Tags
+  Tags,
+  Bot
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { clsx, type ClassValue } from 'clsx';
@@ -75,6 +73,7 @@ export function AppLayout({
       icon: ShoppingCart, 
       children: [
         { name: 'Acompanhamento de Pedidos', href: '/acompanhamento-pedidos' },
+        { name: 'Fila de Separação', href: '/separacao' },
         { name: 'Lista de Separações', href: '/lista-separacoes' },
         { name: 'Pedidos Entregas', href: '/admin/pedidos' },
         { name: 'Kanban de Pedidos', href: '/kanban-pedidos' },
@@ -157,6 +156,13 @@ export function AppLayout({
         { name: 'Fretes', href: '/relatorios/fretes' },
       ]
     },
+    {
+      name: 'Automação',
+      icon: Bot,
+      children: [
+        { name: 'Agents e Jobs', href: '/admin/automacao', adminOnly: true },
+      ]
+    },
     { name: 'Configurações', icon: Settings, href: '/admin/configuracoes', adminOnly: true },
     { name: 'Meu Perfil', icon: User, href: '/perfil' },
   ];
@@ -211,7 +217,7 @@ export function AppLayout({
   const sidebarExpanded = !sidebarCollapsed || sidebarHoverExpanded;
 
   return (
-    <div className="min-h-screen bg-app-bg flex text-textMain">
+    <div className="h-screen overflow-hidden bg-app-bg flex text-textMain">
       {/* Mobile Sidebar Overlay */}
       {sidebarOpen && (
         <div 

@@ -1,57 +1,16 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/router';
-import { NextPageContext } from 'next';
 import Cookies from 'js-cookie';
 import { api } from '../services/api';
 import { User, USER_TYPES, LoginCredentials, AuthError } from '../types/auth-types';
 import { AuthState, AuthContextType } from '../types/auth-context';
-import * as jwt from 'jsonwebtoken';
-
-type ServerRequest = NextPageContext['req'] & {
-  headers: {
-    cookie?: string;
-  };
-};
-
-type CookieOptions = Cookies.CookieAttributes;
-
-// Função para obter cookie no servidor
-function getServerCookie(name: string, req?: NextPageContext['req']): string | undefined {
-  if (!req?.headers?.cookie) return undefined;
-  const cookie = require('cookie');
-  const cookies = cookie.parse(req.headers.cookie || '');
-  return cookies[name] ? decodeURIComponent(cookies[name]) : undefined;
-}
-
-// Funções para uso no cliente
-const getCookie = (name: string): string | undefined => {
-  if (typeof window === 'undefined') return undefined;
-  return Cookies.get(name);
-};
-
-
-
-const setCookie = (name: string, value: string, options: Cookies.CookieAttributes = {}): void => {
-  if (typeof window !== 'undefined') {
-    Cookies.set(name, value, { 
-      path: '/',
-      expires: TOKEN_EXPIRATION_DAYS, // 7 dias
-      sameSite: 'lax',
-      secure: process.env.NODE_ENV === 'production',
-      ...options 
-    });
-  }
-};
+import { PUBLIC_ROUTES } from '../lib/public-routes';
 
 const removeCookie = (name: string): void => {
   if (typeof window !== 'undefined') {
     Cookies.remove(name, { path: '/' });
   }
 };
-
-// Tempo de expiração do token (1 hora)
-const TOKEN_EXPIRATION_MS = 3600000;
-const TOKEN_EXPIRATION_DAYS = 7;
 
 // Re-export para compatibilidade
 export type { AuthContextType } from '../types/auth-context';
@@ -92,8 +51,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     []
   );
 
-  // Lista de rotas públicas que não requerem autenticação
-  const publicRoutes = useMemo(() => ['/login', '/esqueci-senha', '/cadastro'], []);
+  // Lista de rotas públicas que não requerem autenticação (fonte única compartilhada)
+  const publicRoutes = useMemo(() => PUBLIC_ROUTES, []);
 
   // Carregar usuário do armazenamento
   const loadUserFromStorage = useCallback(async (forceCheck: boolean = false) => {

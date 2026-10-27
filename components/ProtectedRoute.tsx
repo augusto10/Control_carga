@@ -1,12 +1,10 @@
 import { useRouter } from 'next/router';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import CircularProgress from '@mui/material/CircularProgress';
 import Box from '@mui/material/Box';
 import { USER_TYPES } from '../types/auth-types';
-
-// Lista de rotas públicas que não requerem autenticação
-const PUBLIC_ROUTES = ['/login', '/esqueci-senha', '/cadastro'];
+import { PUBLIC_ROUTES } from '../lib/public-routes';
 
 type TipoUsuario = typeof USER_TYPES.ADMIN | typeof USER_TYPES.GERENTE | typeof USER_TYPES.USUARIO;
 

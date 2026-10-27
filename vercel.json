@@ -1,7 +1,6 @@
 {
   "version": 2,
   "env": {
-    "PRISMA_GENERATE_DATAPROXY": "false",
     "PRISMA_SKIP_MIGRATIONS": "true"
   },
   "functions": {
