@@ -1,12 +1,17 @@
 import prisma from '@/lib/prisma';
 import { apiExternaService } from '@/services/api-externa';
 import { buscarLogisticaAtual } from '@/lib/pedido-logistica-atual';
+import { getPedidosDashboard } from '@/lib/dashboard-external-cache';
+// Mesma regra de pendência usada pelo card do dashboard
+// (pages/api/dashboard/logistica-inicial) — não a versão mais restrita do
+// snapshot, para que a fila exclua exatamente o que o card PENDÊNCIAS mostra.
+import { isPedidoComPendencias } from '@/pages/api/dashboard/logistica-inicial';
 import {
   deriveDashboardStatus,
   getPedidoId,
   getTipoEntregaPrincipal,
-  isPedidoComPendencias,
   isPedidoPermitidoNoDashboard,
+  montarDashboardPorSnapshot,
   normalizarPedidoConsolidado,
   parsePedidoDate,
   toNumber,
@@ -16,11 +21,13 @@ import {
 /**
  * Fila de separação de pedidos.
  *
- * Regra negocial:
- * - Fonte: API Santri ao vivo (dashboard-logistica consolidado + /pedidos),
- *   mesma pipeline do card "PEDIDOS NOVOS AGUARDANDO SEPARAÇÃO" do dashboard
- *   (normalizar -> filtro de tipo/retirada -> deriveDashboardStatus).
- *   O snapshot local NÃO é usado porque só atualiza via cron.
+ * Regra negocial (mesma pipeline do card "PEDIDOS NOVOS AGUARDANDO
+ * SEPARAÇÃO" em pages/api/dashboard/logistica-inicial):
+ * - Fonte: API Santri ao vivo (dashboard-logistica consolidado + /pedidos
+ *   via getPedidosDashboard, paginado/cacheado como o dashboard). O
+ *   snapshot local NÃO é usado porque só atualiza via cron.
+ * - Tipo de entrega: mesmo filtro do card — ENT/EPG, retirada barrada e
+ *   tipo ausente permitido (complementado pelo detalhe /logistica).
  * - Pedidos já associados (Pedidos.status = 'EM_SEPARACAO') saem da fila,
  *   assim como pedidos com pendência (vão para o card PENDÊNCIAS).
  * - Ordenação por ordem de recebimento (dataHoraRecebimento ASC), exceto
@@ -243,24 +250,92 @@ export async function calcularFilaSeparacao(options: {
   const dataInicioIso = isoDia(dataInicio);
   const dataFimIso = isoDia(hoje);
 
-  const [dashboardExterno, pedidosLista, associados] = await Promise.all([
+  const inicioJanela = new Date(dataInicio);
+  inicioJanela.setHours(0, 0, 0, 0);
+  const fimJanela = new Date(hoje);
+  fimJanela.setHours(23, 59, 59, 999);
+
+  const [dashboardSnapshot, associados] = await Promise.all([
+    // Mesma fonte do card "PEDIDOS NOVOS AGUARDANDO SEPARAÇÃO" da página
+    // inicial: o dashboard montado a partir do snapshot local.
+    montarDashboardPorSnapshot({
+      dataInicioIso,
+      dataFimIso,
+      dataInicio: inicioJanela,
+      dataFim: fimJanela,
+      cacheKey: `${dataInicioIso}:${dataFimIso}`,
+    }).catch(() => null),
+    prisma.pedidos.findMany({
+      where: { status: 'EM_SEPARACAO' },
+      select: { pedidoId: true },
+    }),
+  ]);
+  const pedidosAssociados = new Set(associados.map((item) => item.pedidoId));
+
+  if (dashboardSnapshot) {
+    // Fila = exatamente o grupo PEDIDO_NOVO que o card exibe na página
+    // inicial (mesmas regras de tipo, retirada, pendência e status).
+    const grupoNovo = ((dashboardSnapshot.indicadores || []) as { codigo: string; pedidos: Record<string, any>[] }[])
+      .find((grupo) => grupo.codigo === 'PEDIDO_NOVO');
+    const itensNovo = grupoNovo?.pedidos || [];
+
+    // Separação cancelada no ERP ('C') não volta para a fila — o status
+    // armazenado no snapshot pode ainda estar como PEDIDO_NOVO.
+    const idsNovo = itensNovo.map((item) => item.pedidoId).filter(Boolean);
+    const rawsCancelamento = idsNovo.length
+      ? await (prisma as any).pedidoLogisticaSnapshot.findMany({
+          where: { pedidoId: { in: idsNovo } },
+          select: { pedidoId: true, rawPedido: true },
+        })
+      : [];
+    const cancelados = new Set<number>(
+      rawsCancelamento
+        .filter((row: any) =>
+          String((row.rawPedido as Record<string, unknown> | undefined)?.ultimo_status_separacao ?? '')
+            .trim()
+            .toUpperCase() === 'C'
+        )
+        .map((row: any) => row.pedidoId)
+    );
+
+    const fila = itensNovo
+      .filter(
+        (item) =>
+          item.pedidoId && !pedidosAssociados.has(item.pedidoId) && !cancelados.has(item.pedidoId)
+      )
+      .map((item) => {
+        const dataHoraRecebimento = item.dataHoraRecebimento ? new Date(item.dataHoraRecebimento) : null;
+        const regiaoRestrita = isRegiaoRestrita(item.cidade ?? null, item.localNome ?? null);
+        return {
+          pedidoId: item.pedidoId,
+          clienteNome: item.clienteNome ?? null,
+          nomeFantasia: item.nomeFantasia ?? null,
+          localNome: item.localNome ?? null,
+          cidade: item.cidade ?? null,
+          uf: item.uf ?? null,
+          valorPedido: item.valorPedido ?? null,
+          dataHoraRecebimento,
+          previsaoEntrega: item.previsaoEntrega ? new Date(item.previsaoEntrega) : null,
+          regiaoRestrita,
+          prioridade: regiaoRestrita && recebidoEmDiaDeCarregamento(dataHoraRecebimento),
+        };
+      });
+    return ordenarFilaSeparacao(fila);
+  }
+
+  // Sem snapshot, replica ao vivo a mesma pipeline do card
+  // (consolidado + /pedidos paginado via getPedidosDashboard).
+  const [dashboardExterno, pedidosLista] = await Promise.all([
     apiExternaService.listarDashboardLogistica(
       { empresa_id: 1, data_inicio: dataInicioIso, data_fim: dataFimIso },
       options.username,
       options.password,
       30_000
     ),
-    apiExternaService
-      .listarPedidos(
-        { data_inicio: dataInicioIso, data_fim: dataFimIso, limit: 1500, offset: 0 },
-        options.username,
-        options.password,
-        8_000
-      )
-      .catch(() => null),
-    prisma.pedidos.findMany({
-      where: { status: 'EM_SEPARACAO' },
-      select: { pedidoId: true },
+    getPedidosDashboard(options.username, options.password, 500, 8_000, {
+      data_inicio: dataInicioIso,
+      data_fim: dataFimIso,
+      tipo_data: 'recebimento',
     }),
   ]);
 
@@ -268,11 +343,10 @@ export async function calcularFilaSeparacao(options: {
     throw new Error('API Santri indisponível para montar a fila de separação.');
   }
 
-  const pedidosComTipo = (pedidosLista?.data || []) as Record<string, unknown>[];
+  const pedidosComTipo = (pedidosLista || []) as Record<string, unknown>[];
 
   const entradas: Record<string, unknown>[] = [
     ...((dashboardExterno.data || []) as Record<string, unknown>[]).map(normalizarPedidoConsolidado),
-    ...pedidosComTipo,
   ].filter((item, index, entries) => {
     const pedidoId = getPedidoId(item);
     return (
@@ -288,28 +362,70 @@ export async function calcularFilaSeparacao(options: {
     if (pedidoId && tipoEntrega) tipoEntregaPorPedido.set(pedidoId, tipoEntrega);
   }
 
-  const pedidosAssociados = new Set(associados.map((item) => item.pedidoId));
+  // Mesma guarda do dashboard: se o consolidado trouxe pedidos mas nenhum
+  // casou com /pedidos, a fonte de tipos está quebrada — falha explícita
+  // em vez de fila silenciosamente vazia.
+  const dashboardPedidoIds = new Set(
+    (dashboardExterno.data as Record<string, unknown>[])
+      .map((item) => getPedidoId(item))
+      .filter((pedidoId): pedidoId is number => Boolean(pedidoId))
+  );
+  const totalTiposCorrespondentes = Array.from(dashboardPedidoIds).filter((pedidoId) =>
+    tipoEntregaPorPedido.has(pedidoId)
+  ).length;
+  if (dashboardPedidoIds.size > 0 && totalTiposCorrespondentes === 0) {
+    throw new Error('tipos_pedidos_indisponiveis');
+  }
 
   const candidatos: { pedidoId: number; pedido: Record<string, unknown>; logistica: Record<string, unknown> | null }[] = [];
+  let consultasLogisticaDetalhada = 0;
   for (const entry of entradas) {
     let pedido = entry;
     const pedidoId = getPedidoId(pedido);
     if (!pedidoId || pedidosAssociados.has(pedidoId)) continue;
 
-    const logistica = ((pedido.logistica as Record<string, unknown> | undefined) || null) as Record<string, unknown> | null;
+    let logistica = ((pedido.logistica as Record<string, unknown> | undefined) || null) as Record<string, unknown> | null;
+    const tipoEntregaInicial = getTipoEntregaPrincipal(pedido, logistica);
     const tipoEntregaLista = tipoEntregaPorPedido.get(pedidoId);
-    if (!getTipoEntregaPrincipal(pedido, logistica) && tipoEntregaLista) {
+
+    // Como no dashboard: sem tipo em nenhuma fonte, busca o detalhe
+    // /logistica do pedido para decidir elegibilidade e pendências.
+    if (!tipoEntregaInicial && !tipoEntregaLista && consultasLogisticaDetalhada < 40) {
+      consultasLogisticaDetalhada += 1;
+      const detalhe = await buscarLogisticaAtual(pedidoId, options.username, options.password).catch(() => null);
+      if (detalhe) {
+        logistica = { ...(logistica || {}), ...(detalhe as Record<string, unknown>) };
+      }
+    }
+
+    if (tipoEntregaLista) {
       pedido = { ...pedido, tipo_entrega: tipoEntregaLista, TIPO_ENTREGA: tipoEntregaLista };
     }
 
     const possuiPendencia = isPedidoComPendencias(pedido, logistica);
-    // Fila é ESTRITA: só entra pedido de entrega (ENT/EPG). Diferente do
-    // dashboard, consolidado sem tipo não é permitido — é por aí que RLR
-    // (retira loja rede) e outros retira-no-ato sem marcação vazariam.
-    if (!possuiPendencia && !isPedidoPermitidoNoDashboard(pedido, logistica)) continue;
+    // Mesma regra do card: tipo ausente é permitido quando nenhuma fonte o
+    // trouxe (o detalhe /logistica acima ainda pode revelar retirada).
+    const permitirTipoAusente = !tipoEntregaLista && !tipoEntregaInicial;
+    if (!isPedidoPermitidoNoDashboard(pedido, logistica, permitirTipoAusente) && !possuiPendencia) continue;
     if (possuiPendencia) continue; // pendências ficam no card próprio do dashboard
 
+    // Separação cancelada não volta para a fila: o consolidado mantém
+    // ultimo_status_separacao='C' e o status derivado cai em SEM_LOGISTICA
+    // (PEDIDO_NOVO), reabrindo pedido que ninguém vai separar de novo.
+    const ultimoStatus = toStringValue(pedido.ultimo_status_separacao)?.toUpperCase() || null;
+    const statusSeparacoesCsv = (toStringValue(pedido.status_separacoes) || '').toUpperCase();
+    const separacoesDetalhe = Array.isArray((logistica as Record<string, any> | null)?.separacoes)
+      ? ((logistica as Record<string, any>).separacoes as Record<string, unknown>[])
+      : [];
+    const separacaoCancelada =
+      ultimoStatus === 'C' ||
+      statusSeparacoesCsv.split(',').map((s) => s.trim()).includes('C') ||
+      separacoesDetalhe.some((s) => ['C', 'CANCELADA'].includes(String(s.STATUS ?? '').trim().toUpperCase()));
+    if (separacaoCancelada) continue;
+
     const statusLogistico = ((pedido.status_logistico || {}) as Record<string, unknown>) || {};
+    const previsaoEntrega = toStringValue(pedido.previsao_entrega);
+    if (previsaoEntrega && previsaoEntrega.slice(0, 10) > '2050-12-31') continue;
     if (deriveDashboardStatus(pedido, statusLogistico, logistica) !== 'PEDIDO_NOVO') continue;
 
     candidatos.push({ pedidoId, pedido, logistica });
