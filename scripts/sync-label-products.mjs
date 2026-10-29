@@ -52,6 +52,18 @@ const ALLOWED_NEW_ACCESSORY_PRODUCT_IDS = new Set([
   "38486",
   "38487",
   "38488",
+  "38820",
+  "38821",
+  "38822",
+  "38823",
+  "38824",
+  "38825",
+  "38826",
+  "38827",
+  "38828",
+  "38829",
+  "38830",
+  "38831",
 ]);
 const PRODUCT_BRAND_OVERRIDES = new Map([
   ["28518", "IV PLAST"],
