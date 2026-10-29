@@ -90,7 +90,6 @@ function buildUnitLabel(produto: ProdutoEtiqueta, x: number) {
 
   const titleLines = splitText(produto.nome, 22, 2);
   const brand = sanitizeZpl(produto.marca || 'SEM MARCA');
-  const adm = sanitizeZpl(produto.codigoAdm);
   const usesAdmFallback = !String(produto.codigoBarras ?? '').trim();
   const commands: string[] = [];
 
@@ -108,10 +107,7 @@ function buildUnitLabel(produto: ProdutoEtiqueta, x: number) {
     UNIT_LABEL_WIDTH,
     usesAdmFallback,
   ));
-  commands.push(`^FO${x},${usesAdmFallback ? 137 : 146}^FB${UNIT_LABEL_WIDTH},1,0,C,0^A0N,${usesAdmFallback ? '10,10' : '12,12'}^FDADM ${adm}^FS`);
-  if (usesAdmFallback) {
-    commands.push(`^FO${x},153^FB${UNIT_LABEL_WIDTH},1,0,C,0^A0N,8,8^FDCODIGO ORIGINAL ${sanitizeZpl(produto.codigoOriginal || '-')}^FS`);
-  }
+  commands.push(`^FO${x},${usesAdmFallback ? 137 : 146}^FB${UNIT_LABEL_WIDTH},1,0,C,0^A0N,10,10^FDCODIGO ORIGINAL ${sanitizeZpl(produto.codigoOriginal || '-')}^FS`);
   return commands;
 }
 
@@ -190,10 +186,7 @@ function buildProduct100x60Page(produto: ProdutoEtiqueta) {
   });
   commands.push(`^FO75,108^FB650,1,0,C,0^A0N,27,27^FD${sanitizeZpl(produto.marca || 'SEM MARCA')}^FS`);
   commands.push(buildBarcodeField(analysis.normalizedValue, analysis.type, 0, 155, 150, PAGE_WIDTH, usesAdmFallback));
-  commands.push(`^FO50,415^FB700,1,0,C,0^A0N,26,26^FDADM ${sanitizeZpl(produto.codigoAdm)}^FS`);
-  if (usesAdmFallback) {
-    commands.push(`^FO50,447^FB700,1,0,C,0^A0N,22,22^FDCODIGO ORIGINAL ${sanitizeZpl(produto.codigoOriginal || '-')}^FS`);
-  }
+  commands.push(`^FO50,447^FB700,1,0,C,0^A0N,22,22^FDCODIGO ORIGINAL ${sanitizeZpl(produto.codigoOriginal || '-')}^FS`);
   commands.push('^PQ1,0,1,Y', '^XZ');
   return commands.join('\n');
 }

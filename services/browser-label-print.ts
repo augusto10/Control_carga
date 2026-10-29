@@ -61,6 +61,18 @@ function resolveAbsoluteImageUrl(url: string | null | undefined): string | null 
   return trimmed;
 }
 
+export function buildProductLabelFooterMarkup(
+  produto: ProdutoEtiqueta,
+  isClosedBox: boolean,
+  usesAdmFallback: boolean,
+) {
+  if (isClosedBox) {
+    return `<div class="adm">ADM ${escapeHtml(produto.codigoAdm)}</div>${usesAdmFallback ? `<div class="adm-original">CÓDIGO ORIGINAL ${escapeHtml(produto.codigoOriginal || '-')}</div>` : ''}`;
+  }
+
+  return `<div class="adm-original">CÓDIGO ORIGINAL ${escapeHtml(produto.codigoOriginal || '-')}</div>`;
+}
+
 async function preloadImagesAsDataUrls(produtos: ProdutoEtiqueta[]): Promise<Map<string, string>> {
   const map = new Map<string, string>();
   if (typeof window === 'undefined') return map;
@@ -168,8 +180,7 @@ function buildProductLabelMarkup(
       <div class="brand">${escapeHtml(produto.marca || 'Sem marca')}</div>
       ${isClosedBox ? `<div class="box-info">CAIXA FECHADA - ${produto.quantidadeCaixaFechada || '-'} UN</div>` : ''}
       <div class="barcode${usesAdmFallback ? ' barcode-adm-fallback' : ''}">${barcodeSvg}</div>
-      <div class="adm">ADM ${escapeHtml(produto.codigoAdm)}</div>
-      ${usesAdmFallback ? `<div class="adm-original">CÓDIGO ORIGINAL ${escapeHtml(produto.codigoOriginal || '-')}</div>` : ''}
+      ${buildProductLabelFooterMarkup(produto, isClosedBox, usesAdmFallback)}
     </article>
   `;
 }

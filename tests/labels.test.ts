@@ -4,6 +4,7 @@ import { generateZplLabels } from '@/lib/zpl-generator';
 import { formatProductAdm } from '@/lib/product-label';
 import { mapSantriProductToEtiqueta } from '@/services/santri-products';
 import { getProductLabelPdfPageCount } from '@/services/product-label-pdf';
+import { buildProductLabelFooterMarkup } from '@/services/browser-label-print';
 
 const santriFixture = {
   id: '100879',
@@ -45,6 +46,13 @@ assert.equal(produto.nome, 'BASE REG GAVETA 3/4"');
 assert.equal(produto.codigoOriginal, 'BASE-REG-34');
 assert.equal(produto.imagemUrl, '/api/etiquetas/produto/100879/foto?ordem=0');
 assert.equal(produto.quantidadeEstoque, 42);
+const unitaryFooter = buildProductLabelFooterMarkup(produto, false, false);
+const product100x60Footer = buildProductLabelFooterMarkup(produto, false, false);
+assert.match(unitaryFooter, /CÓDIGO ORIGINAL BASE-REG-34/);
+assert.doesNotMatch(unitaryFooter, /ADM|100879/);
+assert.match(product100x60Footer, /CÓDIGO ORIGINAL BASE-REG-34/);
+assert.doesNotMatch(product100x60Footer, /ADM|100879/);
+assert.match(buildProductLabelFooterMarkup(produto, true, false), /ADM 100879/);
 assert.equal(formatProductAdm('38136'), '38.136');
 assert.equal(formatProductAdm('ABC-38136'), 'ABC-38136');
 assert.equal(getProductLabelPdfPageCount(1), 1);
@@ -76,6 +84,8 @@ const zpl6 = generateZplLabels(produto, 6);
 assert.match(zpl1, /\^FO22,10/);
 assert.match(zpl2, /\^FO286,10/);
 assert.match(zpl3, /\^FO550,10/);
+assert.match(zpl1, /CODIGO ORIGINAL BASE-REG-34/);
+assert.doesNotMatch(zpl1, /ADM 100879/);
 assert.equal((zpl4.match(/\^XA/g) || []).length, 2);
 assert.equal((zpl6.match(/\^XA/g) || []).length, 2);
 assert.equal((generateZplLabels(produto, 50).match(/\^XA/g) || []).length, 17);
@@ -92,18 +102,22 @@ assert.match(product100x60Zpl, /\^LL480/);
 assert.match(product100x60Zpl, /0087946736552/);
 assert.match(product100x60Zpl, /BASE REG GAVETA 3\/4/);
 assert.match(product100x60Zpl, /VERSALLI/);
+assert.match(product100x60Zpl, /CODIGO ORIGINAL BASE-REG-34/);
+assert.doesNotMatch(product100x60Zpl, /ADM 100879/);
 assert.doesNotMatch(product100x60Zpl, /CAIXA FECHADA/);
 const productWithoutBarcode = { ...produto, codigoBarras: null, codigoBarrasCaixaFechada: null };
 const fallbackUnitLabel = generateZplLabels(productWithoutBarcode, 1);
 assert.match(fallbackUnitLabel, /\^FO64,78\^BY2,2,30\^BCN/);
 assert.match(fallbackUnitLabel, /\^FD100879\^FS/);
-assert.match(fallbackUnitLabel, /\^FO0,137\^FB264,1,0,C,0\^A0N,10,10\^FDADM 100879\^FS/);
-assert.match(fallbackUnitLabel, /\^FO0,153\^FB264,1,0,C,0\^A0N,8,8\^FDCODIGO ORIGINAL BASE-REG-34\^FS/);
+assert.match(fallbackUnitLabel, /\^FO0,137\^FB264,1,0,C,0\^A0N,10,10\^FDCODIGO ORIGINAL BASE-REG-34\^FS/);
+assert.doesNotMatch(fallbackUnitLabel, /ADM 100879/);
 const fallbackWideLabel = generateZplLabels(productWithoutBarcode, 1, 'PRODUTO_100X60');
 assert.match(fallbackWideLabel, /\^FO298,155\^BY3,2,150\^BCN/);
 assert.match(fallbackWideLabel, /\^FDCODIGO ORIGINAL BASE-REG-34\^FS/);
+assert.doesNotMatch(fallbackWideLabel, /ADM 100879/);
 const fallbackClosedBoxLabel = generateZplLabels(productWithoutBarcode, 1, 'CAIXA_FECHADA');
 assert.match(fallbackClosedBoxLabel, /\^FO298,205\^BY3,2,120\^BCN/);
+assert.match(fallbackClosedBoxLabel, /ADM 100879/);
 assert.match(fallbackClosedBoxLabel, /\^FDCODIGO ORIGINAL BASE-REG-34\^FS/);
 assert.match(
   generateZplLabels({ ...produto, nome: 'PRODUTO COM NOME MUITO GRANDE PARA TESTE DE QUEBRA CONTROLADA NA ETIQUETA' }, 1),
