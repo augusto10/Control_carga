@@ -7,4 +7,4 @@
  * '/separacao' é o totem: a página é pública, mas as APIs dela exigem
  * cookie de totem, header x-totem-token ou sessão (`withTotemOrAuth`).
  */
-export const PUBLIC_ROUTES = ['/login', '/esqueci-senha', '/cadastro', '/separacao'];
+export const PUBLIC_ROUTES = ['/login', '/esqueci-senha', '/cadastro', '/separacao', '/paineis/controle-pedidos'];

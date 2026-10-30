@@ -1,6 +1,7 @@
 import { buscarLogisticaAtual } from '@/lib/pedido-logistica-atual';
 import prisma from '@/lib/prisma';
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { hasControlPedidosAccess } from '@/lib/control-pedidos-share-access';
 import { apiExternaService } from '@/services/api-externa';
 import { fetchMergedTracking } from '@/services/sswTracking';
 import { buscarPrazoDaRota, type RotaPrazoEntrega } from '@/lib/rota-prazo-entrega';
@@ -135,6 +136,11 @@ const mergePedidoComLogistica = (
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Metodo nao permitido' });
+  }
+
+  if (!hasControlPedidosAccess(req.cookies)) {
+    res.setHeader('Cache-Control', 'private, no-store, max-age=0');
+    return res.status(401).json({ error: 'Acesso nao autorizado' });
   }
 
   const { pedidoId } = req.query;

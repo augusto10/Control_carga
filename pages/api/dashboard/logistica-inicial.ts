@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { hasControlPedidosAccess } from '@/lib/control-pedidos-share-access';
 import { apiExternaService } from '@/services/api-externa';
 import { getPedidosDashboard } from '@/lib/dashboard-external-cache';
 import { montarDashboardPorSnapshot } from '@/lib/logistica-snapshot';
@@ -1019,6 +1020,11 @@ export default async function handler(
   if (req.method !== 'GET') {
     res.setHeader('Allow', 'GET');
     return res.status(405).json({ error: 'Metodo nao permitido' });
+  }
+
+  if (!hasControlPedidosAccess(req.cookies)) {
+    res.setHeader('Cache-Control', 'private, no-store, max-age=0');
+    return res.status(401).json({ error: 'Acesso nao autorizado' });
   }
 
   const username = process.env.API_EXTERNA_USERNAME;
