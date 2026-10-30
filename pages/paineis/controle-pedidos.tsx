@@ -3,6 +3,14 @@ import { prazoDaRotaForaDoPrazo } from '@/lib/rota-prazo-entrega';
 import { useCallback, useEffect, useState, useRef } from 'react';
 import { Loader2 } from 'lucide-react';
 import { ExpedicaoCards } from '@/components/dashboard/ExpedicaoCards';
+import type { GetServerSideProps } from 'next';
+import {
+  CONTROL_PEDIDOS_SHARE_TOKEN_ENV,
+  CONTROL_PEDIDOS_SHARE_COOKIE,
+  createControlPedidosShareCookie,
+  hasValidControlPedidosSession,
+  isValidControlPedidosShareToken,
+} from '@/lib/control-pedidos-share-access';
 import {
   AlertCircle,
   ClipboardList,
@@ -331,5 +339,38 @@ export default function ControlePedidosPainel() {
       </div>
   );
 }
+
+export const getServerSideProps: GetServerSideProps = async ({ req, res, query }) => {
+  res.setHeader('Cache-Control', 'private, no-store, max-age=0');
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  res.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive');
+
+  const shareToken = process.env[CONTROL_PEDIDOS_SHARE_TOKEN_ENV];
+  if (!shareToken) {
+    return hasValidControlPedidosSession(req.cookies.auth_token)
+      ? { props: {} }
+      : { notFound: true };
+  }
+
+  const queryToken = Array.isArray(query.token) ? query.token[0] : query.token;
+  if (isValidControlPedidosShareToken(queryToken, shareToken)) {
+    res.setHeader('Set-Cookie', createControlPedidosShareCookie(shareToken));
+    return {
+      redirect: {
+        destination: '/paineis/controle-pedidos',
+        permanent: false,
+      },
+    };
+  }
+
+  if (
+    isValidControlPedidosShareToken(req.cookies[CONTROL_PEDIDOS_SHARE_COOKIE], shareToken)
+    || hasValidControlPedidosSession(req.cookies.auth_token)
+  ) {
+    return { props: {} };
+  }
+
+  return { notFound: true };
+};
 
 ControlePedidosPainel.usesAppLayout = true;

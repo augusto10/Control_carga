@@ -14,6 +14,12 @@ Para atualizar localmente:
 npm run sync:label-products
 ```
 
+## Painel de controle de pedidos por link
+
+O painel `/paineis/controle-pedidos` pode ser aberto sem login usando um link secreto. Configure `CONTROL_PEDIDOS_SHARE_TOKEN` como variavel de ambiente do servidor (localmente e no ambiente de deploy) com um valor aleatorio longo e privado. O link inicial tem o formato `/paineis/controle-pedidos?token=<CONTROL_PEDIDOS_SHARE_TOKEN>`; depois de validado, o servidor grava um cookie `HttpOnly` e redireciona para a rota sem o token.
+
+Trate o link como uma credencial: compartilhe somente com pessoas autorizadas e troque a variavel de ambiente para revogar os links existentes. As APIs do painel aceitam esse cookie ou uma sessao autenticada.
+
 Sistema web para controle de carga e notas fiscais com leitura de código de barras.
 
 ## Funcionalidades
