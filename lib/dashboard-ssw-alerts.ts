@@ -24,6 +24,19 @@ export function removerPedidosEntreguesPelaSsw<
   });
 }
 
+export function removerPedidosDevolvidos<
+  T extends IndicadorComPedidos<{ pedidoId: number }>
+>(indicadores: T[], pedidosDevolvidos: Set<number>): T[] {
+  if (pedidosDevolvidos.size === 0) return indicadores;
+
+  return indicadores.map((indicador) => {
+    const pedidos = indicador.pedidos.filter((pedido) => !pedidosDevolvidos.has(pedido.pedidoId));
+    return pedidos.length === indicador.pedidos.length
+      ? indicador
+      : { ...indicador, pedidos, total: pedidos.length };
+  });
+}
+
 export function removerPedidosEmbarcadosPelaSsw<
   T extends IndicadorComPedidos<{ pedidoId: number }>
 >(indicadores: T[], pedidosEmbarcados: Set<number>): T[] {

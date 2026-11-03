@@ -30,6 +30,7 @@ assert.equal(pedidoTemDevolucao({ status_separacoes: 'G' }, { itens_entregas_pen
 assert.equal(pedidoTemDevolucao({ status_separacoes: 'G' }, { itens_entregas_pendentes: [{ SALDO: 2, DEVOLVIDOS: 0 }] }), false);
 assert.equal(pedidoTemDevolucao({}, { entregas: [{ STATUS: 'DEVOLVIDO' }] }), true);
 assert.equal(pedidoTemDevolucao({}, { entregas: [{ DEVOLUCAO_TOTAL: 1 }] }), true);
+assert.equal(pedidoTemDevolucao({ pedido_id: 201179 }, { pedido: { TOTALMENTE_DEVOLVIDO: 'S' } }), true);
 assert.equal(pedidoTemEntregaGerada({}, { comparativo_separacao_pendentes: [{ POSSUI_PRODUTO_FALTANDO: 'S' }] }), false);
 assert.equal(pedidoTemEntregaGerada({}, { entregas: [{ ENTREGA_ID: 10 }] }), true);
-console.log('Regras de pendencias: 18 verificacoes passaram.');
+console.log('Regras de pendencias: 19 verificacoes passaram.');

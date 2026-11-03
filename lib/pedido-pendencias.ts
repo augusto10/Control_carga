@@ -47,9 +47,18 @@ export function pedidoTemDevolucao(
   pedido: Record<string, unknown> | null | undefined,
   logistica: Record<string, any> | null | undefined
 ): boolean {
-  const valores = [pedido, (pedido as any)?.logistica, logistica, logistica?.pedido, logistica?.status_logistico].filter(
-    (item): item is Record<string, unknown> => Boolean(item && typeof item === 'object')
-  );
+  const valores: Record<string, unknown>[] = [];
+  const pendentes: unknown[] = [pedido, logistica];
+  const visitados = new Set<object>();
+  while (pendentes.length > 0) {
+    const item = pendentes.pop();
+    if (!item || typeof item !== 'object' || Array.isArray(item) || visitados.has(item)) continue;
+    visitados.add(item);
+    const registro = item as Record<string, unknown>;
+    valores.push(registro);
+    pendentes.push(registro.pedido, registro.logistica, registro.status_logistico);
+  }
+
   if (valores.some(temStatusDevolucao)) return true;
 
   for (const raiz of valores) {

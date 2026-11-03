@@ -232,6 +232,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ error: 'Credenciais da API externa nao configuradas' });
   }
 
+  if (String(req.query.erpOnly || '') === '1') {
+    res.setHeader('Cache-Control', 'private, no-store, max-age=0');
+    try {
+      const [logistica, pedido] = await Promise.all([
+        apiExternaService.buscarPedidoLogistica(id, username, password, 8_000),
+        apiExternaService.buscarPedidoPorId(id, username, password),
+      ]);
+      if (!logistica && !pedido) {
+        return res.status(404).json({ error: 'Pedido nao encontrado no ERP' });
+      }
+      return res.status(200).json({
+        pedido: pedido || {},
+        logistica,
+        confirmacaoDisponivel: Boolean(logistica),
+      });
+    } catch (error) {
+      console.error(`[Pedido Logistica] Falha ao confirmar devolucao no ERP para o pedido ${id}:`, error);
+      return res.status(503).json({ error: 'Nao foi possivel confirmar o status do pedido no ERP' });
+    }
+  }
+
   const cacheKey = `${id}:${chaveNfeInformada || ''}:${numeroNotaInformado || ''}:${transportadoraInformada || ''}`;
   const cached = pedidoLogisticaCache.get(cacheKey);
   if (

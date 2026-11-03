@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {
   removerPedidosEmbarcadosPelaSsw,
+  removerPedidosDevolvidos,
   removerPedidosEntreguesPelaSsw,
 } from '../lib/dashboard-ssw-alerts';
 
@@ -22,4 +23,10 @@ assert.deepEqual(entregues[0].pedidos.map((pedido) => pedido.pedidoId), [199883]
 assert.equal(entregues[2], indicadores[2]);
 assert.equal(removerPedidosEntreguesPelaSsw(indicadores, new Set()), indicadores);
 
-console.log('Filtragem de embarcados e entregues SSW nos alertas: 8 verificações passaram.');
+const devolvidos = removerPedidosDevolvidos(indicadores, new Set([200036]));
+assert.deepEqual(devolvidos.map((item) => item.total), [1, 0, 0]);
+assert.deepEqual(devolvidos[0].pedidos.map((pedido) => pedido.pedidoId), [199883]);
+assert.equal(devolvidos[2].pedidos.length, 0);
+assert.equal(removerPedidosDevolvidos(indicadores, new Set()), indicadores);
+
+console.log('Filtragem de pedidos devolvidos no painel: 4 verificacoes passaram.');

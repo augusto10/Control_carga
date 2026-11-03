@@ -1,12 +1,13 @@
 import { useCurrentDashboard } from '@/hooks/useCurrentDashboard';
 import {
   removerPedidosEmbarcadosPelaSsw,
+  removerPedidosDevolvidos,
   removerPedidosEntreguesPelaSsw,
 } from '@/lib/dashboard-ssw-alerts';
 import { resumirPedidosPorStatus } from '@/lib/pedido-resumo-status';
 import { PedidoInformacoes } from '@/components/dashboard/PedidoInformacoes';
 import { ResumoStatusPedidos } from '@/components/dashboard/ResumoStatusPedidos';
-import { saldoPendente, itensComSaldoPendente, codigoAdmDoProduto } from '@/lib/pedido-pendencias';
+import { saldoPendente, itensComSaldoPendente, codigoAdmDoProduto, pedidoTemDevolucao } from '@/lib/pedido-pendencias';
 import { getLabelProductAdmById, getLabelProductBrandById } from '@/lib/label-products-catalog';
 import { dadosPedido } from '@/lib/pedido-apresentacao';
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
@@ -319,6 +320,7 @@ const DASHBOARD_LOCAL_CACHE_KEY = 'dashboard-logistica-cache-v11';
 const DASHBOARD_ALERTAS_LOCAL_CACHE_KEY = 'dashboard-logistica-alertas-cache-v16';
 const DASHBOARD_AUTO_REFRESH_INTERVAL_MS = 3 * 60_000;
 const SSW_RESULT_CACHE_TTL_MS = 30 * 60_000;
+const ERP_RETURN_CACHE_TTL_MS = 60_000;
 const SSW_BACKGROUND_CONCURRENCY = 4;
 const DASHBOARD_LEGACY_CACHE_KEYS = [
   'dashboard-logistica-cache-v3',
@@ -556,6 +558,7 @@ function Home() {
   const sswResultadosRef = useRef(
     new Map<string, { embarcado: boolean; entregue: boolean; consultadoEm: number }>()
   );
+  const devolucaoErpRef = useRef(new Map<number, { devolvido: boolean; consultadoEm: number }>());
   const sswConsultasAtivasRef = useRef(new Set<string>());
   const [sswConsultasPendentes, setSswConsultasPendentes] = useState(0);
 
@@ -694,6 +697,67 @@ function Home() {
     );
   }, [setDashboardAlertas]);
 
+  const confirmarDevolucoesNoErp = useCallback((data: DashboardLogisticaData) => {
+    const pedidos = new Map<number, DashboardPedidoItem>();
+    for (const indicador of data.indicadores) {
+      if (indicador.codigo !== 'ALERTAS_NAO_EMBARCADOS') continue;
+      for (const pedido of indicador.pedidos) pedidos.set(pedido.pedidoId, pedido);
+    }
+
+    const pendentes = [...pedidos.values()];
+    let proximo = 0;
+    const removerPedidoDevolvido = (pedidoId: number) => {
+      const idsDevolvidos = new Set([pedidoId]);
+      setDashboardAlertas((atual) => atual
+        ? { ...atual, indicadores: removerPedidosDevolvidos(atual.indicadores, idsDevolvidos) }
+        : atual);
+      setDashboard((atual) => atual
+        ? { ...atual, indicadores: removerPedidosDevolvidos(atual.indicadores, idsDevolvidos) }
+        : atual);
+      setDashboardDiaAtual((atual) => atual
+        ? { ...atual, indicadores: removerPedidosDevolvidos(atual.indicadores, idsDevolvidos) }
+        : atual);
+      setListaPedidos((atual) => atual
+        ? { ...atual, pedidos: atual.pedidos.filter((pedido) => pedido.pedidoId !== pedidoId) }
+        : atual);
+    };
+    const verificarProximo = async () => {
+      while (proximo < pendentes.length) {
+        const pedido = pendentes[proximo++];
+        const cached = devolucaoErpRef.current.get(pedido.pedidoId);
+        if (cached && Date.now() - cached.consultadoEm < ERP_RETURN_CACHE_TTL_MS) {
+          if (cached.devolvido) removerPedidoDevolvido(pedido.pedidoId);
+          continue;
+        }
+
+        try {
+          const response = await fetch(`/api/pedidos/${pedido.pedidoId}/logistica?erpOnly=1`, {
+            credentials: 'include',
+            cache: 'no-store',
+          });
+          if (!response.ok) {
+            throw new Error(`Falha ao confirmar devolucao no ERP (${response.status})`);
+          }
+
+          const resultado = await response.json();
+          const devolvido = pedidoTemDevolucao(resultado?.pedido, resultado?.logistica);
+          if (!resultado?.confirmacaoDisponivel && !devolvido) {
+            console.warn(`[Dashboard] ERP sem detalhe de logistica para confirmar devolucao do pedido ${pedido.pedidoId}.`);
+            continue;
+          }
+          devolucaoErpRef.current.set(pedido.pedidoId, { devolvido, consultadoEm: Date.now() });
+          if (devolvido) removerPedidoDevolvido(pedido.pedidoId);
+        } catch (error) {
+          console.error(`[Dashboard] Nao foi possivel confirmar devolucao no ERP para o pedido ${pedido.pedidoId}:`, error);
+        }
+      }
+    };
+
+    void Promise.all(
+      Array.from({ length: Math.min(SSW_BACKGROUND_CONCURRENCY, pendentes.length) }, () => verificarProximo())
+    );
+  }, [setDashboard, setDashboardAlertas, setDashboardDiaAtual]);
+
   const loadDashboard = useCallback(async (
     forceRefresh = false,
     periodo = periodoAplicado,
@@ -810,6 +874,7 @@ function Home() {
           if (!nextError) nextError = data.warning || 'Nao foi possivel atualizar alertas e pendencias agora.';
         } else {
           consultarAlertasSswEmSegundoPlano(data);
+          confirmarDevolucoesNoErp(data);
         }
       } else if (!nextError) {
         const data = await response.json().catch(() => null);
@@ -849,7 +914,7 @@ function Home() {
     setRefreshingDashboard(false);
     setAcaoFiltroAtiva(null);
     lastDashboardSyncRef.current = Date.now();
-  }, [consultarAlertasSswEmSegundoPlano, periodoAplicado]);
+  }, [consultarAlertasSswEmSegundoPlano, confirmarDevolucoesNoErp, periodoAplicado]);
 
   useEffect(() => {
     if (isAuthenticated) {
