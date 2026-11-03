@@ -157,9 +157,10 @@ function buildClosedBoxPage(produto: ProdutoEtiqueta) {
   commands.push(`^FO75,108^FB650,1,0,C,0^A0N,27,27^FD${sanitizeZpl(produto.marca || 'SEM MARCA')}^FS`);
   commands.push(`^FO50,150^FB700,1,0,C,0^A0N,30,30^FDCAIXA FECHADA - ${produto.quantidadeCaixaFechada || '-'} UN^FS`);
   commands.push(buildBarcodeField(analysis.normalizedValue, analysis.type, 0, 205, 120, PAGE_WIDTH, usesAdmFallback));
-  commands.push(`^FO50,415^FB700,1,0,C,0^A0N,26,26^FDADM ${sanitizeZpl(produto.codigoAdm)}^FS`);
   if (usesAdmFallback) {
     commands.push(`^FO50,447^FB700,1,0,C,0^A0N,22,22^FDCODIGO ORIGINAL ${sanitizeZpl(produto.codigoOriginal || '-')}^FS`);
+  } else {
+    commands.push(`^FO50,415^FB700,1,0,C,0^A0N,26,26^FDADM ${sanitizeZpl(produto.codigoAdm)}^FS`);
   }
   commands.push('^PQ1,0,1,Y', '^XZ');
   return commands.join('\n');

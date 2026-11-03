@@ -304,9 +304,11 @@ export function LabelPreview({ produto, quantidade, labelType = 'UNITARIA' }: La
               <Box>
                 {isClosedBox ? (
                   <>
-                    <Typography variant="caption" display="block" textAlign="center" color="text.secondary">
-                      ADM {produto.codigoAdm}
-                    </Typography>
+                    {!usesAdmFallback && (
+                      <Typography variant="caption" display="block" textAlign="center" color="text.secondary">
+                        ADM {produto.codigoAdm}
+                      </Typography>
+                    )}
                     {usesAdmFallback && (
                       <Typography variant="caption" display="block" textAlign="center" color="text.secondary">
                         CÓDIGO ORIGINAL {produto.codigoOriginal || '-'}

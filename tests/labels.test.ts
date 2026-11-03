@@ -53,6 +53,13 @@ assert.doesNotMatch(unitaryFooter, /ADM|100879/);
 assert.match(product100x60Footer, /CÓDIGO ORIGINAL BASE-REG-34/);
 assert.doesNotMatch(product100x60Footer, /ADM|100879/);
 assert.match(buildProductLabelFooterMarkup(produto, true, false), /ADM 100879/);
+const fallbackClosedBoxFooter = buildProductLabelFooterMarkup(
+  { ...produto, codigoBarrasCaixaFechada: null },
+  true,
+  true,
+);
+assert.doesNotMatch(fallbackClosedBoxFooter, /ADM 100879/);
+assert.match(fallbackClosedBoxFooter, /CÓDIGO ORIGINAL BASE-REG-34/);
 assert.equal(formatProductAdm('38136'), '38.136');
 assert.equal(formatProductAdm('ABC-38136'), 'ABC-38136');
 assert.equal(getProductLabelPdfPageCount(1), 1);
@@ -117,8 +124,9 @@ assert.match(fallbackWideLabel, /\^FDCODIGO ORIGINAL BASE-REG-34\^FS/);
 assert.doesNotMatch(fallbackWideLabel, /ADM 100879/);
 const fallbackClosedBoxLabel = generateZplLabels(productWithoutBarcode, 1, 'CAIXA_FECHADA');
 assert.match(fallbackClosedBoxLabel, /\^FO298,205\^BY3,2,120\^BCN/);
-assert.match(fallbackClosedBoxLabel, /ADM 100879/);
+assert.doesNotMatch(fallbackClosedBoxLabel, /ADM 100879/);
 assert.match(fallbackClosedBoxLabel, /\^FDCODIGO ORIGINAL BASE-REG-34\^FS/);
+assert.match(closedBoxZpl, /ADM 100879/);
 assert.match(
   generateZplLabels({ ...produto, nome: 'PRODUTO COM NOME MUITO GRANDE PARA TESTE DE QUEBRA CONTROLADA NA ETIQUETA' }, 1),
   /…|\^FDPRODUTO COM NOME/

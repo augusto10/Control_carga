@@ -66,8 +66,8 @@ export function buildProductLabelFooterMarkup(
   isClosedBox: boolean,
   usesAdmFallback: boolean,
 ) {
-  if (isClosedBox) {
-    return `<div class="adm">ADM ${escapeHtml(produto.codigoAdm)}</div>${usesAdmFallback ? `<div class="adm-original">CÓDIGO ORIGINAL ${escapeHtml(produto.codigoOriginal || '-')}</div>` : ''}`;
+  if (isClosedBox && !usesAdmFallback) {
+    return `<div class="adm">ADM ${escapeHtml(produto.codigoAdm)}</div>`;
   }
 
   return `<div class="adm-original">CÓDIGO ORIGINAL ${escapeHtml(produto.codigoOriginal || '-')}</div>`;
