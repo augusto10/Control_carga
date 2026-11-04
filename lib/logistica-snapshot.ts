@@ -7,6 +7,7 @@ import { getLabelProductAdmById, getLabelProductBrandById } from '@/lib/label-pr
 import type { Prisma } from '@prisma/client';
 import prisma from '@/lib/prisma';
 import { apiExternaService } from '@/services/api-externa';
+import { isPedidoElegivelPorDataDoAlerta } from '@/lib/dashboard-alert-eligibility';
 
 const STATUS_ORDER = [
   'PEDIDO_NOVO',
@@ -456,26 +457,7 @@ export const isPedidoComPendencias = (pedido: Record<string, unknown>, logistica
 
 const isPedidoParaAlerta = (dataHoraRecebimento: Date | null, pedido: Record<string, unknown> | null, logistica: Record<string, any> | null) => {
   if (isSeparacaoCancelada(pedido, logistica)) return false;
-  if (!dataHoraRecebimento) return true;
-
-  const partes = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
-  }).formatToParts(new Date()).reduce<Record<string, string>>((resultado, parte) => {
-    resultado[parte.type] = parte.value;
-    return resultado;
-  }, {});
-  const hojeSaoPaulo = `${partes.year}-${partes.month}-${partes.day}`;
-  const pedidoPartes = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit',
-  }).formatToParts(dataHoraRecebimento).reduce<Record<string, string>>((resultado, parte) => {
-    resultado[parte.type] = parte.value;
-    return resultado;
-  }, {});
-  const dataPedido = `${pedidoPartes.year}-${pedidoPartes.month}-${pedidoPartes.day}`;
-  if (dataPedido < hojeSaoPaulo) return true;
-  if (dataPedido > hojeSaoPaulo) return false;
-  return false;
+  return isPedidoElegivelPorDataDoAlerta(dataHoraRecebimento);
 };
 
 const deriveAlertaStatus = (

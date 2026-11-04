@@ -7,6 +7,7 @@ import { obterStatusPrincipalDoPedido } from '@/lib/dashboard-order-status';
 import { codigoAdmDoProduto } from '@/lib/pedido-pendencias';
 import { getLabelProductAdmById, getLabelProductBrandById } from '@/lib/label-products-catalog';
 import { buscarPrazoDaRota, type RotaPrazoEntrega } from '@/lib/rota-prazo-entrega';
+import { isPedidoElegivelPorDataDoAlerta } from '@/lib/dashboard-alert-eligibility';
 import prisma from '@/lib/prisma';
 
 const DASHBOARD_PREVISAO_FINAL = '2050-12-31';
@@ -276,19 +277,19 @@ const STATUS_META: Record<StatusCode, Omit<DashboardStatusItem, 'total' | 'pedid
   ALERTAS_NAO_SEPARADOS: {
     codigo: 'ALERTAS_NAO_SEPARADOS',
     titulo: 'ALERTAS: NÃO SEPARADOS',
-    descricao: 'Pedidos novos e em separação (A e S) recebidos em dias anteriores ou, no dia atual, após passar o corte de 16:00',
+    descricao: 'Pedidos novos e em separação (A e S) recebidos em dias anteriores ou antes das 16:00 no dia atual',
     statusSeparacao: 'ALERTA_NAO_SEPARADO',
   },
   ALERTAS_NAO_CONFERIDOS: {
     codigo: 'ALERTAS_NAO_CONFERIDOS',
     titulo: 'ALERTAS: NÃO CONFERIDOS',
-    descricao: 'Pedidos separados (E) recebidos em dias anteriores ou, no dia atual, após passar o corte de 16:00',
+    descricao: 'Pedidos separados (E) recebidos em dias anteriores ou antes das 16:00 no dia atual',
     statusSeparacao: 'ALERTA_NAO_CONFERIDO',
   },
   ALERTAS_NAO_EMBARCADOS: {
     codigo: 'ALERTAS_NAO_EMBARCADOS',
     titulo: 'ALERTAS: NÃO EMBARCADOS',
-    descricao: 'Pedidos conferidos (G) recebidos em dias anteriores ou, no dia atual, após passar o corte de 16:00',
+    descricao: 'Pedidos conferidos (G) recebidos em dias anteriores ou antes das 16:00 no dia atual',
     statusSeparacao: 'ALERTA_NAO_EMBARCADO',
   },
   ALERTAS_NAO_ENTREGUES: {
@@ -717,38 +718,7 @@ const isSeparacaoCancelada = (pedido: Record<string, unknown>, logistica: Record
 
 const isPedidoParaAlerta = (pedido: Record<string, unknown>, logistica: Record<string, any> | null): boolean => {
   if (isSeparacaoCancelada(pedido, logistica)) return false;
-  const dataHoraRecebimento = getPedidoDataHoraRecebimento(pedido);
-  if (!dataHoraRecebimento) return true; // Se não tem data, considera para alerta
-
-  const agoraPartes = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/Sao_Paulo',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-  }).formatToParts(new Date()).reduce<Record<string, string>>((resultado, parte) => {
-    resultado[parte.type] = parte.value;
-    return resultado;
-  }, {});
-  const recebimentoPartes = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/Sao_Paulo',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(dataHoraRecebimento).reduce<Record<string, string>>((resultado, parte) => {
-    resultado[parte.type] = parte.value;
-    return resultado;
-  }, {});
-  const hoje = `${agoraPartes.year}-${agoraPartes.month}-${agoraPartes.day}`;
-  const dataRecebimento = `${recebimentoPartes.year}-${recebimentoPartes.month}-${recebimentoPartes.day}`;
-
-  if (dataRecebimento < hoje) return true;
-  if (dataRecebimento > hoje) return false;
-
-  const minutosAtuais = Number(agoraPartes.hour || 0) * 60 + Number(agoraPartes.minute || 0);
-  return false;
+  return isPedidoElegivelPorDataDoAlerta(getPedidoDataHoraRecebimento(pedido));
 };
 
 // Helper: deriva o status de alerta baseado no status de separação
