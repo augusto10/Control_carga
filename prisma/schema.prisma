@@ -216,6 +216,15 @@ model SswEntregaConsulta {
   @@index([entregue, proximaConsultaEm])
 }
 
+model SswDashboardTrackingCache {
+  cacheKey     String   @id
+  payload      String
+  consultadoEm DateTime @default(now())
+  expiresAt    DateTime
+
+  @@index([expiresAt])
+}
+
 model Motorista {
   id               String         @id @default(uuid())
   dataCriacao      DateTime       @default(now())

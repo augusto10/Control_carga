@@ -5,6 +5,7 @@ import { hasControlPedidosAccess } from '@/lib/control-pedidos-share-access';
 import { apiExternaService } from '@/services/api-externa';
 import { fetchMergedTracking } from '@/services/sswTracking';
 import { buscarPrazoDaRota, type RotaPrazoEntrega } from '@/lib/rota-prazo-entrega';
+import { parseSswDashboardTrackingCachePayload } from '@/lib/ssw-dashboard-cache';
 
 const PEDIDO_LOGISTICA_CACHE_TTL_MS = 60_000;
 const SSW_TRACKING_CACHE_TTL_MS = 30 * 60_000;
@@ -187,6 +188,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(200).json({ ssw: cachedSsw.payload });
     }
 
+    const sharedCacheEnabled = process.env.SSW_SHARED_CACHE_ENABLED !== 'false';
+    if (sharedCacheEnabled) {
+      try {
+        const sharedCache = await prisma.sswDashboardTrackingCache.findUnique({
+          where: { cacheKey: sswCacheKey },
+          select: { payload: true, expiresAt: true },
+        });
+        if (sharedCache && sharedCache.expiresAt.getTime() > Date.now()) {
+          const payload = parseSswDashboardTrackingCachePayload(sharedCache.payload);
+          if (payload) {
+            sswOnlyCache.set(sswCacheKey, {
+              expiresAt: sharedCache.expiresAt.getTime(),
+              payload,
+            });
+            return res.status(200).json({ ssw: payload });
+          }
+          console.error('[SSW dashboard cache] Payload persistido invalido.');
+        }
+      } catch (error) {
+        console.error('[SSW dashboard cache] Falha ao consultar cache persistente:', error);
+      }
+    }
+
     try {
       const tracking = await fetchMergedTracking({
         chave: chaveNfe,
@@ -209,7 +233,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           dominio: occurrence.dominio || null,
         })),
       };
-      sswOnlyCache.set(sswCacheKey, { expiresAt: Date.now() + SSW_TRACKING_CACHE_TTL_MS, payload });
+      const expiresAt = Date.now() + SSW_TRACKING_CACHE_TTL_MS;
+      sswOnlyCache.set(sswCacheKey, { expiresAt, payload });
+      if (sharedCacheEnabled) {
+        try {
+          await prisma.sswDashboardTrackingCache.upsert({
+            where: { cacheKey: sswCacheKey },
+            create: {
+              cacheKey: sswCacheKey,
+              payload: JSON.stringify(payload),
+              expiresAt: new Date(expiresAt),
+            },
+            update: {
+              payload: JSON.stringify(payload),
+              consultadoEm: new Date(),
+              expiresAt: new Date(expiresAt),
+            },
+          });
+        } catch (error) {
+          console.error('[SSW dashboard cache] Falha ao gravar cache persistente:', error);
+        }
+      }
       return res.status(200).json({ ssw: payload });
     } catch {
       return res.status(200).json({ ssw: {
