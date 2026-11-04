@@ -4,7 +4,7 @@ import { apiExternaService } from '@/services/api-externa';
 import { getPedidosDashboard } from '@/lib/dashboard-external-cache';
 import { montarDashboardPorSnapshot } from '@/lib/logistica-snapshot';
 import { obterStatusPrincipalDoPedido } from '@/lib/dashboard-order-status';
-import { codigoAdmDoProduto } from '@/lib/pedido-pendencias';
+import { codigoAdmDoProduto, pedidoTemDevolucao } from '@/lib/pedido-pendencias';
 import { getLabelProductAdmById, getLabelProductBrandById } from '@/lib/label-products-catalog';
 import { buscarPrazoDaRota, type RotaPrazoEntrega } from '@/lib/rota-prazo-entrega';
 import prisma from '@/lib/prisma';
@@ -1412,7 +1412,8 @@ export default async function handler(
             // Flag do ERP manda sozinha: mesmo com separacao aberta ou total
             // zerado, so o /logistica diz quantos itens faltam.
             possuiProdutosFaltandoNoConsolidado(pedido) ||
-            (hasResumoPendenciaNoPedido(pedido) && !isPedidoSomenteComSeparacaoAberta(pedido));
+            (hasResumoPendenciaNoPedido(pedido) && !isPedidoSomenteComSeparacaoAberta(pedido)) ||
+            deriveDashboardStatus(pedido, statusLogistico, logistica) === 'PEDIDO_EMBARCADO';
 
           if (
             pedidoId &&
@@ -1436,6 +1437,10 @@ export default async function handler(
               tipo_entrega: tipoEntregaLista,
               TIPO_ENTREGA: tipoEntregaLista,
             };
+          }
+
+          if (pedidoTemDevolucao(pedido, logistica)) {
+            return null;
           }
 
           const previsaoEntrega = toStringValue(pedido.previsao_entrega);
