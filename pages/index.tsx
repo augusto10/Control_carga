@@ -31,6 +31,7 @@ import {
   MapPin,
   Package,
   PackageCheck,
+  Printer,
   RefreshCw,
   UserCheck,
 } from 'lucide-react';
@@ -1079,6 +1080,93 @@ function Home() {
   const fecharListaPedidos = () => {
     setListaPedidos(null);
     setPrazosRotaConsultados(new Set());
+  };
+
+  const imprimirPedidosComProdutosFaltando = () => {
+    if (!listaPedidos || listaPedidos.codigo !== 'PENDENCIAS') return;
+
+    const janela = window.open('', '_blank', 'width=900,height=700');
+    if (!janela) {
+      window.alert('Permita a abertura de pop-ups para imprimir a lista.');
+      return;
+    }
+
+    janela.opener = null;
+    const escaparHtml = (valor: unknown) =>
+      String(valor ?? '').replace(/[&<>"']/g, (caractere) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;',
+      })[caractere] || caractere);
+    const quantidadeTotal = listaPedidos.pedidos.reduce(
+      (total, pedido) => total + pedido.produtosPendentes.reduce((soma, produto) => soma + produto.quantidade, 0),
+      0
+    );
+    const pedidosHtml = listaPedidos.pedidos.map((pedido) => `
+      <section class="pedido">
+        <div class="pedido-cabecalho">
+          <strong>Pedido #${escaparHtml(pedido.pedidoId)}</strong>
+          <span>${escaparHtml(pedido.nomeFantasia || pedido.clienteNome)}</span>
+        </div>
+        <p class="local">Local: ${escaparHtml(pedido.localNome || 'Não informado')}</p>
+        <table>
+          <thead>
+            <tr><th>Produto</th><th>Marca</th><th class="quantidade">Quantidade faltante</th></tr>
+          </thead>
+          <tbody>
+            ${pedido.produtosPendentes.length
+              ? pedido.produtosPendentes.map((produto) => `
+                <tr>
+                  <td>${produto.codigo ? `<strong>${escaparHtml(produto.codigo)}</strong> - ` : ''}${escaparHtml(produto.nome)}</td>
+                  <td>${escaparHtml(produto.marca || getLabelProductBrandById(produto.produtoId) || '-')}</td>
+                  <td class="quantidade">${escaparHtml(produto.quantidade)}</td>
+                </tr>
+              `).join('')
+              : '<tr><td colspan="3">Nenhum produto pendente detalhado.</td></tr>'}
+          </tbody>
+        </table>
+      </section>
+    `).join('');
+
+    janela.document.open();
+    janela.document.write(`<!doctype html>
+      <html lang="pt-BR">
+        <head>
+          <meta charset="utf-8">
+          <title>${escaparHtml(listaPedidos.titulo)}</title>
+          <style>
+            @page { size: A4; margin: 14mm; }
+            * { box-sizing: border-box; }
+            body { color: #172033; font: 12px Arial, sans-serif; margin: 0; }
+            h1 { font-size: 20px; margin: 0 0 6px; }
+            .resumo { border-bottom: 2px solid #334155; margin-bottom: 18px; padding-bottom: 10px; }
+            .resumo p { color: #475569; margin: 4px 0; }
+            .pedido { border: 1px solid #cbd5e1; border-radius: 6px; margin: 0 0 14px; padding: 10px; break-inside: avoid; }
+            .pedido-cabecalho { align-items: baseline; display: flex; gap: 12px; justify-content: space-between; }
+            .pedido-cabecalho strong { font-size: 15px; }
+            .pedido-cabecalho span { text-align: right; }
+            .local { color: #475569; margin: 6px 0 9px; }
+            table { border-collapse: collapse; width: 100%; }
+            th, td { border: 1px solid #cbd5e1; padding: 6px; text-align: left; }
+            th { background: #f1f5f9; }
+            .quantidade { text-align: center; white-space: nowrap; width: 135px; }
+            @media screen { body { margin: 24px auto; max-width: 190mm; } }
+          </style>
+        </head>
+        <body>
+          <header class="resumo">
+            <h1>${escaparHtml(listaPedidos.titulo)}</h1>
+            <p>${listaPedidos.pedidos.length} pedido(s) · ${quantidadeTotal} unidade(s) faltante(s)</p>
+            <p>Impresso em ${escaparHtml(new Date().toLocaleString('pt-BR'))}</p>
+          </header>
+          ${pedidosHtml || '<p>Nenhum pedido com produtos faltantes.</p>'}
+        </body>
+      </html>`);
+    janela.document.close();
+    janela.focus();
+    janela.setTimeout(() => janela.print(), 250);
   };
 
   const fetchPedidoDetalhe = useCallback(async (
@@ -2456,6 +2544,16 @@ function Home() {
           onClose={fecharListaPedidos}
           title={listaPedidos?.titulo || 'Pedidos'}
           size="xl"
+          footer={listaPedidos?.codigo === 'PENDENCIAS' ? (
+            <button
+              type="button"
+              onClick={imprimirPedidosComProdutosFaltando}
+              className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90"
+            >
+              <Printer className="h-4 w-4" />
+              Imprimir lista
+            </button>
+          ) : undefined}
         >
           {listaPedidos && (
             <div className="space-y-4">
