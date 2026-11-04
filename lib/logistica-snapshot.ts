@@ -774,7 +774,6 @@ export async function sincronizarLogisticaSnapshot(options: {
         pedidoId,
         tipoEntrega: getTipoEntregaPrincipal(pedido, logistica),
         statusCodigo,
-        devolvido: pedidoTemDevolucao(pedido, logistica),
         statusSeparacoes: pedido.status_separacoes,
         ultimoStatus: pedido.ultimo_status_separacao,
         entregaConfirmada: pedido.entrega_confirmada,
