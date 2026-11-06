@@ -29,6 +29,6 @@ export const isPedidoElegivelPorDataDoAlerta = (
   if (dataRecebimento < hoje) return true;
   if (dataRecebimento > hoje) return false;
 
-  const minutosRecebimento = Number(recebimentoPartes.hour) * 60 + Number(recebimentoPartes.minute);
-  return minutosRecebimento < ALERT_CUTOFF_MINUTES;
+  const minutosAgora = Number(agoraPartes.hour) * 60 + Number(agoraPartes.minute);
+  return minutosAgora >= ALERT_CUTOFF_MINUTES;
 };
