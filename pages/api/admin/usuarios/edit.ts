@@ -8,7 +8,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const { id, nome, tipo, senha, ativo } = req.body;
+    const { id, nome, tipo, senha, ativo, codigoAdm, senhaAdm, biometria } = req.body;
 
     if (!id) {
       return res.status(400).json({ message: 'ID é obrigatório' });
@@ -22,6 +22,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (senha && senha.trim() !== '') {
       data.senha = await bcrypt.hash(senha, 10);
+    }
+
+    // Credenciais ADM do separador (opcionais). senhaAdm/biometria vazios
+    // significam "manter o valor atual" — o form não os pré-preenche.
+    // senhaAdm fica em texto puro — repassada em claro ao job de automação.
+    if (codigoAdm !== undefined) {
+      const codigoAdmNum = Number(codigoAdm);
+      data.codigoAdm = Number.isInteger(codigoAdmNum) ? codigoAdmNum : null;
+    }
+    if (typeof senhaAdm === 'string' && senhaAdm.trim()) {
+      data.senhaAdm = senhaAdm.trim();
+    }
+    if (typeof biometria === 'string' && biometria.trim()) {
+      data.biometria = biometria.trim();
     }
 
     const usuario = await prisma.usuario.update({
