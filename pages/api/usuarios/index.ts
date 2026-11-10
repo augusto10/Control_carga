@@ -17,6 +17,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         dataCriacao: true,
         ultimoAcesso: true,
         foto: true,
+        codigoAdm: true,
       },
       orderBy: {
         nome: 'asc',
