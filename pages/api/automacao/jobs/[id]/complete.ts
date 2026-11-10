@@ -4,6 +4,9 @@ import {
   AgentAuthenticatedRequest,
   withAgentAuth,
 } from '@/lib/middleware/withAgentAuth';
+import { sincronizarPedidoDoJob } from '@/lib/separacao-job-sync';
+
+const JOB_TYPE_SEPARACAO = 'IMPRIMIR_LISTA_SEPARACAO';
 
 /**
  * POST /api/automacao/jobs/[id]/complete
@@ -47,6 +50,12 @@ async function handler(req: AgentAuthenticatedRequest, res: NextApiResponse) {
   }
 
   try {
+    // Tipo necessário antes do update: updateMany não retorna o registro.
+    const jobAtual = await automationPrisma.job.findUnique({
+      where: { id },
+      select: { type: true },
+    });
+
     const updated = await automationPrisma.job.updateMany({
       where: { id, status: 'RUNNING', agentId: req.agent.id },
       data: {
@@ -62,6 +71,12 @@ async function handler(req: AgentAuthenticatedRequest, res: NextApiResponse) {
         success: false,
         message: 'Job não está em execução por este agent.',
       });
+    }
+
+    // Reflete o resultado no Pedidos do banco principal:
+    // sucesso → FINALIZADO; falha → FALHA_AUTOMACAO (pedido volta à fila).
+    if (jobAtual?.type === JOB_TYPE_SEPARACAO) {
+      await sincronizarPedidoDoJob(id, success);
     }
 
     return res.status(200).json({ success: true });
