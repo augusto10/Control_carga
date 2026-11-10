@@ -4,6 +4,9 @@ import {
   AgentAuthenticatedRequest,
   withAgentAuth,
 } from '@/lib/middleware/withAgentAuth';
+import { sincronizarPedidoDoJob } from '@/lib/separacao-job-sync';
+
+const JOB_TYPE_SEPARACAO = 'IMPRIMIR_LISTA_SEPARACAO';
 
 /**
  * POST /api/automacao/jobs/claim
@@ -50,6 +53,19 @@ async function handler(req: AgentAuthenticatedRequest, res: NextApiResponse) {
       },
       data: { status: 'QUEUED', agentId: null, startedAt: null },
     });
+
+    // Jobs que esgotaram tentativas viram FAILED aqui (sem passar pelo
+    // complete do agente) — sincronizamos o Pedidos desses jobs para o
+    // pedido voltar à fila como FALHA_AUTOMACAO.
+    const expirados = await automationPrisma.job.findMany({
+      where: {
+        status: 'RUNNING',
+        lastHeartbeatAt: { lt: limiteHeartbeat },
+        attempts: { gte: MAX_TENTATIVAS_JOB },
+        type: JOB_TYPE_SEPARACAO,
+      },
+      select: { id: true },
+    });
     await automationPrisma.job.updateMany({
       where: {
         status: 'RUNNING',
@@ -62,6 +78,9 @@ async function handler(req: AgentAuthenticatedRequest, res: NextApiResponse) {
         finishedAt: agora,
       },
     });
+    for (const expirado of expirados) {
+      await sincronizarPedidoDoJob(expirado.id, false);
+    }
 
     // st agora = new Date();
 
