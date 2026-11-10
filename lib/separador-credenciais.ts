@@ -1,57 +1,79 @@
 import prisma from '@/lib/prisma';
 
 /**
- * Credenciais de separação (mock).
+ * Credenciais do separador consultadas em `Usuario`.
  *
- * Placeholder da futura autenticação por biometria: quando ela chegar, basta
- * trocar `validarSeparador` para consultar o serviço real — o endpoint
- * /api/separacao/associar não muda.
+ * `senhaAdm` fica em texto puro por necessidade funcional: ela é repassada
+ * em claro no payload do job para o agente autenticar no ERP — um hash
+ * bcrypt a tornaria ilegível. Nunca expor o campo em APIs de listagem.
  *
- * `senhaAdm` em texto puro por decisão de escopo (mock).
+ * `biometria` é placeholder até a escolha do leitor: guarda o template/ID
+ * que o aparelho devolver; o match hoje é por igualdade exata.
  */
-export const SEPARADORES_MOCK: Array<{
-  codigoAdm: number;
-  senhaAdm: string;
-  nome: string;
-  email: string;
-}> = [
-  { codigoAdm: 101, senhaAdm: '1234', nome: 'Separador Um', email: 'separador1@totem.local' },
-  { codigoAdm: 102, senhaAdm: '1234', nome: 'Separador Dois', email: 'separador2@totem.local' },
-  { codigoAdm: 103, senhaAdm: '1234', nome: 'Separador Três', email: 'separador3@totem.local' },
-];
-
 export type SeparadorValido = {
   id: string;
   nome: string;
+  codigoAdm: number;
+  senhaAdm: string;
 };
 
+const SELECIONAR_CREDENCIAIS = {
+  id: true,
+  nome: true,
+  ativo: true,
+  codigoAdm: true,
+  senhaAdm: true,
+} as const;
+
+function toSeparador(usuario: {
+  id: string;
+  nome: string;
+  ativo: boolean;
+  codigoAdm: number | null;
+  senhaAdm: string | null;
+}): SeparadorValido | null {
+  if (!usuario.ativo || usuario.codigoAdm == null || !usuario.senhaAdm) {
+    return null;
+  }
+  return {
+    id: usuario.id,
+    nome: usuario.nome,
+    codigoAdm: usuario.codigoAdm,
+    senhaAdm: usuario.senhaAdm,
+  };
+}
+
 /**
- * Valida codigoAdm + senhaAdm contra o mock e garante um `Usuario` ativo e
- * do tipo SEPARADOR para satisfazer a FK de `Pedidos.usuarioId`.
- *
- * Retorna `null` quando a credencial é inválida ou o usuário está inativo.
+ * Fallback manual: localiza o `Usuario` pelo par codigoAdm + senhaAdm.
+ * Retorna `null` quando não há usuário, está inativo ou sem credenciais ADM.
  */
 export async function validarSeparador(
   codigoAdm: number,
   senhaAdm: string
 ): Promise<SeparadorValido | null> {
-  const credencial = SEPARADORES_MOCK.find(
-    (item) => item.codigoAdm === codigoAdm && item.senhaAdm === senhaAdm
-  );
-  if (!credencial) return null;
-
-  const usuario = await prisma.usuario.upsert({
-    where: { email: credencial.email },
-    update: { nome: credencial.nome, tipo: 'SEPARADOR' },
-    create: {
-      nome: credencial.nome,
-      email: credencial.email,
-      senha: 'MOCK_TOTEM', // hash inatingível — login por senha permanece bloqueado
-      tipo: 'SEPARADOR',
-    },
-    select: { id: true, nome: true, ativo: true },
+  const usuario = await prisma.usuario.findFirst({
+    where: { codigoAdm, senhaAdm },
+    select: SELECIONAR_CREDENCIAIS,
   });
+  if (!usuario) return null;
+  return toSeparador(usuario);
+}
 
-  if (!usuario.ativo) return null;
-  return { id: usuario.id, nome: usuario.nome };
+/**
+ * Caminho primário (placeholder do leitor): localiza o `Usuario` cujo
+ * `biometria` bate exatamente com o valor enviado pelo totem e devolve
+ * suas credenciais ADM para o payload do job.
+ */
+export async function buscarSeparadorPorBiometria(
+  biometria: string
+): Promise<SeparadorValido | null> {
+  const valor = biometria.trim();
+  if (!valor) return null;
+
+  const usuario = await prisma.usuario.findFirst({
+    where: { biometria: valor },
+    select: SELECIONAR_CREDENCIAIS,
+  });
+  if (!usuario) return null;
+  return toSeparador(usuario);
 }
