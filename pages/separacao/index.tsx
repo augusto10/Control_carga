@@ -5,6 +5,7 @@ import {
   BellRing,
   CheckCircle2,
   Delete,
+  Fingerprint,
   PackageOpen,
   RefreshCw,
   Tablet,
@@ -305,7 +306,7 @@ function SeparacaoContent() {
       const response = await fetchTotem('/api/separacao/associar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ codigoAdm: codigo, senhaAdm }),
+        body: JSON.stringify({ codigoAdm: codigo, senhaAdm, pedidoId: proximo?.pedidoId }),
       });
       const data = await response.json();
 
@@ -317,6 +318,12 @@ function SeparacaoContent() {
       setMensagem(
         `Pedido #${data.pedido?.pedidoId ?? ''} enviado para separação.`
       );
+      // Remove o pedido da fila local imediatamente — sem isso, ele continua
+      // aparecendo na tela até o próximo polling de /api/separacao/fila.
+      const pedidoAssociadoId = data.pedido?.pedidoId ?? proximo?.pedidoId;
+      if (pedidoAssociadoId) {
+        setFila((atual) => atual.filter((item) => item.pedidoId !== pedidoAssociadoId));
+      }
       await carregar(true);
     } catch (error) {
       setErroModal(error instanceof Error ? error.message : 'Falha ao associar pedido.');
@@ -553,6 +560,20 @@ function SeparacaoContent() {
               <p className="text-sm font-medium">{erroModal}</p>
             </div>
           ) : null}
+          {/* Biometria (placeholder): será o caminho primário quando o leitor
+              for definido. A API /api/separacao/associar já aceita `biometria`;
+              até lá, a identificação é por código + senha ADM. */}
+          <button
+            type="button"
+            disabled
+            title="Disponível quando o leitor biométrico for configurado"
+            className="flex h-20 w-full cursor-not-allowed items-center justify-center gap-3 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 text-slate-400"
+          >
+            <Fingerprint className="h-10 w-10" />
+            <span className="text-base font-semibold">
+              Ler digital — em breve
+            </span>
+          </button>
           <div>
             <label
               htmlFor="codigoAdm"

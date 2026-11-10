@@ -30,7 +30,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (req.method === 'POST') {
     try {
-      const { nome, email, senha, tipo, ativo } = req.body;
+      const { nome, email, senha, tipo, ativo, codigoAdm, senhaAdm, biometria } = req.body;
 
       if (!nome || !email || !senha) {
         return res.status(400).json({ message: 'Dados obrigatórios faltando' });
@@ -46,6 +46,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       const hashedPassword = await bcrypt.hash(senha, 10);
 
+      // Credenciais ADM do separador (opcionais). senhaAdm fica em texto
+      // puro — é repassada em claro no payload do job de automação.
+      const codigoAdmNum = Number(codigoAdm);
       const usuario = await prisma.usuario.create({
         data: {
           nome,
@@ -53,6 +56,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           senha: hashedPassword,
           tipo: tipo || 'USUARIO',
           ativo: ativo !== undefined ? ativo : true,
+          codigoAdm: Number.isInteger(codigoAdmNum) ? codigoAdmNum : null,
+          senhaAdm: typeof senhaAdm === 'string' && senhaAdm.trim() ? senhaAdm.trim() : null,
+          biometria: typeof biometria === 'string' && biometria.trim() ? biometria.trim() : null,
         },
         select: {
           id: true,

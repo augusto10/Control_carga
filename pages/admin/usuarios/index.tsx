@@ -2,8 +2,7 @@ import { useState, useEffect } from 'react';
 import Head from 'next/head';
 import { 
   Users, 
-  UserPlus, 
-  Search, 
+  UserPlus,
   RefreshCw, 
   Edit, 
   Trash2, 
@@ -11,7 +10,6 @@ import {
   XCircle, 
   Shield, 
   Clock,
-  MoreVertical,
   AlertCircle,
   User,
   ShieldAlert,
@@ -46,6 +44,9 @@ interface Usuario {
   senha?: string;
   confirmarSenha?: string;
   foto?: string | null;
+  codigoAdm?: number | null;
+  senhaAdm?: string;
+  biometria?: string;
 }
 
 export default function GerenciarUsuariosPage() {
@@ -143,7 +144,10 @@ export default function GerenciarUsuariosPage() {
           nome: currentUsuario.nome,
           tipo: currentUsuario.tipo,
           senha: currentUsuario.senha,
-          ativo: currentUsuario.ativo
+          ativo: currentUsuario.ativo,
+          codigoAdm: currentUsuario.codigoAdm,
+          senhaAdm: currentUsuario.senhaAdm,
+          biometria: currentUsuario.biometria
         });
         showToast('Usuário atualizado com sucesso!');
       } else {
@@ -294,13 +298,13 @@ export default function GerenciarUsuariosPage() {
                               <span className="font-semibold text-textMain truncate">{usuario.nome}</span>
                               <span className="text-xs text-textMuted truncate">{usuario.email}</span>
                               <div className="sm:hidden mt-1 flex gap-1">
-                                <Badge variant={tipoInfo.variant} size="sm" className="px-1.5 py-0">
+                                <Badge variant={tipoInfo.variant} className="px-1.5 py-0">
                                   {tipoInfo.label.split(' ')[0]}
                                 </Badge>
                                 {usuario.ativo ? (
-                                  <Badge variant="success" size="sm" className="px-1.5 py-0">Ativo</Badge>
+                                  <Badge variant="success" className="px-1.5 py-0">Ativo</Badge>
                                 ) : (
-                                  <Badge variant="neutral" size="sm" className="px-1.5 py-0">Inativo</Badge>
+                                  <Badge variant="neutral" className="px-1.5 py-0">Inativo</Badge>
                                 )}
                               </div>
                             </div>
@@ -473,6 +477,50 @@ export default function GerenciarUsuariosPage() {
                 </div>
               </div>
             </div>
+
+            {/* Credenciais ADM do separador (totem /separacao) */}
+            {currentUsuario?.tipo === 'SEPARADOR' && (
+              <div className="space-y-4 p-4 bg-blue-50/50 rounded-2xl border border-blue-100">
+                <div className="flex flex-col">
+                  <span className="text-sm font-bold text-slate-700">Credenciais ADM do Separador</span>
+                  <span className="text-[10px] text-slate-500 uppercase tracking-wider font-medium">
+                    Usadas no totem de separação — senha em texto puro, enviada ao agente
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-1.5">
+                    <Label>Código ADM</Label>
+                    <Input
+                      type="number"
+                      placeholder="Ex.: 101"
+                      value={currentUsuario?.codigoAdm ?? ''}
+                      onChange={(e) => setCurrentUsuario(prev => ({
+                        ...prev!,
+                        codigoAdm: e.target.value === '' ? null : Number(e.target.value)
+                      }))}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>{isEditing ? 'Senha ADM (manter se vazio)' : 'Senha ADM'}</Label>
+                    <Input
+                      type="password"
+                      placeholder="••••"
+                      value={currentUsuario?.senhaAdm || ''}
+                      onChange={(e) => setCurrentUsuario(prev => ({ ...prev!, senhaAdm: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>{isEditing ? 'Biometria (manter se vazio)' : 'Biometria'}</Label>
+                    <Input
+                      type="text"
+                      placeholder="Template do leitor (futuro)"
+                      value={currentUsuario?.biometria || ''}
+                      onChange={(e) => setCurrentUsuario(prev => ({ ...prev!, biometria: e.target.value }))}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
 
             {currentUsuario?.senha && currentUsuario?.confirmarSenha && 
              currentUsuario.senha !== currentUsuario.confirmarSenha && (

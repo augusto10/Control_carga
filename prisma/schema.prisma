@@ -76,6 +76,9 @@ model Usuario {
   dataCriacao          DateTime                @default(now())
   ultimoAcesso         DateTime?
   foto                 String?
+  codigoAdm            Int?                    @unique // Código ADM do separador no ERP
+  senhaAdm             String?                 // Senha ADM em texto puro — repassada ao job do agente
+  biometria            String?                 @unique // Template/ID do leitor biométrico (placeholder)
   historicoPontos      HistoricoPontuacao[]
   notas                NotaFiscal[]
   ajustesPallets       PalletAjuste[]
@@ -100,6 +103,7 @@ enum StatusPedidoSeparacao {
   EM_SEPARACAO
   FINALIZADO
   CANCELADO
+  FALHA_AUTOMACAO // Falha reportada pelo agente de automação — pedido volta à fila
 }
 
 model Pedidos {
