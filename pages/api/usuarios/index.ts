@@ -17,13 +17,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         dataCriacao: true,
         ultimoAcesso: true,
         foto: true,
+        biometria: true,
+        codigoAdm: true,
+        senhaAdm: true,
       },
       orderBy: {
         nome: 'asc',
       },
     });
 
-    return res.status(200).json(usuarios);
+    return res.status(200).json(
+      usuarios.map(({ biometria, senhaAdm, ...usuario }) => ({
+        ...usuario,
+        temBiometria: Boolean(biometria),
+        temSenhaAdm: Boolean(senhaAdm),
+      }))
+    );
   } catch (error) {
     console.error('Erro ao buscar usuários:', error);
     return res.status(500).json({ message: 'Erro interno do servidor' });

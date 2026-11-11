@@ -16,6 +16,7 @@ import {
   User,
   ShieldAlert,
   ShieldCheck,
+  Fingerprint,
   Package,
   FileCheck,
   Eye
@@ -46,6 +47,10 @@ interface Usuario {
   senha?: string;
   confirmarSenha?: string;
   foto?: string | null;
+  temBiometria?: boolean;
+  codigoAdm?: number | string | null;
+  senhaAdm?: string;
+  temSenhaAdm?: boolean;
 }
 
 export default function GerenciarUsuariosPage() {
@@ -53,6 +58,7 @@ export default function GerenciarUsuariosPage() {
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
+  const [biometriaLoading, setBiometriaLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
   // Modais
@@ -93,6 +99,7 @@ export default function GerenciarUsuariosPage() {
   const carregarUsuarios = async () => {
     try {
       setLoading(true);
+      setError(null);
       const response = await api.get('/api/usuarios');
       setUsuarios(response.data);
     } catch (error: any) {
@@ -110,6 +117,7 @@ export default function GerenciarUsuariosPage() {
       tipo: 'USUARIO' as TipoUsuario,
       ativo: true,
       senha: '',
+      senhaAdm: '',
       confirmarSenha: ''
     });
     setIsEditing(false);
@@ -120,6 +128,7 @@ export default function GerenciarUsuariosPage() {
     setCurrentUsuario({
       ...usuario,
       senha: '',
+      senhaAdm: '',
       confirmarSenha: ''
     });
     setIsEditing(true);
@@ -143,12 +152,25 @@ export default function GerenciarUsuariosPage() {
           nome: currentUsuario.nome,
           tipo: currentUsuario.tipo,
           senha: currentUsuario.senha,
+          codigoAdm: currentUsuario.codigoAdm ?? null,
+          senhaAdm: currentUsuario.senhaAdm,
           ativo: currentUsuario.ativo
         });
         showToast('Usuário atualizado com sucesso!');
       } else {
-        await api.post('/api/admin/usuarios', currentUsuario);
-        showToast('Usuário criado com sucesso!');
+        const response = await api.post('/api/admin/usuarios', currentUsuario);
+        setCurrentUsuario({
+          ...response.data,
+          senha: '',
+          senhaAdm: '',
+          confirmarSenha: '',
+          temSenhaAdm: Boolean(currentUsuario.senhaAdm),
+          temBiometria: false,
+        });
+        setIsEditing(true);
+        showToast('Usuário criado. Cadastre a digital antes de usar no totem.');
+        await carregarUsuarios();
+        return;
       }
       handleCloseFormModal();
       await carregarUsuarios();
@@ -157,6 +179,56 @@ export default function GerenciarUsuariosPage() {
       showToast(error.response?.data?.message || 'Erro ao salvar usuário', 'error');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCadastrarBiometria = async () => {
+    if (!currentUsuario?.id) return;
+
+    try {
+      setBiometriaLoading(true);
+      const captureResponse = await fetch('http://127.0.0.1:17876/capture', { method: 'POST' });
+      const capture = await captureResponse.json();
+      if (!captureResponse.ok || typeof capture.template !== 'string') {
+        throw new Error(capture.detail || capture.message || 'Não foi possível capturar a digital.');
+      }
+
+      await api.post('/api/admin/usuarios/biometria', {
+        id: currentUsuario.id,
+        template: capture.template,
+      });
+      setCurrentUsuario((previous) => ({ ...previous!, temBiometria: true }));
+      await carregarUsuarios();
+      showToast('Digital cadastrada com segurança.');
+    } catch (error: any) {
+      console.error('Erro ao cadastrar biometria:', error);
+      showToast(
+        error.response?.data?.message ||
+          (error instanceof TypeError
+            ? 'Não foi possível conectar ao agente biométrico deste computador.'
+            : error.message) ||
+          'Não foi possível cadastrar a digital.',
+        'error'
+      );
+    } finally {
+      setBiometriaLoading(false);
+    }
+  };
+
+  const handleRemoverBiometria = async () => {
+    if (!currentUsuario?.id) return;
+
+    try {
+      setBiometriaLoading(true);
+      await api.delete('/api/admin/usuarios/biometria', { data: { id: currentUsuario.id } });
+      setCurrentUsuario((previous) => ({ ...previous!, temBiometria: false }));
+      await carregarUsuarios();
+      showToast('Digital removida.');
+    } catch (error: any) {
+      console.error('Erro ao remover biometria:', error);
+      showToast(error.response?.data?.message || 'Não foi possível remover a digital.', 'error');
+    } finally {
+      setBiometriaLoading(false);
     }
   };
 
@@ -265,6 +337,23 @@ export default function GerenciarUsuariosPage() {
                       </td>
                     </tr>
                   ))
+                ) : error ? (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-12 text-center">
+                      <div className="flex flex-col items-center gap-3 text-rose-600">
+                        <AlertCircle className="w-8 h-8" />
+                        <p>{error}</p>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          onClick={() => void carregarUsuarios()}
+                          disabled={loading}
+                        >
+                          Tentar novamente
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
                 ) : filteredUsuarios.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="px-4 py-12 text-center">
@@ -293,14 +382,17 @@ export default function GerenciarUsuariosPage() {
                             <div className="flex flex-col min-w-0">
                               <span className="font-semibold text-textMain truncate">{usuario.nome}</span>
                               <span className="text-xs text-textMuted truncate">{usuario.email}</span>
+                              <span className="mt-1 text-[10px] font-medium text-textMuted">
+                                {usuario.temBiometria ? 'Digital cadastrada' : 'Sem digital cadastrada'}
+                              </span>
                               <div className="sm:hidden mt-1 flex gap-1">
-                                <Badge variant={tipoInfo.variant} size="sm" className="px-1.5 py-0">
+                                <Badge variant={tipoInfo.variant} className="px-1.5 py-0">
                                   {tipoInfo.label.split(' ')[0]}
                                 </Badge>
                                 {usuario.ativo ? (
-                                  <Badge variant="success" size="sm" className="px-1.5 py-0">Ativo</Badge>
+                                  <Badge variant="success" className="px-1.5 py-0">Ativo</Badge>
                                 ) : (
-                                  <Badge variant="neutral" size="sm" className="px-1.5 py-0">Inativo</Badge>
+                                  <Badge variant="neutral" className="px-1.5 py-0">Inativo</Badge>
                                 )}
                               </div>
                             </div>
@@ -440,6 +532,25 @@ export default function GerenciarUsuariosPage() {
               </div>
             </div>
 
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="codigoAdm">Código ADM</Label>
+                <Input id="codigoAdm" type="number" min="0" max="2147483647" step="1"
+                  value={currentUsuario?.codigoAdm ?? ''}
+                  onChange={(e) => setCurrentUsuario(prev => ({ ...prev!, codigoAdm: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="senhaAdm">Senha ADM</Label>
+                <Input id="senhaAdm" type="password" autoComplete="new-password"
+                  value={currentUsuario?.senhaAdm || ''}
+                  placeholder={currentUsuario?.temSenhaAdm ? 'Deixe em branco para manter' : 'Senha do ADM'}
+                  onChange={(e) => setCurrentUsuario(prev => ({ ...prev!, senhaAdm: e.target.value }))}
+                />
+                <p className="text-xs text-textMuted">Credenciais do ERP para a separação. Diferentes da senha de acesso ao sistema.</p>
+              </div>
+            </div>
+
             {/* Senhas */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
               <div className="space-y-1.5">
@@ -481,6 +592,45 @@ export default function GerenciarUsuariosPage() {
                 <span className="text-xs font-medium">As senhas não coincidem</span>
               </div>
             )}
+
+            <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <Label>Biometria para separação</Label>
+              {currentUsuario?.id ? (
+                <>
+                  <p className="text-xs text-textMuted">
+                    {currentUsuario.temBiometria
+                      ? 'Há uma digital associada a este usuário.'
+                      : 'Cadastre a digital no leitor SecuGen para permitir a identificação no totem.'}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      iconLeft={<Fingerprint className="h-4 w-4" />}
+                      loading={biometriaLoading}
+                      disabled={loading || biometriaLoading}
+                      onClick={() => void handleCadastrarBiometria()}
+                    >
+                      {currentUsuario.temBiometria ? 'Substituir digital' : 'Cadastrar digital'}
+                    </Button>
+                    {currentUsuario.temBiometria ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        disabled={loading || biometriaLoading}
+                        onClick={() => void handleRemoverBiometria()}
+                      >
+                        Remover digital
+                      </Button>
+                    ) : null}
+                  </div>
+                </>
+              ) : (
+                <p className="text-xs text-textMuted">
+                  Salve o usuário e depois abra a edição para cadastrar a digital.
+                </p>
+              )}
+            </div>
 
             <label htmlFor="user-active" className="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-200 transition-all hover:bg-slate-100/50 cursor-pointer">
               <div className="relative inline-flex items-center">

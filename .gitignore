@@ -56,3 +56,12 @@ data/
 nul
 map-api.js
 scripts/output*.json
+biometric-agent/bin/
+biometric-agent/obj/
+biometric-agent/publish/
+biometric-agent/local-test/
+biometric-agent/appsettings.json
+biometric-agent/*.log
+.chrome-cdp/
+.chrome-debug/
+.edge-debug/

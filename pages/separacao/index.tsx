@@ -4,7 +4,7 @@ import {
   AlertTriangle,
   BellRing,
   CheckCircle2,
-  Delete,
+  Fingerprint,
   PackageOpen,
   RefreshCw,
   Tablet,
@@ -13,7 +13,6 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { cn } from '@/utils/cn';
 
@@ -22,12 +21,7 @@ const POLLING_MS = 20_000;
 const ALERTA_PEDIDO_PARADO_MS = 5 * 60_000;
 // Intervalo entre os realertas enquanto o pedido continua parado.
 const ALERTA_RECORRENTE_MS = 5 * 60_000;
-// Linhas do teclado virtual do totem (sem teclado físico no kiosk).
-const TECLADO_LINHAS = ['1234567890', 'qwertyuiop', 'asdfghjkl', 'zxcvbnm'];
-// Página de símbolos/acentos do teclado (alternada pela tecla "!#1").
-const TECLADO_SIMBOLOS = ['!@#$%&*()-_', '=+/?;:.,', 'áàâãéêíóôõ', 'úüç'];
-// Teclado numérico exibido no campo "Código ADM" (o zero fica na linha de ações).
-const TECLADO_NUMERICO = ['123', '456', '789'];
+const AGENTE_BIOMETRIA_URL = 'http://127.0.0.1:17876';
 
 // Página pública (totem): as APIs de separação autenticam pelo cookie
 // httpOnly `totem_auth`, emitido uma única vez por GET /api/totem/auth?k=
@@ -83,17 +77,12 @@ function SeparacaoContent() {
   const [loading, setLoading] = useState(true);
   const [associando, setAssociando] = useState(false);
   const [modalAberto, setModalAberto] = useState(false);
-  const [codigoAdm, setCodigoAdm] = useState('');
-  const [senhaAdm, setSenhaAdm] = useState('');
   const [erroModal, setErroModal] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [mensagem, setMensagem] = useState<string | null>(null);
   const [somAtivo, setSomAtivo] = useState(true);
   const [novoPedido, setNovoPedido] = useState(false);
   const [alertaParado, setAlertaParado] = useState(false);
-  const [campoTeclado, setCampoTeclado] = useState<'codigo' | 'senha'>('codigo');
-  const [shiftAtivo, setShiftAtivo] = useState(false);
-  const [tecladoSimbolos, setTecladoSimbolos] = useState(false);
   const [agora, setAgora] = useState(() => Date.now());
   const [marqueeAtivo, setMarqueeAtivo] = useState(false);
   const audioRef = useRef<AudioContext | null>(null);
@@ -247,54 +236,12 @@ function SeparacaoContent() {
 
   function abrirModal() {
     if (!proximo || associando) return;
-    setCodigoAdm('');
-    setSenhaAdm('');
-    setCampoTeclado('codigo');
-    setShiftAtivo(false);
-    setTecladoSimbolos(false);
     setErroModal(null);
     setModalAberto(true);
   }
 
-  // Teclado virtual do kiosk: digita no campo selecionado (codigo ou senha).
-  function teclar(tecla: string) {
-    if (tecla === 'shift') {
-      setShiftAtivo((v) => !v);
-      return;
-    }
-    if (tecla === 'simbolos') {
-      setTecladoSimbolos((v) => !v);
-      return;
-    }
-    if (tecla === 'limpar') {
-      if (campoTeclado === 'codigo') setCodigoAdm('');
-      else setSenhaAdm('');
-      return;
-    }
-    if (tecla === 'backspace') {
-      if (campoTeclado === 'codigo') setCodigoAdm((v) => v.slice(0, -1));
-      else setSenhaAdm((v) => v.slice(0, -1));
-      return;
-    }
-    if (tecla === 'espaco') tecla = ' ';
-    if (campoTeclado === 'codigo') {
-      if (/^\d$/.test(tecla)) setCodigoAdm((v) => v + tecla);
-      return;
-    }
-    // Senha: aplica maiúscula quando o shift está ativo (como no celular,
-    // o shift vale para a próxima tecla e depois desarma sozinho).
-    setSenhaAdm((v) => v + (shiftAtivo ? tecla.toUpperCase() : tecla));
-    if (shiftAtivo) setShiftAtivo(false);
-  }
-
   async function confirmarAssociacao() {
     if (associando) return;
-
-    const codigo = Number(codigoAdm);
-    if (!Number.isInteger(codigo) || !senhaAdm) {
-      setErroModal('Informe o código ADM e a senha ADM.');
-      return;
-    }
 
     setAssociando(true);
     setErro(null);
@@ -302,24 +249,31 @@ function SeparacaoContent() {
     setErroModal(null);
 
     try {
-      const response = await fetchTotem('/api/separacao/associar', {
+      const response = await fetch(`${AGENTE_BIOMETRIA_URL}/identify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ codigoAdm: codigo, senhaAdm }),
       });
       const data = await response.json();
 
       if (!response.ok || !data.success) {
-        throw new Error(data.message || 'Falha ao associar pedido.');
+        throw new Error(
+          data.detail || data.message || 'Falha ao identificar o separador pela digital.'
+        );
       }
 
       setModalAberto(false);
       setMensagem(
-        `Pedido #${data.pedido?.pedidoId ?? ''} enviado para separação.`
+        `Pedido #${data.pedido?.pedidoId ?? ''} enviado para separação${data.separador?.nome ? ` por ${data.separador.nome}` : ''}.`
       );
       await carregar(true);
     } catch (error) {
-      setErroModal(error instanceof Error ? error.message : 'Falha ao associar pedido.');
+      setErroModal(
+        error instanceof TypeError
+          ? 'Agente biométrico indisponível neste computador. Verifique se está aberto e tente novamente.'
+          : error instanceof Error
+          ? error.message
+          : 'Não foi possível conectar ao agente biométrico deste computador.'
+      );
     } finally {
       setAssociando(false);
     }
@@ -523,26 +477,24 @@ function SeparacaoContent() {
         </div>
       ) : null}
 
-      {/* Autenticação do separador (mock — futuro: biometria) */}
+      {/* Captura e identificação biométrica no agente local do leitor */}
       <Modal
         isOpen={modalAberto}
         onClose={() => {
           if (!associando) setModalAberto(false);
         }}
-        title="Insira o código e senha adm."
-        size="xl"
-        // Footer fica fora da área de scroll do modal: o botão Confirmar
-        // está sempre visível, sem precisar arrastar até o fim do teclado.
+        title="Identificação do separador"
+        size="md"
         footer={
           <Button
             variant="primary"
             size="lg"
             className="h-14 w-full text-xl"
-            iconLeft={<CheckCircle2 className="h-7 w-7" />}
+            iconLeft={<Fingerprint className="h-7 w-7" />}
             onClick={() => void confirmarAssociacao()}
             loading={associando}
           >
-            Confirmar separação
+            Ler digital e iniciar separação
           </Button>
         }
       >
@@ -553,168 +505,14 @@ function SeparacaoContent() {
               <p className="text-sm font-medium">{erroModal}</p>
             </div>
           ) : null}
-          <div>
-            <label
-              htmlFor="codigoAdm"
-              className="mb-1 block text-sm font-semibold uppercase tracking-wide text-slate-500"
-            >
-              Código ADM
-            </label>
-            <Input
-              id="codigoAdm"
-              inputMode="none"
-              autoComplete="off"
-              value={codigoAdm}
-              onFocus={() => setCampoTeclado('codigo')}
-              onChange={(e) => setCodigoAdm(e.target.value.replace(/\D/g, ''))}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') void confirmarAssociacao();
-              }}
-              className={cn(
-                'h-12 text-center text-xl tracking-widest',
-                campoTeclado === 'codigo' && 'border-primary ring-2 ring-primary/50'
-              )}
-            />
-          </div>
-          <div>
-            <label
-              htmlFor="senhaAdm"
-              className="mb-1 block text-sm font-semibold uppercase tracking-wide text-slate-500"
-            >
-              Senha ADM
-            </label>
-            <Input
-              id="senhaAdm"
-              type="password"
-              inputMode="none"
-              autoComplete="off"
-              value={senhaAdm}
-              onFocus={() => setCampoTeclado('senha')}
-              onChange={(e) => setSenhaAdm(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') void confirmarAssociacao();
-              }}
-              className={cn(
-                'h-12 text-center text-xl tracking-widest',
-                campoTeclado === 'senha' && 'border-primary ring-2 ring-primary/50'
-              )}
-            />
-          </div>
-          {/* Teclado virtual — o totem não tem teclado físico no display.
-              Campo código usa só o numérico; senha usa o QWERTY completo.
-              preventDefault no pointerdown mantém o campo ativo selecionado. */}
-          <div
-            className="flex select-none flex-col gap-1.5"
-            onPointerDown={(e) => e.preventDefault()}
-          >
-            {campoTeclado === 'codigo' ? (
-              <>
-                {TECLADO_NUMERICO.map((linha) => (
-                  <div key={linha} className="flex gap-1.5">
-                    {linha.split('').map((tecla) => (
-                      <button
-                        key={tecla}
-                        type="button"
-                        onClick={() => teclar(tecla)}
-                        className="h-14 flex-1 rounded-lg border border-slate-200 bg-slate-50 text-2xl font-semibold text-slate-700 transition-colors hover:bg-slate-100 active:bg-primary/20"
-                      >
-                        {tecla}
-                      </button>
-                    ))}
-                  </div>
-                ))}
-                <div className="flex gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => teclar('limpar')}
-                    className="h-14 flex-1 rounded-lg border border-slate-200 bg-slate-50 text-base font-semibold text-slate-700 transition-colors hover:bg-slate-100 active:bg-primary/20"
-                  >
-                    Limpar
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => teclar('0')}
-                    className="h-14 flex-1 rounded-lg border border-slate-200 bg-slate-50 text-2xl font-semibold text-slate-700 transition-colors hover:bg-slate-100 active:bg-primary/20"
-                  >
-                    0
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => teclar('backspace')}
-                    className="flex h-14 flex-1 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-700 transition-colors hover:bg-slate-100 active:bg-primary/20"
-                    aria-label="Apagar"
-                  >
-                    <Delete className="h-6 w-6" />
-                  </button>
-                </div>
-              </>
-            ) : (
-              <>
-                {(tecladoSimbolos ? TECLADO_SIMBOLOS : TECLADO_LINHAS).map((linha, index, linhas) => (
-                  <div key={linha} className="flex gap-1.5">
-                    {index === linhas.length - 1 ? (
-                      <button
-                        type="button"
-                        onClick={() => teclar('shift')}
-                        className={cn(
-                          'flex h-12 w-14 shrink-0 items-center justify-center rounded-lg border text-lg font-semibold transition-colors',
-                          shiftAtivo
-                            ? 'border-primary/50 bg-primary/20 text-primary'
-                            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-100'
-                        )}
-                        aria-label="Maiúsculas"
-                        aria-pressed={shiftAtivo}
-                      >
-                        ⇧
-                      </button>
-                    ) : null}
-                    {linha.split('').map((tecla) => (
-                      <button
-                        key={tecla}
-                        type="button"
-                        onClick={() => teclar(tecla)}
-                        className="h-12 flex-1 rounded-lg border border-slate-200 bg-slate-50 text-xl font-semibold text-slate-700 transition-colors hover:bg-slate-100 active:bg-primary/20"
-                      >
-                        {shiftAtivo ? tecla.toUpperCase() : tecla}
-                      </button>
-                    ))}
-                    {index === linhas.length - 1 ? (
-                      <button
-                        type="button"
-                        onClick={() => teclar('backspace')}
-                        className="flex h-12 w-14 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-100"
-                        aria-label="Apagar"
-                      >
-                        <Delete className="h-5 w-5" />
-                      </button>
-                    ) : null}
-                  </div>
-                ))}
-                <div className="flex gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => teclar('simbolos')}
-                    className="h-12 w-16 shrink-0 rounded-lg border border-slate-200 bg-white text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-100"
-                  >
-                    {tecladoSimbolos ? 'ABC' : '!#1'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => teclar('limpar')}
-                    className="h-12 w-20 shrink-0 rounded-lg border border-slate-200 bg-white text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-100"
-                  >
-                    Limpar
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => teclar('espaco')}
-                    className="h-12 flex-1 rounded-lg border border-slate-200 bg-slate-50 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-100 active:bg-primary/20"
-                  >
-                    Espaço
-                  </button>
-                </div>
-              </>
-            )}
+          <div className="flex flex-col items-center gap-3 rounded-2xl bg-slate-50 px-6 py-8 text-center">
+            <Fingerprint className="h-14 w-14 text-primary" />
+            <p className="text-base font-semibold text-slate-800">
+              Apoie o dedo no leitor SecuGen
+            </p>
+            <p className="text-sm text-slate-500">
+              Mantenha o dedo parado até a digital ser identificada. O código e a senha ADM são enviados pelo servidor.
+            </p>
           </div>
         </div>
       </Modal>
@@ -724,7 +522,7 @@ function SeparacaoContent() {
 
 export default function SeparacaoPage() {
   // Rota pública (ver publicRoutes em _app.tsx): sem ProtectedRoute/AppLayout.
-  // As APIs se protegem via x-totem-token enviado por fetchTotem.
+  // A fila usa o cookie do totem; a captura e associação passam pelo agente local.
   return (
     <>
       <Head>

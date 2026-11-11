@@ -76,6 +76,9 @@ model Usuario {
   dataCriacao          DateTime                @default(now())
   ultimoAcesso         DateTime?
   foto                 String?
+  codigoAdm            Int?
+  senhaAdm              String?
+  biometria             String?
   historicoPontos      HistoricoPontuacao[]
   notas                NotaFiscal[]
   ajustesPallets       PalletAjuste[]

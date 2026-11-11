@@ -1,8 +1,13 @@
-import { NextApiRequest, NextApiResponse } from 'next';
+import { NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
+import { camposAdm } from '@/lib/usuario-adm';
+import { withAuth, AuthenticatedRequest } from '@/lib/middleware/withAuth';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
+  if (!['ADMIN', 'GERENTE'].includes(req.user.tipo)) {
+    return res.status(403).json({ message: 'Acesso restrito à administração.' });
+  }
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' });
   }
@@ -14,7 +19,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ message: 'ID é obrigatório' });
     }
 
+    let adm: ReturnType<typeof camposAdm>;
+    try { adm = camposAdm(req.body); } catch (error) {
+      return res.status(400).json({ message: (error as Error).message });
+    }
+
     const data: any = {
+      ...adm,
       nome,
       tipo,
       ativo,
@@ -31,6 +42,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         id: true,
         nome: true,
         email: true,
+        codigoAdm: true,
         tipo: true,
         ativo: true,
       },
@@ -42,3 +54,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ message: 'Erro interno do servidor' });
   }
 }
+
+export default withAuth(handler);

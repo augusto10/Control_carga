@@ -9,7 +9,7 @@ import { professionalTheme } from '../styles/theme';
 import { SnackbarProvider, MaterialDesignContent } from 'notistack';
 import { AppProps } from 'next/app';
 import { useRouter } from 'next/router';
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 
 // Estilização global para o Notistack (Glassmorphism)
 const StyledMaterialDesignContent = styled(MaterialDesignContent)(({ theme }) => ({
@@ -63,21 +63,12 @@ import { PUBLIC_ROUTES } from '../lib/public-routes';
 // Removendo o estado loading e o GlobalLoader
 // O carregamento agora será gerenciado pelos contextos
 function MyApp({ Component, pageProps }: AppProps) {
-  const [mounted, setMounted] = useState(false);
   const router = useRouter();
   const isPublicRoute = PUBLIC_ROUTES.includes(router.pathname);
   const isMobileSnack = useMediaQuery('(max-width:600px)', { noSsr: true });
   const anchorOrigin = isMobileSnack
     ? ({ vertical: 'bottom', horizontal: 'center' } as const)
     : ({ vertical: 'top', horizontal: 'center' } as const);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  if (!mounted) {
-    return null;
-  }
 
   const getLayout = (page: React.ReactNode) => {
     if (isPublicRoute) {
