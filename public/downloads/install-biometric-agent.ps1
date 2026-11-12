@@ -5,6 +5,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $downloadUrl = "$($ServerBaseUrl.TrimEnd('/'))/downloads/control-carga-biometric-agent-win-x64.zip"
+$fallbackDownloadUrl = 'https://raw.githubusercontent.com/augusto10/Control_carga/feature/implantacao-biometria/public/downloads/control-carga-biometric-agent-win-x64.zip'
 $installDir = Join-Path $env:LOCALAPPDATA 'ControlCarga\biometric-agent'
 $zipPath = Join-Path $env:TEMP 'control-carga-biometric-agent-win-x64.zip'
 
@@ -42,7 +43,12 @@ if ([string]::IsNullOrWhiteSpace($AgentToken)) {
 if ([string]::IsNullOrWhiteSpace($AgentToken)) { throw 'O token do agente e obrigatorio.' }
 
 Write-Host 'Baixando o agente...'
-Invoke-WebRequest -UseBasicParsing -Uri $downloadUrl -OutFile $zipPath
+try {
+  Invoke-WebRequest -UseBasicParsing -Uri $downloadUrl -OutFile $zipPath
+} catch {
+  Write-Host 'Pacote ainda nao publicado no dominio. Usando o pacote validado da branch de instalacao.'
+  Invoke-WebRequest -UseBasicParsing -Uri $fallbackDownloadUrl -OutFile $zipPath
+}
 New-Item -ItemType Directory -Path $installDir -Force | Out-Null
 Get-Process -Name 'biometric-agent' -ErrorAction SilentlyContinue | Stop-Process -Force
 Expand-Archive -LiteralPath $zipPath -DestinationPath $installDir -Force
