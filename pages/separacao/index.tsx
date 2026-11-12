@@ -509,11 +509,11 @@ function SeparacaoContent() {
                 <p className="text-sm font-medium">{erroModal}</p>
                 {agenteIndisponivel ? (
                   <a
-                    href="/downloads/install-biometric-agent.ps1"
+                    href="/downloads/instalar-agente-biometrico.cmd"
                     download
                     className="rounded-lg bg-rose-700 px-3 py-2 text-sm font-semibold text-white hover:bg-rose-800"
                   >
-                    Baixar instalador do agente
+                    Baixar e instalar o agente
                   </a>
                 ) : null}
               </div>

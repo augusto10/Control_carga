@@ -35,8 +35,11 @@ capturas são armazenadas com AES-256-GCM.
 
 ### Instalação pela tela do totem
 
-Quando o agente não estiver disponível, a tela de separação oferece **Baixar
-instalador do agente**. Execute o arquivo PowerShell com:
+Quando o agente não estiver disponível, a tela de separação oferece **Baixar e
+instalar o agente**. Abra o arquivo `instalar-agente-biometrico.cmd` com duplo
+clique. Ele mantém a janela aberta para exibir o andamento e eventuais erros.
+
+Também é possível executar diretamente o arquivo PowerShell com:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\install-biometric-agent.ps1
