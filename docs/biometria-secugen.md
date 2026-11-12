@@ -33,6 +33,22 @@ capturas são armazenadas com AES-256-GCM.
 
 ## Preparar o computador Windows
 
+### Instalação pela tela do totem
+
+Quando o agente não estiver disponível, a tela de separação oferece **Baixar
+instalador do agente**. Execute o arquivo PowerShell com:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\install-biometric-agent.ps1
+```
+
+O instalador baixa o pacote leve publicado pelo próprio ControlCarga, instala o
+runtime ASP.NET Core 8 pelo `winget` quando necessário, solicita o
+`BIOMETRIA_AGENT_TOKEN`, grava a configuração em
+`%LOCALAPPDATA%\ControlCarga\biometric-agent`, cria o atalho de inicialização e
+abre o agente. O token não faz parte do pacote publicado. O driver SecuGen U20-A
+ainda precisa estar instalado no computador.
+
 1. Instale o driver oficial U20-A em cada computador e conecte o leitor.
    Consulte [drivers SecuGen](https://secugen.com/drivers/).
 2. Feche o SGDX e qualquer outro programa que esteja usando o leitor. O leitor

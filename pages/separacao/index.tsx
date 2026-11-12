@@ -78,6 +78,7 @@ function SeparacaoContent() {
   const [associando, setAssociando] = useState(false);
   const [modalAberto, setModalAberto] = useState(false);
   const [erroModal, setErroModal] = useState<string | null>(null);
+  const [agenteIndisponivel, setAgenteIndisponivel] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [mensagem, setMensagem] = useState<string | null>(null);
   const [somAtivo, setSomAtivo] = useState(true);
@@ -247,6 +248,7 @@ function SeparacaoContent() {
     setErro(null);
     setMensagem(null);
     setErroModal(null);
+    setAgenteIndisponivel(false);
 
     try {
       const response = await fetch(`${AGENTE_BIOMETRIA_URL}/identify`, {
@@ -267,6 +269,7 @@ function SeparacaoContent() {
       );
       await carregar(true);
     } catch (error) {
+      setAgenteIndisponivel(error instanceof TypeError);
       setErroModal(
         error instanceof TypeError
           ? 'Agente biométrico indisponível neste computador. Verifique se está aberto e tente novamente.'
@@ -500,9 +503,20 @@ function SeparacaoContent() {
       >
         <div className="flex flex-col gap-4">
           {erroModal ? (
-            <div className="flex items-center gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-rose-800">
-              <AlertTriangle className="h-5 w-5 shrink-0" />
-              <p className="text-sm font-medium">{erroModal}</p>
+            <div className="flex gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-rose-800">
+              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
+              <div className="flex flex-col items-start gap-2">
+                <p className="text-sm font-medium">{erroModal}</p>
+                {agenteIndisponivel ? (
+                  <a
+                    href="/downloads/install-biometric-agent.ps1"
+                    download
+                    className="rounded-lg bg-rose-700 px-3 py-2 text-sm font-semibold text-white hover:bg-rose-800"
+                  >
+                    Baixar instalador do agente
+                  </a>
+                ) : null}
+              </div>
             </div>
           ) : null}
           <div className="flex flex-col items-center gap-3 rounded-2xl bg-slate-50 px-6 py-8 text-center">
