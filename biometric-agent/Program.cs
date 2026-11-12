@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Security.Authentication;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
 using SecuGen.FDxSDKPro.Windows;
@@ -16,7 +17,16 @@ builder.Logging.AddConsole();
 builder.Services.Configure<BiometricAgentOptions>(
     builder.Configuration.GetSection(BiometricAgentOptions.SectionName));
 builder.Services.AddSingleton<FingerprintService>();
-builder.Services.AddHttpClient<ControlCargaClient>();
+builder.Services.AddHttpClient<ControlCargaClient>()
+    .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+    {
+        // Evita que o Schannel tente selecionar automaticamente um certificado
+        // de cliente da conta interativa. Alguns totens não possuem credenciais
+        // disponíveis no repositório do Windows e a negociação TLS falha antes
+        // mesmo de a requisição chegar ao servidor.
+        ClientCertificateOptions = ClientCertificateOption.Manual,
+        SslProtocols = SslProtocols.Tls12,
+    });
 
 var app = builder.Build();
 var options = app.Services.GetRequiredService<IOptions<BiometricAgentOptions>>().Value;
@@ -109,6 +119,12 @@ app.MapPost("/identify", async (
     catch (ControlCargaException error)
     {
         return Results.Problem(error.Message, statusCode: error.StatusCode);
+    }
+    catch (HttpRequestException error)
+    {
+        return Results.Problem(
+            $"Não foi possível conectar ao servidor do Controle de Carga: {error.Message}",
+            statusCode: StatusCodes.Status502BadGateway);
     }
 });
 
