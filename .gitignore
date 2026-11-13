@@ -65,3 +65,4 @@ biometric-agent/*.log
 .chrome-cdp/
 .chrome-debug/
 .edge-debug/
+.worktrees/
