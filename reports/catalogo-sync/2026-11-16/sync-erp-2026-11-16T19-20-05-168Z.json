@@ -1,0 +1,29 @@
+{
+  "generatedAt": "2026-11-16T19:20:05.168Z",
+  "baseUrl": "http://ec2-15-229-152-29.sa-east-1.compute.amazonaws.com",
+  "companyId": "1",
+  "summary": {
+    "listed": 0,
+    "added": 0,
+    "changed": 1,
+    "unchanged": 0,
+    "removalCandidates": 0,
+    "failed": 0
+  },
+  "added": [],
+  "changed": [
+    {
+      "id": "22396",
+      "name": "OCULOS PROTECAO LEOPARDO CINZA",
+      "changes": [
+        {
+          "field": "Atualização",
+          "before": "2026-11-01T00:18:45",
+          "after": "2026-11-16T15:48:19"
+        }
+      ]
+    }
+  ],
+  "removalCandidates": [],
+  "failed": []
+}
