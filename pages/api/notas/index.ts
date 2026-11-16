@@ -1,4 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
+import { Prisma } from '@prisma/client';
 import prisma from '@/lib/prisma';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -56,7 +57,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     console.log('[API Notas] Filtro where:', JSON.stringify(where));
 
-    const notas = await prisma.notaFiscal.findMany({
+    // Mantém cada consulta abaixo do limite de resposta do Prisma Accelerate.
+    // O id desempata datas iguais para não repetir nem perder notas nos lotes.
+    const query = {
       where,
       include: {
         controle: {
@@ -73,10 +76,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           }
         }
       },
-      orderBy: {
-        dataCriacao: 'desc',
-      },
-    });
+      orderBy: [{ dataCriacao: 'desc' }, { id: 'desc' }],
+      take: 1000,
+    } satisfies Prisma.NotaFiscalFindManyArgs;
+
+    let lote = await prisma.notaFiscal.findMany(query);
+    const notas = [...lote];
+    while (lote.length === query.take) {
+      lote = await prisma.notaFiscal.findMany({
+        ...query,
+        cursor: { id: lote[lote.length - 1].id },
+        skip: 1,
+      });
+      notas.push(...lote);
+    }
 
     return res.status(200).json(notas);
   } catch (error) {
