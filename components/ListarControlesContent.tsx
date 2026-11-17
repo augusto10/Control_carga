@@ -51,6 +51,7 @@ import { useSnackbar } from 'notistack';
 import api from '../services/api';
 import { CEPService } from '../services/cep';
 import { useAuth } from '../contexts/AuthContext';
+import { dadosPdfCompletos, validarNotasPdf } from '@/lib/controles/pdf-dados';
 import { estimarFreteDfPorRegiao } from '@/lib/freteDf';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -275,7 +276,8 @@ const ListarControlesContent: React.FC = () => {
   const pdfDadosInFlightRef = React.useRef(new Map<string, Promise<ControleComNotas>>());
   const carregarDadosPdf = useCallback((controle: ControleComNotas) => {
     const cached = pdfDadosCacheRef.current.get(controle.id);
-    if (cached) return Promise.resolve(cached);
+    if (cached && dadosPdfCompletos(cached)) return Promise.resolve(cached);
+    if (cached) pdfDadosCacheRef.current.delete(controle.id);
 
     const inFlight = pdfDadosInFlightRef.current.get(controle.id);
     if (inFlight) return inFlight;
@@ -285,11 +287,15 @@ const ListarControlesContent: React.FC = () => {
       .then((response) => response.data as ControleComNotas)
       .catch(() => controle)
       .then((dados) => {
-        pdfDadosCacheRef.current.set(controle.id, dados);
+        if (pdfDadosInFlightRef.current.get(controle.id) === request && dadosPdfCompletos(dados)) {
+          pdfDadosCacheRef.current.set(controle.id, dados);
+        }
         return dados;
       })
       .finally(() => {
-        pdfDadosInFlightRef.current.delete(controle.id);
+        if (pdfDadosInFlightRef.current.get(controle.id) === request) {
+          pdfDadosInFlightRef.current.delete(controle.id);
+        }
       });
 
     pdfDadosInFlightRef.current.set(controle.id, request);
@@ -771,6 +777,7 @@ const ListarControlesContent: React.FC = () => {
           return base;
         })
       );
+      validarNotasPdf(notasParaPdf);
       const doc = await PDFDocument.load(existingBytes);
       let page = doc.getPage(0);
       let { width, height } = page.getSize();
@@ -2069,7 +2076,7 @@ const ListarControlesContent: React.FC = () => {
                     boxShadow: 'inset 0 0 10px rgba(255,255,255,0.1)'
                   },
                   transition: 'all 0.3s ease',
-                  position: 'relative',
+                  position: 'sticky',
                   overflow: 'hidden',
                   '&::after': {
                     content: '""',
@@ -2090,7 +2097,7 @@ const ListarControlesContent: React.FC = () => {
                     boxShadow: 'inset 0 0 10px rgba(255,255,255,0.1)'
                   },
                   transition: 'all 0.3s ease',
-                  position: 'relative',
+                  position: 'sticky',
                   '&::after': {
                     content: '""',
                     position: 'absolute',
@@ -2110,7 +2117,7 @@ const ListarControlesContent: React.FC = () => {
                     boxShadow: 'inset 0 0 10px rgba(255,255,255,0.1)'
                   },
                   transition: 'all 0.3s ease',
-                  position: 'relative',
+                  position: 'sticky',
                   '&::after': {
                     content: '""',
                     position: 'absolute',
@@ -2130,7 +2137,7 @@ const ListarControlesContent: React.FC = () => {
                     boxShadow: 'inset 0 0 10px rgba(255,255,255,0.1)'
                   },
                   transition: 'all 0.3s ease',
-                  position: 'relative',
+                  position: 'sticky',
                   '&::after': {
                     content: '""',
                     position: 'absolute',
@@ -2150,7 +2157,7 @@ const ListarControlesContent: React.FC = () => {
                     boxShadow: 'inset 0 0 10px rgba(255,255,255,0.1)'
                   },
                   transition: 'all 0.3s ease',
-                  position: 'relative',
+                  position: 'sticky',
                   '&::after': {
                     content: '""',
                     position: 'absolute',
@@ -2170,7 +2177,7 @@ const ListarControlesContent: React.FC = () => {
                     boxShadow: 'inset 0 0 10px rgba(255,255,255,0.1)'
                   },
                   transition: 'all 0.3s ease',
-                  position: 'relative',
+                  position: 'sticky',
                   '&::after': {
                     content: '""',
                     position: 'absolute',
@@ -2190,7 +2197,7 @@ const ListarControlesContent: React.FC = () => {
                     boxShadow: 'inset 0 0 10px rgba(255,255,255,0.1)'
                   },
                   transition: 'all 0.3s ease',
-                  position: 'relative',
+                  position: 'sticky',
                   '&::after': {
                     content: '""',
                     position: 'absolute',
@@ -2211,7 +2218,7 @@ const ListarControlesContent: React.FC = () => {
                     boxShadow: 'inset 0 0 10px rgba(255,255,255,0.1)'
                   },
                   transition: 'all 0.3s ease',
-                  position: 'relative',
+                  position: 'sticky',
                   '&::after': {
                     content: '""',
                     position: 'absolute',
