@@ -42,6 +42,7 @@ const ControlesPage = () => {
 
   return (
     <AppLayout
+      fluid
       title="Controles de Carga"
       subtitle="Gerencie e visualize os controles de carga"
     >

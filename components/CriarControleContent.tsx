@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useStore } from '../store/store';
 import { CriarControleDTO } from '../types';
 import { 
@@ -15,6 +15,7 @@ import {
   Paper,
   List,
   ListItem,
+  ListItemButton,
   ListItemText,
   Checkbox,
   FormControlLabel,
@@ -41,7 +42,7 @@ import {
 import type { SelectChangeEvent } from '@mui/material';
 import { useRouter } from 'next/router';
 import { useSnackbar } from 'notistack';
-import { Transportadora, NotaFiscal } from '@prisma/client';
+import { Transportadora as PrismaTransportadora } from '@prisma/client';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useAuth } from '../contexts/AuthContext';
@@ -62,6 +63,14 @@ import {
   Info as InfoIcon
 } from '@mui/icons-material';
 import { NumericFormat } from 'react-number-format';
+import { isTransportadora } from '@/lib/notas/transportadora';
+import {
+  filtrarNotasDisponiveis,
+  filtrarNotasSemTransportadora,
+  limparSelecaoAoTrocarTransportadora,
+} from '@/lib/controles/notas-direcionamento';
+
+type TransportadoraEnum = (typeof PrismaTransportadora)[keyof typeof PrismaTransportadora];
 
 const MotionBox = motion.create(Box);
 const MotionGrid = motion.create(Grid);
@@ -130,14 +139,16 @@ const CriarControleContent: React.FC = () => {
     fetchTransportadoras, 
     criarControle, 
     loading: storeLoading, 
-    fetchNotas, 
+    fetchNotasDisponiveis,
+    transferirNotas,
     notas 
   } = useStore((state) => ({
     transportadoras: state.transportadoras,
     fetchTransportadoras: state.fetchTransportadoras,
     criarControle: state.criarControle,
     loading: state.loading,
-    fetchNotas: state.fetchNotas,
+    fetchNotasDisponiveis: state.fetchNotasDisponiveis,
+    transferirNotas: state.transferirNotas,
     notas: state.notas
   }));
   
@@ -168,8 +179,6 @@ const CriarControleContent: React.FC = () => {
     return encontrada;
   };
 
-  type TransportadoraEnum = 'ACERT' | 'ACCERT' | 'EXPRESSO_GOIAS' | 'TERCEIRIZADA' | 'DETAFRA_TRANSPORTES' | 'RETIRA_VENDEDOR' | 'RETIRA_CLIENTE' | 'VLOG' | 'ZANUELO_TRANSPORTE_LOGISTICA';
-  
   interface FormData {
     motorista: string;
     cpfMotorista: string;
@@ -208,26 +217,49 @@ const CriarControleContent: React.FC = () => {
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [selectedNotas, setSelectedNotas] = useState<string[]>([]);
+  const [buscaNotas, setBuscaNotas] = useState('');
+  const [mostrarSemTransportadora, setMostrarSemTransportadora] = useState(false);
+  const [transportadoraTransferencia, setTransportadoraTransferencia] = useState<TransportadoraEnum>(
+    PrismaTransportadora.ACCERT
+  );
+  const [isTransferring, setIsTransferring] = useState(false);
   
-  // Filtra as notas que não estão vinculadas a nenhum controle
-  const notasDisponiveis = Array.isArray(notas) ? notas : [];
-  const notasNaoVinculadas = notasDisponiveis.filter(nota => !nota.controleId);
-  
-  // Logs para depuração
-  console.log('Todas as notas da store:', notas);
-  console.log('Notas disponíveis (array):', notasDisponiveis);
-  console.log('Notas não vinculadas:', notasNaoVinculadas);
+  const notasNaoVinculadas = mostrarSemTransportadora
+    ? filtrarNotasSemTransportadora(Array.isArray(notas) ? notas : [])
+    : filtrarNotasDisponiveis(
+      Array.isArray(notas) ? notas : [],
+      formData.transportadora
+    );
+  const notasFiltradas = notasNaoVinculadas.filter((nota) =>
+    `${nota.numeroNota} ${nota.codigo}`.toLocaleLowerCase('pt-BR').includes(buscaNotas.trim().toLocaleLowerCase('pt-BR'))
+  );
+
+  const carregarNotasDisponiveis = useCallback(async (
+    destino: TransportadoraEnum,
+    semTransportadora = false
+  ) => {
+    setIsLoading((prev) => ({ ...prev, notas: true }));
+    try {
+      await fetchNotasDisponiveis(semTransportadora
+        ? { semTransportadora: true }
+        : { transportadoraDestino: destino });
+    } catch (error) {
+      console.error('Erro ao carregar notas disponíveis:', error);
+      enqueueSnackbar(
+        error instanceof Error ? error.message : 'Erro ao carregar notas disponíveis',
+        { variant: 'error' }
+      );
+    } finally {
+      setIsLoading((prev) => ({ ...prev, notas: false }));
+    }
+  }, [fetchNotasDisponiveis, enqueueSnackbar]);
 
   useEffect(() => {
     const carregarDados = async () => {
       try {
-        setIsLoading(prev => ({ ...prev, transportadoras: true, notas: true, pessoas: true }));
+        setIsLoading(prev => ({ ...prev, transportadoras: true, pessoas: true }));
         
-        // Carrega transportadoras e notas em paralelo
-        await Promise.all([
-          fetchTransportadoras(),
-          fetchNotas()
-        ]);
+        await fetchTransportadoras();
         
         // Carrega pessoas (motoristas, funcionários e clientes)
         const response = await api.get('/api/pessoas/para-controles');
@@ -236,12 +268,16 @@ const CriarControleContent: React.FC = () => {
         console.error('Erro ao carregar dados:', error);
         enqueueSnackbar('Erro ao carregar os dados. Tente novamente.', { variant: 'error' });
       } finally {
-        setIsLoading(prev => ({ ...prev, transportadoras: false, notas: false, pessoas: false }));
+        setIsLoading(prev => ({ ...prev, transportadoras: false, pessoas: false }));
       }
     };
 
     carregarDados();
-  }, [fetchTransportadoras, fetchNotas, enqueueSnackbar]);
+  }, [fetchTransportadoras, enqueueSnackbar]);
+
+  useEffect(() => {
+    void carregarNotasDisponiveis(formData.transportadora, mostrarSemTransportadora);
+  }, [carregarNotasDisponiveis, formData.transportadora, mostrarSemTransportadora]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | { name?: string; value: unknown }> | SelectChangeEvent<string>) => {
     const { name, value } = e.target as { name: string; value: string };
@@ -255,6 +291,11 @@ const CriarControleContent: React.FC = () => {
       }));
     } else if (name === 'transportadora') {
       const transportadoraSelecionada = value as TransportadoraEnum;
+      setSelectedNotas((selecionadas) => limparSelecaoAoTrocarTransportadora(
+        selecionadas,
+        formData.transportadora,
+        transportadoraSelecionada
+      ));
       setFormData(prev => ({
         ...prev,
         transportadora: transportadoraSelecionada
@@ -283,8 +324,54 @@ const CriarControleContent: React.FC = () => {
     }
   };
 
+  const handleTransferirNotas = async () => {
+    const destino = mostrarSemTransportadora
+      ? formData.transportadora
+      : transportadoraTransferencia;
+    if (
+      selectedNotas.length === 0
+      || (!mostrarSemTransportadora && destino === formData.transportadora)
+    ) {
+      return;
+    }
+
+    const destinoNome = getTransportadoraById(destino)?.descricao || destino;
+    if (!window.confirm(
+      `Transferir ${selectedNotas.length} nota(s) para ${destinoNome}? Elas sairão da fila atual.`
+    )) {
+      return;
+    }
+
+    setIsTransferring(true);
+    try {
+      const resultado = await transferirNotas(selectedNotas, destino);
+      setSelectedNotas((selecionadas) => selecionadas.filter(
+        (id) => !resultado.ids.includes(id)
+      ));
+      await carregarNotasDisponiveis(formData.transportadora, mostrarSemTransportadora);
+      enqueueSnackbar(`${resultado.count} nota(s) transferida(s) para ${destinoNome}.`, {
+        variant: 'success',
+      });
+    } catch (error) {
+      console.error('Erro ao transferir notas:', error);
+      enqueueSnackbar(
+        error instanceof Error ? error.message : 'Erro ao transferir notas',
+        { variant: 'error' }
+      );
+    } finally {
+      setIsTransferring(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (mostrarSemTransportadora && selectedNotas.length > 0) {
+      enqueueSnackbar('Direcione as notas para uma transportadora antes de vinculá-las ao controle.', {
+        variant: 'warning',
+      });
+      return;
+    }
     
     try {
       // Limpa erros anteriores
@@ -874,14 +961,93 @@ const CriarControleContent: React.FC = () => {
                   </Grid>
 
                   <Grid item xs={12}>
+                    <FormControl size="small" sx={{ mb: 2, minWidth: 280 }}>
+                      <InputLabel id="fila-notas-label">Fila de notas</InputLabel>
+                      <Select
+                        labelId="fila-notas-label"
+                        value={mostrarSemTransportadora ? 'semTransportadora' : 'destino'}
+                        label="Fila de notas"
+                        onChange={(event) => {
+                          const semTransportadora = event.target.value === 'semTransportadora';
+                          setSelectedNotas([]);
+                          setMostrarSemTransportadora(semTransportadora);
+                        }}
+                      >
+                        <MenuItem value="destino">
+                          Destinadas a {getTransportadoraById(formData.transportadora)?.descricao || formData.transportadora}
+                        </MenuItem>
+                        <MenuItem value="semTransportadora">Sem transportadora</MenuItem>
+                      </Select>
+                    </FormControl>
                     <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
                       <Typography variant="body2" color="text.secondary">
-                        {notasNaoVinculadas.length} notas disponíveis • {selectedNotas.length} selecionadas
+                        {notasNaoVinculadas.length} {mostrarSemTransportadora
+                          ? 'notas sem transportadora'
+                          : 'notas disponíveis'} • {selectedNotas.length} selecionadas
                       </Typography>
                       <Box sx={{ display: 'flex', gap: 1 }}>
+                        {selectedNotas.length > 0 && (
+                          mostrarSemTransportadora ? (
+                            <Button
+                              variant="outlined"
+                              size="small"
+                              onClick={handleTransferirNotas}
+                              disabled={isTransferring || storeLoading}
+                              startIcon={isTransferring ? <CircularProgress size={16} /> : undefined}
+                              sx={{ textTransform: 'none' }}
+                            >
+                              Direcionar para {getTransportadoraById(formData.transportadora)?.descricao || formData.transportadora}
+                            </Button>
+                          ) : (
+                            <>
+                              <FormControl size="small" sx={{ minWidth: 220 }}>
+                                <InputLabel id="transportadora-transferencia-label">
+                                  Transferir para
+                                </InputLabel>
+                                <Select
+                                  labelId="transportadora-transferencia-label"
+                                  value={transportadoraTransferencia}
+                                  label="Transferir para"
+                                  onChange={(event) => {
+                                    const destino = event.target.value;
+                                    if (isTransportadora(destino)) {
+                                      setTransportadoraTransferencia(destino);
+                                    }
+                                  }}
+                                  disabled={isTransferring}
+                                >
+                                  {transportadoras.map((transportadora) => (
+                                    <MenuItem
+                                      key={transportadora.id}
+                                      value={transportadora.id}
+                                      disabled={transportadora.id === formData.transportadora}
+                                    >
+                                      {transportadora.descricao}
+                                    </MenuItem>
+                                  ))}
+                                </Select>
+                              </FormControl>
+                              <Button
+                                variant="outlined"
+                                size="small"
+                                onClick={handleTransferirNotas}
+                                disabled={
+                                  isTransferring
+                                  || storeLoading
+                                  || transportadoraTransferencia === formData.transportadora
+                                }
+                                startIcon={isTransferring ? <CircularProgress size={16} /> : undefined}
+                                sx={{ textTransform: 'none' }}
+                              >
+                                Transferir selecionadas
+                              </Button>
+                            </>
+                          )
+                        )}
                         <Button
                           variant="outlined"
                           size="small"
+                          disabled={notasNaoVinculadas.length === 0 || isTransferring}
                           onClick={() => {
                             if (selectedNotas.length === notasNaoVinculadas.length) {
                               // Se todas já estão selecionadas, limpa a seleção
@@ -919,44 +1085,53 @@ const CriarControleContent: React.FC = () => {
                       </Box>
                     </Box>
                     
+                    {notasNaoVinculadas.length === 0 ? (
+                      <Alert severity="info">
+                        {mostrarSemTransportadora
+                          ? 'Não há notas sem transportadora.'
+                          : `Não há notas disponíveis para ${getTransportadoraById(formData.transportadora)?.descricao || formData.transportadora}.`}
+                      </Alert>
+                    ) : (
                     <FormControl fullWidth>
-                      <Autocomplete
-                        multiple
-                        options={notasNaoVinculadas}
-                        getOptionLabel={(option) => `NF: ${option.numeroNota} - ${option.codigo}`}
-                        value={selectedNotas.map(id => notasNaoVinculadas.find(n => n.id === id)).filter((n): n is any => !!n)}
-                        onChange={(_, newValue) => {
-                          const newIds = newValue.map(n => n.id);
-                          // Encontra o que foi adicionado para colocar no topo
-                          const added = newIds.filter(id => !selectedNotas.includes(id));
-                          const remaining = selectedNotas.filter(id => newIds.includes(id));
-                          setSelectedNotas([...added, ...remaining]);
-                        }}
-                        renderInput={(params) => (
-                          <TextField
-                            {...params}
-                            label="Selecionar Notas Fiscais"
-                            placeholder="Pesquisar por número ou cliente..."
-                            sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
-                          />
-                        )}
-                        renderTags={(value, getTagProps) =>
-                          selectedNotas.map(id => notasNaoVinculadas.find(n => n.id === id)).filter(Boolean).map((option: any, index: number) => (
-                            <Chip
-                              variant="outlined"
-                              label={`${option.numeroNota}`}
-                              size="small"
-                              {...getTagProps({ index })}
-                              sx={{ borderRadius: 1.5, fontWeight: '700', bgcolor: 'rgba(25, 118, 210, 0.05)' }}
-                            />
-                          ))
-                        }
-                        sx={{ mb: 1 }}
+                      <TextField
+                        label="Pesquisar notas fiscais"
+                        placeholder="Número da nota ou código"
+                        value={buscaNotas}
+                        onChange={(event) => setBuscaNotas(event.target.value)}
+                        sx={{ mb: 1, '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
                       />
+                      <List aria-label="Notas fiscais disponíveis" sx={{ maxHeight: 420, overflowY: 'auto', border: 1, borderColor: 'divider', borderRadius: 2 }}>
+                        {notasFiltradas.map((nota) => {
+                          const checked = selectedNotas.includes(nota.id);
+                          return (
+                            <ListItem key={nota.id} disablePadding divider>
+                              <ListItemButton
+                                role="checkbox"
+                                aria-checked={checked}
+                                aria-label={`Selecionar nota fiscal ${nota.numeroNota}`}
+                                selected={checked}
+                                disabled={isTransferring || isLoading.notas}
+                                onClick={() => setSelectedNotas((atual) => checked
+                                  ? atual.filter((id) => id !== nota.id)
+                                  : [...atual, nota.id])}
+                              >
+                                <Checkbox checked={checked} tabIndex={-1} disableRipple sx={{ pointerEvents: 'none' }} inputProps={{ 'aria-hidden': true }} />
+                                <ListItemText primary={`NF: ${nota.numeroNota}`} secondary={`Código: ${nota.codigo} • Volumes: ${nota.volumes || '0'}`} />
+                              </ListItemButton>
+                            </ListItem>
+                          );
+                        })}
+                        {notasFiltradas.length === 0 && (
+                          <ListItem><ListItemText primary="Nenhuma nota encontrada para esta pesquisa." /></ListItem>
+                        )}
+                      </List>
                       <FormHelperText>
-                        {selectedNotas.length} notas selecionadas. Somente notas sem vínculo aparecem aqui.
+                        {mostrarSemTransportadora
+                          ? 'Direcione as notas para uma transportadora antes de vinculá-las.'
+                          : `${selectedNotas.length} notas selecionadas para esta transportadora.`}
                       </FormHelperText>
                     </FormControl>
+                    )}
                   </Grid>
 
                   {/* Seção: Observações */}

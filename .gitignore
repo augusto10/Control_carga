@@ -31,6 +31,15 @@ test-*.ts
 *test*.ts
 !tests/pedido-pendencias.test.ts
 !tests/pedido-cards.test.ts
+!tests/nota-transportadora-rules.test.ts
+!tests/nota-cadastro-contract.test.ts
+!tests/nota-transferencia-contract.test.ts
+!tests/controle-notas-contract.test.ts
+!tests/criar-controle-notas-view.test.ts
+!tests/controle-edicao-api.test.ts
+!tests/controle-finalizacao.test.ts
+!tests/controle-exclusao-store.test.ts
+!tests/controle-listagem-api.test.ts
 create-test-*.js
 scripts/teste-*.ts
 scripts/test-*.js

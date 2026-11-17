@@ -14,6 +14,7 @@ import {
   Typography, 
   Button,
   Checkbox,
+  Autocomplete,
   Chip,
   CircularProgress,
   Dialog,
@@ -51,6 +52,7 @@ import { useSnackbar } from 'notistack';
 import api from '../services/api';
 import { CEPService } from '../services/cep';
 import { useAuth } from '../contexts/AuthContext';
+import { canDeleteControle, canEditControle } from '@/lib/auth/permissions';
 import { estimarFreteDfPorRegiao } from '@/lib/freteDf';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -103,7 +105,7 @@ interface AssinaturaState {
 }
 const ListarControlesContent: React.FC = () => {
   const { user } = useAuth();
-  const { controles: controlesStore, fetchControles, finalizarControle, atualizarControle } = useStore();
+  const { controles: controlesStore, fetchControles, finalizarControle, atualizarControle, excluirControle } = useStore();
   const [controles, setControles] = useState<ControleComNotas[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [loadingButtons, setLoadingButtons] = useState<Record<string, boolean>>({});
@@ -285,11 +287,11 @@ const ListarControlesContent: React.FC = () => {
       .then((response) => response.data as ControleComNotas)
       .catch(() => controle)
       .then((dados) => {
-        pdfDadosCacheRef.current.set(controle.id, dados);
+        if (pdfDadosInFlightRef.current.get(controle.id) === request) pdfDadosCacheRef.current.set(controle.id, dados);
         return dados;
       })
       .finally(() => {
-        pdfDadosInFlightRef.current.delete(controle.id);
+        if (pdfDadosInFlightRef.current.get(controle.id) === request) pdfDadosInFlightRef.current.delete(controle.id);
       });
 
     pdfDadosInFlightRef.current.set(controle.id, request);
@@ -303,7 +305,7 @@ const ListarControlesContent: React.FC = () => {
   useEffect(() => {
     let cancelled = false;
     let nextIndex = 0;
-    const queue = controles.filter((controle) => controle.notas?.length > 0).slice(0, 5);
+    const queue = controles.filter((controle) => controle.finalizado && controle.notas?.length > 0).slice(0, 5);
 
     const preloadNext = () => {
       if (cancelled || nextIndex >= queue.length) return;
@@ -323,6 +325,25 @@ const ListarControlesContent: React.FC = () => {
   }, [controles, carregarDadosPdf]);
   const [editing, setEditing] = React.useState<ControleComNotas | null>(null);
   const [editData, setEditData] = React.useState<Partial<Omit<PrismaControleCarga, 'id' | 'dataCriacao' | 'notas'>>>({});
+  const [editNotasIds, setEditNotasIds] = useState<string[]>([]);
+  const [editNotasDisponiveis, setEditNotasDisponiveis] = useState<NotaFiscal[]>([]);
+  const [editNotasLoading, setEditNotasLoading] = useState(false);
+  const [editNotasErro, setEditNotasErro] = useState('');
+  const [editSaving, setEditSaving] = useState(false);
+  useEffect(() => {
+    if (!editing) return;
+    let cancelled = false;
+    setEditNotasLoading(true);
+    setEditNotasErro('');
+    api.get('/api/notas', { params: { disponiveis: '1', transportadoraDestino: editData.transportadora || editing.transportadora } })
+      .then(({ data }) => { if (!cancelled) setEditNotasDisponiveis(data); })
+      .catch(() => { if (!cancelled) setEditNotasErro('Não foi possível carregar as notas disponíveis. Feche e abra a edição para tentar novamente.'); })
+      .finally(() => { if (!cancelled) setEditNotasLoading(false); });
+    return () => { cancelled = true; };
+  }, [editing, editData.transportadora]);
+  const editNotasOpcoes = Array.from(new Map(
+    [...(editing?.notas || []), ...editNotasDisponiveis].map((nota) => [nota.id, nota])
+  ).values());
   const [pdfUrl, setPdfUrl] = React.useState<string | null>(null);
   const [pdfOpen, setPdfOpen] = React.useState(false);
   const [assinaturaAberta, setAssinaturaAberta] = React.useState<AssinaturaState>({
@@ -603,6 +624,11 @@ const ListarControlesContent: React.FC = () => {
   };
 
   const gerarPdf = async (controle: ControleComNotas) => {
+    if (!controle.finalizado) {
+      enqueueSnackbar('Finalize o controle antes de visualizar o PDF.', { variant: 'warning' });
+      return;
+    }
+
     const pdfLoadingKey = `pdf_${controle.id}`;
     setLoadingButtons((atual) => ({ ...atual, [pdfLoadingKey]: true }));
 
@@ -1428,12 +1454,11 @@ const ListarControlesContent: React.FC = () => {
   };
 
   const canEdit = (c: ControleComNotas): boolean => {
-    if (!c.finalizado) return true;
-    return user?.tipo === 'GERENTE' || user?.tipo === 'ADMIN';
+    return canEditControle(user, { finalizado: c.finalizado });
   };
 
   const handleExcluirControle = async (controle: ControleComNotas) => {
-    if (!confirm(`Tem certeza que deseja excluir o controle ${controle.numeroManifesto || controle.id.substring(0, 8)}? Esta ação não pode ser desfeita.`)) {
+    if (!confirm(`Tem certeza que deseja excluir o controle ${controle.numeroManifesto || controle.id.substring(0, 8)}? As notas e os pedidos serão desvinculados e preservados. Esta ação não pode ser desfeita.`)) {
       return;
     }
 
@@ -1441,26 +1466,17 @@ const ListarControlesContent: React.FC = () => {
     setLoadingButtons(prev => ({ ...prev, [deleteKey]: true }));
 
     try {
-      // Corrigido para usar DELETE na rota correta
-      const response = await api.delete(`/api/controles/${controle.id}`);
-      
-      if (response.status === 200 || response.status === 204) {
-        enqueueSnackbar('Controle excluído com sucesso!', { 
-          variant: 'success',
-          autoHideDuration: 3000 
-        });
-        
-        // Recarregar a lista de controles
-        await fetchControles();
-        setControles(converterControles(controlesStore as any));
-      }
+      await excluirControle(controle.id);
+      pdfDadosCacheRef.current.delete(controle.id);
+      pdfDadosInFlightRef.current.delete(controle.id);
+      enqueueSnackbar('Controle excluído com sucesso!', { variant: 'success', autoHideDuration: 3000 });
     } catch (error: any) {
       console.error('Erro ao excluir controle:', error);
       
-      let errorMessage = 'Erro ao excluir controle. Tente novamente.';
+      let errorMessage = error instanceof Error ? error.message : 'Erro ao excluir controle. Tente novamente.';
       
-      if (error.response?.data?.error) {
-        errorMessage = error.response.data.error;
+      if (error.response?.data?.message || error.response?.data?.error) {
+        errorMessage = error.response.data.message || error.response.data.error;
       }
       
       enqueueSnackbar(errorMessage, { 
@@ -1474,6 +1490,10 @@ const ListarControlesContent: React.FC = () => {
 
   const handleOpenEdit = useCallback((c: ControleComNotas) => {
     setEditing(c);
+    setEditNotasIds(c.notas.map((nota) => nota.id));
+    setEditNotasDisponiveis([]);
+    setEditNotasErro('');
+    setEditNotasLoading(true);
     setEditData({
       motorista: c.motorista,
       responsavel: c.responsavel,
@@ -1487,10 +1507,12 @@ const ListarControlesContent: React.FC = () => {
   const handleCloseEdit = useCallback(() => {
     setEditing(null);
     setEditData({});
+    setEditNotasIds([]);
   }, []);
 
   const handleSaveEdit = useCallback(async () => {
-    if (!editing) return;
+    if (!editing || editSaving || editNotasLoading || editNotasErro || !canEditControle(user, editing)) return;
+    setEditSaving(true);
     try {
       // Cria um objeto com apenas os campos que podem ser atualizados
       const dadosAtualizacao: Partial<Omit<PrismaControleCarga, 'id' | 'dataCriacao' | 'notas'>> = {};
@@ -1500,7 +1522,7 @@ const ListarControlesContent: React.FC = () => {
       if (editData.responsavel !== undefined) dadosAtualizacao.responsavel = editData.responsavel as string;
       if (editData.cpfMotorista !== undefined) dadosAtualizacao.cpfMotorista = editData.cpfMotorista as string;
       if (editData.transportadora !== undefined) {
-        const transportadoraValida = (['ACCERT', 'EXPRESSO_GOIAS', 'TERCEIRIZADA', 'DETAFRA_TRANSPORTES', 'RETIRA_VENDEDOR', 'RETIRA_CLIENTE', 'VLOG', 'ZANUELO_TRANSPORTE_LOGISTICA'].includes(editData.transportadora)) ? editData.transportadora : 'ACCERT';
+        const transportadoraValida = (['ACERT', 'ACCERT', 'EXPRESSO_GOIAS', 'TERCEIRIZADA', 'DETAFRA_TRANSPORTES', 'RETIRA_VENDEDOR', 'RETIRA_CLIENTE', 'VLOG', 'ZANUELO_TRANSPORTE_LOGISTICA'].includes(editData.transportadora)) ? editData.transportadora : 'ACCERT';
         dadosAtualizacao.transportadora = transportadoraValida;
       }
       if (editData.qtdPallets !== undefined) dadosAtualizacao.qtdPallets = Number(editData.qtdPallets) || 0;
@@ -1511,12 +1533,14 @@ const ListarControlesContent: React.FC = () => {
         dadosAtualizacao.numeroManifesto = editData.numeroManifesto || undefined;
       }
       
-      const controleAtualizado = await atualizarControle(editing.id, dadosAtualizacao as any);
+      const controleAtualizado = await atualizarControle(editing.id, { ...dadosAtualizacao, notasIds: editNotasIds } as any);
       if (!controleAtualizado) {
         throw new Error('Controle não retornado após atualização');
       }
 
       const controleConvertido = converterControles([controleAtualizado as any])[0];
+      pdfDadosCacheRef.current.delete(editing.id);
+      pdfDadosInFlightRef.current.delete(editing.id);
       setControles(prevControles =>
         prevControles.map(controle =>
           controle.id === editing.id ? controleConvertido : controle
@@ -1534,9 +1558,11 @@ const ListarControlesContent: React.FC = () => {
       handleCloseEdit();
     } catch (error) {
       console.error('Erro ao atualizar controle:', error);
-      enqueueSnackbar('Erro ao atualizar controle', { variant: 'error' });
+      enqueueSnackbar(error instanceof Error ? error.message : 'Erro ao atualizar controle', { variant: 'error' });
+    } finally {
+      setEditSaving(false);
     }
-  }, [editing, editData, atualizarControle, enqueueSnackbar, handleCloseEdit, converterControles, detalhesModal]);
+  }, [editing, editData, editNotasIds, editNotasLoading, editNotasErro, editSaving, user, atualizarControle, enqueueSnackbar, handleCloseEdit, converterControles, detalhesModal]);
 
   const handleAbrirAssinatura = useCallback((controle: ControleComNotas, tipo: 'motorista' | 'responsavel') => {
     console.log('[Modal Assinatura] Abrindo modal para controle:', controle.id, 'tipo:', tipo);
@@ -1760,7 +1786,7 @@ const ListarControlesContent: React.FC = () => {
       });
     } catch (error) {
       console.error('Erro ao finalizar controle:', error);
-      enqueueSnackbar('Erro ao finalizar controle. Tente novamente.', { 
+      enqueueSnackbar(error instanceof Error ? error.message : 'Erro ao finalizar controle. Tente novamente.', {
         variant: 'error',
         autoHideDuration: 5000,
         anchorOrigin: { vertical: 'top', horizontal: 'center' },
@@ -1797,10 +1823,11 @@ const ListarControlesContent: React.FC = () => {
 
   return (
     <Container 
-      maxWidth="lg" 
+      maxWidth={false}
       sx={{ 
         mt: 4, 
         mb: 4,
+        px: { xs: 0, sm: 1 },
         opacity: 0,
         animation: 'fadeIn 0.5s ease-out forwards',
         '@keyframes fadeIn': {
@@ -2002,7 +2029,7 @@ const ListarControlesContent: React.FC = () => {
       >
         <TableContainer 
           sx={{ 
-            maxHeight: 'calc(100vh - 400px)', // Aumentar espaço para os filtros
+            maxHeight: '70vh',
             minHeight: '400px', // Altura mínima garantida
             overflowY: 'auto', // Garantir scroll vertical
             overflowX: 'auto', // Scroll horizontal se necessário
@@ -2035,7 +2062,9 @@ const ListarControlesContent: React.FC = () => {
             stickyHeader 
             aria-label="tabela de controles"
             sx={{
+              minWidth: 1100,
               '& .MuiTableCell-root': {
+                px: 1.5,
                 borderBottom: '1px solid rgba(224, 224, 224, 0.5)',
                 // Melhorias para mobile
                 '@media (max-width: 900px)': {
@@ -2048,6 +2077,9 @@ const ListarControlesContent: React.FC = () => {
               },
               '& .MuiTableRow-root:hover .MuiTableCell-root': {
                 backgroundColor: 'rgba(0, 0, 0, 0.02)'
+              },
+              '& .MuiTableRow-root:hover .MuiTableCell-root:last-child': {
+                backgroundColor: 'background.paper'
               },
               '& .MuiTableRow-root.Mui-selected': {
                 backgroundColor: 'rgba(25, 118, 210, 0.08)',
@@ -2206,12 +2238,14 @@ const ListarControlesContent: React.FC = () => {
                   background: 'linear-gradient(135deg, #1976d2 0%, #1565c0 100%)',
                   color: '#fff',
                   borderTopRightRadius: '8px',
+                  right: 0,
+                  zIndex: 3,
                   '&:hover': {
                     background: 'linear-gradient(135deg, #1565c0 0%, #0d47a1 100%)',
                     boxShadow: 'inset 0 0 10px rgba(255,255,255,0.1)'
                   },
                   transition: 'all 0.3s ease',
-                  position: 'relative',
+                  position: 'sticky',
                   '&::after': {
                     content: '""',
                     position: 'absolute',
@@ -2286,8 +2320,8 @@ const ListarControlesContent: React.FC = () => {
                       sx={controle.finalizado ? { backgroundColor: '#4caf50', color: 'white' } : {}}
                     />
                   </TableCell>
-                  <TableCell align="right">
-                    <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end' }}>
+                  <TableCell align="right" sx={{ minWidth: 320, position: 'sticky', right: 0, bgcolor: 'background.paper', zIndex: 1 }}>
+                    <Box sx={{ display: 'flex', flexWrap: 'nowrap', alignItems: 'center', gap: 0.5, justifyContent: 'flex-end', '& > *': { flexShrink: 0 } }}>
                       <Tooltip title="Ver detalhes completos">
                         <IconButton 
                           onClick={() => handleAbrirDetalhes(controle)}
@@ -2309,13 +2343,15 @@ const ListarControlesContent: React.FC = () => {
                         </IconButton>
                       </Tooltip>
 
-                      <Tooltip title="Gerar PDF">
+                      <Tooltip title={controle.finalizado ? 'Visualizar PDF' : 'Finalize o controle antes de visualizar o PDF'}>
+                        <span>
                         <IconButton 
                           onClick={() => gerarPdf(controle)}
-                          onMouseEnter={() => { void carregarDadosPdf(controle); }}
+                          onMouseEnter={() => { if (controle.finalizado) void carregarDadosPdf(controle); }}
+                          aria-label="Visualizar PDF"
                           color="primary"
                           size="small"
-                          disabled={loadingButtons[controle.id] || loadingButtons[`pdf_${controle.id}`]}
+                          disabled={!controle.finalizado || loadingButtons[controle.id] || loadingButtons[`pdf_${controle.id}`]}
                           sx={buttonStyles}
                         >
                           {loadingButtons[`pdf_${controle.id}`] ? (
@@ -2324,6 +2360,7 @@ const ListarControlesContent: React.FC = () => {
                             <PictureAsPdfIcon fontSize="small" />
                           )}
                         </IconButton>
+                        </span>
                       </Tooltip>
 
                       <Tooltip title={controle.imagens && controle.imagens.length > 0 ? `${controle.imagens.length} foto(s) anexada(s)` : "Adicionar Foto"}>
@@ -2331,7 +2368,7 @@ const ListarControlesContent: React.FC = () => {
                           onClick={() => handleCapturarImagem(controle)}
                           color={controle.imagens && controle.imagens.length > 0 ? "success" : "secondary"}
                           size="small"
-                          disabled={loadingButtons[controle.id]}
+                          disabled={loadingButtons[controle.id] || !canEdit(controle)}
                           sx={{
                             ...buttonStyles,
                             ...(controle.imagens && controle.imagens.length > 0 && {
@@ -2380,17 +2417,15 @@ const ListarControlesContent: React.FC = () => {
                             </span>
                           </Tooltip>
 
-                          {(
-                            (!controle.finalizado && (user?.tipo === 'ADMIN' || user?.tipo === 'GERENTE')) ||
-                            (controle.finalizado && user?.tipo === 'ADMIN')
-                          ) && (
-                            <Tooltip title="Excluir">
+                          {user?.tipo === 'ADMIN' && (
+                            <Tooltip title="Excluir controle">
                               <span>
                                 <IconButton 
                                   onClick={() => handleExcluirControle(controle)} 
                                   color="error" 
                                   size="small"
-                                  disabled={loadingButtons[`delete_${controle.id}`]}
+                                  aria-label="Excluir controle"
+                                  disabled={loadingButtons[`delete_${controle.id}`] || !canDeleteControle(user, { finalizado: controle.finalizado, notasCount: controle.notas?.length || 0 })}
                                   sx={buttonStyles}
                                 >
                                   {loadingButtons[`delete_${controle.id}`] ? (
@@ -2411,6 +2446,7 @@ const ListarControlesContent: React.FC = () => {
                                   color="primary"
                                   size="small"
                                   onClick={() => handleFinalizarControle(controle)}
+                                  aria-label="Finalizar controle"
                                   disabled={loadingButtons[controle.id]}
                                   sx={{
                                     ...buttonStyles,
@@ -2422,7 +2458,7 @@ const ListarControlesContent: React.FC = () => {
                                   {loadingButtons[controle.id] ? (
                                     <CircularProgress size={18} color="inherit" />
                                   ) : (
-                                    <HowToRegIcon fontSize="small" />
+                                    <><HowToRegIcon fontSize="small" sx={{ mr: 0.5 }} /> Finalizar</>
                                   )}
                                 </Button>
                               </span>
@@ -2523,9 +2559,10 @@ const ListarControlesContent: React.FC = () => {
 
       {/* Modal de Edição */}
       {editing && (
-        <Dialog open={!!editing} onClose={handleCloseEdit} maxWidth="md" fullWidth>
+        <Dialog open={!!editing} onClose={editSaving ? undefined : handleCloseEdit} maxWidth="md" fullWidth>
           <DialogTitle>Editar Controle</DialogTitle>
           <DialogContent>
+            <Box component="fieldset" disabled={editSaving || !canEdit(editing)} sx={{ border: 0, p: 0, m: 0, minWidth: 0 }}>
             <Grid container spacing={2} sx={{ mt: 1 }}>
               <Grid item xs={12} sm={6}>
                 <TextField
@@ -2577,6 +2614,29 @@ const ListarControlesContent: React.FC = () => {
                 />
               </Grid>
               <Grid item xs={12}>
+                <Typography variant="subtitle1" sx={{ mb: 1 }}>Notas do controle</Typography>
+                {editNotasErro && <Alert severity="error" sx={{ mb: 1 }}>{editNotasErro}</Alert>}
+                <Autocomplete
+                  multiple
+                  disableCloseOnSelect
+                  options={editNotasOpcoes}
+                  value={editNotasOpcoes.filter((nota) => editNotasIds.includes(nota.id))}
+                  onChange={(_, selecionadas) => setEditNotasIds(selecionadas.map((nota) => nota.id))}
+                  isOptionEqualToValue={(option, value) => option.id === value.id}
+                  getOptionLabel={(nota) => `NF: ${nota.numeroNota} - ${nota.codigo}`}
+                  loading={editNotasLoading}
+                  disabled={editSaving || editNotasLoading || Boolean(editNotasErro)}
+                  noOptionsText="Nenhuma nota disponível para esta transportadora"
+                  renderOption={(props, nota, { selected }) => (
+                    <li {...props} key={nota.id}>
+                      <Checkbox checked={selected} tabIndex={-1} sx={{ mr: 1 }} />
+                      NF: {nota.numeroNota} - {nota.codigo}
+                    </li>
+                  )}
+                  renderInput={(params) => <TextField {...params} label="Adicionar ou remover notas" helperText={`${editNotasIds.length} nota(s) selecionada(s). Desmarque uma nota ou remova seu marcador para retirá-la do controle.`} />}
+                />
+              </Grid>
+              <Grid item xs={12}>
                 <TextField
                   fullWidth
                   label="Observações"
@@ -2587,10 +2647,11 @@ const ListarControlesContent: React.FC = () => {
                 />
               </Grid>
             </Grid>
+            </Box>
           </DialogContent>
           <DialogActions>
-            <Button onClick={handleCloseEdit}>Cancelar</Button>
-            <Button onClick={handleSaveEdit} variant="contained">Salvar</Button>
+            <Button onClick={handleCloseEdit} disabled={editSaving}>Cancelar</Button>
+            <Button onClick={handleSaveEdit} variant="contained" disabled={editSaving || editNotasLoading || Boolean(editNotasErro) || !canEdit(editing)}>{editSaving ? 'Salvando...' : 'Salvar'}</Button>
           </DialogActions>
         </Dialog>
       )}
@@ -2821,6 +2882,7 @@ const ListarControlesContent: React.FC = () => {
                             />
                             <IconButton
                               onClick={() => handleExcluirImagem(detalhesModal.controle!.id, index)}
+                              disabled={!detalhesModal.controle || !canEdit(detalhesModal.controle)}
                               sx={{
                                 position: 'absolute',
                                 top: 8,
@@ -3012,7 +3074,7 @@ const ListarControlesContent: React.FC = () => {
             <Button 
               variant="contained" 
               onClick={() => detalhesModal.controle && gerarPdf(detalhesModal.controle)}
-              disabled={Boolean(detalhesModal.controle && loadingButtons[`pdf_${detalhesModal.controle.id}`])}
+              disabled={!detalhesModal.controle?.finalizado || Boolean(detalhesModal.controle && loadingButtons[`pdf_${detalhesModal.controle.id}`])}
               startIcon={
                 detalhesModal.controle && loadingButtons[`pdf_${detalhesModal.controle.id}`]
                   ? <CircularProgress size={18} color="inherit" />
@@ -3028,7 +3090,7 @@ const ListarControlesContent: React.FC = () => {
                 }
               }}
             >
-              Gerar PDF
+              {detalhesModal.controle?.finalizado ? 'Gerar PDF' : 'Finalize o controle para gerar o PDF'}
             </Button>
           </DialogActions>
         </Dialog>

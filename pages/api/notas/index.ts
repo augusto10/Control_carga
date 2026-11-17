@@ -1,21 +1,62 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { Prisma } from '@prisma/client';
+import { z } from 'zod';
 import prisma from '@/lib/prisma';
+import { findNotaByIdentity } from '@/lib/notas/salvar-multiplas-contract';
+import {
+  buildNotasDisponiveisWhere,
+  notasDisponiveisQuerySchema,
+} from '@/lib/notas/transferencia-contract';
+
+const queryValueSchema = z.union([z.string(), z.array(z.string())]);
+const notasQuerySchema = z.object({
+  start: queryValueSchema.optional(),
+  end: queryValueSchema.optional(),
+  numeroNota: queryValueSchema.optional(),
+  codigo: queryValueSchema.optional(),
+  existe: z.enum(['1']).optional(),
+}).passthrough().and(notasDisponiveisQuerySchema);
+
+function firstQueryValue(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function hasQueryFlag(value: '1' | Array<'1'> | undefined): boolean {
+  return value === '1' || (Array.isArray(value) && value.includes('1'));
+}
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
     return res.status(405).json({ message: 'Method not allowed' });
   }
 
+  const parsedQuery = notasQuerySchema.safeParse(req.query);
+  if (!parsedQuery.success) {
+    return res.status(400).json({ error: 'invalid_query' });
+  }
+
   try {
-    const start = req.query.start as string | undefined;
-    const end = req.query.end as string | undefined;
-    const numeroNota = req.query.numeroNota as string | undefined;
-    const codigo = req.query.codigo as string | undefined;
+    const start = firstQueryValue(parsedQuery.data.start);
+    const end = firstQueryValue(parsedQuery.data.end);
+    const numeroNota = firstQueryValue(parsedQuery.data.numeroNota);
+    const codigo = firstQueryValue(parsedQuery.data.codigo);
+
+    if (parsedQuery.data.existe === '1') {
+      if (!codigo && !numeroNota) {
+        return res.status(400).json({ error: 'identity_required' });
+      }
+
+      const nota = await findNotaByIdentity(prisma, {
+          codigo: codigo || '',
+          numeroNota: numeroNota || '',
+      });
+
+      return res.status(200).json({ exists: Boolean(nota), nota });
+    }
 
     console.log('[API Notas] Parâmetros recebidos:', { start, end, numeroNota, codigo });
 
-    const where: any = {};
+    const where: Prisma.NotaFiscalWhereInput = {};
 
     if (start && end) {
       try {
@@ -48,17 +89,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (codigo) {
-      const c = Array.isArray(codigo) ? codigo[0] : codigo;
       where.codigo = {
-        contains: String(c),
+        contains: codigo,
         mode: 'insensitive',
       };
     }
 
+    if (hasQueryFlag(parsedQuery.data.semTransportadora)) {
+      Object.assign(where, buildNotasDisponiveisWhere({ semTransportadora: true }));
+    } else if (hasQueryFlag(parsedQuery.data.disponiveis)) {
+      Object.assign(where, buildNotasDisponiveisWhere({
+        transportadoraDestino: parsedQuery.data.transportadoraDestino,
+      }));
+    } else if (parsedQuery.data.transportadoraDestino) {
+      where.transportadoraDestino = parsedQuery.data.transportadoraDestino;
+    }
+
     console.log('[API Notas] Filtro where:', JSON.stringify(where));
 
-    // Mantém cada consulta abaixo do limite de resposta do Prisma Accelerate.
-    // O id desempata datas iguais para não repetir nem perder notas nos lotes.
+    // Limita cada resposta do banco para não exceder os 5 MB do Accelerate.
+    // O id desempata datas iguais e mantém o cursor estável entre os lotes.
     const query = {
       where,
       include: {

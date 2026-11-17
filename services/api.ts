@@ -65,8 +65,6 @@ const createApi = (): AxiosInstance => {
         if (token) {
           console.log('[API] Token JWT encontrado nos cookies');
           config.headers['Authorization'] = `Bearer ${token}`;
-        } else {
-          console.log('[API] Nenhum token JWT encontrado nos cookies');
         }
       }
       

@@ -6,6 +6,7 @@ import {
   Typography, 
   CircularProgress,
   TextField,
+  MenuItem,
   IconButton,
   InputAdornment,
   useTheme,
@@ -23,12 +24,30 @@ import {
   Close as CloseIcon
 } from '@mui/icons-material';
 import { NumericFormat } from 'react-number-format';
+import { Transportadora as PrismaTransportadora } from '@prisma/client';
+import { isTransportadora, normalizeNotaIdentity } from '@/lib/notas/transportadora';
+
+type TransportadoraDestino = (typeof PrismaTransportadora)[keyof typeof PrismaTransportadora];
+
+const transportadorasDestino = Object.values(PrismaTransportadora);
+const transportadoraLabels: Record<TransportadoraDestino, string> = {
+  ACERT: 'ACERT',
+  ACCERT: 'ACCERT',
+  EXPRESSO_GOIAS: 'Expresso Goiás',
+  TERCEIRIZADA: 'Terceirizada',
+  DETAFRA_TRANSPORTES: 'Detafra Transportes',
+  RETIRA_VENDEDOR: 'Retira vendedor',
+  RETIRA_CLIENTE: 'Retira cliente',
+  VLOG: 'VLOG',
+  ZANUELO_TRANSPORTE_LOGISTICA: 'Zanuelo Transporte Logística',
+};
 
 interface NotaFiscal {
   id: string;
   codigo: string;
   numeroNota: string;
   volumes: string;
+  transportadoraDestino: TransportadoraDestino;
   isScanned: boolean;
   status: 'pendente' | 'processando' | 'concluido' | 'erro';
   dataHora: string;
@@ -85,6 +104,9 @@ const AdicionarNotasContent: React.FC = () => {
   const [manualNumero, setManualNumero] = useState('');
   const [manualValor, setManualValor] = useState('0,00');
   const [notaEditandoValor, setNotaEditandoValor] = useState<string | null>(null);
+  const [transportadoraPadrao, setTransportadoraPadrao] = useState<TransportadoraDestino>(
+    PrismaTransportadora.ACCERT
+  );
   
   // Ref para o campo de entrada do scanner
   const inputRef = useRef<HTMLInputElement>(null);
@@ -163,6 +185,32 @@ const AdicionarNotasContent: React.FC = () => {
     return codigoLimpo.slice(-9);
   };
 
+  const notaJaEstaSalva = async (codigo: string, numeroNota: string): Promise<boolean> => {
+    const params = new URLSearchParams({
+      existe: '1',
+      codigo,
+      numeroNota,
+    });
+    const response = await fetch(`/api/notas?${params.toString()}`, {
+      cache: 'no-store',
+      credentials: 'include',
+    });
+    if (!response.ok) {
+      throw new Error('Não foi possível verificar se a nota já está salva');
+    }
+
+    const result = await response.json() as { exists: boolean };
+    return result.exists;
+  };
+
+  const avisarNotaSalva = () => {
+    enqueueSnackbar('Esta nota já está salva', {
+      variant: 'warning',
+      autoHideDuration: 4000,
+      anchorOrigin: { vertical: 'top', horizontal: 'center' },
+    });
+  };
+
   // Função para atualizar os volumes de uma nota
   const atualizarVolumesNota = (id: string, volumes: string) => {
     setNotas(prevNotas => 
@@ -212,18 +260,18 @@ const AdicionarNotasContent: React.FC = () => {
       // Formata o número da nota para exibição (remove zeros à esquerda)
       const numeroNotaFormatado = numeroNota.replace(/^0+/, '');
       
-      // Verificar se a nota já foi adicionada (verifica tanto por código quanto por número da nota)
-      const notaExistente = notas.find(n => 
-        (n.codigo && codigoLimpo && n.codigo === codigoLimpo) ||
-        (n.numeroNota && n.numeroNota === numeroNotaFormatado)
-      );
-      
+      const identity = normalizeNotaIdentity({
+        codigo: codigoLimpo,
+        numeroNota: numeroNotaFormatado,
+      });
+      const notaExistente = notas.some((nota) => normalizeNotaIdentity(nota) === identity);
       if (notaExistente) {
-        enqueueSnackbar('Nota já escaneada anteriormente', { 
-          variant: 'warning',
-          autoHideDuration: 4000,
-          anchorOrigin: { vertical: 'top', horizontal: 'center' }
-        });
+        avisarNotaSalva();
+        return;
+      }
+
+      if (await notaJaEstaSalva(codigoLimpo, numeroNotaFormatado)) {
+        avisarNotaSalva();
         return;
       }
       
@@ -233,6 +281,7 @@ const AdicionarNotasContent: React.FC = () => {
         codigo: codigoLimpo,
         numeroNota: numeroNotaFormatado, // Usa o número formatado (sem zeros à esquerda)
         volumes: '1', // Valor padrão de volumes
+        transportadoraDestino: transportadoraPadrao,
         isScanned: true, // Marca como nota escaneada
         status: 'pendente',
         dataHora: new Date().toLocaleString('pt-BR'),
@@ -282,7 +331,7 @@ const AdicionarNotasContent: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [notas, enqueueSnackbar]);
+  }, [notas, enqueueSnackbar, transportadoraPadrao]);
 
   const handleEditarNota = (index: number) => {
     setNotas(prev => {
@@ -326,53 +375,66 @@ const AdicionarNotasContent: React.FC = () => {
     enqueueSnackbar('Nota atualizada com sucesso!', { variant: 'success' });
   };
 
-  const handleAddManual = (e: React.FormEvent) => {
+  const handleAddManual = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!manualNumero.trim()) {
       enqueueSnackbar('Informe o número da nota', { variant: 'error' });
       return;
     }
-    
-    // Verifica se a nota já foi adicionada (verifica por número da nota)
-    const notaExistente = notas.find(n => n.numeroNota === manualNumero.trim());
-    if (notaExistente) {
-      enqueueSnackbar('Nota já escaneada anteriormente', { 
-        variant: 'warning',
-        autoHideDuration: 4000,
-        anchorOrigin: { vertical: 'top', horizontal: 'center' }
-      });
+
+    const numeroNormalizado = manualNumero.replace(/\D/g, '').replace(/^0+(?=\d)/, '');
+    if (!numeroNormalizado) {
+      enqueueSnackbar('Informe um número de nota válido', { variant: 'error' });
       return;
     }
-    
-    // Cria uma nova nota manual
-    const novaNota: NotaFiscal = {
-      id: Date.now().toString(),
-      codigo: `MANUAL-${Date.now()}`,
-      numeroNota: manualNumero.trim(),
-      volumes: '1', // Valor padrão de volumes para notas manuais
-      isScanned: false, // Marca como nota manual
-      status: 'pendente',
-      dataHora: new Date().toLocaleString('pt-BR'),
-      editando: true // Abre para edição dos volumes
-    };
-    
-    // Adiciona a nova nota no topo
-    setNotas(prev => [novaNota, ...prev]);
-    setNotaEditandoValor(novaNota.id);
-    
-    // Limpa o formulário
-    setManualNumero('');
-    
-    enqueueSnackbar(`Nota ${manualNumero} adicionada com sucesso!`, { variant: 'success' });
-    
-    // Rola até a nota recém-adicionada
-    setTimeout(() => {
-      const notaElement = document.querySelector(`[data-nota-id="${novaNota.id}"]`);
-      if (notaElement) {
-        notaElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+    const codigoManual = `MANUAL-${numeroNormalizado}`;
+    const identity = normalizeNotaIdentity({
+      codigo: codigoManual,
+      numeroNota: numeroNormalizado,
+    });
+    if (notas.some((nota) => normalizeNotaIdentity(nota) === identity)) {
+      avisarNotaSalva();
+      return;
+    }
+
+    try {
+      if (await notaJaEstaSalva(codigoManual, numeroNormalizado)) {
+        avisarNotaSalva();
+        return;
       }
-    }, 100);
+
+      const novaNota: NotaFiscal = {
+        id: Date.now().toString(),
+        codigo: codigoManual,
+        numeroNota: numeroNormalizado,
+        volumes: '1',
+        transportadoraDestino: transportadoraPadrao,
+        isScanned: false,
+        status: 'pendente',
+        dataHora: new Date().toLocaleString('pt-BR'),
+        editando: true,
+      };
+
+      setNotas((prev) => [novaNota, ...prev]);
+      setNotaEditandoValor(novaNota.id);
+      setManualNumero('');
+      enqueueSnackbar(`Nota ${numeroNormalizado} adicionada com sucesso!`, { variant: 'success' });
+
+      setTimeout(() => {
+        const notaElement = document.querySelector(`[data-nota-id="${novaNota.id}"]`);
+        if (notaElement) {
+          notaElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      }, 100);
+    } catch (error) {
+      console.error('Erro ao verificar nota manual:', error);
+      enqueueSnackbar(
+        error instanceof Error ? error.message : 'Erro ao verificar nota',
+        { variant: 'error', autoHideDuration: 5000 }
+      );
+    }
   };
 
 
@@ -415,11 +477,11 @@ const AdicionarNotasContent: React.FC = () => {
       // 1. Primeiro salva as notas no backend
       const response = await fetch('/api/notas/salvar-multiplas', {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
           'Cache': 'no-cache',
-          'credentials': 'include'
         },
         body: JSON.stringify({ notas: notasParaEnviar })
       });
@@ -430,25 +492,13 @@ const AdicionarNotasContent: React.FC = () => {
       console.log('Resposta do servidor:', data);
 
       if (!response.ok) {
-        // Se for erro de duplicação, mostra a mensagem específica
-        if (data.error === 'Nota já escaneada anteriormente' || data.message === 'Nota já escaneada anteriormente') {
-          throw new Error('Nota já escaneada anteriormente');
-        }
-        // Para outros erros, usa a mensagem do servidor ou uma mensagem padrão
-        throw new Error(data.error || data.message || 'Erro ao salvar notas');
+        throw new Error(data.message || data.error || 'Erro ao salvar notas');
       }
 
-      // 2. Mostra mensagem de sucesso
-      enqueueSnackbar(`Notas salvas com sucesso!`, { 
-        variant: 'success',
-        autoHideDuration: 3000
-      });
-
-      // 3. Limpa as notas locais e reseta o estado
+      // Limpa as notas locais somente após confirmação do servidor.
       setNotas([]);
       setNotaEditandoValor(null);
       
-      // 4. Mostra mensagem de sucesso
       enqueueSnackbar('Notas salvas com sucesso!', { 
         variant: 'success',
         autoHideDuration: 3000
@@ -677,6 +727,31 @@ const AdicionarNotasContent: React.FC = () => {
                   <Typography variant="body2" color="text.secondary">
                     Código: {nota.codigo}
                   </Typography>
+                  <TextField
+                    select
+                    size="small"
+                    label="Transportadora"
+                    value={nota.transportadoraDestino}
+                    onChange={(event) => {
+                      const destino = event.target.value;
+                      if (!isTransportadora(destino)) {
+                        enqueueSnackbar('Transportadora inválida', { variant: 'error' });
+                        return;
+                      }
+                      setNotas((prev) => prev.map((item) => (
+                        item.id === nota.id
+                          ? { ...item, transportadoraDestino: destino }
+                          : item
+                      )));
+                    }}
+                    sx={{ mt: 1, minWidth: 220 }}
+                  >
+                    {transportadorasDestino.map((destino) => (
+                      <MenuItem key={destino} value={destino}>
+                        {transportadoraLabels[destino]}
+                      </MenuItem>
+                    ))}
+                  </TextField>
                   {notaEditandoValor === nota.id ? (
                     <Box mt={1} mb={1}>
                       <Typography variant="subtitle2" gutterBottom>
@@ -784,10 +859,41 @@ const AdicionarNotasContent: React.FC = () => {
   return (
     <Box>
       {/* Campo para leitura do scanner óptico */}
-      <Paper component="form" onSubmit={handleAddManual} sx={{ p: 3, mb: 3 }}>
+      <Paper
+        component="form"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (codigoBarras.trim()) {
+            void processarCodigoBarras(codigoBarras);
+            setCodigoBarras('');
+          }
+        }}
+        sx={{ p: 3, mb: 3 }}
+      >
         <Typography variant="h6" gutterBottom>
           Leitor de Código de Barras
         </Typography>
+        <TextField
+          select
+          label="Transportadora padrão para novas notas"
+          value={transportadoraPadrao}
+          onChange={(event) => {
+            const destino = event.target.value;
+            if (!isTransportadora(destino)) {
+              enqueueSnackbar('Transportadora inválida', { variant: 'error' });
+              return;
+            }
+            setTransportadoraPadrao(destino);
+          }}
+          sx={{ mb: 2, minWidth: 280 }}
+          disabled={loading || isSaving}
+        >
+          {transportadorasDestino.map((destino) => (
+            <MenuItem key={destino} value={destino}>
+              {transportadoraLabels[destino]}
+            </MenuItem>
+          ))}
+        </TextField>
         <Box display="flex" gap={2} alignItems="flex-end">
           <TextField
             fullWidth
@@ -828,6 +934,33 @@ const AdicionarNotasContent: React.FC = () => {
         <Typography variant="caption" color="textSecondary" display="block" mt={1}>
           Posicione o cursor no campo acima e leia o código com o scanner
         </Typography>
+      </Paper>
+
+      <Paper
+        component="form"
+        onSubmit={(event) => { void handleAddManual(event); }}
+        sx={{ p: 3, mb: 3 }}
+      >
+        <Typography variant="h6" gutterBottom>
+          Adicionar nota manualmente
+        </Typography>
+        <Box display="flex" gap={2} alignItems="flex-end">
+          <TextField
+            fullWidth
+            label="Número da nota"
+            value={manualNumero}
+            onChange={(event) => setManualNumero(event.target.value)}
+            disabled={loading || isSaving}
+          />
+          <Button
+            type="submit"
+            variant="outlined"
+            disabled={!manualNumero.trim() || loading || isSaving}
+            startIcon={<AddIcon />}
+          >
+            Adicionar
+          </Button>
+        </Box>
       </Paper>
 
       {/* Lista de Notas */}

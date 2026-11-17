@@ -31,19 +31,21 @@ import { cn } from '@/utils/cn';
 import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
 import { Select } from '@/components/ui/Select';
+import { canDeleteControle } from '@/lib/auth/permissions';
 
 interface Controle {
   id: string;
-  numero: string;
+  numeroManifesto: string | null;
   motorista: string;
   responsavel: string;
-  status: 'ABERTO' | 'EM_ANDAMENTO' | 'FINALIZADO' | 'CANCELADO';
+  finalizado: boolean;
+  transportadora: string;
   dataCriacao: string;
   dataFinalizacao?: string | null;
-  notasFiscais: Array<{
+  notas: Array<{
     id: string;
-    numero: string;
-    valor: number;
+    numeroNota: string;
+    codigo: string;
   }>;
   usuario: {
     nome: string;
@@ -61,6 +63,22 @@ function GerenciarControlesContent() {
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [currentControle, setCurrentControle] = useState<Partial<Controle> | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [notasSelecionadas, setNotasSelecionadas] = useState<string[]>([]);
+  const [notasDisponiveis, setNotasDisponiveis] = useState<Controle['notas']>([]);
+  const [notasLoading, setNotasLoading] = useState(false);
+  const [notasErro, setNotasErro] = useState('');
+  useEffect(() => {
+    if (!isFormModalOpen || !currentControle?.id) return;
+    let cancelled = false;
+    setNotasLoading(true);
+    setNotasErro('');
+    api.get('/api/notas', { params: { disponiveis: '1', transportadoraDestino: currentControle.transportadora } })
+      .then(({ data }) => { if (!cancelled) setNotasDisponiveis(data); })
+      .catch(() => { if (!cancelled) setNotasErro('Não foi possível carregar as notas. Feche e abra a edição para tentar novamente.'); })
+      .finally(() => { if (!cancelled) setNotasLoading(false); });
+    return () => { cancelled = true; };
+  }, [isFormModalOpen, currentControle?.id, currentControle?.transportadora]);
+  const opcoesNotas = Array.from(new Map([...(currentControle?.notas || []), ...notasDisponiveis].map((nota) => [nota.id, nota])).values());
   
   // Toast
   const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({ 
@@ -75,7 +93,7 @@ function GerenciarControlesContent() {
   };
 
   const filteredControles = controles.filter(c => 
-    (c.numero || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (c.numeroManifesto || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
     (c.motorista || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
     (c.responsavel || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
     (c.usuario?.nome || '').toLowerCase().includes(searchTerm.toLowerCase())
@@ -101,6 +119,10 @@ function GerenciarControlesContent() {
   };
 
   const handleOpenEditarControle = (controle: Controle) => {
+    setNotasSelecionadas(controle.notas.map((nota) => nota.id));
+    setNotasDisponiveis([]);
+    setNotasErro('');
+    setNotasLoading(true);
     setCurrentControle({
       ...controle,
       motorista: controle.motorista || '',
@@ -125,12 +147,17 @@ function GerenciarControlesContent() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!currentControle) return;
+    if (!currentControle || notasLoading || notasErro) return;
 
     try {
       setLoading(true);
       if (isEditing && currentControle.id) {
-        await api.put(`/api/controles/${currentControle.id}`, currentControle);
+        await api.put(`/api/controles/${currentControle.id}`, {
+          motorista: currentControle.motorista,
+          responsavel: currentControle.responsavel,
+          finalizado: currentControle.finalizado,
+          notasIds: notasSelecionadas,
+        });
         showToast('Controle atualizado com sucesso!');
       }
       handleCloseFormModal();
@@ -144,14 +171,14 @@ function GerenciarControlesContent() {
   };
 
   const handleExcluirControle = async (id: string) => {
-    if (!window.confirm('Tem certeza que deseja excluir este controle? Esta ação não pode ser desfeita.')) {
+    if (!window.confirm('Tem certeza que deseja excluir este controle? As notas e os pedidos serão desvinculados e preservados. Esta ação não pode ser desfeita.')) {
       return;
     }
 
     try {
       setLoading(true);
-      await api.post('/api/controles/delete', { id });
-      await carregarControles();
+      await api.delete(`/api/controles/${id}`);
+      setControles((atual) => atual.filter((controle) => controle.id !== id));
       showToast('Controle excluído com sucesso!');
     } catch (error: any) {
       console.error('Erro ao excluir controle:', error);
@@ -168,8 +195,8 @@ function GerenciarControlesContent() {
 
     try {
       setLoading(true);
-      await api.patch(`/api/controles/${id}/finalizar`);
-      await carregarControles();
+      const response = await api.put(`/api/controles/${id}`, { finalizado: true });
+      setControles((atual) => atual.map((controle) => controle.id === id ? response.data : controle));
       showToast('Controle finalizado com sucesso!');
     } catch (error: any) {
       console.error('Erro ao finalizar controle:', error);
@@ -182,7 +209,7 @@ function GerenciarControlesContent() {
   const getStatusInfo = (status: string) => {
     switch (status) {
       case 'ABERTO':
-        return { label: 'Aberto', variant: 'primary' as const, icon: Clock };
+        return { label: 'Aberto', variant: 'info' as const, icon: Clock };
       case 'EM_ANDAMENTO':
         return { label: 'Em Andamento', variant: 'warning' as const, icon: RefreshCw };
       case 'FINALIZADO':
@@ -196,6 +223,7 @@ function GerenciarControlesContent() {
 
   return (
     <AppLayout 
+      fluid
       title="Gestão de Controles" 
       subtitle="Visualize, edite e gerencie todos os controles de carga do sistema"
     >
@@ -235,7 +263,7 @@ function GerenciarControlesContent() {
         {/* Tabela de Controles */}
         <Card noPadding>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left">
+            <table className="w-full min-w-[1100px] text-sm text-left">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200">
                   <th className="px-6 py-4 font-semibold text-textMain">Número</th>
@@ -268,14 +296,14 @@ function GerenciarControlesContent() {
                   </tr>
                 ) : (
                   filteredControles.map((controle) => {
-                    const statusInfo = getStatusInfo(controle.status);
+                    const statusInfo = getStatusInfo(controle.finalizado ? 'FINALIZADO' : 'ABERTO');
                     const StatusIcon = statusInfo.icon;
                     
                     return (
                       <tr key={controle.id} className="hover:bg-slate-50/50 transition-colors group">
                         <td className="px-6 py-4">
                           <span className="font-semibold text-textMain">
-                            {controle.numero || '-'}
+                            {controle.numeroManifesto || '-'}
                           </span>
                         </td>
                         <td className="px-6 py-4">
@@ -293,10 +321,10 @@ function GerenciarControlesContent() {
                           {controle.responsavel || 'Não informado'}
                         </td>
                         <td className="px-6 py-4 hidden sm:table-cell">
-                          {controle.notasFiscais && controle.notasFiscais.length > 0 ? (
+                          {controle.notas && controle.notas.length > 0 ? (
                             <Badge variant="info" className="gap-1">
                               <FileText className="w-3 h-3" />
-                              {controle.notasFiscais.length} nota(s)
+                              {controle.notas.length} nota(s)
                             </Badge>
                           ) : (
                             <span className="text-xs text-textMuted italic">Sem notas</span>
@@ -322,8 +350,8 @@ function GerenciarControlesContent() {
                         <td className="px-6 py-4 hidden xl:table-cell text-xs text-textMuted font-medium">
                           {controle.usuario?.nome || '-'}
                         </td>
-                        <td className="px-6 py-4 text-right">
-                          <div className="flex justify-end gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                        <td className="sticky right-0 bg-white px-6 py-4 text-right min-w-[180px]">
+                          <div className="flex flex-nowrap items-center justify-end gap-2">
                             <Button 
                               size="icon" 
                               variant="ghost" 
@@ -332,20 +360,24 @@ function GerenciarControlesContent() {
                             >
                               <Edit className="w-4 h-4 text-primary" />
                             </Button>
-                            <Button 
+                            {user?.tipo === 'ADMIN' && <Button
                               size="icon" 
                               variant="ghost" 
                               onClick={() => handleExcluirControle(controle.id)}
-                              title="Excluir"
+                              disabled={loading || !canDeleteControle(user, { finalizado: controle.finalizado, notasCount: controle.notas?.length || 0 })}
+                              aria-label="Excluir controle"
+                              title="Excluir controle"
                             >
                               <Trash2 className="w-4 h-4 text-rose-500" />
-                            </Button>
-                            {controle.status !== 'FINALIZADO' && controle.status !== 'CANCELADO' && (
+                            </Button>}
+                            {!controle.finalizado && (
                               <Button 
                                 size="icon" 
                                 variant="ghost" 
                                 onClick={() => handleFinalizarControle(controle.id)}
                                 title="Finalizar"
+                                aria-label="Finalizar controle"
+                                disabled={loading}
                               >
                                 <CheckCircle2 className="w-4 h-4 text-emerald-500" />
                               </Button>
@@ -377,7 +409,7 @@ function GerenciarControlesContent() {
                 <Input 
                   type="text"
                   disabled
-                  value={currentControle?.numero || ''}
+                  value={currentControle?.numeroManifesto || ''}
                 />
               </div>
               <div className="space-y-1.5">
@@ -405,19 +437,33 @@ function GerenciarControlesContent() {
               <div className="space-y-1.5">
                 <Label>Status</Label>
                 <Select 
-                  name="status"
-                  value={currentControle?.status || 'ABERTO'}
-                  onChange={handleInputChange}
+                  name="finalizado"
+                  value={currentControle?.finalizado ? 'FINALIZADO' : 'ABERTO'}
+                  onChange={(event) => setCurrentControle((atual) => ({ ...atual, finalizado: event.target.value === 'FINALIZADO' }))}
                 >
                   <option value="ABERTO">Aberto</option>
-                  <option value="EM_ANDAMENTO">Em Andamento</option>
                   <option value="FINALIZADO">Finalizado</option>
-                  <option value="CANCELADO">Cancelado</option>
                 </Select>
               </div>
             </div>
           </div>
 
+          <div className="space-y-2">
+            <Label>Adicionar ou remover notas</Label>
+            {notasLoading && <p className="text-sm text-textMuted">Carregando notas...</p>}
+            {notasErro && <p role="alert" className="text-sm text-rose-600">{notasErro}</p>}
+            <div className="max-h-64 overflow-y-auto rounded-xl border border-slate-200 p-2">
+              {opcoesNotas.map((nota) => (
+                <label key={nota.id} className="flex cursor-pointer items-center gap-3 rounded-lg p-3 hover:bg-slate-50">
+                  <input type="checkbox" checked={notasSelecionadas.includes(nota.id)} disabled={loading || notasLoading || Boolean(notasErro)}
+                    onChange={(event) => setNotasSelecionadas((atual) => event.target.checked ? [...atual, nota.id] : atual.filter((id) => id !== nota.id))} />
+                  <span className="text-sm">NF: {nota.numeroNota} - {nota.codigo}</span>
+                </label>
+              ))}
+              {!notasLoading && opcoesNotas.length === 0 && <p className="p-3 text-sm text-textMuted">Nenhuma nota disponível.</p>}
+            </div>
+            <p className="text-sm text-textMuted">{notasSelecionadas.length} nota(s) selecionada(s). Desmarque para remover do controle.</p>
+          </div>
           <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
             <Button variant="ghost" onClick={handleCloseFormModal} type="button">
               Cancelar
@@ -426,7 +472,7 @@ function GerenciarControlesContent() {
               variant="primary" 
               type="submit" 
               loading={loading}
-              disabled={!currentControle?.motorista || !currentControle?.responsavel}
+              disabled={!currentControle?.motorista || !currentControle?.responsavel || notasLoading || Boolean(notasErro)}
             >
               Salvar Alterações
             </Button>

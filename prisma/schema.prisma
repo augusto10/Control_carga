@@ -60,10 +60,12 @@ model NotaFiscal {
   controleId  String?
   usuarioId   String?
   volumes     String         @default("1")
+  transportadoraDestino Transportadora?
   controle    ControleCarga? @relation(fields: [controleId], references: [id])
   usuario     Usuario?       @relation(fields: [usuarioId], references: [id])
 
   @@index([dataCriacao])
+  @@index([transportadoraDestino, controleId])
 }
 
 model Usuario {

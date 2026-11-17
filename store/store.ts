@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { useSnackbar } from 'notistack';
 import { api } from '../services/api';
+import { removerNotasTransferidas } from '@/lib/controles/notas-direcionamento';
 
 export type ControleResumido = {
   id: string;
@@ -11,6 +12,17 @@ export type ControleResumido = {
   dataCriacao: Date;
 };
 
+export type TransportadoraDestino =
+  | 'ACERT'
+  | 'ACCERT'
+  | 'EXPRESSO_GOIAS'
+  | 'TERCEIRIZADA'
+  | 'DETAFRA_TRANSPORTES'
+  | 'RETIRA_VENDEDOR'
+  | 'RETIRA_CLIENTE'
+  | 'VLOG'
+  | 'ZANUELO_TRANSPORTE_LOGISTICA';
+
 export type NotaFiscal = {
   id: string;
   dataCriacao: Date;
@@ -18,6 +30,7 @@ export type NotaFiscal = {
   numeroNota: string;
   volumes: string;
   controleId: string | null;
+  transportadoraDestino?: TransportadoraDestino | null;
   controle?: ControleResumido | null;
 };
 
@@ -33,7 +46,7 @@ export type ControleCarga = {
   motorista: string;
   cpfMotorista: string;
   responsavel: string;
-  transportadora: 'ACERT' | 'ACCERT' | 'EXPRESSO_GOIAS' | 'TERCEIRIZADA' | 'DETAFRA_TRANSPORTES' | 'RETIRA_VENDEDOR' | 'RETIRA_CLIENTE' | 'VLOG' | 'ZANUELO_TRANSPORTE_LOGISTICA';
+  transportadora: TransportadoraDestino;
   numeroManifesto: string | null;
   qtdPallets: number;
   observacao: string | null;
@@ -55,6 +68,14 @@ interface StoreState {
   status: 'success' | 'error' | null;
   loading: boolean;
   fetchNotas: (start?: string, end?: string, numeroNota?: string, codigo?: string) => Promise<void>;
+  fetchNotasDisponiveis: (filters?: {
+    transportadoraDestino?: TransportadoraDestino;
+    semTransportadora?: boolean;
+  }) => Promise<NotaFiscal[]>;
+  transferirNotas: (
+    notaIds: string[],
+    destino: TransportadoraDestino
+  ) => Promise<{ count: number; ids: string[] }>;
   fetchControles: (filters?: {
     start?: string;
     end?: string;
@@ -69,7 +90,8 @@ interface StoreState {
   criarControle: (controle: Omit<ControleCarga, 'id' | 'dataCriacao' | 'finalizado' | 'notas'> & { notasIds?: string[] }) => Promise<ControleCarga>;
   vincularNotas: (controleId: string, notasIds: string[]) => Promise<void>;
   finalizarControle: (controleId: string) => Promise<void>;
-  atualizarControle: (controleId: string, dados: Partial<Omit<ControleCarga, 'id' | 'dataCriacao' | 'notas'>>) => Promise<ControleCarga | null>;
+  excluirControle: (controleId: string) => Promise<void>;
+  atualizarControle: (controleId: string, dados: Partial<Omit<ControleCarga, 'id' | 'dataCriacao' | 'notas'>> & { notasIds?: string[] }) => Promise<ControleCarga | null>;
   deleteNota: (notaId: string) => Promise<boolean>;
 }
 
@@ -122,6 +144,47 @@ export const useStore = create<StoreState>((set) => ({
     }
   },
 
+  fetchNotasDisponiveis: async (filters = {}) => {
+    const params = new URLSearchParams({ disponiveis: '1' });
+    if (filters.transportadoraDestino) {
+      params.set('transportadoraDestino', filters.transportadoraDestino);
+    }
+    if (filters.semTransportadora) params.set('semTransportadora', '1');
+
+    const response = await fetch(`/api/notas?${params.toString()}`, {
+      headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' },
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Erro ao buscar notas disponíveis');
+    }
+
+    const notas = await response.json() as NotaFiscal[];
+    set({ notas });
+    return notas;
+  },
+
+  transferirNotas: async (notaIds, destino) => {
+    const response = await fetch('/api/notas/transferir', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ notaIds, transportadoraDestino: destino }),
+    });
+
+    const result = await response.json() as { count: number; ids: string[]; message?: string };
+    if (!response.ok) {
+      throw new Error(result.message || 'Erro ao transferir notas');
+    }
+
+    set((state) => ({
+      notas: removerNotasTransferidas(state.notas, result.ids),
+    }));
+    return { count: result.count, ids: result.ids };
+  },
+
   fetchControles: async (filters = {}) => {
     console.log('Iniciando fetchControles com filtros:', filters);
     set({ loading: true });
@@ -154,7 +217,7 @@ export const useStore = create<StoreState>((set) => ({
         console.error('Erro ao buscar controles:', response.status, response.statusText);
         const errorData = await response.json().catch(() => ({}));
         console.error('Detalhes do erro:', errorData);
-        throw new Error(errorData.error || 'Erro ao buscar controles');
+        throw new Error(errorData.message || errorData.error || 'Erro ao buscar controles');
       }
       
       const controles = await response.json();
@@ -338,40 +401,6 @@ export const useStore = create<StoreState>((set) => ({
 
       const novoControle = responseData;
       
-      // Se houver notas para vincular, faz o vínculo
-      if (notasIds.length > 0) {
-        try {
-          const vinculoResponse = await fetch('/api/controles/vincular-notas', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-            },
-            credentials: 'include',
-            body: JSON.stringify({
-              controleId: novoControle.id,
-              notasIds: notasIds
-            }),
-          });
-
-          if (!vinculoResponse.ok) {
-            const errorData = await vinculoResponse.json().catch(() => ({}));
-            console.warn('Aviso ao vincular notas:', errorData);
-            // Não interrompe o fluxo, apenas registra o aviso
-          }
-          
-          // Atualiza o controle com as notas vinculadas
-          novoControle.notas = notasIds.map((id: string) => ({
-            id,
-            // Adicione outros campos necessários da nota aqui
-          }));
-          
-        } catch (error) {
-          console.error('Erro ao vincular notas:', error);
-          // Não lança o erro para não interromper o fluxo, apenas loga
-        }
-      }
-      
       // Atualiza a lista de controles
       try {
         const controlesResponse = await fetch('/api/controles', {
@@ -397,13 +426,19 @@ export const useStore = create<StoreState>((set) => ({
   },
 
   vincularNotas: async (controleId, notasIds) => {
-    await fetch('/api/controles/vincular-notas', {
+    const response = await fetch('/api/controles/vincular-notas', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
+      credentials: 'include',
       body: JSON.stringify({ controleId, notasIds }),
     });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Erro ao vincular notas');
+    }
     
     await Promise.all([
       useStore.getState().fetchNotas(),
@@ -411,10 +446,28 @@ export const useStore = create<StoreState>((set) => ({
     ]);
   },
 
+  excluirControle: async (controleId) => {
+    const response = await fetch(`/api/controles/${controleId}`, {
+      method: 'DELETE',
+      credentials: 'include',
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || errorData.error || 'Erro ao excluir controle');
+    }
+    set((state) => ({
+      controles: state.controles.filter((controle) => controle.id !== controleId),
+      notas: state.notas.map((nota) => nota.controleId === controleId
+        ? { ...nota, controleId: null, controle: null }
+        : nota),
+    }));
+  },
+
   finalizarControle: async (controleId) => {
     try {
       const response = await fetch(`/api/controles/${controleId}`, {
         method: 'PUT',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
           'Cache-Control': 'no-cache, no-store, must-revalidate',
@@ -429,7 +482,12 @@ export const useStore = create<StoreState>((set) => ({
         throw new Error(errorData.message || 'Erro ao finalizar controle');
       }
       
-      await useStore.getState().fetchControles();
+      const updatedControle = await response.json() as ControleCarga;
+      set((state) => ({
+        controles: state.controles.map((controle) =>
+          controle.id === controleId ? { ...controle, ...updatedControle } : controle
+        ),
+      }));
     } catch (error) {
       console.error('Erro ao finalizar controle:', error);
       throw error;
@@ -470,7 +528,7 @@ export const useStore = create<StoreState>((set) => ({
         console.error('Erro na resposta da API:', response.status, response.statusText);
         const errorData = await response.json().catch(() => ({}));
         console.error('Detalhes do erro:', errorData);
-        throw new Error(errorData.error || errorData.message || 'Erro ao atualizar controle');
+        throw new Error(errorData.message || errorData.error || 'Erro ao atualizar controle');
       }
 
       const result = await response.json();
