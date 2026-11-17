@@ -40,6 +40,7 @@ test-*.ts
 !tests/controle-finalizacao.test.ts
 !tests/controle-exclusao-store.test.ts
 !tests/controle-listagem-api.test.ts
+!tests/controle-pdf-dados.test.ts
 create-test-*.js
 scripts/teste-*.ts
 scripts/test-*.js

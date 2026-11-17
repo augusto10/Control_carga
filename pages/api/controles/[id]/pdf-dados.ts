@@ -1,14 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '@/lib/prisma';
 import { apiExternaService } from '@/services/api-externa';
+import { normalizarNotaPdf, temDadosCompletosNotaPdf } from '@/lib/controles/pdf-dados';
 
 const onlyDigits = (value: unknown) => String(value ?? '').replace(/\D/g, '');
-const pick = (...values: unknown[]) => {
-  for (const value of values) {
-    if (value !== null && value !== undefined && String(value).trim() !== '') return value;
-  }
-  return null;
-};
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -35,21 +30,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     controle.notas.map(async (nota) => {
       try {
         const chave = onlyDigits(nota.codigo);
-        const externa = chave.length === 44
+        let externa = chave.length === 44
           ? await apiExternaService.buscarNotaFiscalPorChave(chave, username, password)
           : await apiExternaService.buscarNotaFiscalPorNumeroSerie(nota.numeroNota, '1', username, password);
 
-        const dados = (externa || {}) as Record<string, unknown>;
+        let dados = normalizarNotaPdf(nota, externa);
+        if (chave.length === 44 && !temDadosCompletosNotaPdf(dados) && nota.numeroNota) {
+          const serie = String(Number(chave.slice(22, 25)));
+          const porNumero = await apiExternaService.buscarNotaFiscalPorNumeroSerie(nota.numeroNota, serie, username, password);
+          dados = normalizarNotaPdf(dados, porNumero);
+          externa = porNumero ?? externa;
+        }
+        const itens = externa?.itens;
         return {
-          ...nota,
-          _pdfEnriquecida: true,
-          valorPedido: pick(dados.valorPedido, dados.valor, dados.VALOR_TOTAL_NOTA, dados.VALOR_TOTAL, dados.TOTAL),
-          pesoBruto: pick(dados.pesoBruto, dados.peso, dados.PESO_BRUTO, dados.PESO_TOTAL, dados.TOTAL_PESO),
-          razaoSocial: pick(dados.razaoSocial, dados.NOME_RAZAO_SOCIAL, dados.NOME_FANTASIA),
-          dataEmissao: pick(dados.dataEmissao, dados.DATA_EMISSAO, dados.DATA_HORA_EMISSAO),
-          cnpj: pick(dados.cnpj, dados.CNPJ, dados.CNPJ_CPF, dados.CNPJ_DESTINATARIO),
-          volumes: String(pick(nota.volumes, dados.volumes, dados.VOLUMES) ?? '1'),
-          produtos: Array.isArray(dados.itens) ? dados.itens.map((item: any) => ({
+          ...dados,
+          produtos: Array.isArray(itens) ? itens.map((item) => ({
             produtoId: item.produtoId,
             codigo: item.codigo,
             nome: item.nome,
@@ -61,7 +56,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         };
       } catch (error) {
         console.error(`[PDF Controle] Falha ao completar NF ${nota.numeroNota}:`, error);
-        return { ...nota, _pdfEnriquecida: true };
+        return normalizarNotaPdf(nota);
       }
     })
   );

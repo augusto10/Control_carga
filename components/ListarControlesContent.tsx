@@ -53,6 +53,7 @@ import api from '../services/api';
 import { CEPService } from '../services/cep';
 import { useAuth } from '../contexts/AuthContext';
 import { canDeleteControle, canEditControle } from '@/lib/auth/permissions';
+import { dadosPdfCompletos, normalizarNotaPdf, temDadosCompletosNotaPdf, validarNotasPdf } from '@/lib/controles/pdf-dados';
 import { estimarFreteDfPorRegiao } from '@/lib/freteDf';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -277,7 +278,8 @@ const ListarControlesContent: React.FC = () => {
   const pdfDadosInFlightRef = React.useRef(new Map<string, Promise<ControleComNotas>>());
   const carregarDadosPdf = useCallback((controle: ControleComNotas) => {
     const cached = pdfDadosCacheRef.current.get(controle.id);
-    if (cached) return Promise.resolve(cached);
+    if (cached && dadosPdfCompletos(cached)) return Promise.resolve(cached);
+    if (cached) pdfDadosCacheRef.current.delete(controle.id);
 
     const inFlight = pdfDadosInFlightRef.current.get(controle.id);
     if (inFlight) return inFlight;
@@ -287,7 +289,7 @@ const ListarControlesContent: React.FC = () => {
       .then((response) => response.data as ControleComNotas)
       .catch(() => controle)
       .then((dados) => {
-        if (pdfDadosInFlightRef.current.get(controle.id) === request) pdfDadosCacheRef.current.set(controle.id, dados);
+        if (pdfDadosInFlightRef.current.get(controle.id) === request && dadosPdfCompletos(dados)) pdfDadosCacheRef.current.set(controle.id, dados);
         return dados;
       })
       .finally(() => {
@@ -697,17 +699,6 @@ const ListarControlesContent: React.FC = () => {
           nota?.emitente?.cnpj
         );
       };
-      const toNumber = (x: any) => {
-        if (x === null || x === undefined) return undefined;
-        let s = String(x).trim().replace(/R\$\s*/g, '');
-        if (s === '') return undefined;
-        const hasComma = s.includes(',');
-        if (hasComma) {
-          s = s.replace(/\./g, '').replace(',', '.');
-        }
-        const n = Number(s);
-        return isNaN(n) ? undefined : n;
-      };
       const notaExternaCache = new Map<string, any>();
       const buscarNotaExternaCache = async (params: Record<string, string>) => {
         const cacheKey = Object.entries(params)
@@ -731,72 +722,18 @@ const ListarControlesContent: React.FC = () => {
       };
       const notasParaPdf = await Promise.all(
         (controleCompleto.notas || []).map(async (nota) => {
-          const base = { ...nota };
-          try {
-            if ((base as any)._pdfEnriquecida) return base;
-            const chave = extrairChaveNFe(base.codigo || '');
-            if (chave) {
-              const d = await buscarNotaExternaCache({ chave });
-              const valorFromD = toNumber(d.valorPedido ?? d.valor ?? d.VALOR_TOTAL_NOTA ?? d.VALOR_TOTAL ?? (d as any).TOTAL ?? (d as any).total);
-              const pesoFromD = toNumber(
-                (d as any).TOTAL_PESO ?? (d as any).PESO_TOTAL ?? (d as any).PESO_NOTA ??
-                d.pesoBruto ?? d.peso ??
-                (d as any).PESO_BRUTO ?? (d as any).PESO ?? (d as any).PESO_LIQUIDO ?? (d as any).peso_liquido
-              );
-              const valorFromBase = toNumber((base as any).valorPedido ?? (base as any).valor ?? (base as any).VALOR_TOTAL ?? (base as any).TOTAL ?? (base as any).valor_total);
-              const pesoFromBase = toNumber(
-                (base as any).pesoBruto ?? (base as any).peso ??
-                (base as any).PESO_BRUTO ?? (base as any).PESO ?? (base as any).PESO_LIQUIDO ?? (base as any).peso_liquido ??
-                (base as any).PESO_TOTAL ?? (base as any).PESO_NOTA ?? (base as any).TOTAL_PESO
-              );
-              const valorFinal = (valorFromBase !== undefined) ? valorFromBase : valorFromD;
-              const pesoFinal = (pesoFromBase !== undefined && pesoFromBase > 0) ? pesoFromBase : pesoFromD;
-              return {
-                ...base,
-                volumes: String(base.volumes ?? d.volumes ?? '1'),
-                valorPedido: valorFinal,
-                razaoSocial: (base as any).razaoSocial ?? d.razaoSocial ?? d.cliente?.nome ?? d.cliente?.razaoSocial ?? d.NOME_RAZAO_SOCIAL,
-                pesoBruto: pesoFinal,
-                dataEmissao: (base as any).dataEmissao ?? d.dataEmissao ?? d.DATA_EMISSAO,
-                cnpj: resolveCnpj({
-                  ...(base as any),
-                  ...(d || {})
-                }) || undefined,
-              };
-            }
-            if (base.numeroNota) {
-              const d = await buscarNotaExternaCache({ numero: String(base.numeroNota), serie: '1' });
-              const valorFromD = toNumber(d.valorPedido ?? d.valor ?? d.VALOR_TOTAL_NOTA ?? d.VALOR_TOTAL ?? (d as any).TOTAL ?? (d as any).total);
-              const pesoFromD = toNumber(
-                (d as any).TOTAL_PESO ?? (d as any).PESO_TOTAL ?? (d as any).PESO_NOTA ??
-                d.pesoBruto ?? d.peso ??
-                (d as any).PESO_BRUTO ?? (d as any).PESO ?? (d as any).PESO_LIQUIDO ?? (d as any).peso_liquido
-              );
-              const valorFromBase = toNumber((base as any).valorPedido ?? (base as any).valor ?? (base as any).VALOR_TOTAL ?? (base as any).TOTAL ?? (base as any).valor_total);
-              const pesoFromBase = toNumber(
-                (base as any).pesoBruto ?? (base as any).peso ??
-                (base as any).PESO_BRUTO ?? (base as any).PESO ?? (base as any).PESO_LIQUIDO ?? (base as any).peso_liquido ??
-                (base as any).PESO_TOTAL ?? (base as any).PESO_NOTA ?? (base as any).TOTAL_PESO
-              );
-              const valorFinal = (valorFromBase !== undefined) ? valorFromBase : valorFromD;
-              const pesoFinal = (pesoFromBase !== undefined && pesoFromBase > 0) ? pesoFromBase : pesoFromD;
-              return {
-                ...base,
-                volumes: String(base.volumes ?? d.volumes ?? '1'),
-                valorPedido: valorFinal,
-                razaoSocial: (base as any).razaoSocial ?? d.razaoSocial ?? d.cliente?.nome ?? d.cliente?.razaoSocial ?? d.NOME_RAZAO_SOCIAL,
-                pesoBruto: pesoFinal,
-                dataEmissao: (base as any).dataEmissao ?? d.dataEmissao ?? d.DATA_EMISSAO,
-                cnpj: resolveCnpj({
-                  ...(base as any),
-                  ...(d || {})
-                }) || undefined,
-              };
-            }
-          } catch (_) {}
-          return base;
+          let dados = normalizarNotaPdf(nota);
+          if (temDadosCompletosNotaPdf(dados)) return dados;
+          const chave = extrairChaveNFe(nota.codigo || '');
+          if (chave) dados = normalizarNotaPdf(dados, await buscarNotaExternaCache({ chave }));
+          if (!temDadosCompletosNotaPdf(dados) && nota.numeroNota) {
+            const serie = chave ? String(Number(chave.slice(22, 25))) : '1';
+            dados = normalizarNotaPdf(dados, await buscarNotaExternaCache({ numero: String(nota.numeroNota), serie }));
+          }
+          return dados;
         })
       );
+      validarNotasPdf(notasParaPdf);
       const doc = await PDFDocument.load(existingBytes);
       let page = doc.getPage(0);
       let { width, height } = page.getSize();
@@ -1447,7 +1384,7 @@ const ListarControlesContent: React.FC = () => {
       setPdfOpen(true);
     } catch (error) {
       console.error('Erro ao gerar PDF:', error);
-      enqueueSnackbar('Erro ao gerar PDF', { variant: 'error' });
+      enqueueSnackbar(error instanceof Error ? error.message : 'Erro ao gerar PDF', { variant: 'error', autoHideDuration: 8000 });
     } finally {
       setLoadingButtons((atual) => ({ ...atual, [pdfLoadingKey]: false }));
     }
