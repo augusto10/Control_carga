@@ -6,6 +6,7 @@ let externa: unknown = { valor: 'R$ 1.234,56', TOTAL_PESO: '12,50', cliente: { n
 let falhar = false;
 let forcarFallback = false;
 let ultimaSerie = '';
+let notasCompletas: unknown[] = [];
 const prismaPath = require.resolve('../lib/prisma');
 require.cache[prismaPath] = { id: prismaPath, filename: prismaPath, loaded: true, exports: { __esModule: true, default: {
   controleCarga: { findUnique: async () => ({ id: 'c1', finalizado: true, notas: [nota] }) },
@@ -15,6 +16,7 @@ const buscar = async () => { if (falhar) throw new Error('Falha temporária'); r
 require.cache[servicePath] = { id: servicePath, filename: servicePath, loaded: true, exports: { apiExternaService: {
   buscarNotaFiscalPorChave: async () => forcarFallback ? null : buscar(),
   buscarNotaFiscalPorNumeroSerie: async (_numero: string, serie: string) => { ultimaSerie = serie; return buscar(); },
+  listarNotasFiscaisCompletas: async () => ({ data: notasCompletas, total: notasCompletas.length }),
 } } } as any;
 const handler = require('../pages/api/controles/[id]/pdf-dados').default;
 async function request() {
@@ -50,9 +52,27 @@ async function main() {
     forcarFallback = true;
     assert.equal((await request()).notas[0]._pdfEnriquecida, true, 'consulta por número deve recuperar uma chave não encontrada');
     assert.equal(ultimaSerie, '2', 'a série deve vir da chave da NF-e');
-    nota.codigo = 'MANUAL-123';
+    nota.numeroNota = '113127';
+    nota.codigo = 'MANUAL-113127';
     forcarFallback = false;
     externa = null;
+    notasCompletas = [{
+      nota_fiscal: {
+        NUMERO_NOTA: '000113127',
+        VALOR_TOTAL_NOTA: '2.500,75',
+        PESO_TOTAL: '35,2',
+        CNPJ_CPF: '12345678000199',
+        DATA_EMISSAO: '2026-11-17',
+      },
+      pedido: { NOME_RAZAO_SOCIAL: 'Cliente encontrado na listagem' },
+    }];
+    const recuperada = await request();
+    assert.equal(recuperada.notas[0].razaoSocial, 'Cliente encontrado na listagem');
+    assert.equal(recuperada.notas[0].valorPedido, 2500.75);
+    assert.equal(recuperada.notas[0]._pdfEnriquecida, true, 'fallback da listagem deve recuperar nota quando consulta direta não encontra');
+    assert.doesNotThrow(() => validarNotasPdf(recuperada.notas));
+
+    notasCompletas = [];
     assert.notEqual((await request()).notas[0]._pdfEnriquecida, true, 'nota não encontrada deve permitir outra tentativa');
     falhar = true;
     assert.notEqual((await request()).notas[0]._pdfEnriquecida, true, 'falha temporária não pode ser marcada como consulta completa');
