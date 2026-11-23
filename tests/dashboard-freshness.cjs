@@ -37,6 +37,24 @@ test('compares absolute dates across offsets and permits intentional period chan
   assert.equal(freshness.canReplaceDashboard(later, sample('2026-09-09T12:00:00Z', 20, '2026-09-09')), true);
 });
 
+test('accepts a fresh zero count when the last alert is resolved', () => {
+  const current = { ...earlier, indicadores: [{ total: 3 }] };
+  const resolved = { ...later, indicadores: [{ total: 0 }] };
+  assert.equal(freshness.canReplaceDashboard(current, resolved), true);
+});
+
+test('clears yesterday counts when the new day has no orders', () => {
+  const current = { ...later, indicadores: [{ total: 12 }] };
+  const today = { ...sample('2026-09-11T03:01:00Z', 0, '2026-09-11'), indicadores: [{ total: 0 }] };
+  assert.equal(freshness.canReplaceDashboard(current, today), true);
+});
+
+test('preserves valid counts when an empty response warns that its source is unavailable', () => {
+  const current = { ...earlier, indicadores: [{ total: 3 }] };
+  const fallback = { ...later, indicadores: [{ total: 0 }], warning: 'API indisponivel' };
+  assert.equal(freshness.canReplaceDashboard(current, fallback), false);
+});
+
 function setup() {
   let rendered = null;
   const storage = new Map();
