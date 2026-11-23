@@ -1,6 +1,7 @@
 export type DatedDashboard = {
   generatedAt: string;
   filtros?: { dataInicio?: string | null; dataFim?: string | null };
+  warning?: string;
 };
 
 export function isDashboardSnapshotFresh(
@@ -45,8 +46,8 @@ export function canReplaceDashboard(current: DatedDashboard | null, incoming: Da
   const incomingTotal = Array.isArray((incoming as any).indicadores)
     ? (incoming as any).indicadores.reduce((sum: number, item: any) => sum + (Number(item?.total) || 0), 0)
     : 0;
-  // Uma resposta vazia durante a atualização não pode apagar o último quadro válido.
-  if (currentTotal > 0 && incomingTotal === 0) return false;
+  // Apenas o fallback de falha deve preservar os totais anteriores; zero pode ser um resultado válido.
+  if (currentTotal > 0 && incomingTotal === 0 && incoming.warning) return false;
   const samePeriod = (current.filtros?.dataInicio || '') === (incoming.filtros?.dataInicio || '') &&
     (current.filtros?.dataFim || '') === (incoming.filtros?.dataFim || '');
   if (!samePeriod) return true;

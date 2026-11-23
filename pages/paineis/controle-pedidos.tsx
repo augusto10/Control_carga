@@ -61,6 +61,7 @@ type DashboardResponse = {
   };
   indicadores: DashboardItem[];
   warning?: string;
+  stale?: boolean;
 };
 
 const statusConfig: Record<StatusCode, { icon: typeof Package; colorClass: string; iconClassName?: string; backgroundColor?: string; backgroundImage?: string }> = {
@@ -135,11 +136,14 @@ const getPedidosEntrega = (item?: DashboardItem) => Array.from(
 
 const validarNaoEntreguesNoSsw = async (data: DashboardResponse): Promise<DashboardResponse> => {
   const candidatos = getPedidosEntrega(data.indicadores.find((item) => item.codigo === 'ALERTAS_NAO_ENTREGUES'));
-  const naoEntregues: NonNullable<DashboardItem['pedidos']> = [];
+  if (candidatos.length === 0) return data;
+  const entregues = new Set<number>();
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 60_000);
   let proximo = 0;
 
   const worker = async () => {
-    while (proximo < candidatos.length) {
+    while (proximo < candidatos.length && !controller.signal.aborted) {
       const pedido = candidatos[proximo++];
       const params = new URLSearchParams({ sswOnly: '1' });
       if (pedido.chaveNfe) params.set('chaveNfe', pedido.chaveNfe);
@@ -151,6 +155,7 @@ const validarNaoEntreguesNoSsw = async (data: DashboardResponse): Promise<Dashbo
         const response = await fetch(`/api/pedidos/${pedido.pedidoId}/logistica?${params.toString()}`, {
           credentials: 'include',
           cache: 'no-store',
+          signal: controller.signal,
         });
         const payload = await response.json().catch(() => null);
         entregue = response.ok && payload?.ssw?.delivered === true;
@@ -158,14 +163,23 @@ const validarNaoEntreguesNoSsw = async (data: DashboardResponse): Promise<Dashbo
         entregue = false;
       }
 
-      if (!entregue) naoEntregues.push(pedido);
+      if (entregue) entregues.add(pedido.pedidoId);
     }
   };
 
-  await Promise.all(Array.from({ length: Math.min(4, candidatos.length) }, () => worker()));
+  try {
+    await Promise.all(Array.from({ length: Math.min(4, candidatos.length) }, () => worker()));
+  } finally {
+    clearTimeout(timeoutId);
+  }
+  // Sem confirmação da SSW, o pedido continua no alerta, inclusive após timeout.
+  const naoEntregues = candidatos.filter((pedido) => !entregues.has(pedido.pedidoId));
   naoEntregues.sort((a, b) => b.pedidoId - a.pedidoId);
   return {
     ...data,
+    warning: controller.signal.aborted
+      ? 'A verificação de entregas demorou mais que o esperado. Pedidos sem confirmação continuam nos alertas.'
+      : data.warning,
     indicadores: data.indicadores.map((item) => item.codigo === 'ALERTAS_NAO_ENTREGUES'
       ? { ...item, pedidos: naoEntregues, total: naoEntregues.length }
       : item),
@@ -177,6 +191,7 @@ export default function ControlePedidosPainel() {
   const [dashboardAlertas, setDashboardAlertas] = useCurrentDashboard<DashboardResponse>(emptyDashboard, DASHBOARD_ALERTAS_LOCAL_CACHE_KEY);
   const [loading, setLoading] = useState(true);
   const [loadingSecondary, setLoadingSecondary] = useState(true);
+  const [verificandoSsw, setVerificandoSsw] = useState(false);
   const [error, setError] = useState('');
 
   const dashboardRequestId = useRef(0);
@@ -195,7 +210,10 @@ export default function ControlePedidosPainel() {
         `/api/dashboard/logistica-inicial?${queries.etapas.toString()}`,
         { credentials: 'include', cache: 'no-store' }
       );
-      if (!etapasResponse.ok) throw new Error('Falha ao carregar as etapas do painel');
+      if (!etapasResponse.ok) {
+        const payload = await etapasResponse.json().catch(() => null);
+        throw new Error(payload?.error || 'Falha ao carregar as etapas do painel');
+      }
 
       const etapasData = await etapasResponse.json();
       if (requestId !== dashboardRequestId.current) return;
@@ -208,14 +226,25 @@ export default function ControlePedidosPainel() {
           `/api/dashboard/logistica-inicial?${queries.alertas.toString()}`,
           { credentials: 'include', cache: 'no-store' }
         );
-        if (!alertasResponse.ok) throw new Error('Falha ao carregar alertas do painel');
+        if (!alertasResponse.ok) {
+          const payload = await alertasResponse.json().catch(() => null);
+          throw new Error(payload?.error || 'Falha ao carregar alertas do painel');
+        }
 
         const alertasData = await alertasResponse.json();
         if (requestId !== dashboardRequestId.current) return;
-        if (!isDashboardFallbackVazio(alertasData)) {
+        if (isDashboardFallbackVazio(alertasData)) throw new Error(alertasData.warning);
+        // Produtos faltando e demais alertas não dependem da consulta de entregas.
+        setDashboardAlertas(alertasData);
+        setLoadingSecondary(false);
+        setVerificandoSsw(true);
+        try {
           const alertasValidados = await validarNaoEntreguesNoSsw(alertasData);
           if (requestId !== dashboardRequestId.current) return;
-          setDashboardAlertas(alertasValidados);
+          // A validação complementa o mesmo snapshot, sem alterar sua data de geração.
+          setDashboardAlertas((current) => current.generatedAt === alertasData.generatedAt ? alertasValidados : current);
+        } finally {
+          if (requestId === dashboardRequestId.current) setVerificandoSsw(false);
         }
       } finally {
         if (requestId === dashboardRequestId.current) setLoadingSecondary(false);
@@ -285,6 +314,11 @@ export default function ControlePedidosPainel() {
   const dataHojeLabel = new Intl.DateTimeFormat('pt-BR', {
     day: '2-digit', month: '2-digit', year: '2-digit',
   }).format(new Date());
+  const warning = error || dashboardAlertas.warning || dashboard.warning || (
+    dashboard.stale || dashboardAlertas.stale
+      ? 'Não foi possível atualizar todos os dados. Exibindo a última atualização disponível.'
+      : ''
+  );
 
   return (
     <div
@@ -292,6 +326,11 @@ export default function ControlePedidosPainel() {
       style={{ backgroundColor: '#020617' }}
     >
         <div className="mx-auto max-w-[1800px]">
+          {warning && (
+            <div role="alert" className="mb-4 rounded-lg border border-amber-400/50 bg-amber-950 px-4 py-3 text-sm text-amber-100">
+              {warning}
+            </div>
+          )}
           {loading ? (
             <div className="flex min-h-screen items-center justify-center">
               <Loader2 className="h-10 w-10 animate-spin text-cyan-300" />
@@ -324,6 +363,7 @@ export default function ControlePedidosPainel() {
                   naoConferido: getTotalAlerta('ALERTAS_NAO_CONFERIDOS'),
                   naoEmbarcado: getTotalAlerta('ALERTAS_NAO_EMBARCADOS'),
                   naoEntregue: getTotalAlerta('ALERTAS_NAO_ENTREGUES'),
+                  naoEntregueConsultando: verificandoSsw,
                   total: totalPedidosAlertas,
                   onClick: () => undefined,
                 }}
