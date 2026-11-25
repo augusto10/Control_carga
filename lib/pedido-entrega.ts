@@ -9,8 +9,7 @@ type PedidoParaConsultaEntrega = {
 };
 
 const onlyDigits = (value: unknown) => String(value ?? '').replace(/\D/g, '');
-const MAX_CONSULTAS_POR_EXECUCAO = 100;
-const INTERVALO_RECONSULTA_MINUTOS = 60;
+const MAX_CONSULTAS_POR_EXECUCAO = 6;
 const INTERVALO_RETRY_MINUTOS = 15;
 
 export function pedidoFoiEmbarcadoHoje(
@@ -164,14 +163,14 @@ export async function buscarEntregasSswPorPedido(
 }
 
 export async function sincronizarCacheSituacoesEntrega(
-  pedidos: PedidoParaConsultaEntrega[],
+  pedidos: Array<Omit<PedidoParaConsultaEntrega, 'pedidoId'> & { pedidoId: number | null }>,
   agora: Date = new Date(),
   concorrencia = 20
 ) {
-  const pedidosPorChave = new Map<string, PedidoParaConsultaEntrega>();
+  const pedidosPorChave = new Map<string, Omit<PedidoParaConsultaEntrega, 'pedidoId'> & { pedidoId: number | null }>();
   for (const pedido of pedidos) {
     const chaveNfe = onlyDigits(pedido.chaveNfe);
-    if (chaveNfe.length !== 44 || !Number.isFinite(pedido.pedidoId)) continue;
+    if (chaveNfe.length !== 44) continue;
     if (!pedidosPorChave.has(chaveNfe)) {
       pedidosPorChave.set(chaveNfe, { ...pedido, chaveNfe });
     }
@@ -184,16 +183,16 @@ export async function sincronizarCacheSituacoesEntrega(
 
   const existentes = await prisma.sswEntregaConsulta.findMany({
     where: { chaveNfe: { in: candidatos.map((pedido) => pedido.chaveNfe!) } },
-    select: { chaveNfe: true, entregue: true, proximaConsultaEm: true },
+    select: { chaveNfe: true, proximaConsultaEm: true, trackingPayload: true },
   });
   const cachePorChave = new Map(existentes.map((registro) => [registro.chaveNfe, registro]));
   const ignoradosPorCache = candidatos.filter((pedido) => {
     const registro = cachePorChave.get(pedido.chaveNfe!);
-    return registro?.entregue || Boolean(registro?.proximaConsultaEm && registro.proximaConsultaEm > agora);
+    return Boolean(registro?.trackingPayload && registro?.proximaConsultaEm && registro.proximaConsultaEm > agora);
   }).length;
   const vencidos = candidatos.filter((pedido) => {
     const registro = cachePorChave.get(pedido.chaveNfe!);
-    return !registro?.entregue && (!registro?.proximaConsultaEm || registro.proximaConsultaEm <= agora);
+    return !registro?.trackingPayload || !registro?.proximaConsultaEm || registro.proximaConsultaEm <= agora;
   });
   const lote = vencidos.slice(0, MAX_CONSULTAS_POR_EXECUCAO);
 
@@ -201,7 +200,7 @@ export async function sincronizarCacheSituacoesEntrega(
   let pendentes = 0;
   let falhas = 0;
   let proximo = 0;
-  const limiteConcorrencia = Math.max(1, Math.min(20, Math.floor(concorrencia) || 1));
+  const limiteConcorrencia = Math.max(1, Math.min(6, Math.floor(concorrencia) || 1));
 
   const worker = async () => {
     while (proximo < lote.length) {
@@ -213,13 +212,15 @@ export async function sincronizarCacheSituacoesEntrega(
           chave: chaveNfe,
           numeroNota: pedido.numeroNota,
           transportadora: pedido.transportadoraNome,
+          forceRefresh: true,
         });
         const entregue = Boolean(tracking.delivered);
+        const proximaConsultaEm = new Date(agora.getTime() + (entregue ? 24 * 60 : 15) * 60_000);
         await prisma.sswEntregaConsulta.upsert({
           where: { chaveNfe },
           create: {
             chaveNfe,
-            pedidoId: pedido.pedidoId,
+            pedidoId: pedido.pedidoId ?? undefined,
             numeroNota: pedido.numeroNota || null,
             transportadoraNome: pedido.transportadoraNome || null,
             situacao: tracking.status || tracking.message || 'SEM_SITUACAO',
@@ -227,12 +228,10 @@ export async function sincronizarCacheSituacoesEntrega(
             sswStatus: tracking.status,
             dataEntrega: tracking.deliveredAt,
             consultadoEm: agora,
-            proximaConsultaEm: entregue
-              ? null
-              : new Date(agora.getTime() + INTERVALO_RECONSULTA_MINUTOS * 60_000),
+            proximaConsultaEm,
           },
           update: {
-            pedidoId: pedido.pedidoId,
+            pedidoId: pedido.pedidoId ?? undefined,
             numeroNota: pedido.numeroNota || null,
             transportadoraNome: pedido.transportadoraNome || null,
             situacao: tracking.status || tracking.message || 'SEM_SITUACAO',
@@ -240,9 +239,7 @@ export async function sincronizarCacheSituacoesEntrega(
             sswStatus: tracking.status,
             dataEntrega: tracking.deliveredAt,
             consultadoEm: agora,
-            proximaConsultaEm: entregue
-              ? null
-              : new Date(agora.getTime() + INTERVALO_RECONSULTA_MINUTOS * 60_000),
+            proximaConsultaEm,
           },
         });
         if (entregue) entregues += 1;
@@ -254,7 +251,7 @@ export async function sincronizarCacheSituacoesEntrega(
           where: { chaveNfe },
           create: {
             chaveNfe,
-            pedidoId: pedido.pedidoId,
+            pedidoId: pedido.pedidoId ?? undefined,
             numeroNota: pedido.numeroNota || null,
             transportadoraNome: pedido.transportadoraNome || null,
             situacao: mensagem || 'ERRO_CONSULTA',
@@ -263,12 +260,7 @@ export async function sincronizarCacheSituacoesEntrega(
             proximaConsultaEm: new Date(agora.getTime() + INTERVALO_RETRY_MINUTOS * 60_000),
           },
           update: {
-            pedidoId: pedido.pedidoId,
-            numeroNota: pedido.numeroNota || null,
-            transportadoraNome: pedido.transportadoraNome || null,
-            situacao: mensagem || 'ERRO_CONSULTA',
-            entregue: false,
-            consultadoEm: agora,
+            pedidoId: pedido.pedidoId ?? undefined,
             proximaConsultaEm: new Date(agora.getTime() + INTERVALO_RETRY_MINUTOS * 60_000),
           },
         });

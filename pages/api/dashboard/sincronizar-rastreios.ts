@@ -36,8 +36,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       orderBy: { dataHoraControle: 'asc' },
       take: 1500,
     });
-    const resultado = await sincronizarCacheSituacoesEntrega(pedidos, new Date(), 20);
-    return res.status(200).json({ ok: true, candidatos: pedidos.length, ...resultado });
+    const consultasAnteriores = await prisma.sswEntregaConsulta.findMany({
+      select: { pedidoId: true, chaveNfe: true, numeroNota: true, transportadoraNome: true },
+      orderBy: [{ proximaConsultaEm: 'asc' }, { consultadoEm: 'asc' }],
+      take: 500,
+    });
+    const candidatos = [
+      ...pedidos,
+      ...consultasAnteriores.map((consulta) => ({
+        pedidoId: consulta.pedidoId,
+        chaveNfe: consulta.chaveNfe,
+        numeroNota: consulta.numeroNota,
+        transportadoraNome: consulta.transportadoraNome,
+      })),
+    ];
+    const resultado = await sincronizarCacheSituacoesEntrega(candidatos, new Date(), 6);
+    return res.status(200).json({ ok: true, candidatos: candidatos.length, ...resultado });
   } catch (error) {
     console.error('[Sincronizacao Rastreios] Erro:', error);
     return res.status(503).json({

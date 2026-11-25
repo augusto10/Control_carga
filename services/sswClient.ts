@@ -59,6 +59,7 @@ export async function getSswToken(force = false): Promise<string> {
   console.log(`[ SSW ] Gerando novo token (force=${force})`);
   const response = await fetch(`${SSW_API_BASE_URL}/generateToken`, {
     method: 'POST',
+    signal: AbortSignal.timeout(10_000),
     headers: {
       'Content-Type': 'application/json',
       accept: 'application/json',
@@ -187,6 +188,7 @@ export async function trackingDanfe(chaveNfe: string): Promise<TrackingDanfeResp
 
   const response = await fetch(`${SSW_API_BASE_URL}/trackingdanfe`, {
     method: 'POST',
+    signal: AbortSignal.timeout(10_000),
     headers: {
       Authorization: await getSswToken(false),
       'Content-Type': 'application/json',

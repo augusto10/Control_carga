@@ -1,9 +1,12 @@
 import assert from 'node:assert/strict';
 import { trackingBySender } from '../services/sswClient';
 import { fetchMergedTracking } from '../services/sswTracking';
+import { sswTrackingRepository } from '../services/sswTrackingRepository';
 
 const chave = '43261112345678000199550010000000011000000011';
 const originalFetch = globalThis.fetch;
+const originalRead = sswTrackingRepository.read;
+const originalSave = sswTrackingRepository.save;
 
 async function run() {
   const requests: Array<{ url: string; body: Record<string, unknown> }> = [];
@@ -11,6 +14,8 @@ async function run() {
     requests.push({ url: String(url), body: JSON.parse(String(options?.body)) });
     return new Response(JSON.stringify({ success: true, message: 'Documento localizado com sucesso', tracking: [{ ocorrencia: 'ENTREGA REALIZADA' }] }), { status: 200 });
   };
+  sswTrackingRepository.read = async () => null;
+  sswTrackingRepository.save = async () => undefined;
   try {
     const response = await trackingBySender(chave);
     assert.equal(requests[0]?.url, 'https://ssw.inf.br/api/tracking');
@@ -25,6 +30,8 @@ async function run() {
     await assert.rejects(() => trackingBySender('123'), /chave/i);
   } finally {
     globalThis.fetch = originalFetch;
+    sswTrackingRepository.read = originalRead;
+    sswTrackingRepository.save = originalSave;
   }
 }
 

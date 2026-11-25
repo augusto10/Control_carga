@@ -1,4 +1,6 @@
 import { trackingBySender, trackingDanfe } from './sswClient';
+import { resolveCachedSswTracking } from './sswPersistentCache';
+import { sswTrackingRepository } from './sswTrackingRepository';
 
 /**
  * Ocorrencia normalizada de rastreio da API SSW.
@@ -400,8 +402,19 @@ export async function fetchMergedTracking(input: {
   chave: string;
   numeroNota?: string | null;
   transportadora?: string | null;
+  forceRefresh?: boolean;
 }): Promise<SswTrackingResult> {
-  const chave = input.chave;
+  const chave = input.chave.replace(/\D/g, '');
+  if (chave.length !== 44) throw new Error('Chave de NF-e invalida para rastreamento SSW');
+  return resolveCachedSswTracking(
+    chave,
+    sswTrackingRepository,
+    () => fetchLiveTracking(chave),
+    input.forceRefresh,
+  );
+}
+
+async function fetchLiveTracking(chave: string): Promise<SswTrackingResult> {
   try {
     const tracking = await trackingBySender(chave);
     const result = parseTracking(tracking as Record<string, unknown>, 'tracking');

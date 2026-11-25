@@ -209,6 +209,7 @@ model SswEntregaConsulta {
   entregue           Boolean  @default(false)
   sswStatus          String?
   dataEntrega        String?
+  trackingPayload     Json?
   consultadoEm       DateTime @default(now())
   proximaConsultaEm  DateTime?
   dataCriacao        DateTime @default(now())
@@ -216,6 +217,7 @@ model SswEntregaConsulta {
 
   @@index([pedidoId])
   @@index([entregue, proximaConsultaEm])
+  @@index([proximaConsultaEm])
 }
 
 model Motorista {

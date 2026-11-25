@@ -7,8 +7,6 @@ import { fetchMergedTracking } from '@/services/sswTracking';
 import { buscarPrazoDaRota, type RotaPrazoEntrega } from '@/lib/rota-prazo-entrega';
 
 const PEDIDO_LOGISTICA_CACHE_TTL_MS = 60_000;
-const SSW_TRACKING_CACHE_TTL_MS = 30 * 60_000;
-const SSW_TRACKING_CACHE_VERSION = 'tracking-remetente-v3';
 
 type PedidoLogisticaResponse = {
   pedido: Record<string, any>;
@@ -39,7 +37,6 @@ const pedidoLogisticaCache = new Map<
     payload: PedidoLogisticaResponse;
   }
 >();
-const sswOnlyCache = new Map<string, { expiresAt: number; payload: NonNullable<PedidoLogisticaResponse['ssw']> }>();
 
 const pickString = (...values: Array<unknown>) => {
   for (const value of values) {
@@ -181,12 +178,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       } });
     }
 
-    const sswCacheKey = `${SSW_TRACKING_CACHE_VERSION}:${chaveNfe}:${numeroNotaInformado || ''}:${transportadoraInformada || ''}`;
-    const cachedSsw = sswOnlyCache.get(sswCacheKey);
-    if (cachedSsw && cachedSsw.expiresAt > Date.now()) {
-      return res.status(200).json({ ssw: cachedSsw.payload });
-    }
-
     try {
       const tracking = await fetchMergedTracking({
         chave: chaveNfe,
@@ -209,7 +200,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           dominio: occurrence.dominio || null,
         })),
       };
-      sswOnlyCache.set(sswCacheKey, { expiresAt: Date.now() + SSW_TRACKING_CACHE_TTL_MS, payload });
       return res.status(200).json({ ssw: payload });
     } catch {
       return res.status(200).json({ ssw: {
