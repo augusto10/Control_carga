@@ -12,7 +12,7 @@ O serviço compartilhado consulta o banco primeiro. Em uma NF-e ainda não salva
 
 ## Validação antes da produção
 
-Há apenas o banco de produção. A migração não deve ser aplicada durante o teste local. Os testes automatizados usam armazenamento em memória e simulam falha e mudança de status. A validação do esquema Prisma usa uma URL fictícia e não conecta ao banco. Para validar persistência real sem tocar na produção, será necessário um banco de homologação ou PostgreSQL local.
+Há apenas o banco de produção. A migração não foi aplicada nele. Os testes automatizados usam armazenamento em memória e simulam falha e mudança de status. A validação do esquema Prisma usa uma URL fictícia e não conecta ao banco. Em 25/11/2026, a migração foi aplicada em um PostgreSQL 16 local temporário. A gravação e a atualização do JSON foram verificadas com um registro de teste, e o contêiner temporário foi removido.
 
 ## Ativação
 
