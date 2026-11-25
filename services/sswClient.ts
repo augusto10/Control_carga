@@ -221,6 +221,22 @@ export async function trackingDanfe(chaveNfe: string): Promise<TrackingDanfeResp
   return data;
 }
 
+export async function trackingBySender(chaveNfe: string): Promise<TrackingDanfeResponse> {
+  const chave = chaveNfe.replace(/\D/g, '');
+  if (chave.length !== 44) throw new Error('Chave de NF-e invalida para rastreamento SSW');
+
+  const response = await fetch(`${SSW_API_BASE_URL}/tracking`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', accept: 'application/json' },
+    body: JSON.stringify({ cnpj: chave.slice(6, 20), chave_nfe: chave, tipo_doc: 'E' }),
+    signal: AbortSignal.timeout(12_000),
+  });
+  if (!response.ok) throw new Error(`Falha ao consultar tracking SSW (${response.status})`);
+  const data: TrackingDanfeResponse = await response.json();
+  if (!data || typeof data !== 'object') throw new Error('Resposta invalida do tracking SSW');
+  return data;
+}
+
 type NotaFiscalResponse = {
   erro?: boolean;
   mensagem?: string;

@@ -8,7 +8,7 @@ import { buscarPrazoDaRota, type RotaPrazoEntrega } from '@/lib/rota-prazo-entre
 
 const PEDIDO_LOGISTICA_CACHE_TTL_MS = 60_000;
 const SSW_TRACKING_CACHE_TTL_MS = 30 * 60_000;
-const SSW_TRACKING_CACHE_VERSION = 'all-occurrences-v2';
+const SSW_TRACKING_CACHE_VERSION = 'tracking-remetente-v3';
 
 type PedidoLogisticaResponse = {
   pedido: Record<string, any>;

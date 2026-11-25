@@ -1,8 +1,7 @@
-import { trackingDanfe } from './sswClient';
-import { trackingPortalByNotaFiscal } from './sswPortalClient';
+import { trackingBySender, trackingDanfe } from './sswClient';
 
 /**
- * Ocorrencia normalizada de rastreio (portal SSW ou tracking DANFE).
+ * Ocorrencia normalizada de rastreio da API SSW.
  * Usada no Rastrear Pedidos para exibir TODAS as ocorrencias da entrega.
  */
 export type SswTrackingOccurrence = {
@@ -32,7 +31,7 @@ export type SswTrackingResult = {
   receiverName: string | null;
   photoUrl: string | null;
   occurrences: SswTrackingOccurrence[];
-  source: 'trackingdanfe' | 'ssw_portal' | 'trackingdanfe+ssw_portal' | null;
+  source: 'tracking' | 'trackingdanfe' | 'ssw_portal' | 'trackingdanfe+ssw_portal' | null;
 };
 
 export function isSswOccurrenceDelivered(event: SswTrackingOccurrence): boolean {
@@ -53,15 +52,6 @@ export function isSswOccurrenceDelivered(event: SswTrackingOccurrence): boolean 
 export function hasSswDeliveredOccurrence(occurrences: SswTrackingOccurrence[]): boolean {
   return occurrences.some(isSswOccurrenceDelivered);
 }
-
-type PortalTrackingPayload = {
-  success?: boolean;
-  message?: string;
-  documento?: {
-    header?: unknown;
-    tracking?: Array<Record<string, unknown>>;
-  };
-};
 
 function pickString(...values: Array<unknown>): string | null {
   for (const value of values) {
@@ -171,6 +161,7 @@ function parseTrackingEventDateMs(event: Record<string, unknown>): number {
 
 function extractTrackingText(data: Record<string, unknown>): string {
   const direct = pickString(
+    data.message,
     data.mensagem,
     data.MENSAGEM,
     data.descricao,
@@ -402,95 +393,36 @@ function parseTracking(
 
 
 /**
- * Consulta o rastreio usando o mesmo codigo do "Acompanhar Entregas" (solucoes):
- * portal SSW (Situacao do CTRC) + fallback/merge tracking DANFE.
- * Retorna todas as ocorrencias do rastreio sem as restricoes usadas no
- * acompanhamento-entregas (que limita o tracking as 20 notas mais recentes).
+ * Consulta primeiro o rastreamento por remetente. Usa tracking DANFE como
+ * alternativa quando a transportadora nao disponibiliza o documento ao remetente.
  */
 export async function fetchMergedTracking(input: {
   chave: string;
   numeroNota?: string | null;
   transportadora?: string | null;
 }): Promise<SswTrackingResult> {
-  const { chave, numeroNota, transportadora } = input;
-  const canUsePortal = hasPortalCredentials() && Boolean(numeroNota);
-
-  type DanfeOutcome =
-    | { kind: 'ok'; data: Record<string, unknown> }
-    | { kind: 'err'; error: unknown };
-  type PortalOutcome =
-    | { kind: 'ok'; data: PortalTrackingPayload }
-    | { kind: 'err'; error: unknown };
-
-  const danfePromise: Promise<DanfeOutcome> = trackingDanfe(chave).then(
-    (data) => {
-      if (data?.erro === true) {
-        return {
-          kind: 'err',
-          error:
-            pickString(data.mensagem, (data as Record<string, unknown>).MENSAGEM) ||
-            'SSW retornou erro ao consultar o tracking',
-        };
-      }
-      return { kind: 'ok', data: data as Record<string, unknown> };
-    },
-    (error: unknown) => ({ kind: 'err', error })
-  );
-
-  const portalPromise: Promise<PortalOutcome | null> =
-    canUsePortal && numeroNota
-      ? trackingPortalByNotaFiscal(numeroNota, transportadora).then(
-          (data) => ({ kind: 'ok', data }),
-          (error: unknown) => ({ kind: 'err', error })
-        )
-      : Promise.resolve(null);
-
-  const [danfeOutcome, portalOutcome] = await Promise.all([danfePromise, portalPromise]);
-
-  const danfePayload = danfeOutcome.kind === 'ok' ? danfeOutcome.data : null;
-  const danfeError = danfeOutcome.kind === 'err' ? danfeOutcome.error : null;
-  const portalPayload = portalOutcome?.kind === 'ok' ? portalOutcome.data : null;
-  const portalError = portalOutcome?.kind === 'err' ? portalOutcome.error : null;
-
-  const portalEvents = portalPayload?.documento?.tracking ?? [];
-
-  let payload: Record<string, unknown> | null = null;
-  let source: SswTrackingResult['source'] = null;
-
-  if (portalEvents.length > 0) {
-    const danfeDocumento = (danfePayload?.documento ?? {}) as Record<string, unknown>;
-    payload = {
-      ...(danfePayload ?? {}),
-      documento: {
-        ...danfeDocumento,
-        tracking: portalEvents,
-        source: 'trackingdanfe+ssw_portal',
-      },
-    };
-    source = 'trackingdanfe+ssw_portal';
-  } else if (danfePayload) {
-    payload = danfePayload;
-    source = 'trackingdanfe';
+  const chave = input.chave;
+  try {
+    const tracking = await trackingBySender(chave);
+    const result = parseTracking(tracking as Record<string, unknown>, 'tracking');
+    if (result.found && result.occurrences.length > 0) return result;
+  } catch (error) {
+    console.warn('[SSW] Tracking por remetente indisponivel:', error instanceof Error ? error.message : error);
   }
 
-  if (!payload) {
-    const errorMessage =
-      (danfeError instanceof Error ? danfeError.message : null) ||
-      (portalError instanceof Error ? portalError.message : null) ||
-      'Nao foi possivel consultar o rastreio';
-
+  try {
+    return parseTracking(await trackingDanfe(chave) as Record<string, unknown>, 'trackingdanfe');
+  } catch (error) {
     return {
       found: false,
       delivered: false,
       status: null,
-      message: errorMessage,
+      message: error instanceof Error ? error.message : 'Nao foi possivel consultar o rastreio',
       deliveredAt: null,
       receiverName: null,
       photoUrl: null,
       occurrences: [],
-      source,
+      source: null,
     };
   }
-
-  return parseTracking(payload, source);
 }
