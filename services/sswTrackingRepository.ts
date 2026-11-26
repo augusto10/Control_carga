@@ -16,9 +16,11 @@ export const sswTrackingRepository: SswTrackingRepository = {
   async read(chaveNfe) {
     const row = await prisma.sswEntregaConsulta.findUnique({
       where: { chaveNfe },
-      select: { trackingPayload: true },
+      select: { trackingPayload: true, proximaConsultaEm: true },
     });
-    return isTrackingResult(row?.trackingPayload) ? row.trackingPayload : null;
+    return isTrackingResult(row?.trackingPayload)
+      ? { result: row.trackingPayload, refreshAt: row.proximaConsultaEm }
+      : null;
   },
 
   async save(chaveNfe, result) {

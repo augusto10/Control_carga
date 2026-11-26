@@ -10,32 +10,38 @@ const delivered: SswTrackingResult = {
 const pending: SswTrackingResult = { ...delivered, delivered: false, status: 'EM TRANSITO', deliveredAt: null };
 
 async function main() {
-  const rows = new Map<string, SswTrackingResult>();
+  const rows = new Map<string, { result: SswTrackingResult; refreshAt: Date | null }>();
   const repository = {
     read: async (key: string) => rows.get(key) ?? null,
-    save: async (key: string, result: SswTrackingResult) => { rows.set(key, result); },
+    save: async (key: string, result: SswTrackingResult) => { rows.set(key, { result, refreshAt: new Date(Date.now() + 60_000) }); },
   };
   let calls = 0;
   const fetchLive = async () => { calls++; return delivered; };
 
-  rows.set('existing', pending);
+  rows.set('existing', { result: pending, refreshAt: new Date(Date.now() + 60_000) });
   assert.deepEqual(await resolveCachedSswTracking('existing', repository, fetchLive), pending);
   assert.equal(calls, 0, 'a consulta repetida deve responder pelo banco');
 
   assert.deepEqual(await resolveCachedSswTracking('new', repository, fetchLive), delivered);
   assert.equal(calls, 1);
-  assert.deepEqual(rows.get('new'), delivered);
+  assert.deepEqual(rows.get('new')?.result, delivered);
+
+  rows.set('expired', { result: pending, refreshAt: new Date(Date.now() - 1) });
+  assert.deepEqual(await resolveCachedSswTracking('expired', repository, fetchLive), delivered);
+  assert.equal(calls, 2, 'cache vencido deve buscar dados atualizados na SSW');
+  rows.set('expired', { result: pending, refreshAt: new Date(Date.now() - 1) });
+  const failed = async () => { throw new Error('SSW indisponivel'); };
+  assert.deepEqual(await resolveCachedSswTracking('expired', repository, failed), pending);
 
   assert.deepEqual(await resolveCachedSswTracking('existing', repository, fetchLive, true), delivered);
-  assert.equal(calls, 2, 'sincronizacao deve buscar na SSW mesmo com cache');
-  assert.deepEqual(rows.get('existing'), delivered);
+  assert.equal(calls, 3, 'sincronizacao deve buscar na SSW mesmo com cache');
+  assert.deepEqual(rows.get('existing')?.result, delivered);
 
-  const failed = async () => { throw new Error('SSW indisponivel'); };
   await assert.rejects(() => resolveCachedSswTracking('existing', repository, failed, true), /SSW indisponivel/);
-  assert.deepEqual(rows.get('existing'), delivered);
+  assert.deepEqual(rows.get('existing')?.result, delivered);
   const notFound = async (): Promise<SswTrackingResult> => ({ ...pending, found: false, source: null });
   await assert.rejects(() => resolveCachedSswTracking('existing', repository, notFound, true), /nao confirmou/);
-  assert.deepEqual(rows.get('existing'), delivered);
+  assert.deepEqual(rows.get('existing')?.result, delivered);
   await assert.rejects(() => resolveCachedSswTracking('missing', repository, failed), /SSW indisponivel/);
 }
 

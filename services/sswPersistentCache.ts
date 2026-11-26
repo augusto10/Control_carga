@@ -1,7 +1,7 @@
 import type { SswTrackingResult } from './sswTracking';
 
 export type SswTrackingRepository = {
-  read(chaveNfe: string): Promise<SswTrackingResult | null>;
+  read(chaveNfe: string): Promise<{ result: SswTrackingResult; refreshAt: Date | null } | null>;
   save(chaveNfe: string, result: SswTrackingResult): Promise<void>;
 };
 
@@ -12,13 +12,16 @@ export async function resolveCachedSswTracking(
   forceRefresh = false,
 ): Promise<SswTrackingResult> {
   let cached: SswTrackingResult | null = null;
+  let refreshAt: Date | null = null;
   try {
-    cached = await repository.read(chaveNfe);
+    const row = await repository.read(chaveNfe);
+    cached = row?.result ?? null;
+    refreshAt = row?.refreshAt ?? null;
   } catch (error) {
     console.warn('[SSW] Falha ao ler cache persistente:', error);
   }
 
-  if (cached && !forceRefresh) return cached;
+  if (cached && !forceRefresh && refreshAt && refreshAt.getTime() > Date.now()) return cached;
 
   try {
     const result = await fetchLive();

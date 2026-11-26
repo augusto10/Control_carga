@@ -40,7 +40,7 @@ async function main() {
 
     const delivered: SswTrackingResult = { ...result, delivered: true, status: 'ENTREGUE', deliveredAt: '2026-11-25T12:00:00-03:00' };
     assert.deepEqual(await resolveCachedSswTracking(chaveNfe, sswTrackingRepository, async () => delivered, true), delivered);
-    assert.deepEqual(await sswTrackingRepository.read(chaveNfe), delivered);
+    assert.deepEqual((await sswTrackingRepository.read(chaveNfe))?.result, delivered);
     assert.equal((await prisma.sswEntregaConsulta.findUniqueOrThrow({ where: { chaveNfe } })).entregue, true);
   } finally {
     await prisma.sswEntregaConsulta.deleteMany({ where: { chaveNfe } });
